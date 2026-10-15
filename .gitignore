@@ -5,7 +5,8 @@
 # RE artifacts — large, regenerable, and derived from a proprietary binary
 /re/ghidra-project/
 /re/out/*/decomp/
-/re/extracted/
+/re/extracted*/
+/rea-bins/
 /re/out/*.log
 
 # Keep the small, human-readable RE deliverables
