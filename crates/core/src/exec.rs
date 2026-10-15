@@ -743,11 +743,16 @@ fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     // `POP rmw` entry at ROM `0x040` contains no branch at all. An `8F` with
     // `mod=01` or `mod=10` therefore cannot fail on those grounds.
     //
-    // mod=11 and reg!=0 stay refused, but as an explicit policy rather than a
-    // hardware claim: the microcode's `M` pseudo-register predicts a register
-    // destination, yet no source establishes what the chip does, so guessing is
-    // not better than documenting the choice. An 8086 settles it in seconds:
-    // point SP at a known value, run `8F C3`, see whether BX changes.
+    // mod=11 and reg!=0 stay refused as an explicit policy, and this is an OPEN
+    // question rather than a settled one. The microcode's `M` pseudo-register
+    // predicts a register destination for mod=11, since the hardware substitutes
+    // a register when there is no effective address, and no group substitution
+    // exists to make reg!=0 meaningful. But no source states either behaviour: a
+    // research report claimed both as verified and cited an article that never
+    // mentions 8F, so the structural argument stands alone. Refusing is the
+    // conservative choice, and it is recorded as a decision this project made
+    // without hardware. An 8086 settles it in seconds: point SP at a known value,
+    // run `8F C3`, and see whether BX changes.
     if m.reg != 0 || m.mod_bits == 0b11 {
         return Err(ExecError::NotOn8086(opcode));
     }

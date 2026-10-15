@@ -50,7 +50,7 @@ The second test this item said would have to flip alongside it, `a_rep_string_op
 
 ### 3. CLOSED except one item — the four gaps, checked against the microcode
 
-- **`POP rmw` / `8F mod`.** The `mod=00/01/10` behaviour was already right, but the *reason* recorded in `pop_to_memory` was wrong: it credited a per-routine table that does not exist. The real reason is structural — the Translation ROM dispatches `mod`/`rm` and computes the effective address before any instruction microcode starts, and the `POP rmw` entry at `0x040` has no branch at all, so no instruction can reject a `mod` value. Rewritten in the code.
+- **`POP rmw` / `8F mod`.** The `mod=00/01/10` behaviour was already right, but the *reason* recorded in `pop_to_memory` was wrong: it credited a per-routine table that does not exist. The real reason is structural — the Translation ROM dispatches `mod`/`rm` and computes the effective address before any instruction microcode starts, and the `POP rmw` entry at `0x040` has no branch at all, so no instruction can reject a `mod` value. Rewritten in the code. **`mod=11` and `reg != 0` stay refused and are now marked OPEN**, not settled: the microcode's `M` pseudo-register predicts a register destination, but the only source that appeared to confirm it never mentions `8F` (see item 4a).
 - **Intel errata for `A8`/`A9`.** None exists — Intel published no errata for the 8086/8088 family. Worse for us: the microcode points the **other** way from our decision. A dedicated `TEST A,i` routine of two opcodes sits at `0x09c` (AND, discard to `no dest`), while `alu A,i` at `0x018` already covers its full sixteen and ends in `SIGMA -> M`, which would overwrite `AL`/`AX` with the difference. **Decision: keep `CMP`**, recorded in `documentation-guide.md` ‡5 as a documented divergence with the 30-second experiment that would settle it (`B0 05` / `A8 03`, then look at `AL`). Confidence ~0.75; the chain needs a stage-1 opcode count we could not re-verify.
 - **The `FF` group's latch interactions.** No defect. Jenner: the group opcodes `F6`/`F7`/`FE`/`FF` have no top-level microcode instruction at all, so nothing in that group reads the `REP` latch — the project's "read by nobody" answer was right *for this group*, and the code comment claiming it generally has been corrected, because `MUL`/`IMUL`/`IDIV` do read it.
 - **Silicon `REP` with `CX = 0`.** See item 2. Closed, and the manual is correct.
@@ -75,6 +75,18 @@ Each contained a claim this work overturned. Reading one as current guidance wou
 - `odd/research/_brief-verify-f5-and-debt.md` — **not in the list above when this item was written**: the same three false claims appear again at ~lines 11-13. A worker found it while doing the other three.
 
 Still open, and named by the work that did the banners: `documentation-guide.md` §1.3 footnote ‡3 and log entry L14 are marked "now the wrong documents" by `ec669a4`. Untouched.
+
+### 4a. A Deep Research report that over-claimed, and what survived it
+
+`odd/research/_prompt-microcode-closure.md` asked six questions and labelled almost every answer **(a) verified**. Three of its claims were checked by hand; two did not survive:
+
+- **Q6 was a method check for self-consistent arithmetic, and it failed its own check**: it wrote `208 + 7 + 8 + 32 = 256`. It is **255**.
+- **Q2's load-bearing citation does not contain the claim.** The report cited Shirriff's *Undocumented 8086 instructions* as the source for "`8F C0` executes `POP AX`" and "`reg != 0` is ignored". The article has no section on `8F` at all. Its structural argument is in there — the hardware substitutes the pseudo-register `M` with a register when there is no effective address — but that is an inference, not a verified statement.
+- The same author's own caveat, dropped by the report: *"my analysis is based on transistor-level simulation and examining the microcode; I haven't verified the behavior on a physical 8086 processor."* Everything labelled (a) from that work inherits it.
+
+What did survive is the one link the open `A8`/`A9` decision needed: Jenner's **public** routine table lists `alu r,i 16` and `TEST A,i 2`. Eight ALU operations times two widths is exactly sixteen, and `A8`/`A9` are the only accumulator-against-immediate pair left over, so the manual and the microcode now agree and this project is the divergent one. Not yet acted on: the chain is being independently refuted before anything flips.
+
+The lesson matches every other one in this file. The report was *more* confident than the sources allowed, and the two places to check a research output are its arithmetic and its citations — both of which were checkable in under a minute.
 
 ### 5. `odd/research/_prompt-audit7-and-friends.md` is the single most valuable document here
 
