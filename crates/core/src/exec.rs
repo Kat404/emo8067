@@ -236,6 +236,12 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
 
     match opcode {
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
+        // The BCD adjustments sit inside 0x00..=0x3F, so they must be
+        // matched before the arithmetic groups or they are never reached.
+        0x27 => daa(cpu, true),
+        0x2F => daa(cpu, false),
+        0x37 => aaa(cpu, true),
+        0x3F => aaa(cpu, false),
         0x00..=0x3F => alu_group(cpu, opcode)?,
         // ---- Group 1: r/m against an immediate. The ModRM /digit selects
         // all eight operations, so this is not three separate groups. Only
@@ -269,6 +275,8 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xCC | 0xCD => int(cpu, opcode)?,
         0xCF => iret(cpu),
         0xFF => ff_group(cpu, opcode)?,
+        // ---- shifts and rotates
+        0xD0..=0xD3 => shift_group(cpu, opcode)?,
         0x40..=0x47 => {
             cpu.regs.set_word(
                 Reg16::from_bits(opcode & 0b111),
@@ -522,6 +530,202 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     };
     write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, value);
     Ok(())
+}
+
+/// Group 2, `0xD0..=0xD3`: the seven shifts and rotates, by one or by `CL`.
+///
+/// `D0`/`D1` shift by one; `D2`/`D3` take the count from `CL`. The count is
+/// masked to five bits on an 8086, so a shift of 32 is a shift of zero.
+fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode & 1 != 0 { 16 } else { 8 };
+    let from_cl = opcode >= 0xD2;
+    let m = decode_from(cpu)?;
+    let op = m.reg & 0b111;
+
+    let count = if from_cl {
+        (cpu.regs.byte(Reg8::Cl) & 0b1_1111) as u16
+    } else {
+        1
+    };
+
+    let value = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+    let result = match op {
+        // 0b000 ROL, 0b001 ROR
+        0x0 => rotate_left(value, 1, bits),
+        0x1 => rotate_right(value, 1, bits),
+        // 0b010 RCL, 0b011 RCR take CF in and out
+        0x2 => {
+            let carry_in = cpu.regs.flags.get(CF);
+            let (r, cf) = rotate_left(value, 1, bits);
+            (
+                if carry_in {
+                    r | msb(bits)
+                } else {
+                    r & !msb(bits)
+                },
+                cf,
+            )
+        }
+        0x3 => {
+            let carry_in = cpu.regs.flags.get(CF);
+            let (r, cf) = rotate_right(value, 1, bits);
+            (
+                if carry_in {
+                    r | lsb(bits)
+                } else {
+                    r & !lsb(bits)
+                },
+                cf,
+            )
+        }
+        // 0b100 SHL, 0b110 SAL (identical), 0b101 SHR, 0b111 SAR
+        0x4 | 0x6 => shift_left(value, count, bits),
+        0x5 => shift_right(value, count, bits, false),
+        _ => shift_right(value, count, bits, true),
+    };
+
+    let (result, cf) = result;
+    let f = &mut cpu.regs.flags;
+    f.set(CF, cf);
+    if count == 1 {
+        f.set(OF, signed_overflow_shift(value, result, op, bits));
+    }
+    write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
+    Ok(())
+}
+
+const fn msb(bits: u8) -> u16 {
+    if bits == 8 { 0x80 } else { 0x8000 }
+}
+const fn lsb(bits: u8) -> u16 {
+    if bits == 8 { 0x01 } else { 0x0001 }
+}
+const fn width(bits: u8) -> u16 {
+    if bits == 8 { 0x00FF } else { 0xFFFF }
+}
+
+/// `OF` is only architecturally defined after a rotate by one, and after a
+/// left shift by one. A right shift always clears it.
+fn signed_overflow_shift(before: u16, after: u16, op: u8, bits: u8) -> bool {
+    match op {
+        0x0 => {
+            let top = before & msb(bits) != 0;
+            top && (after & msb(bits) == 0) || !top && (after & msb(bits) != 0)
+        }
+        0x1 => {
+            let top = before & msb(bits) != 0;
+            top && (after & lsb(bits) == 0) || !top && (after & lsb(bits) != 0)
+        }
+        0x4 | 0x6 => before & msb(bits) != 0 && after & msb(bits) == 0,
+        _ => false,
+    }
+}
+
+fn shift_left(value: u16, count: u16, bits: u8) -> (u16, bool) {
+    let mask = width(bits);
+    let mut v = value & mask;
+    let mut cf = false;
+    for _ in 0..count {
+        cf = v & msb(bits) != 0;
+        v = (v << 1) & mask;
+    }
+    (v, cf)
+}
+
+fn shift_right(value: u16, count: u16, bits: u8, arithmetic: bool) -> (u16, bool) {
+    let mask = width(bits);
+    let v = value & mask;
+    let mut r = v;
+    let mut cf = false;
+    for _ in 0..count {
+        cf = r & lsb(bits) != 0;
+        r = if arithmetic {
+            // Re-fill from the *current* sign, or a chain of shifts drifts.
+            let fill = if r & msb(bits) != 0 { msb(bits) } else { 0 };
+            (r >> 1) | fill
+        } else {
+            (r >> 1) & mask
+        };
+    }
+    (r, cf)
+}
+
+fn rotate_left(value: u16, count: u16, bits: u8) -> (u16, bool) {
+    let n = bits as u16;
+    let mask = width(bits);
+    let v = value & mask;
+    let k = count % n;
+    let r = ((v << k) | (v >> (n - k))) & mask;
+    (r, v & msb(bits) != 0) // the bit that left the top
+}
+
+fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
+    let n = bits as u16;
+    let mask = width(bits);
+    let v = value & mask;
+    let k = count % n;
+    let r = ((v >> k) | (v << (n - k))) & mask;
+    (r, v & lsb(bits) != 0) // the bit that left the bottom
+}
+
+/// `DAA` and `DAS` share a shape and differ only in the direction.
+///
+/// The low nibble is corrected first, then the high one; the carry the high
+/// correction produces is the new CF. `AF` is undefined afterwards on an 8086,
+/// so it is left alone, and only CF, ZF, SF and PF are written.
+fn daa(cpu: &mut crate::Cpu, add: bool) {
+    let old_cf = cpu.regs.flags.get(CF);
+    let old_af = cpu.regs.flags.get(AF);
+    let mut al = cpu.regs.byte(Reg8::Al);
+
+    if add {
+        if al & 0x0F > 9 || old_af {
+            al = al.wrapping_add(0x06);
+        }
+        let mut cf = old_cf;
+        if al > 0x99 || old_cf {
+            cf = true;
+            al = al.wrapping_add(0x60);
+        }
+        cpu.regs.flags.set(CF, cf);
+    } else {
+        if al & 0x0F > 9 || old_af {
+            al = al.wrapping_sub(0x06);
+        }
+        let mut cf = old_cf;
+        if al > 0x99 || old_cf {
+            cf = true;
+            al = al.wrapping_sub(0x60);
+        }
+        cpu.regs.flags.set(CF, cf);
+    }
+
+    cpu.regs.set_byte(Reg8::Al, al);
+    let f = &mut cpu.regs.flags;
+    f.set(ZF, al == 0);
+    f.set(SF, al & 0x80 != 0);
+    f.set(PF, crate::flags::parity_even(al));
+}
+
+/// `AAA` and `AAS` differ only in the direction of the adjustment.
+fn aaa(cpu: &mut crate::Cpu, add: bool) {
+    let old_af = cpu.regs.flags.get(AF);
+    let mut al = cpu.regs.byte(Reg8::Al);
+    let adjust = add;
+    let carry = al & 0x0F > 9 || old_af;
+
+    if carry {
+        let delta = if adjust { 0x06u8 } else { 0xFAu8 }; // +6 or -6
+        al = al.wrapping_add(delta);
+        al &= 0x0F;
+        let ah = cpu.regs.byte(Reg8::Ah);
+        cpu.regs
+            .set_byte(Reg8::Ah, ah.wrapping_add(if adjust { 1 } else { 0xFF }));
+    }
+    cpu.regs.set_byte(Reg8::Al, al);
+    let f = &mut cpu.regs.flags;
+    f.set(AF, carry);
+    f.set(CF, carry);
 }
 
 /// The sixteen conditional jumps at `0x70..=0x7F`, each with an `rel8`.
@@ -1032,6 +1236,154 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
         assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
+    }
+
+    // ---- shifts, rotates and BCD -------------------------------------------------
+
+    #[test]
+    fn shift_by_one_moves_the_top_bit_into_carry() {
+        // D0 /4 = SHL r/m8, 1.  0b1000_0001 << 1 = 0b0000_0010, CF = 1.
+        let mut cpu = cpu_with(&[0xD0, 0xE0]);
+        cpu.regs.set_byte(Reg8::Al, 0x81);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x02);
+        assert!(cpu.regs.flags.get(CF));
+    }
+
+    #[test]
+    fn sar_keeps_the_sign_and_rotate_puts_it_in_carry() {
+        // D0 /7 = SAR AL, 1 on 0x90. 0x90 is a negative signed byte, so the
+        // sign bit is replicated: 0x90 >> 1 is 0xC8, not 0x48.
+        let mut cpu = cpu_with(&[0xD0, 0xF8]);
+        cpu.regs.set_byte(Reg8::Al, 0x90);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xC8);
+        assert!(
+            !cpu.regs.flags.get(CF),
+            "the bit that left the bottom was 0"
+        );
+
+        // A positive byte does clear the top bit.
+        let mut cpu = cpu_with(&[0xD0, 0xF8]);
+        cpu.regs.set_byte(Reg8::Al, 0x50);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x28);
+        assert!(!cpu.regs.flags.get(CF));
+
+        // SAR of a negative number fills with ones.
+        let mut cpu = cpu_with(&[0xD0, 0xF8]);
+        cpu.regs.set_byte(Reg8::Al, 0x80);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xC0);
+        assert!(!cpu.regs.flags.get(CF));
+    }
+
+    #[test]
+    fn ror_and_rcl_wrap_around_the_ends() {
+        // D0 /1 = ROR AL, 1.  0b0000_0001 -> 0b1000_0000, CF = 1.
+        let mut cpu = cpu_with(&[0xD0, 0xC8]);
+        cpu.regs.set_byte(Reg8::Al, 0x01);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x80);
+        assert!(cpu.regs.flags.get(CF));
+
+        // D0 /0 = ROL AL, 1.  0b1000_0000 -> 0b0000_0001, CF = 1.
+        let mut cpu = cpu_with(&[0xD0, 0xC0]);
+        cpu.regs.set_byte(Reg8::Al, 0x80);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x01);
+        assert!(cpu.regs.flags.get(CF));
+    }
+
+    #[test]
+    fn shift_count_comes_from_cl_and_is_masked_to_five_bits() {
+        // D2 /4 = SHL r/m8, CL.  The count is masked, so 32 means 0.
+        let mut cpu = cpu_with(&[0xD2, 0xE0]);
+        cpu.regs.set_byte(Reg8::Al, 0x01);
+        cpu.regs.set_byte(Reg8::Cl, 32);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x01, "a count of 32 shifts by 0");
+
+        let mut cpu = cpu_with(&[0xD2, 0xE0]);
+        cpu.regs.set_byte(Reg8::Al, 0x01);
+        cpu.regs.set_byte(Reg8::Cl, 4);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x10);
+    }
+
+    #[test]
+    fn aaa_adjusts_a_low_nibble_that_is_out_of_range() {
+        // 37 = AAA. AL = 0x0B: the nibble is out of range, so AL keeps only
+        // the low nibble of (0x0B + 6) and AH carries into it.
+        let mut cpu = cpu_with(&[0x37]);
+        cpu.regs.set_byte(Reg8::Al, 0x0B);
+        cpu.regs.set_byte(Reg8::Ah, 0x00);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x01);
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x01);
+        assert!(cpu.regs.flags.get(AF) && cpu.regs.flags.get(CF));
+
+        // AL = 0x09 with AF clear: the nibble is in range and nothing adjusts.
+        let mut cpu = cpu_with(&[0x37]);
+        cpu.regs.set_byte(Reg8::Al, 0x09);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x09);
+        assert!(!cpu.regs.flags.get(AF) && !cpu.regs.flags.get(CF));
+
+        // The same AL with AF set does adjust: the manual says AAA fires when
+        // the nibble is out of range *or* AF is 1.
+        let mut cpu = cpu_with(&[0x37]);
+        cpu.regs.set_byte(Reg8::Al, 0x09);
+        cpu.regs.flags.set(AF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x0F);
+        assert!(cpu.regs.flags.get(AF));
+    }
+
+    #[test]
+    fn daa_repairs_a_packed_bcd_result() {
+        // 27 = DAA. 0x28 + 0x37 = 0x5F, whose low nibble F is not a digit.
+        // The low correction turns it into 0x65, which is valid, and nothing
+        // carries out of the tens, so CF stays clear.
+        let mut cpu = cpu_with(&[0x27]);
+        cpu.regs.set_byte(Reg8::Al, 0x5F);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x65);
+        assert!(!cpu.regs.flags.get(CF));
+    }
+
+    #[test]
+    fn daa_leaves_a_valid_packed_result_alone() {
+        // 0x28 + 0x11 = 0x39, already valid packed BCD, so nothing changes.
+        let mut cpu = cpu_with(&[0x27]);
+        cpu.regs.set_byte(Reg8::Al, 0x39);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x39);
+        assert!(!cpu.regs.flags.get(CF));
+
+        // A high nibble above 9 does carry: 0x99 + 0x01 needs the 0x60 add.
+        let mut cpu = cpu_with(&[0x27]);
+        cpu.regs.set_byte(Reg8::Al, 0x9A);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x00);
+        assert!(cpu.regs.flags.get(CF));
+    }
+
+    #[test]
+    fn bcd_adjustments_leave_the_other_flags_alone() {
+        // The manual marks SF, ZF, PF, OF and AF undefined for AAA, so the
+        // only honest implementation is to leave them exactly as they were.
+        let mut cpu = cpu_with(&[0x37]);
+        cpu.regs.set_byte(Reg8::Al, 0x0B);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(SF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert!(cpu.regs.flags.get(ZF) && cpu.regs.flags.get(SF) && cpu.regs.flags.get(OF));
     }
 
     // ---- control transfer -------------------------------------------------------
