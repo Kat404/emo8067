@@ -251,16 +251,25 @@ Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
 **Discrepancies found while transcribing.** Every cell carrying a footnote is a
 place where Table 4-13 does not agree with the implementation or with the
 standing instruction for this section. The manual does not settle any of them,
-so they are recorded rather than silently reconciled — but three are now
+so they are recorded rather than silently reconciled — but four are now
 settled by evidence *outside* the manual: `82` by the `L8` micro-condition
-(‡2), `84`/`85` by the microcode routine list (‡3) and `A8`/`A9` by this
-project's recorded decision to follow silicon (‡5). Footnote ‡8 collects the
+(‡2), `84`/`85` by the microcode routine list (‡3), `A8`/`A9` by single-step
+captures on a real 8086 (‡5), and `0F` by this project's own 256-byte decode
+gate together with the same captures (‡1). Footnote ‡8 collects the
 cells where the 1979 print is simply wrong about the chip.
 
 - **‡1 `0F`.** Table 4-13, PDF p. 267 / printed 4-28 prints `0F` as `(not used)`.
   The cell records `POP CS`, which is what `crates/core/src/exec.rs` executes
-  (`segment_push_pop`, `exec.rs:857`). **Unresolved from this source; do not
-  change the decoder on the strength of the printed `(not used)`.**
+  (`segment_push_pop`). **Settled: `POP CS`, and the 1979 print is wrong about
+  the chip.** Three checks agree. The Group Decode ROM runs its `POP sr`
+  microcode for the instruction bit pattern `000??111`, which matches `07`, `17`,
+  `1F` and also `0F` [26]. The single-step captures on a real P80C86A-2 record
+  `0F` with `"status": "normal"` and no undefined flags [30], which an
+  unimplemented opcode would not. And this project's own gate
+  `every_first_opcode_byte_the_8086_defines_decodes` refuses any hole. Intel did
+  not document `POP CS` because it is nearly useless — it moves `CS` without
+  moving `IP` — and left the action implemented rather than adding circuitry to
+  disable it [26].
 - **‡2 `82`.** Table 4-13, PDF p. 269 / printed 4-30 defines `82` for `/0`,
   `/2`, `/3`, `/5` and `/7` and prints `(not used)` for `/1`, `/4` and `/6`
   (re-read from the scan to confirm the three blanks). **Settled in favour of
@@ -304,9 +313,9 @@ cells where the 1979 print is simply wrong about the chip.
      records `A8` and `A9` with `"flags": ".....a.."` — `AF` undefined and
      nothing else. That is the signature of an `AND`. It records `3C`/`3D`, the
      documented `CMP AL/AX, imm`, with no undefined flags at all, because a
-     subtraction defines all six. The 8088 capture (Harris 80C88) agrees.
-  2. **Microcode.** Jenner's public routine table lists `alu r,i 16` — the eight
-     ALU operations at two widths, exactly filling the sixteen slots, and
+     subtraction defines all six. The 8088 capture (Harris 80C88) agrees [30].
+  2. **Microcode.** Jenner's public routine table [28] lists `alu r,i 16` — the
+     eight ALU operations at two widths, exactly filling the sixteen slots, and
      `A8` has bit 7 set so it cannot reach that decode at all — and a separate
      two-opcode `TEST A,i`, which `A0`–`A3` (`MOV A,[i]` / `MOV [i],A`, listed
      as their own routines) do not account for. `A8`/`A9` are the only
@@ -356,10 +365,21 @@ cells where the 1979 print is simply wrong about the chip.
   Two of these bear on `step`'s prefix loop rather than on an opcode. The Group
   Decode ROM sets the `REP` latch from column 31 and loads the segment latches
   from column 32, so a repeat prefix and a segment override are independent
-  latches and neither can change the other [27]. And the internal `F1` that the
-  multiply and divide microcode reuse as a sign flag is toggled inside that
-  instruction's own `PREIMUL`/`NEGATE` subroutines [29] — no prefix writes it,
-  and the manual states that the repeat prefixes do not affect the flags [1].
+  latches and neither can change the other [27] — but that independence does not
+  extend to the segment latches *among themselves*, because column 32 **loads**
+  rather than combines: a later segment override replaces an earlier one, so
+  `36 2E AC` reads through `CS` and `2E 36 AC` through `SS`. And the internal
+  `F1` that the multiply and divide microcode reuse as a sign flag is toggled
+  inside that instruction's own `PREIMUL`/`NEGATE` subroutines [29] — which is
+  exactly why a `REP` prefix reaching that microcode changes the result: the
+  prefix *loads* `F1` to 1 before the multiply or divide starts [26]. **This
+  guide previously recorded the opposite**, on the reasoning that no prefix
+  writes the flag and the manual states the repeat prefixes do not affect the
+  flags [1]. Both halves of that reasoning are wrong for this case: the prefix
+  does load the latch, and "the flags" means the architectural FLAGS register,
+  which a negated product does not touch. `MUL`, `IMUL` and `IDIV` define only
+  CF and OF, and negating a product that fits still fits. See §1.4 and the
+  `rep_negates_a_multiply_and_a_signed_divide` test.
 
 ### 1.4 Exact flag effects
 
@@ -411,8 +431,8 @@ rows **verified** except the three marked below.
 | `IDIV` | U | — | — | — | U | U | U | U | U | all six undefined | 78 |
 | `CMPS` | X | — | — | — | X | X | X | X | X | | 76 |
 | `SCAS` | X | — | — | — | X | X | X | X | X | | 88 |
-| `SHL`/`SAL` | X | — | — | — | — | — | — | — | X | table row as printed; **contradicted by the prose, see note 8** | 88 |
-| `SHR` | X | — | — | — | — | — | — | — | X | table row as printed; **contradicted by the prose, see note 8** | 89 |
+| `SHL`/`SAL` | X | — | — | — | X | X | U | X | X | row as printed in Table 2-21 has S, Z, A, P blank; **this project follows the prose instead**, see note 7 | 88 |
+| `SHR` | X | — | — | — | X | X | U | X | X | same, see note 7 | 89 |
 | `SAR` | X | — | — | — | X | X | U | X | X | **AF undefined**, the only shift/rotate that defines S, Z, P | 88 |
 | `ROL` | X | — | — | — | — | — | — | — | X | | 87 |
 | `ROR` | X | — | — | — | — | — | — | — | X | | 87 |
@@ -472,32 +492,45 @@ guide, all **verified** [1]:
    p. 74) [1]. An earlier draft of this section recorded CF as set.
 6. **`SAR` writes S, Z and P and leaves AF undefined** (PDF p. 88) [1]. An
    earlier draft recorded every flag except OF and CF as unaffected.
-7. **`LDS` is `ambiguous`.** Table 2-21 skips it — the table runs `LEA`,
-   `LODSI`, `LES` with no `LDS` row at all (PDF p. 82), so there is no
-   `ODITSZAPC` line to transcribe. The `LDS` instruction is defined elsewhere in
-   the manual: Table 4-13 prints `C5 … LDS REG16,MEM16` (PDF p. 272 / printed
-   4-33) and the instruction description at PDF p. 55 describes it as a 32-bit
-   pointer load that does not mention any flag. The row above is therefore
-   **not** traceable to Table 2-21 and is recorded as a gap, not as verified.
-8. **`SHL`/`SAL`/`SHR` — the flag table and the prose disagree inside the same
-   manual.** Table 2-21 prints only `X` under OF and `X` under CF for these two
-   (PDF pp. 88–89), which is what the rows above record. The instruction
-   description says the opposite about three flags: "Shift instructions affect
-   the flags as follows. AF is always undefined following a shift operation.
-   **PF, SF and ZF are updated normally, as in the logical instructions.** CF
-   always contains the value of the last bit shifted out of the destination
-   operand. The content of OF is always undefined following a multibit shift.
-   In a single-bit shift, OF is set if the value of the high-order (sign) bit
-   was changed by the operation; if the sign bit retains its original value, OF
-   is cleared" (PDF p. 62 / printed 2-38) [1]. Read together with `SAR` — whose
-   Table 2-21 row does mark S, Z and P — the prose is the coherent account, and
-   the blank S, Z, P, A cells for `SHL`/`SAL`/`SHR` look like the table's own
-   error. **This section transcribes the table because that is the stated
-   source; the contradiction is recorded here and is unresolved. Do not write a
-   flag test for `SHL`/`SAL`/`SHR` until it is settled.** The rotate prose
-   ("Rotates affect only the carry and overflow flags", same page) does agree
-   with the `ROL`/`ROR`/`RCL`/`RCR` rows, so the contradiction is confined to
-   the two shift instructions.
+7. **`LDS` — settled, with the source named.** Table 2-21 skips it: the table
+   runs `LEA`, `LODSI`, `LES` with no `LDS` row at all (PDF p. 82), so there is
+   no `ODITSZAPC` line to transcribe. The instruction is defined elsewhere in
+   the manual — Table 4-13 prints `C5 … LDS REG16,MEM16` (PDF p. 272 / printed
+   4-33) and the description at PDF p. 55 calls it a 32-bit pointer load that
+   mentions no flag — and the single-step captures on a real P80C86A-2 record
+   `C5` with `"status": "normal"` and **no undefined flag** [30], the same as
+   `C4`/`LES`. So the blank row above is right, on evidence that is not the table
+   it transcribes. It was recorded as `ambiguous` before this pass and is no
+   longer a gap.
+8. **`SHL`/`SAL`/`SHR` — Table 2-21 and the prose disagree inside the same
+   manual, and this project follows the prose.** Table 2-21 prints only `X`
+   under OF and `X` under CF for these two, leaving S, Z, A and P blank
+   (PDF pp. 88–89). The instruction description says the opposite about three
+   flags: "Shift instructions affect the flags as follows. AF is always
+   undefined following a shift operation. **PF, SF and ZF are updated normally,
+   as in the logical instructions.** CF always contains the value of the last
+   bit shifted out of the destination operand. The content of OF is always
+   undefined following a multibit shift. In a single-bit shift, OF is set if
+   the value of the high-order (sign) bit was changed by the operation; if the
+   sign bit retains its original value, OF is cleared" (PDF p. 62 / printed
+   2-38) [1]. **Resolved in favour of the prose**, on three grounds. `SAR`'s own
+   Table 2-21 row does mark S, Z and P, and `SAR` is described by the same
+   sentence, so the blank cells are the table's error rather than a distinction.
+   The single-step captures on a real P80C86A-2 record `D0`/`D1` `/4` — the
+   single-bit shifts — with `AF` and only `AF` undefined [30], which is exactly
+   what "PF, SF and ZF are updated normally, AF undefined" predicts and not what
+   the blank cells predict, since a blank cell is not an undefined value but a
+   reliable one. And the emulator implements the prose reading, pinned by
+   `a_shift_updates_the_arithmetic_flags`. **One honest limit:** the capture file
+   records which flags end up *unreliable*, so it cannot by itself distinguish
+   "updated from the result" from "left alone" — both are reliable. It
+   corroborates the prose on AF and cannot settle S, Z, P on its own; the
+   authority for those remains the instruction description. `D2`/`D3` `/4` are
+   recorded with OF *and* AF undefined [30], matching the prose's multibit rule.
+   The rotate prose ("Rotates affect only the carry and overflow flags", same
+   page) agrees with the `ROL`/`ROR`/`RCL`/`RCR` rows, and the captures record
+   no undefined flag for `D0`/`D1` `/0`–`/3` [30], which a flag that retained a
+   reliable value also satisfies.
 
 ---
 
@@ -1046,46 +1079,61 @@ reference and `vasm` as a TUI reference. Neither is a dependency candidate.
 
 ## Open questions
 
-1. **`## Sources` [17] and [18] are index-level only.** The CTME `INT 21h` and
-   `INT 16h` pages and the per-function Ralf Brown pages repeatedly timed out or
-   returned navigation stubs without the register-level description. The
-   *identities* of `INT 10h/00h`, `INT 10h/0Eh`, `INT 21h/09h`, `INT 21h/3Dh` and
-   `INT 21h/4Ch` are verified [17][18]; the register conventions for every other
-   function in §3.2 are **unknown** from a reachable public source and were
-   deliberately not filled in. **Next action:** retry
-   `https://www.ctyme.com/intr/int-21.htm` and `.../int-16.htm`, or obtain the
-   complete Ralf Brown archive — the copy served from
-   `https://www.cs.cmu.edu/~ralf/interrupt-list/inter61d.zip` during this pass
-   contained only `INTERRUP.O/P/Q/R`, which does not contain the `INT 10`, `INT 16`
-   or `INT 21` sections [25].
-2. **OSDev wiki was unreachable.** `https://wiki.osdev.org/8086` and
-   `https://www.osdev.org/wiki/8086` both return HTTP 403 to every fetch method
-   tried. The brief lists it as a preferred tertiary source; it contributed
-   nothing here. **Next action:** fetch through a plain browser or an archive
-   mirror, and use it only to cross-check, since the Intel manual is primary.
-3. **`SHL`/`SAL`, `SAR`, `LAHF`, `SAHF`, `PUSHF`, `POPF`, `NOT`, `CBW`, `CWD`
-   flag rows** were not recovered from cleanly positioned flag rows in the scan
-   and are stated from the manual's surrounding instruction descriptions. The
-   values are correct, but re-verify against printed pages 2-51…2-80 if a flag
-   test ever disagrees.
+1. **CLOSED for §1–§3. Re-scoped to T13.** The CTME `INT 21h` and `INT 16h`
+   pages and the per-function Ralf Brown pages repeatedly timed out or returned
+   navigation stubs without the register-level description. The *identities* of
+   `INT 10h/00h`, `INT 10h/0Eh`, `INT 21h/09h`, `INT 21h/3Dh` and `INT 21h/4Ch`
+   are verified [17][18]; the register conventions for every other function in
+   §3.2 are **unknown** from a reachable public source and were deliberately not
+   filled in. This is not documentation debt for the emulator core — it is work
+   for the assembler task, and only matters if emu8067 ships a BIOS/DOS layer.
+   **Next action:** obtain the complete Ralf Brown archive, since the copy served
+   from `https://www.cs.cmu.edu/~ralf/interrupt-list/inter61d.zip` contained only
+   `INTERRUP.O/P/Q/R` [25].
+2. **Still unreachable, and no longer worth retrying.** `https://wiki.osdev.org/8086`
+   and `https://www.osdev.org/wiki/8086` return HTTP 403 to every fetch method
+   tried. The Intel manual [1] is primary and microcode [26][28] settles the
+   questions the wiki would have been a tertiary cross-check for, so nothing in
+   §1–§3 is missing because of it. **Closed as a dead source**, not as a gap.
+3. **NARROWED, not closed.** The `SHL`/`SAL`, `SAR`, `LAHF`, `SAHF`, `PUSHF`,
+   `POPF`, `NOT`, `CBW`, `CWD` flag rows were stated from the manual's
+   surrounding descriptions rather than from cleanly positioned rows in the scan.
+   The captures on a real P80C86A-2 [30] now corroborate the `AF` cells for the
+   shifts and settle `LDS` outright (§1.4 note 7), but they record only which
+   flags end up *unreliable*, so they cannot distinguish "updated" from "left
+   alone" for S, Z, P. **Next action:** if a flag test ever disagrees, read the
+   per-opcode capture file for that opcode, which does carry initial and final
+   state, or re-verify against printed pages 2-51…2-80.
 4. **Word-straddle wrap arithmetic** (§2.1) is inferred from the single-word
    transfer statement, not from an explicit manual statement about the top of
-   memory. Needs a test, not more reading.
+   memory. **Now covered by tests**: `a_word_wraps_the_offset_inside_the_segment`
+   and `the_high_byte_reads_the_segment_base_not_the_next_byte` in
+   `crates/core/src/memory.rs` pin both readings. Closed.
 5. **The "`PUSHF` reads bits 12–15 as one"** claim is inferred. The manual only
-   says those bits are undefined and must be masked [1]. Decide explicitly
-   whether emu8067 is spec-pure or reference-compatible here.
+   says those bits are undefined and must be masked [1]. `crates/core` already
+   makes this an explicit choice behind one place in the flag code rather than
+   letting it drift. The remaining question is a policy one, not a research one:
+   spec-pure or reference-compatible. **Decide in T7**, when the UI and the
+   saved-state format are fixed, because a saved state records the flag word.
 6. **macOS signing and notarisation** is not covered anywhere in this research.
    Tier 2 `x86_64-apple-darwin` builds fine; a distributable `.app`/`.dmg` needs
-   an Apple Developer ID. Decide whether the first release ships unsigned.
+   an Apple Developer ID. Decide whether the first release ships unsigned. Belongs
+   to the packaging task, not to the core.
 7. **eframe feature trimming** (§4.2) is a recommendation, not a measurement. The
    actual binary-size delta from dropping `accesskit`, `system_fonts` and
    `web_screen_reader` was not measured. **Next action:** build both variants and
-   record the numbers before fixing the feature set.
+   record the numbers before fixing the feature set. No UI exists yet, so this
+   is blocked on T7 by construction.
 8. **`cargo-xwin` licence acceptance** [12] binds the user to the Microsoft
    licence URL. Whether that is acceptable for a The Unlicense project needs a
-   human decision before it enters CI.
+   human decision before it enters CI. The GNU route in §5.2 needs no
+   Microsoft component, which is why it is listed first.
 9. **rsasm was not evaluated against FASM** (L8 defers that to T6). The
    §7 table records it as a candidate only.
+
+**Nothing in §1, §2 or §3 of this guide is now blocking the emulator core.**
+Items 6–9 are decisions for the UI and packaging tasks; item 1 is assembler
+work; items 2–5 are closed or narrowed.
 
 ---
 
@@ -1190,21 +1238,44 @@ reference and `vasm` as a TUI reference. Neither is a dependency candidate.
     it transcribes are primary for §1.3 footnotes ‡2, ‡3 and ‡8.
 27. Ken Shirriff, "The 8086 processor's group decode ROM", righto.com, May 2023.
     <http://www.righto.com/2023/05/8086-processor-group-decode-rom.html> — Group
-    Decode column 31 sets the `REP` and `REPZ/NZ` latches, column 32 *loads* the
-    segment latches and column 33 sets `LOCK`: three independent columns, so
-    prefix order cannot matter.
+    Decode column 31 sets the `REP` and `REPZ/NZ` latches, column 32 **loads**
+    the segment latches and column 33 sets `LOCK`: three independent columns, so
+    a repeat prefix cannot change a segment override or vice versa. *Correction
+    added 2026-10-15:* an earlier revision of this guide concluded from these
+    three columns that "prefix order cannot matter". That is true between a
+    repeat prefix and a segment latch, and **false between two segment
+    latches**, because column 32 loads rather than combines: a later override
+    replaces an earlier one.
 28. Andrew Jenner, "8086 microcode disassembled", reenigne.org.
     <https://www.reenigne.org/blog/8086-microcode-disassembled/> — the
     per-routine table whose columns are "number of opcodes handled, size of
     top-level microcode routine". `TEST rm,r` handles two opcodes and `POP rmw`
-    handles one. Secondary transcription of the die; used in §1.3 footnotes ‡3
-    and ‡8.
+    handles one. `alu r,i` handles sixteen, and `TEST A,i` handles two.
+    Secondary transcription of the die; used in §1.3 footnotes ‡3 and ‡8 and in
+    the `A8`/`A9` chain of ‡5.
 29. Ken Shirriff, "8086 multiplication microcode", righto.com, March 2023.
     <http://www.righto.com/2023/03/8086-multiplication-microcode.html> — `F1`
     is an internal flag toggled by `PREIMUL` and `NEGATE` to track the sign of
-    an operand, and read once by `CALL F1 NEGATE` after `CORX`. No prefix sets
-    it. Cited in §1.3 footnote ‡8 to close the question of whether a repeat
-    prefix reaches the multiply and divide microcode.
+    an operand, and read once by `CALL F1 NEGATE` after `CORX`.
+    *Correction added 2026-10-15:* this entry previously ended "No prefix sets
+    it", used to close the question of whether a repeat prefix reaches the
+    multiply and divide microcode. That conclusion was wrong. The same author's
+    [26] explains the opposite: the `REP`/`REPNE` prefix **loads** `F1` to 1
+    before the instruction runs, so the computed sign is inverted and the result
+    is negated. The manual's statement that repeat prefixes do not affect the
+    flags refers to the architectural FLAGS register, which stays untouched —
+    the negation is in the result, not in a flag.
+30. `SingleStepTests/8086`, `v1/metadata.json`, plus the per-opcode capture
+    files. <https://github.com/SingleStepTests/8086/> — single-step captures
+    taken on a real **Intel P80C86A-2 782003 J20 (C)1978**, ~2,000 cases per
+    opcode, recording the final register, flag and memory state of each. The
+    `metadata.json` field `"flags"` lists the flags that end up **undefined**
+    per opcode, which is the only part used here: it distinguishes an AND/TEST
+    signature from a SUB/CMP signature without needing new hardware. Used in
+    §1.3 footnotes ‡1 and ‡5 and in §1.4 notes 7 and 8. **Limitation:** it
+    records unreliability, not whether a flag was updated or merely preserved,
+    so it cannot by itself settle `SHL`/`SHR`'s S, Z, P. The 8088 sibling
+    repository, captured on a Harris 80C88, agrees on every opcode checked.
 
 **Sources consulted and rejected.** `https://wiki.osdev.org/8086` and
 `https://www.osdev.org/wiki/8086` — HTTP 403 on every fetch method (open
