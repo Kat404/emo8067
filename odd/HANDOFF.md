@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 115 + 4 + 8 + 109 + 0 passed   (241)
+cargo test --workspace   0 + 5 + 115 + 4 + 18 + 109 + 0 passed   (251)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     7dafe45   (signed; every commit in this session is GPG-signed)
+HEAD                     9547d10   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -172,7 +172,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 2. ~~Decide item 2 with a primary source~~ — done; microcode settles `CX = 0`, and it is not an erratum.
 3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
 4. **Decide the oracle question** in "A second cause" above — the cheap semantic gate first, and whether §1.3 becomes a derived document gated on the hardware captures. It is a decision before it is a task, and it changes what the next unit is allowed to trust.
-5. **Grow the program corpus.** `crates/core/tests/programs.rs` has eight programs and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. It also found its own author's share of encoding errors: four of the eight were hand-assembled wrongly and the emulator was right every time. Twenty more programs covering the areas still untested end to end — `INT`/`IRET`, `REP` with `DF` set, a far `CALL`/`RET`, `XLAT` with a negative index, segment arithmetic, a self-checking loop — before anything else is built on top.
+5. **Keep growing the program corpus.** `crates/core/tests/programs.rs` has eighteen programs and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. The second batch added the direction flag moving pointers backwards, `INT`/`IRET`, a far `CALL`/`RET`, a signed `XLAT` index, writing a segment register and indexing through it, `LOOP`'s counting rule, `CBW`/`CWD`, an overflowing byte multiply, a shift loop and an XOR checksum. Still untested end to end: a program that reads its own instructions, `REP` with a zero count, nested `CALL`s, self-modifying code, and anything with two segments live at once beyond the string cases. **Check each new program by mutating the rule its name claims** — one of the eighteen proved nothing until a mutation survived it, and the fix is documented in place.
 6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus now makes its value concrete: twenty-one tests had to be hand-re-encoded against Intel's table, which is exactly the work an assembler does once and for all.
 7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). Note that `re/` currently contains **no** `.asm` files — the 86 examples are not in the tree, so this needs either locating them in the extracted reference build or writing them.
 8. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
