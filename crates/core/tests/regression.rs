@@ -221,3 +221,89 @@ fn rep_lods_advances_only_si() {
     assert_eq!(c.regs.word(Reg16::Si), 0x0023);
     assert_eq!(c.regs.word(Reg16::Di), 0x0300, "REP LODS must not touch DI");
 }
+
+/// RCL and RCR rotate the carry *through* the operand. The previous code
+/// put the old carry into the top bit and dropped the count entirely.
+#[test]
+fn rcl_rolls_the_old_carry_into_the_bottom() {
+    // D1 D0 = RCL AX, 1.  8000h with CF=0 -> 0000h, CF=1.
+    let mut c = cpu(&[0xD1, 0xD0]);
+    c.regs.set_word(Reg16::Ax, 0x8000);
+    c.regs.flags.set(CF, false);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0000, "the old CF lands in bit 0");
+    assert!(c.regs.flags.get(CF), "the old MSB lands in CF");
+}
+
+/// A count above one winds the carry around step by step: CF=1 enters at
+/// bit 0 on the first step and is itself shifted out on the second.
+#[test]
+fn rcl_honours_a_count_above_one() {
+    // MOV CX, 2 then RCL AX, CL. AX=0001h, CF=1.
+    //   step 1 -> AX=0003h, CF=0   (bit 15 was clear)
+    //   step 2 -> AX=0006h, CF=0   (bit 15 was still clear)
+    let mut c = cpu(&[0xB9, 0x02, 0x00, 0xD3, 0xD0]);
+    c.regs.set_word(Reg16::Ax, 0x0001);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x0006,
+        "CF=1 was rolled in, then shifted up"
+    );
+    assert!(!c.regs.flags.get(CF));
+}
+
+/// RCR brings the carry in at the top and pushes the bottom bit out.
+#[test]
+fn rcr_rolls_the_old_carry_into_the_top() {
+    // D1 D8 = RCR AX, 1.  0001h with CF=1 -> 8000h, CF=1.
+    let mut c = cpu(&[0xD1, 0xD8]);
+    c.regs.set_word(Reg16::Ax, 0x0001);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x8000);
+    assert!(c.regs.flags.get(CF));
+}
+
+/// Rotating by zero changes nothing, and used to panic in debug because the
+/// rotate computed `v >> width` on a u16.
+#[test]
+fn rotating_by_zero_is_a_no_op_and_does_not_panic() {
+    // D3 C0 = ROL AX, CL with CL = 0. CL=16 is also a zero rotation on a word.
+    for cl in [0u8, 16] {
+        let mut c = cpu(&[0xB9, cl as u8, 0x00, 0xD3, 0xC0]);
+        c.regs.set_word(Reg16::Ax, 0x1234);
+        c.regs.flags.set(CF, true);
+        c.step().unwrap(); // MOV CX, cl
+        c.regs.set_byte(Reg8::Cl, cl);
+        c.step().unwrap(); // ROL AX, CL
+        assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "CL={cl} must not rotate");
+        assert!(c.regs.flags.get(CF), "a zero rotate leaves CF alone");
+    }
+}
+
+/// CF reports the bit that left, which is bit n-k for ROL and bit k-1 for ROR.
+#[test]
+fn rotate_reports_the_bit_that_left() {
+    // ROL AL, 3 (D0 /0 with a count needs CL, so use D2). 0000_1000 rol 3.
+    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xD2, 0xC0]);
+    c.regs.set_byte(Reg8::Al, 0x08);
+    c.regs.set_byte(Reg8::Cl, 3);
+    c.step().unwrap();
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x40, "0000_1000 rol 3");
+    assert!(
+        !c.regs.flags.get(CF),
+        "bit 5 of 0000_1000 is clear, so CF clears"
+    );
+
+    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xD2, 0xC8]);
+    c.regs.set_byte(Reg8::Al, 0x08);
+    c.regs.set_byte(Reg8::Cl, 3);
+    c.step().unwrap();
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x01, "0000_1000 ror 3");
+    assert!(!c.regs.flags.get(CF), "bit 2 of 0000_1000 is clear");
+}
