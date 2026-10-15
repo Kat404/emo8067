@@ -74,25 +74,19 @@ fn fetch_u16(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
 /// `SS:SP`. `DF` flips which way the stack grows, so with `DF=1` the push
 /// postincrements instead.
 pub(crate) fn push(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u16) {
-    let sp = regs.word(Reg16::Sp);
-    let new_sp = if regs.flags.get(DF) {
-        sp.wrapping_add(2)
-    } else {
-        sp.wrapping_sub(2)
-    };
+    // An 8086 pushes with an unconditional decrement. The stack that follows
+    // the direction flag arrived with the 80186, so `DF` must not move `SP`
+    // here — it governs the string operations only.
+    let new_sp = regs.word(Reg16::Sp).wrapping_sub(2);
     mem.write_u16(regs.segment(Seg::Ss), new_sp, value);
     regs.set_word(Reg16::Sp, new_sp);
 }
 
 fn pop(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
+    // The mirror of `push`: unconditional increment, never direction-aware.
     let sp = regs.word(Reg16::Sp);
     let value = mem.read_u16(regs.segment(Seg::Ss), sp);
-    let new_sp = if regs.flags.get(DF) {
-        sp.wrapping_sub(2)
-    } else {
-        sp.wrapping_add(2)
-    };
-    regs.set_word(Reg16::Sp, new_sp);
+    regs.set_word(Reg16::Sp, sp.wrapping_add(2));
     value
 }
 
@@ -1986,15 +1980,19 @@ mod tests {
     }
 
     #[test]
-    fn direction_flag_reverses_the_stack_pointer() {
-        let mut cpu = cpu_with(&[0x50]);
-        cpu.regs.set_segment(Seg::Ss, 0x1000);
-        cpu.regs.set_word(Reg16::Sp, 0x0100);
-        cpu.regs.flags.set(DF, true);
-        cpu.regs.set_word(Reg16::Ax, 0x1234);
-        cpu.step().unwrap();
-        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
-        assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
+    fn direction_flag_does_not_move_the_stack_pointer() {
+        // DF belongs to the string instructions. The stack that follows it is
+        // an 80186 feature, so an 8086 pushes and pops the same way either way.
+        for df in [false, true] {
+            let mut cpu = cpu_with(&[0x50]);
+            cpu.regs.set_segment(Seg::Ss, 0x1000);
+            cpu.regs.set_word(Reg16::Sp, 0x0100);
+            cpu.regs.flags.set(DF, df);
+            cpu.regs.set_word(Reg16::Ax, 0x1234);
+            cpu.step().unwrap();
+            assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FE, "DF={df}");
+            assert_eq!(cpu.mem.read_u16(0x1000, 0x00FE), 0x1234, "DF={df}");
+        }
     }
 
     // ---- string operations, ports and segment transfers --------------------------
