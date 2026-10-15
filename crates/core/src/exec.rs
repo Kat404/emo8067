@@ -261,9 +261,10 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // `LOCK` is accepted on any byte it covers, matching the hardware: the
     // 8086 drives LOCK# and has no invalid-opcode trap to object. A later
     // segment override simply replaces an earlier one rather than composing.
-    while let Some(next) = prefix_effect(opcode) {
-        if let Some(seg) = next {
-            cpu.seg_override = Some(seg);
+    while let Some(effect) = prefix_effect(opcode) {
+        match effect {
+            Prefix::Lock => {}
+            Prefix::Segment(seg) => cpu.seg_override = Some(seg),
         }
         opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
     }
@@ -272,6 +273,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // Cleared even on a fault, so a pending override cannot leak into the
     // next instruction.
     cpu.seg_override = None;
+    cpu.rep = None;
     result?;
 
     Ok(crate::StepInfo {
@@ -281,16 +283,24 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     })
 }
 
-/// What a prefix byte contributes: `Some(None)` for LOCK, which carries no
-/// value into the instruction it covers, and `Some(Some(seg))` for a segment
-/// override. `None` means the byte is not a prefix.
-fn prefix_effect(opcode: u8) -> Option<Option<Seg>> {
+/// What a prefix byte contributes to the decoder state of the instruction it
+/// covers.
+enum Prefix {
+    /// `F0`/`F1`, `LOCK`: drives the LOCK# pin and contributes nothing else.
+    Lock,
+    /// `26`/`2E`/`36`/`3E`: load the named segment latch.
+    Segment(Seg),
+}
+
+/// What a prefix byte contributes. `None` means the byte is not a prefix, so
+/// the loop in [`step`] stops and dispatches it as an opcode.
+fn prefix_effect(opcode: u8) -> Option<Prefix> {
     match opcode {
-        0xF0 | 0xF1 => Some(None),
-        0x26 => Some(Some(Seg::Es)),
-        0x2E => Some(Some(Seg::Cs)),
-        0x36 => Some(Some(Seg::Ss)),
-        0x3E => Some(Some(Seg::Ds)),
+        0xF0 | 0xF1 => Some(Prefix::Lock),
+        0x26 => Some(Prefix::Segment(Seg::Es)),
+        0x2E => Some(Prefix::Segment(Seg::Cs)),
+        0x36 => Some(Prefix::Segment(Seg::Ss)),
+        0x3E => Some(Prefix::Segment(Seg::Ds)),
         _ => None,
     }
 }
@@ -1958,6 +1968,35 @@ mod tests {
         cpu.regs.set_segment(Seg::Cs, 0);
         cpu.regs.ip = 0;
         cpu
+    }
+
+    /// Each prefix byte names what it does, rather than leaving the caller to
+    /// re-derive that from the byte value.
+    #[test]
+    fn every_prefix_byte_names_its_effect() {
+        assert!(matches!(prefix_effect(0xF0), Some(Prefix::Lock)));
+        assert!(matches!(prefix_effect(0xF1), Some(Prefix::Lock)));
+        assert!(matches!(
+            prefix_effect(0x26),
+            Some(Prefix::Segment(Seg::Es))
+        ));
+        assert!(matches!(
+            prefix_effect(0x2E),
+            Some(Prefix::Segment(Seg::Cs))
+        ));
+        assert!(matches!(
+            prefix_effect(0x36),
+            Some(Prefix::Segment(Seg::Ss))
+        ));
+        assert!(matches!(
+            prefix_effect(0x3E),
+            Some(Prefix::Segment(Seg::Ds))
+        ));
+        // 0xF2/0xF3 are the REP latch, which is deliberately not recognised
+        // yet: they still reach `repeat_prefix`.
+        assert!(prefix_effect(0xF2).is_none());
+        assert!(prefix_effect(0xF3).is_none());
+        assert!(prefix_effect(0x90).is_none(), "NOP is not a prefix");
     }
 
     #[test]
