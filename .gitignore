@@ -14,3 +14,5 @@
 # Runtime
 *.bak
 /crates/core/.scratch
+# Codegraph index — local SQLite, regenerable with `codegraph init`
+.codegraph/
