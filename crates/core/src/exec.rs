@@ -16,6 +16,9 @@ pub enum ExecError {
     BadPrefix(u8),
     /// A segment-register transfer opcode reached the ALU dispatcher.
     SegmentTransfer(u8),
+    /// `LEA` with a register operand, where there is no address to compute.
+    /// The manual does not define this encoding on an 8086.
+    BadLea(u8),
     /// The 80186 `(disp16)` alias, which needs a later CPU.
     UnsupportedAddressing(DecodeError),
 }
@@ -223,13 +226,30 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     match opcode {
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
         0x00..=0x3F => alu_group(cpu, opcode)?,
-        // ---- the only three ALU groups that take an immediate. ADC, SBB,
-        // AND, SUB and XOR have no r/m,imm encoding on an 8086: 0x90..0x9F
-        // is XCHG/CBW/CWD/CALL/PUSHF, and 0xB8..0xBF is MOV.
-        0x80..=0x83 => alu_group_imm(cpu, opcode, AluOp::Add)?,
-        0x88..=0x8B => alu_group_imm(cpu, opcode, AluOp::Or)?,
-        0xA8..=0xAB => alu_group_imm(cpu, opcode, AluOp::Cmp)?,
+        // ---- Group 1: r/m against an immediate. The ModRM /digit selects
+        // all eight operations, so this is not three separate groups. Only
+        // ADD, OR and CMP have an accumulator-to-immediate form elsewhere,
+        // at 0x0C..0x0D, 0x14..0x15 and 0x3C..0x3D.
+        0x80..=0x83 => alu_group_imm(cpu, opcode)?,
+        // CMP also has a dedicated r/m,imm pair at A8/A9; the /digit is 7.
+        0xA8 | 0xA9 => alu_group_imm(cpu, opcode)?,
         0xF6 | 0xF7 => mul_group(cpu, opcode)?,
+        // ---- MOV and friends. None of these modify FLAGS.
+        0x87 => xchg_memory(cpu, opcode)?,
+        0x88..=0x8B => mov_group(cpu, opcode)?,
+        0x8C..=0x8E => mov_group(cpu, opcode)?,
+        0xA0..=0xA3 => mov_accumulator_offset(cpu, opcode)?,
+        0xB0..=0xB7 => {
+            let reg = Reg8::from_bits(opcode & 0b111);
+            let imm = u16::from(fetch_u8(&cpu.mem, &mut cpu.regs));
+            cpu.regs.set_byte(reg, imm as u8);
+        }
+        0xB8..=0xBF => {
+            let reg = Reg16::from_bits(opcode & 0b111);
+            let imm = fetch_u16(&cpu.mem, &mut cpu.regs);
+            cpu.regs.set_word(reg, imm);
+        }
+        0xC6 | 0xC7 => mov_to_immediate(cpu, opcode)?,
         0x40..=0x47 => {
             cpu.regs.set_word(
                 Reg16::from_bits(opcode & 0b111),
@@ -266,7 +286,15 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             let ax = cpu.regs.word(Reg16::Ax) as i16 as u32;
             cpu.regs.set_word(Reg16::Dx, (ax >> 16) as u16);
         }
-        0x90 => {} // NOP
+        // 90 is XCHG AX, AX, which is the NOP. Handling 91..=97 here keeps
+        // the overlap explicit rather than duplicated.
+        0x91..=0x97 => {
+            let r = Reg16::from_bits(opcode & 0b111);
+            let ax = cpu.regs.word(Reg16::Ax);
+            let other = cpu.regs.word(r);
+            cpu.regs.set_word(r, ax);
+            cpu.regs.set_word(Reg16::Ax, other);
+        }
         0xF4 => {
             cpu.halted = true;
             cpu.stop_reason = crate::StopReason::Halted;
@@ -354,12 +382,13 @@ fn alu_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 /// with the byte sign-extended. The ModR/M `reg` field is the `/digit`
 /// that names the operation, not a destination register, so the result
 /// always lands in `r/m`.
-fn alu_group_imm(cpu: &mut crate::Cpu, opcode: u8, op: AluOp) -> Result<(), ExecError> {
+fn alu_group_imm(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let m = decode_from(cpu)?;
+    let op = alu_op(m.reg & 0b111);
     let form = opcode & 0b11;
     let bits: u8 = if form & 1 != 0 { 16 } else { 8 };
     let mask = width_mask(bits);
 
-    let m = decode_from(cpu)?;
     let imm = if form == 0b01 {
         fetch_u16(&cpu.mem, &mut cpu.regs)
     } else {
@@ -375,6 +404,104 @@ fn alu_group_imm(cpu: &mut crate::Cpu, opcode: u8, op: AluOp) -> Result<(), Exec
     if op != AluOp::Cmp {
         write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
     }
+    Ok(())
+}
+
+/// Execute the `MOV` encodings at `0x88`..=0x8E`.
+///
+/// `88`/`89` and `8A`/`8B` are the four register/memory orders; `8C` moves a
+/// segment register to memory or a register, `8E` the other way, and `8D` is
+/// `LEA`, which takes the *address* rather than the contents.
+fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode & 1 != 0 { 16 } else { 8 };
+    let m = decode_from(cpu)?;
+    let reg_field = m.reg & 0b111;
+
+    match opcode {
+        0x88 | 0x89 => {
+            let right = RegArg::from_bits(reg_field, bits).read(&cpu.regs);
+            write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, right);
+        }
+        0x8A | 0x8B => {
+            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+            RegArg::from_bits(reg_field, bits).write(&mut cpu.regs, value);
+        }
+        0x8C => {
+            let value = cpu.regs.segment(Seg::from_bits(reg_field));
+            write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, 16, value);
+        }
+        0x8E => {
+            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+            cpu.regs.set_segment(Seg::from_bits(reg_field), value);
+        }
+        0x8D => {
+            // LEA needs a memory operand: the effective address, and nothing
+            // else, is what lands in the register.
+            let Operand::Mem { seg, base, disp } = m.rm else {
+                return Err(ExecError::BadLea(opcode));
+            };
+            let value = offset_of(&cpu.regs, base, disp);
+            debug_assert!(seg == Seg::Ds, "LEA ignores the segment override");
+            RegArg::from_bits(reg_field, bits).write(&mut cpu.regs, value);
+        }
+        other => return Err(ExecError::UnknownOpcode(other)),
+    }
+    Ok(())
+}
+
+/// `A0`..=`A3` move between the accumulator and a direct `disp16` address
+/// within the current data segment, bypassing ModR/M entirely.
+fn mov_accumulator_offset(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let offset = fetch_u16(&cpu.mem, &mut cpu.regs);
+    let segment = cpu.regs.segment(Seg::Ds);
+    match opcode {
+        0xA0 => {
+            let v = cpu.mem.read_u8(segment, offset);
+            cpu.regs.set_byte(Reg8::Al, v);
+        }
+        0xA1 => {
+            let v = cpu.mem.read_u16(segment, offset);
+            cpu.regs.set_word(Reg16::Ax, v);
+        }
+        0xA2 => {
+            let v = cpu.regs.byte(Reg8::Al);
+            cpu.mem.write_u8(segment, offset, v);
+        }
+        0xA3 => {
+            let v = cpu.regs.word(Reg16::Ax);
+            cpu.mem.write_u16(segment, offset, v);
+        }
+        other => return Err(ExecError::UnknownOpcode(other)),
+    }
+    Ok(())
+}
+
+/// `86`/`87` exchange a register with a register or memory operand.
+fn xchg_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode == 0x87 { 16 } else { 8 };
+    let m = decode_from(cpu)?;
+    let reg = RegArg::from_bits(m.reg & 0b111, bits);
+    let saved = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+    let from_reg = reg.read(&cpu.regs);
+    write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, from_reg);
+    reg.write(&mut cpu.regs, saved);
+    Ok(())
+}
+
+/// `C6 /0` and `C7 /0` move an immediate into a register or memory operand.
+fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode == 0xC7 { 16 } else { 8 };
+    let m = decode_from(cpu)?;
+    if m.reg != 0 {
+        // C6 /1..7 and C7 /1..7 are the 80186+ shifts. Not 8086.
+        return Err(ExecError::UnknownOpcode(opcode));
+    }
+    let value = if bits == 16 {
+        fetch_u16(&cpu.mem, &mut cpu.regs)
+    } else {
+        u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
+    };
+    write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, value);
     Ok(())
 }
 
@@ -783,6 +910,153 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
         assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
+    }
+
+    // ---- MOV / XCHG / LEA --------------------------------------------------------
+    // MOV and XCHG touch no flags at all. Every test below sets a flag first
+    // and asserts it afterwards, because "does not modify" is only meaningful
+    // when something was there to modify.
+
+    #[test]
+    fn mov_immediate_to_word_register() {
+        // B8 imm16 = MOV AX, 0x1234.
+        let mut cpu = cpu_with(&[0xB8, 0x34, 0x12]);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x1234);
+        assert!(
+            cpu.regs.flags.get(ZF) && cpu.regs.flags.get(CF),
+            "MOV leaves FLAGS alone"
+        );
+    }
+
+    #[test]
+    fn mov_immediate_to_byte_register_and_immediate_to_memory() {
+        // B0 imm8 = MOV AL, 0x42.  C6 /0 imm8 = MOV BYTE [BX], 0x42.
+        let mut cpu = cpu_with(&[0xB0, 0x42, 0xC6, 0x07, 0x42]);
+        cpu.regs.set_word(Reg16::Bx, 0x0500);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x42);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u8(0x0000, 0x0500), 0x42);
+    }
+
+    #[test]
+    fn mov_between_registers_in_both_directions() {
+        // 89 C3 = MOV BX, AX.  8B D8 = MOV BX, AX.
+        for code in [vec![0x89, 0xC3], vec![0x8B, 0xD8]] {
+            let mut cpu = cpu_with(&code);
+            cpu.regs.set_word(Reg16::Ax, 0x1111);
+            cpu.regs.set_word(Reg16::Bx, 0x1234);
+            cpu.step().unwrap();
+            assert_eq!(cpu.regs.word(Reg16::Bx), 0x1111, "BX takes the value");
+            assert_eq!(cpu.regs.word(Reg16::Ax), 0x1111, "source is unchanged");
+        }
+    }
+
+    #[test]
+    fn mov_between_register_and_memory() {
+        // 88 07 = MOV [BX], AL.  8A 07 = MOV AL, [BX].
+        let mut cpu = cpu_with(&[0x88, 0x07, 0x8A, 0x07]);
+        cpu.regs.set_word(Reg16::Bx, 0x0600);
+        cpu.regs.set_byte(Reg8::Al, 0x7E);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u8(0x0000, 0x0600), 0x7E);
+        cpu.regs.set_byte(Reg8::Al, 0x00);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x7E);
+    }
+
+    #[test]
+    fn mov_word_to_and_from_memory() {
+        // 89 07 = MOV [BX], AX.  8B 07 = MOV AX, [BX].
+        let mut cpu = cpu_with(&[0x89, 0x07, 0x8B, 0x07]);
+        cpu.regs.set_word(Reg16::Bx, 0x0700);
+        cpu.regs.set_word(Reg16::Ax, 0xBEEF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x0000, 0x0700), 0xBEEF);
+        cpu.regs.set_word(Reg16::Ax, 0x0000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xBEEF);
+    }
+
+    #[test]
+    fn mov_accumulator_to_and_from_a_direct_address() {
+        // A0 disp16 = MOV AL, [0000:disp16].  A2 disp16 = MOV [0000:disp16], AL.
+        let mut cpu = cpu_with(&[0xA2, 0x00, 0x08, 0xA0, 0x00, 0x08]);
+        cpu.regs.set_byte(Reg8::Al, 0x5A);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u8(0x0000, 0x0800), 0x5A);
+        cpu.regs.set_byte(Reg8::Al, 0x00);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x5A);
+    }
+
+    #[test]
+    fn mov_to_a_segment_register_and_back() {
+        // 8E D8 = MOV DS, AX.  8C D8 = MOV AX, DS.
+        let mut cpu = cpu_with(&[0x8E, 0xD8, 0x8C, 0xD8]);
+        cpu.regs.set_word(Reg16::Ax, 0x2000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.segment(Seg::Ds), 0x2000);
+        cpu.regs.set_word(Reg16::Ax, 0x0000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x2000);
+    }
+
+    #[test]
+    fn mov_to_cs_changes_where_the_next_instruction_is_fetched_from() {
+        // The classic near jump into a segment. The reg field must name CS,
+        // which is /1: 0x8E with reg=001 is 0xC8. `8E D8` would be MOV DS, AX.
+        let mut cpu = cpu_at(&[0x8E, 0xC8, 0x90]);
+        // Code at 3000:0000 is MOV CS, AX; NOP, and at 0x4000:0000 is HLT.
+        assert!(cpu.mem.load_at(0x30000, &[0x8E, 0xC8, 0x90]).is_ok());
+        // MOV CS does not move IP. The next instruction is fetched at the
+        // *same* offset in the new segment, so 4000:0002 is where execution
+        // continues, not 4000:0000.
+        assert!(cpu.mem.load_at(0x40000, &[0x90, 0x90, 0xF4]).is_ok());
+        cpu.regs.set_segment(Seg::Cs, 0x3000);
+        cpu.regs.set_word(Reg16::Ax, 0x4000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x4000);
+        // The NOP at 3000:0002 is never fetched; the HLT at 4000:0002 is.
+        cpu.step().unwrap();
+        assert!(cpu.halted);
+    }
+
+    #[test]
+    fn xchg_swaps_two_registers_without_touching_flags() {
+        // 93 is XCHG AX, BX. Plain 0x90 is NOP and never reads a ModR/M byte.
+        let mut cpu = cpu_with(&[0x93]);
+        cpu.regs.set_word(Reg16::Ax, 0x1111);
+        cpu.regs.set_word(Reg16::Bx, 0x2222);
+        cpu.regs.flags.set(SF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x2222);
+        assert_eq!(cpu.regs.word(Reg16::Bx), 0x1111);
+        assert!(cpu.regs.flags.get(SF));
+    }
+
+    #[test]
+    fn lea_computes_an_address_without_touching_memory() {
+        // 8D 00 = LEA AX, [BX+SI]. The memory is read for nothing; only the
+        // address is what lands in AX.
+        let mut cpu = cpu_with(&[0x8D, 0x00]);
+        cpu.regs.set_word(Reg16::Bx, 0x0800);
+        cpu.regs.set_word(Reg16::Si, 0x0020);
+        cpu.mem.write_u16(0x0000, 0x0820, 0xDEAD);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x0820, "the effective address");
+        assert_eq!(cpu.mem.read_u16(0x0000, 0x0820), 0xDEAD, "memory untouched");
+    }
+
+    #[test]
+    fn lea_refuses_a_form_that_has_no_address_on_this_cpu() {
+        // LEA AX, AX would encode as r/m in register mode, where there is no
+        // displacement to form an address from. The manual does not define it.
+        let mut cpu = cpu_with(&[0x8D, 0xC0]);
+        assert_eq!(cpu.step(), Err(ExecError::BadLea(0x8D)));
     }
 
     #[test]
