@@ -1751,18 +1751,37 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         _ => return Err(ExecError::UnknownOpcode(opcode)),
     };
 
-    let (lo, hi) = if inverts(cpu, op) {
-        // The multiply and divide microcode flips its internal F1 flag once per
-        // negative sign in the inputs, and a REP prefix is what loads that flag,
-        // so the result comes out inverted (Andrew Jenner, from the microcode
-        // extracted from an 8086 die: "Using the REP or REPNE prefix with a MUL
-        // or IMUL instruction negates the product"). The inversion is in the
-        // result: these opcodes define CF and OF from the magnitude, and the
-        // negation of a fitting result still fits, so neither flag moves.
-        let (neg_lo, carry) = lo.overflowing_neg();
-        (neg_lo, if carry { !hi } else { hi })
-    } else {
-        (lo, hi)
+    // A pending repeat latch inverts the sign of the result: the multiply and
+    // divide microcode flips its internal F1 flag once per negative sign in the
+    // inputs, and a REP prefix is what loads that flag (Andrew Jenner, from the
+    // microcode extracted from an 8086 die: "Using the REP or REPNE prefix with
+    // a MUL or IMUL instruction negates the product").
+    //
+    // The inversion is in the result only. CF and OF come from the magnitude,
+    // and negating a product that fits still fits, so `set_mul_flags` above ran
+    // on the unnegated halves and is deliberately not re-run.
+    let (lo, hi) = match op {
+        // `/4` and `/5` put the product in `AX:DX`, so both halves negate. The
+        // carry into the high half is the carry out of `!lo + 1`, which is 1
+        // exactly when `lo` is zero — the *opposite* of `overflowing_neg`'s
+        // overflow flag, which is set exactly when `lo` is not zero.
+        0x4 | 0x5 if cpu.rep.is_some() => {
+            let (neg_lo, _) = lo.overflowing_neg();
+            (
+                neg_lo,
+                (!hi).wrapping_add(1).wrapping_sub(u16::from(lo != 0)),
+            )
+        }
+        // `/7` returns `(quotient, remainder)`. Only the quotient is negated;
+        // the remainder is exactly what the division produced and the microcode
+        // never inverts it.
+        0x7 if cpu.rep.is_some() => (lo.wrapping_neg(), hi),
+        // `/6`, unsigned `DIV`, is left alone as a **policy**, not as a hardware
+        // claim: Jenner's own routine table lists one routine per width for
+        // `IDIV/DIV`, so signed and unsigned divide share microcode that tests
+        // F1, and whether REP also negates an unsigned quotient is not settled by
+        // any source. Question 4 of `odd/research/_prompt-microcode-closure.md`.
+        _ => (lo, hi),
     };
 
     if bits == 8 {
@@ -1772,16 +1791,6 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         cpu.regs.set_word(Reg16::Dx, hi);
     }
     Ok(())
-}
-
-/// Whether the pending repeat latch inverts this multiply or divide result.
-///
-/// `MUL`, `IMUL` and `IDIV` sign their results and read the latch; `DIV` is
-/// unsigned and has no sign to invert. `TEST`, `NOT` and `NEG` are not
-/// multiplies at all: `/digit` is used to reach them, and each returns before
-/// this point, so only `/4`, `/5`, `/6` and `/7` can arrive here.
-fn inverts(cpu: &crate::Cpu, digit: u8) -> bool {
-    cpu.rep.is_some() && matches!(digit & 0b111, 0x4 | 0x5 | 0x7)
 }
 
 /// `MUL`/`IMUL` define CF and OF together: both set when the product did not

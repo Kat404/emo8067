@@ -2672,6 +2672,204 @@ fn the_rep_latch_does_not_outlive_the_multiply_it_negated() {
     );
 }
 
+/// The carry into the high half of a negated product is the carry out of
+/// `!lo + 1`, which is 1 exactly when the low half is zero. A first attempt
+/// used `overflowing_neg`'s overflow flag instead, which is set exactly when
+/// the low half is *not* zero — the two cases are opposites, so every product
+/// with a zero low half came back un-negated.
+#[test]
+fn rep_negates_the_high_half_when_the_low_half_is_zero() {
+    let mut c = cpu(&[0xF3, 0xF6, 0xE1]); // REP MUL CL
+    c.regs.set_byte(Reg8::Al, 2);
+    c.regs.set_byte(Reg8::Cl, 128);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0xFF00, "0x0100 negated is 0xFF00");
+
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1]); // REP MUL CX
+    c.regs.set_word(Reg16::Ax, 2);
+    c.regs.set_word(Reg16::Cx, 0x8000);
+    c.step().unwrap();
+    assert_eq!(
+        (c.regs.word(Reg16::Ax), c.regs.word(Reg16::Dx)),
+        (0x0000, 0xFFFF),
+        "0x00010000 negated is 0xFFFF0000"
+    );
+
+    let mut c = cpu(&[0xF3, 0xF6, 0xE9]); // REP IMUL CL, 2 * -128 = -256
+    c.regs.set_byte(Reg8::Al, 2);
+    c.regs.set_byte(Reg8::Cl, 128);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0100, "-256 negated is 0x0100");
+}
+
+/// Every byte-sized pair, signed and unsigned. The whole 8-bit space is 65,536
+/// cases and costs little, so it is checked rather than sampled — the first
+/// attempt at this rule got 769 of them wrong and no sample had caught it.
+#[test]
+fn rep_negates_every_eight_bit_multiply() {
+    let mut c = cpu(&[0xF3, 0xF6, 0xE1]);
+    for a in 0..=u8::MAX {
+        for b in 0..=u8::MAX {
+            // The program is `F3 F6 <modrm>`; reg=100 is MUL and reg=101 IMUL,
+            // so each branch sets the ModR/M byte at offset 2 itself.
+            c.mem.write_u8(0x1000, 2, 0xE1);
+            c.regs.ip = 0;
+            c.regs.set_word(Reg16::Cx, 0);
+            c.regs.set_byte(Reg8::Al, a);
+            c.regs.set_byte(Reg8::Cl, b);
+            c.step().unwrap();
+            assert_eq!(
+                c.regs.word(Reg16::Ax),
+                (u16::from(a) * u16::from(b)).wrapping_neg(),
+                "REP MUL CL {a} * {b}"
+            );
+
+            // The same run with reg=101, which is IMUL. The program is `F3 F6 <modrm>`,
+            // so only the ModR/M byte at offset 2 changes.
+            c.mem.write_u8(0x1000, 2, 0xE9);
+            c.regs.ip = 0;
+            c.regs.set_word(Reg16::Cx, 0);
+            c.regs.set_byte(Reg8::Al, a);
+            c.regs.set_byte(Reg8::Cl, b);
+            c.step().unwrap();
+            assert_eq!(
+                c.regs.word(Reg16::Ax),
+                (i16::from(a as i8) * i16::from(b as i8)).wrapping_neg() as u16,
+                "REP IMUL CL {a} * {b}"
+            );
+        }
+    }
+}
+
+/// A wide sample of word-sized multiplies against a 32-bit reference, plus
+/// every pair of the boundary values that catch carry and sign-extension bugs.
+/// One CPU is reused across cases; `cpu()` allocates a mebibyte each time. The
+// program is `F3 F7 <modrm>`, so the ModR/M byte is at offset 2.
+#[test]
+fn rep_negates_word_sized_multiplies() {
+    let mut cases: Vec<(u16, u16)> = [0u16, 1, 0x100, 0x7FFF, 0x8000, 0x8001, 0xFFFF]
+        .iter()
+        .flat_map(|&a| [0u16, 1, 0x100, 0x7FFF, 0x8000, 0x8001, 0xFFFF].map(|b| (a, b)))
+        .collect();
+    let mut seed = 0x1234_5678u64;
+    for _ in 0..20_000 {
+        let mut next = || {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (seed >> 33) as u16
+        };
+        cases.push((next(), next()));
+    }
+
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1]);
+    for (a, b) in cases {
+        for (modrm, signed) in [(0xE1u8, false), (0xE9, true)] {
+            c.mem.write_u8(0x1000, 2, modrm);
+            c.regs.ip = 0;
+            c.regs.set_word(Reg16::Ax, a);
+            c.regs.set_word(Reg16::Cx, b);
+            c.step().unwrap();
+            let product = if signed {
+                i32::from(a as i16).wrapping_mul(i32::from(b as i16)) as u32
+            } else {
+                u32::from(a) * u32::from(b)
+            };
+            let want = product.wrapping_neg();
+            assert_eq!(
+                (c.regs.word(Reg16::Ax), c.regs.word(Reg16::Dx)),
+                (want as u16, (want >> 16) as u16),
+                "REP {modrm:02X} {a:#06X} * {b:#06X}"
+            );
+        }
+    }
+}
+
+/// `IDIV` negates the quotient and leaves the remainder exactly as the division
+/// produced it. A shared two-word negation got this wrong: the tuple that `/7`
+/// returns is `(quotient, remainder)`, so complementing the high half inverted
+/// the remainder in every non-zero case.
+#[test]
+fn rep_negates_the_idiv_quotient_and_not_the_remainder() {
+    let mut c = cpu(&[0xF2, 0xF7, 0xF9]); // REPNE IDIV CX
+    c.regs.set_word(Reg16::Dx, 0);
+    c.regs.set_word(Reg16::Ax, 100);
+    c.regs.set_word(Reg16::Cx, 7);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), (-14i32) as u16, "quotient negated");
+    assert_eq!(c.regs.word(Reg16::Dx), 2, "100 % 7 = 2, not negated");
+
+    let mut c = cpu(&[0xF2, 0xF6, 0xF9]); // REPNE IDIV CL
+    c.regs.set_word(Reg16::Ax, 100);
+    c.regs.set_byte(Reg8::Cl, 7);
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0xF2, "quotient negated");
+    assert_eq!(c.regs.byte(Reg8::Ah), 2, "remainder stays 2");
+
+    let mut c = cpu(&[0xF2, 0xF7, 0xF9]);
+    c.regs.set_word(Reg16::Dx, 0);
+    c.regs.set_word(Reg16::Ax, 100);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), (-20i32) as u16);
+    assert_eq!(c.regs.word(Reg16::Dx), 0, "a zero remainder stays zero");
+}
+
+/// Every byte-sized `IDIV` that does not fault, so no remainder can slip
+/// through unnoticed.
+#[test]
+fn rep_keeps_every_idiv_remainder() {
+    let mut c = cpu(&[0xF2, 0xF6, 0xF9]);
+    for a in 0..=0xFFu16 {
+        for b in 1..=0x7Fu16 {
+            if !(-128..=127).contains(&((a as i16) / (b as i16))) {
+                continue;
+            }
+            c.regs.ip = 0;
+            c.regs.set_word(Reg16::Dx, 0);
+            c.regs.set_word(Reg16::Ax, a);
+            c.regs.set_byte(Reg8::Cl, b as u8);
+            c.step().unwrap();
+            assert_eq!(
+                c.regs.byte(Reg8::Al),
+                ((a as i16) / (b as i16)).wrapping_neg() as u8,
+                "REPNE IDIV CL {a}/{b} quotient"
+            );
+            assert_eq!(
+                c.regs.byte(Reg8::Ah),
+                ((a as i16) % (b as i16)) as u8,
+                "REPNE IDIV CL {a}/{b} remainder"
+            );
+        }
+    }
+}
+
+/// A divide that faulted leaves nothing behind, and in particular no latch: the
+/// next `MUL` must be plain.
+#[test]
+fn a_faulting_rep_idiv_keeps_no_latch_for_the_next_multiply() {
+    // A type 0 interrupt needs a vector, and the handler returns immediately: the
+    // point is only that the CPU keeps running afterwards.
+    let mut c = cpu(&[0xF2, 0xF7, 0xF9, 0xF7, 0xE1]);
+    c.mem.write_u16(0x0000, 0x0000, 0x0010);
+    c.mem.write_u16(0x0000, 0x0002, 0x0000);
+    c.mem.load_at(0x00010, &[0xCF]).unwrap();
+    c.regs.set_word(Reg16::Dx, 0);
+    c.regs.set_word(Reg16::Ax, 100);
+    c.regs.set_word(Reg16::Cx, 0);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 100, "divide-by-zero writes nothing");
+    c.step().unwrap();
+    c.regs.set_word(Reg16::Ax, 3);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.step().unwrap();
+    assert_eq!(
+        (c.regs.word(Reg16::Ax), c.regs.word(Reg16::Dx)),
+        (0x000F, 0x0000),
+        "the dead REP must not negate the next MUL"
+    );
+}
+
 /// `REPE CMPSB` stops at the first pair that does not compare equal, and the
 /// comparison that stopped it has already been made: both pointers and the
 /// count account for it.
