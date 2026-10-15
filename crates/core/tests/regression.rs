@@ -5,7 +5,7 @@
 
 use emo8067_core::Cpu;
 use emo8067_core::exec::ExecError;
-use emo8067_core::flags::{AF, CF, OF, PF, SF, ZF};
+use emo8067_core::flags::{AF, CF, OF, ONE, PF, SF, ZF};
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 
 fn cpu(code: &[u8]) -> Cpu {
@@ -130,11 +130,11 @@ fn the_encodings_that_are_still_missing_are_listed_here() {
         0x84, 0x85, // TEST r/m, r
         0x9A, 0x9B, // CALL far, WAIT
         0xCA, 0xCB, // RETF, RETF iw
-        0xCE,       // INTO
+        0xCE, // INTO
         0xD4, 0xD5, // AAM, AAD
-        0xD7,       // XLAT
-        0xEA,       // JMP far
-        0xF0,       // LOCK
+        0xD7, // XLAT
+        0xEA, // JMP far
+        0xF0, // LOCK
     ];
     for op in missing {
         let mut c = Cpu::new();
@@ -505,4 +505,76 @@ fn ff_six_pushes_a_memory_word() {
     c.step().unwrap();
     assert_eq!(c.regs.word(Reg16::Sp), 0x00FE);
     assert_eq!(c.mem.read_u16(0x2000, 0x00FE), 0xCAFE);
+}
+
+/// `8F` is /0 with mod=00 only. A guard written as
+/// `matches!(m.rm, Operand::Reg(_))` only ever sees mod=11, so mod=01 and
+/// mod=10 slip through while the comment claims otherwise.
+#[test]
+fn pop_rm16_refuses_every_encoding_the_8086_lacks() {
+    for code in [
+        &[0x8F, 0x46, 0x34][..],       // mod=01 [BP+d8]
+        &[0x8F, 0x85, 0x34, 0x12][..], // mod=10 [BP+d16]
+        &[0x8F, 0x86, 0x34, 0x12][..], // mod=10 [BX+d16]
+        &[0x8F, 0xC3][..],             // mod=11
+        &[0x8F, 0x0E, 0x34, 0x12][..], // mod=00 but reg=001
+    ] {
+        let mut c = cpu(code);
+        c.regs.set_word(Reg16::Sp, 0x0100);
+        assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)), "{code:02X?}");
+        assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
+    }
+    for code in [&[0x8F, 0x06, 0x34, 0x12][..], &[0x8F, 0x00][..]] {
+        let mut c = cpu(code);
+        c.regs.set_word(Reg16::Sp, 0x0100);
+        assert!(c.step().is_ok(), "{code:02X?} is a real 8086 encoding");
+    }
+}
+
+/// LAHF puts exactly SF ZF AF PF CF in AH, with bit 1 a fixed one.
+#[test]
+fn lahf_places_exactly_the_status_flags_and_a_fixed_one() {
+    for (flags, ah) in [
+        (0x0000u16, 0x02u8),
+        (0x0002, 0x02),
+        (0x0001, 0x03),
+        (0x0004, 0x06),
+        (0x0010, 0x12),
+        (0x0040, 0x42),
+        (0x0080, 0x82),
+        (0x00D5, 0xD7),
+        (0x0FD7, 0xD7),
+        (0x0008, 0x02),
+        (0x0020, 0x02),
+        (0xFFFF, 0xD7),
+    ] {
+        let mut c = Cpu::new();
+        c.regs.flags.0 = flags;
+        c.mem.load_at(0, &[0x9E]).unwrap();
+        c.regs.set_segment(Seg::Cs, 0);
+        c.regs.ip = 0;
+        c.step().unwrap();
+        assert_eq!(c.regs.byte(Reg8::Ah), ah, "FLAGS={flags:#06x}");
+    }
+}
+
+/// Power-on FLAGS already carries the fixed one. Flags::new() setting it is
+/// worthless if the public constructor derives Default instead.
+#[test]
+fn power_on_flags_already_carry_the_fixed_one() {
+    assert!(Cpu::new().regs.flags.get(ONE), "power-on FLAGS bit 1");
+
+    let mut c = Cpu::new();
+    c.regs.set_segment(Seg::Ss, 0x2000);
+    c.regs.set_word(Reg16::Sp, 0x0100);
+    c.mem.load_at(0, &[0x9C]).unwrap();
+    c.regs.set_segment(Seg::Cs, 0);
+    c.regs.ip = 0;
+    c.step().unwrap();
+    let image = c.mem.read_u16(0x2000, 0x00FE);
+    assert_eq!(
+        image & 0x0002,
+        0x0002,
+        "PUSHF image {image:#06x} lacks bit 1"
+    );
 }

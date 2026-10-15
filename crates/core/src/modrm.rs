@@ -42,6 +42,10 @@ pub enum Operand {
 pub struct ModRm {
     pub reg: u8,
     pub rm: Operand,
+    /// The raw two-bit `mod` field. An instruction that only exists for
+    /// `mod=00` has to test this, because `rm` alone cannot say: every
+    /// `mod` value produces an `Operand::Mem` for most `rm` values.
+    pub mod_bits: u8,
 }
 
 /// Something the decoder could not make sense of.
@@ -69,6 +73,7 @@ pub fn decode_modrm(code: &[u8], ip: &mut u16, default_seg: Seg) -> Result<ModRm
     if mode == 0b11 {
         return Ok(ModRm {
             reg,
+            mod_bits: mode,
             rm: Operand::Reg(rm),
         });
     }
@@ -92,6 +97,7 @@ pub fn decode_modrm(code: &[u8], ip: &mut u16, default_seg: Seg) -> Result<ModRm
 
     Ok(ModRm {
         reg,
+        mod_bits: mode,
         rm: Operand::Mem {
             seg: default_seg,
             base,

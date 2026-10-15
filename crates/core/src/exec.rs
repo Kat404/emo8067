@@ -589,11 +589,17 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 /// `8F /0` is `POP r/m16`, the one pop that writes memory.
 fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let m = decode_from(cpu)?;
-    // The 8086 defines /0 alone and only with mod=00; the other digits and
-    // the register form are encodings a later CPU added.
-    if m.reg != 0 || matches!(m.rm, Operand::Reg(_)) {
+    // The 8086 defines /0 alone and only with mod=00. Checking
+    // `matches!(m.rm, Operand::Reg(_))` is not the same thing: that variant
+    // only ever carries mod=11, so mod=01 and mod=10 would slip through
+    // while the comment claimed otherwise. Test the encoding directly.
+    // Test the raw `mod` field, not the operand: every `mod` value produces
+    // an `Operand::Mem` for most `rm` values, so the operand cannot say which
+    // one this was. `ModRm::mod_bits` carries it.
+    if m.reg != 0 || m.mod_bits != 0b00 {
         return Err(ExecError::NotOn8086(opcode));
     }
+
     // The word leaves the stack before the destination is written, so a
     // destination inside the popped word takes the value, not the old one.
     let value = pop(&cpu.mem, &mut cpu.regs);
@@ -2428,7 +2434,11 @@ mod tests {
         assert_eq!(cpu.regs.ip, 0x0600);
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FA);
         // PUSH predecrements, so FLAGS is highest and IP is lowest.
-        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), 0xF000, "FLAGS");
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FE),
+            0xF000 | IF | ONE,
+            "FLAGS, with the undefined bits read as one"
+        );
         assert_eq!(cpu.mem.read_u16(0x2000, 0x00FC), cs, "CS");
         assert_eq!(cpu.mem.read_u16(0x2000, 0x00FA), 0x0002, "return address");
     }

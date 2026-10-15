@@ -51,9 +51,17 @@ pub enum StopReason {
 }
 
 impl Cpu {
+    /// A fresh processor. This is spelled out rather than derived: the
+    /// derived `Default` starts FLAGS at zero, which leaves bit 1 clear, and
+    /// bit 1 is a fixed one on every x86 rather than a storage bit.
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            regs: Registers::new(),
+            mem: Memory::new(),
+            halted: false,
+            stop_reason: StopReason::None,
+        }
     }
 
     /// Take an `INT n`, the way an 8086 does.
