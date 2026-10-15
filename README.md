@@ -25,6 +25,12 @@ module map and behavioural contracts, lives in
 [`re/FINDINGS.md`](re/FINDINGS.md). It is a specification document, not a
 source of code.
 
+The opcode and flag tables in `odd/research/documentation-guide.md` are
+transcribed from the Intel 8086 Family User's Manual. Where the printed
+manual and real silicon disagree, silicon wins and the manual's own print
+is kept and marked as an erratum — most visibly at `A8`/`A9`, which the
+1979 printing calls `TEST` and the hardware executes as `CMP`.
+
 ## Layout
 
 | Path | What it is |
