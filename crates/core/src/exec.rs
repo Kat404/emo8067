@@ -104,7 +104,10 @@ fn pop(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
 /// register to itself would double it and silently address the wrong byte.
 fn offset_of(regs: &crate::regs::Registers, base: Base, disp: u16) -> u16 {
     match base {
-        Base::Direct => disp,
+        // Direct carries the whole offset, so it contributes nothing here;
+        // returning `disp` and letting the trailing add run doubled every
+        // [disp16] address in the machine.
+        Base::Direct => 0,
         Base::BxSi => regs.word(Reg16::Bx).wrapping_add(regs.word(Reg16::Si)),
         Base::BxDi => regs.word(Reg16::Bx).wrapping_add(regs.word(Reg16::Di)),
         Base::BpSi => regs.word(Reg16::Bp).wrapping_add(regs.word(Reg16::Si)),
@@ -317,7 +320,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         }
         // 90 is XCHG AX, AX, which is the NOP. Handling 91..=97 here keeps
         // the overlap explicit rather than duplicated.
-        0x91..=0x97 => {
+        0x90..=0x97 => {
             let r = Reg16::from_bits(opcode & 0b111);
             let ax = cpu.regs.word(Reg16::Ax);
             let other = cpu.regs.word(r);

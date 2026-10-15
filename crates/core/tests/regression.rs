@@ -155,7 +155,6 @@ fn mov_segment_to_register_is_rejected_on_the_8086() {
 /// `LEA` computes an address and must never read the segment into the
 /// result, even when the operand carries one.
 #[test]
-#[ignore = "OPEN: LEA AX,[BX] with BX=1234h does not land on 1234h in this build. Undiagnosed; do not trust LEA until it is."]
 fn lea_uses_the_offset_alone() {
     let mut c = cpu(&[0x8D, 0x06, 0x34, 0x12]); // LEA AX, [1234h]
     c.regs.set_segment(Seg::Ds, 0x9999);
