@@ -2222,6 +2222,11 @@ fn movsb_after(code: &[u8]) -> (Cpu, State) {
     c.mem.write_u8(0x0000, 0x0020, 0x11);
     c.mem.write_u8(0x0000, 0x0021, 0x22);
     c.mem.write_u8(0x0000, 0x0022, 0x33);
+    // A segment override reaches the SI side, so a test whose prefix names a
+    // segment other than DS needs the source bytes to exist there too.
+    c.mem.write_u8(0x9000, 0x0020, 0x11);
+    c.mem.write_u8(0x9000, 0x0021, 0x22);
+    c.mem.write_u8(0x9000, 0x0022, 0x33);
     c.step().expect("REP MOVSB must not fault");
     let state = movsb_state(&c);
     (c, state)
@@ -2232,9 +2237,9 @@ fn movsb_after(code: &[u8]) -> (Cpu, State) {
 /// is the length of the program that reached it.
 const REP_MOVSB_THREE: State = (0, 0x0023, 0x0303, 3, [0x11, 0x22, 0x33, 0x00]);
 
-/// The same three iterations reached behind an 8-byte prefix run, so `IP`
+/// The same three iterations reached behind a 4-byte prefix run, so `IP`
 /// stops one byte further on and nothing else differs.
-const REP_MOVSB_THREE_AFTER_EIGHT: State = (0, 0x0023, 0x0303, 9, [0x11, 0x22, 0x33, 0x00]);
+const REP_MOVSB_THREE_AFTER_FOUR: State = (0, 0x0023, 0x0303, 5, [0x11, 0x22, 0x33, 0x00]);
 
 /// `F3 26 A4` used to be `BadRepeat`, because the repeat helper fetched its
 /// own operand byte and rejected anything that was not a string operation.
@@ -2276,6 +2281,95 @@ fn a_segment_override_cannot_redirect_the_string_destination() {
     assert_eq!(c.mem.read_u8(0x0000, 0x0300), 0x00, "and not through DS");
 }
 
+/// The other half of that rule. The manual is explicit that the destination of
+/// a string instruction is the *only* operand an override cannot reach, so
+/// everything on the `SI` side obeys the override like any other memory
+/// operand. `26 A4` reads `ES:0100`, not `DS:0100`.
+#[test]
+fn a_segment_override_reaches_the_string_source() {
+    let mut c = four_segments(&[0x26, 0xA5]); // ES override; MOVSW
+    c.regs.set_word(Reg16::Si, 0x0100);
+    c.regs.set_word(Reg16::Di, 0x0200);
+    c.step().unwrap();
+    assert_eq!(
+        c.mem.read_u16(0x5000, 0x0200),
+        0x4444,
+        "the word came from ES:0100, the override, and not from DS"
+    );
+    assert_eq!(c.mem.read_u16(0x2000, 0x0100), 0x1111, "DS was not read");
+
+    let mut c = four_segments(&[0x26, 0xAC]); // ES override; LODSB
+    c.regs.set_word(Reg16::Si, 0x0100);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x44,
+        "loaded through ES, so the override reached LODS too"
+    );
+
+    let mut c = four_segments(&[0x26, 0xA6]); // ES override; CMPSB
+    c.regs.set_word(Reg16::Si, 0x0100);
+    c.regs.set_word(Reg16::Di, 0x0200);
+    c.mem.write_u8(0x5000, 0x0200, 0x44);
+    c.step().unwrap();
+    assert!(
+        c.regs.flags.get(ZF),
+        "ES:0100 against ES:0200 is the same byte; through DS it would not be"
+    );
+}
+
+/// The destination rule survives the fix: `STOS` and `SCAS` read and write
+/// `ES:DI` even when the override names another segment, which is what makes
+/// them different from the three operations above rather than the same rule
+/// applied twice.
+#[test]
+fn stos_and_scas_ignore_the_override_and_stay_in_es() {
+    let mut c = four_segments(&[0x2E, 0xAA]); // CS override; STOSB
+    c.regs.set_word(Reg16::Di, 0x0200);
+    c.regs.set_byte(Reg8::Al, 0x99);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u8(0x5000, 0x0200), 0x99, "ES:DI, always");
+    assert_eq!(
+        c.mem.read_u8(0x2000, 0x0200),
+        0x00,
+        "not through the overridden segment"
+    );
+
+    let mut c = four_segments(&[0x2E, 0xAE]); // CS override; SCASB
+    c.regs.set_word(Reg16::Di, 0x0100);
+    c.regs.set_byte(Reg8::Al, 0x44);
+    c.step().unwrap();
+    assert!(
+        c.regs.flags.get(ZF),
+        "AL against ES:0100 is 0x44 either way"
+    );
+}
+
+/// Two segment overrides are not a composition and not an error: the Group
+/// Decode ROM loads the segment latch from a column of its own, so the last
+/// one in the run is the one the next instruction sees. That is why order
+/// matters *between two overrides* even though it cannot matter anywhere else.
+#[test]
+fn the_last_segment_override_wins() {
+    let mut c = four_segments(&[0x36, 0x2E, 0xAC]); // SS then CS; LODSB
+    c.regs.set_word(Reg16::Si, 0x0100);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x22,
+        "CS:0100 is 2222h, and CS came last"
+    );
+
+    let mut c = four_segments(&[0x2E, 0x36, 0xAC]); // CS then SS
+    c.regs.set_word(Reg16::Si, 0x0100);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x33,
+        "SS:0100 is 3333h, and SS came last"
+    );
+}
+
 /// A repeat prefix in front of something that is not a string operation is
 /// ignored. The 8086 has no invalid-instruction detection, so refusing it
 /// would be the divergence.
@@ -2294,18 +2388,24 @@ fn rep_in_front_of_a_nop_is_a_nop() {
     assert_ne!(c.regs.byte(Reg8::Al), 0x77, "the NOP retired unchanged");
 }
 
-/// All 8! orders of `F0 F1 26 2E 36 3E F2 F3` ahead of the same `MOVSB`. The
-/// 8086 sets the segment latches and the REP latch from independent columns
-/// of the decode ROM, so nothing about the outcome can depend on the order.
+/// All 4! orders of `F0 F1 F2 F3` ahead of the same `MOVSB`. Those four bytes
+/// feed latches the 8086 loads from independent columns of the decode ROM, so
+/// nothing about the outcome can depend on their order.
+///
+/// No segment override is in this set, and that is deliberate rather than an
+/// oversight: order *does* matter between two of those, which is what
+/// `the_last_segment_override_wins` pins. The earlier version of this test
+/// permuted all eight prefix bytes and still passed while the override was
+/// being discarded on the `SI` side, so the set it chose proved nothing.
 #[test]
-fn every_permutation_of_the_prefix_bytes_reaches_the_same_state() {
-    let mut order = [0xF0u8, 0xF1, 0x26, 0x2E, 0x36, 0x3E, 0xF2, 0xF3];
+fn every_order_of_lock_and_the_repeat_prefixes_reaches_the_same_state() {
+    let mut order = [0xF0u8, 0xF1, 0xF2, 0xF3];
     let mut orders = Vec::new();
     permutations(&mut order, 0, &mut orders);
-    assert_eq!(orders.len(), 40320, "8! orderings, not a sample");
+    assert_eq!(orders.len(), 24, "4! orderings, not a sample");
 
-    let mut code = [0u8; 9];
-    code[8] = 0xA4;
+    let mut code = [0u8; 5];
+    code[4] = 0xA4;
     let mut c = cpu(&code);
     c.regs.set_segment(Seg::Es, 0x9000);
 
@@ -2320,7 +2420,7 @@ fn every_permutation_of_the_prefix_bytes_reaches_the_same_state() {
     }
     assert_eq!(
         reference,
-        Some(REP_MOVSB_THREE_AFTER_EIGHT),
+        Some(REP_MOVSB_THREE_AFTER_FOUR),
         "and the shared state is the right one: three MOVSB iterations"
     );
 }

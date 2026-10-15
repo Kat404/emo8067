@@ -801,10 +801,10 @@ fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let word = opcode & 1 != 0;
     let step: u16 = if word { 2 } else { 1 };
-    // shortcut: a segment override in front of a string operation is consumed
-    // and discarded here, so the DS:SI side still reads DS. The REP latch is
-    // honoured above instead, by `string_op`, not by this body.
-    let ds = cpu.regs.segment(Seg::Ds);
+    // The source side obeys a segment override like any other memory operand.
+    // The destination is the one thing an override cannot reach, so it stays
+    // pinned to ES below, and `STOS`/`SCAS` read and write that ES:DI directly.
+    let ds = cpu.regs.segment(operand_seg(cpu));
     let es = cpu.regs.segment(Seg::Es);
     let mut si = cpu.regs.word(Reg16::Si);
     let mut di = cpu.regs.word(Reg16::Di);
