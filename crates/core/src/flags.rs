@@ -53,9 +53,13 @@ pub struct Flags(pub u16);
 
 impl Flags {
     /// The power-on state: interrupts enabled, everything else clear.
+    ///
+    /// Bit 1 is included because it is not a storage bit. On every x86 it
+    /// reads as one, so a FLAGS that starts without it is wrong before a
+    /// single instruction has run.
     #[must_use]
     pub const fn new() -> Self {
-        Self(IF)
+        Self(IF | ONE)
     }
 
     #[must_use]

@@ -1,9 +1,9 @@
 //! Fetch, decode, execute.
 
-use crate::flags::{parity_even, Flags, AF, CF, DF, IF, OF, PF, SF, ZF};
+use crate::flags::{AF, CF, DF, Flags, IF, OF, ONE, PF, SF, ZF, parity_even};
 use crate::memory::Memory;
-use crate::modrm::{decode_modrm, Base, DecodeError, Operand};
-use crate::regs::{Reg16, Reg8, Seg};
+use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
+use crate::regs::{Reg8, Reg16, Seg};
 
 /// A fault the emulated program caused by executing itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,11 +41,7 @@ impl From<DecodeError> for ExecError {
 
 /// `step` budget helper: how many bytes an instruction consumed.
 fn width_mask(bits: u8) -> u16 {
-    if bits == 16 {
-        0xFFFF
-    } else {
-        0x00FF
-    }
+    if bits == 16 { 0xFFFF } else { 0x00FF }
 }
 
 // ---------------------------------------------------------------- fetching
@@ -270,9 +266,10 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xA9 => cmp_accumulator(cpu, 16)?,
         0xF6 | 0xF7 => mul_group(cpu, opcode)?,
         // ---- MOV and friends. None of these modify FLAGS.
-        0x87 => xchg_memory(cpu, opcode)?,
+        0x86 | 0x87 => xchg_memory(cpu, opcode)?,
         0x88..=0x8B => mov_group(cpu, opcode)?,
         0x8C..=0x8E => mov_group(cpu, opcode)?,
+        0x8F => pop_to_memory(cpu, opcode)?,
         0xA0..=0xA3 => mov_accumulator_offset(cpu, opcode)?,
         0xB0..=0xB7 => {
             let reg = Reg8::from_bits(opcode & 0b111);
@@ -285,6 +282,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             cpu.regs.set_word(reg, imm);
         }
         0xC6 | 0xC7 => mov_to_immediate(cpu, opcode)?,
+        0xC4 | 0xC5 => load_far_pointer(cpu, opcode)?,
         // ---- control transfer
         0x70..=0x7F => jcc(cpu, opcode)?,
         0xE8 => call_relative(cpu)?,
@@ -332,6 +330,20 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             // CWD: sign-extend AX into DX:AX. No flags.
             let ax = cpu.regs.word(Reg16::Ax) as i16 as u32;
             cpu.regs.set_word(Reg16::Dx, (ax >> 16) as u16);
+        }
+        0x9E => {
+            // LAHF: AH takes the five status flags. Bit 1 of AH is the fixed
+            // 1 of FLAGS rather than a copy of that bit, so ONE is forced in
+            // rather than masked through.
+            let status = SF | ZF | AF | PF | CF;
+            cpu.regs
+                .set_byte(Reg8::Ah, ((cpu.regs.flags.0 & status) | ONE) as u8);
+        }
+        0x9F => {
+            // SAHF: the reverse, and the only flag write of this group.
+            let from_ah = u16::from(cpu.regs.byte(Reg8::Ah));
+            let status = SF | ZF | AF | PF | CF;
+            cpu.regs.flags.0 = (cpu.regs.flags.0 & !status) | (from_ah & status);
         }
         // 90 is XCHG AX, AX, which is the NOP. Handling 91..=97 here keeps
         // the overlap explicit rather than duplicated.
@@ -571,6 +583,40 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     };
     write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, value);
+    Ok(())
+}
+
+/// `8F /0` is `POP r/m16`, the one pop that writes memory.
+fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let m = decode_from(cpu)?;
+    // The 8086 defines /0 alone and only with mod=00; the other digits and
+    // the register form are encodings a later CPU added.
+    if m.reg != 0 || matches!(m.rm, Operand::Reg(_)) {
+        return Err(ExecError::NotOn8086(opcode));
+    }
+    // The word leaves the stack before the destination is written, so a
+    // destination inside the popped word takes the value, not the old one.
+    let value = pop(&cpu.mem, &mut cpu.regs);
+    write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, 16, value);
+    Ok(())
+}
+
+/// `C4` is `LES r16, m` and `C5` is `LDS r16, m`: a four-byte far pointer at
+/// the effective address, the low word the offset and the high word the
+/// segment. Neither touches FLAGS.
+fn load_far_pointer(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let m = decode_from(cpu)?;
+    let Operand::Mem { seg, base, disp } = m.rm else {
+        // With mod=11 there is no memory to read a pointer from.
+        return Err(ExecError::NotOn8086(opcode));
+    };
+    let at = offset_of(&cpu.regs, base, disp);
+    let in_segment = cpu.regs.segment(seg);
+    let offset = cpu.mem.read_u16(in_segment, at);
+    let far = cpu.mem.read_u16(in_segment, at.wrapping_add(2));
+    RegArg::from_bits(m.reg & 0b111, 16).write(&mut cpu.regs, offset);
+    let target = if opcode == 0xC4 { Seg::Es } else { Seg::Ds };
+    cpu.regs.set_segment(target, far);
     Ok(())
 }
 
@@ -1009,22 +1055,14 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 }
 
 const fn msb(bits: u8) -> u16 {
-    if bits == 8 {
-        0x80
-    } else {
-        0x8000
-    }
+    if bits == 8 { 0x80 } else { 0x8000 }
 }
 /// Bit 0 is bit 0 at either width.
 const fn lsb(_bits: u8) -> u16 {
     0x0001
 }
 const fn width(bits: u8) -> u16 {
-    if bits == 8 {
-        0x00FF
-    } else {
-        0xFFFF
-    }
+    if bits == 8 { 0x00FF } else { 0xFFFF }
 }
 
 /// `OF` is only architecturally defined after a rotate by one, and after a
@@ -1579,9 +1617,9 @@ impl RegArg {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Cpu;
     use crate::flags::{AF, CF, DF, IF, OF, SF, ZF};
     use crate::regs::Registers;
-    use crate::Cpu;
 
     /// Build a CPU with `code` at `1000:0000`, clear of the interrupt
     /// vector table. The IVT is genuinely at `0000:0000` on real hardware, so
@@ -1930,6 +1968,13 @@ mod tests {
         assert_eq!(cpu.regs.ip, 4, "8F /0 with a disp16 is four bytes");
         let f = cpu.regs.flags;
         assert!(f.get(CF) && f.get(ZF) && f.get(OF), "POP touches no flag");
+
+        // Table 4-13 gives /0 with mod=00 only, so the register form and the
+        // other digits are refused instead of popping into a register.
+        let mut cpu = cpu_with(&[0x8F, 0xC3]);
+        assert_eq!(cpu.step(), Err(ExecError::NotOn8086(0x8F)));
+        let mut cpu = cpu_with(&[0x8F, 0x0E, 0x34, 0x12]);
+        assert_eq!(cpu.step(), Err(ExecError::NotOn8086(0x8F)));
     }
 
     /// `86 /r` is `XCHG r/m8, r8`, the byte sibling of the word form at `87`.
@@ -2007,8 +2052,8 @@ mod tests {
     /// flag moves.
     #[test]
     fn les_loads_the_far_pointer_and_leaves_flags() {
-        // C4 1E 34 12 = LES CX, [1234h]
-        let mut cpu = cpu_with(&[0xC4, 0x1E, 0x34, 0x12]);
+        // C4 0E 34 12 = LES CX, [1234h]
+        let mut cpu = cpu_with(&[0xC4, 0x0E, 0x34, 0x12]);
         cpu.mem.write_u16(0x0000, 0x1234, 0xBEEF);
         cpu.mem.write_u16(0x0000, 0x1236, 0x9000);
         cpu.regs.flags.set(CF, true);
@@ -2427,7 +2472,7 @@ mod tests {
         cpu.regs.set_word(Reg16::Sp, 0x00FC);
         cpu.mem.write_u16(0x2000, 0x00FC, 0x0000); // IP
         cpu.mem.write_u16(0x2000, 0x00FE, 0x0000); // CS
-                                                   // Bit 3 is fixed at zero and bit 12 is not writable on an 8086.
+        // Bit 3 is fixed at zero and bit 12 is not writable on an 8086.
         cpu.mem.write_u16(0x2000, 0x0100, 0x0008 | 0x1000);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.flags.0 & 0x0008, 0, "bit 3 stays zero");
@@ -2578,6 +2623,28 @@ mod tests {
         assert_eq!(cpu.regs.word(Reg16::Ax), 0x2222);
         assert_eq!(cpu.regs.word(Reg16::Bx), 0x1111);
         assert!(cpu.regs.flags.get(SF));
+    }
+
+    #[test]
+    fn xchg_word_form_still_swaps_through_a_modrm_byte() {
+        // 87 D8 = XCHG AX, BX by ModR/M, and 87 06 34 12 = XCHG [1234h], AX.
+        // 93 does the same job in one byte, so only this form reads the queue.
+        let mut cpu = cpu_with(&[0x87, 0xD8]);
+        cpu.regs.set_word(Reg16::Ax, 0x1111);
+        cpu.regs.set_word(Reg16::Bx, 0x2222);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x2222);
+        assert_eq!(cpu.regs.word(Reg16::Bx), 0x1111);
+        assert_eq!(cpu.regs.ip, 2, "87 is opcode plus one ModR/M byte");
+
+        let mut cpu = cpu_with(&[0x87, 0x06, 0x34, 0x12]);
+        cpu.regs.set_word(Reg16::Ax, 0xCAFE);
+        cpu.mem.write_u16(0x0000, 0x1234, 0xBEEF);
+        cpu.regs.flags.set(ZF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x0000, 0x1234), 0xCAFE);
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xBEEF);
+        assert!(cpu.regs.flags.get(ZF), "XCHG touches no flag");
     }
 
     #[test]

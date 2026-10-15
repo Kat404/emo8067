@@ -123,7 +123,19 @@ fn opcode_0f_pops_cs() {
 #[test]
 #[ignore = "T11 is incomplete: these 8086 encodings are not implemented yet"]
 fn the_encodings_that_are_still_missing_are_listed_here() {
-    let missing: Vec<u8> = vec![0x86, 0x8F, 0x9E, 0x9F, 0xC4, 0xC5, 0xCE, 0xD4, 0xD5];
+    // Every 8086 opcode still absent. This is the gate for T11: it stays
+    // ignored until the list is empty, and un-ignoring it before then is
+    // the point.
+    let missing: Vec<u8> = vec![
+        0x84, 0x85, // TEST r/m, r
+        0x9A, 0x9B, // CALL far, WAIT
+        0xCA, 0xCB, // RETF, RETF iw
+        0xCE,       // INTO
+        0xD4, 0xD5, // AAM, AAD
+        0xD7,       // XLAT
+        0xEA,       // JMP far
+        0xF0,       // LOCK
+    ];
     for op in missing {
         let mut c = Cpu::new();
         assert!(
