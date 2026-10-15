@@ -398,10 +398,10 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let a = u16::from(cpu.regs.byte(Reg8::Al));
             let product = a * u16::from(operand as u8);
             set_mul_flags(cpu, (product >> 8) == 0);
-            ((product & 0x00FF) as u16, (product >> 8) as u16)
+            ((product & 0x00FF), (product >> 8))
         }
         (16, 4) => {
-            let product = u32::from(ax) * u32::from(operand as u16);
+            let product = u32::from(ax) * u32::from(operand);
             set_mul_flags(cpu, (product >> 16) == 0);
             (product as u16, (product >> 16) as u16)
         }
@@ -421,7 +421,7 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         (16, 5) => {
             let a = i32::from(ax as i16);
-            let product = a * i32::from(operand as u16 as i16);
+            let product = a * i32::from(operand as i16);
             let as_word = product as u32;
             let low = as_word as u16;
             let expected = (low as i16 as i32 as u32) >> 16;
@@ -444,7 +444,7 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             (quotient, u16::from(remainder))
         }
         (16, 6) => {
-            let divisor = operand as u16;
+            let divisor = operand;
             if divisor == 0 {
                 divide_error(cpu);
                 return Ok(());
@@ -474,7 +474,7 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             ((quotient as u8) as u16, (remainder as u8) as u16)
         }
         (16, 7) => {
-            let divisor = operand as u16 as i16;
+            let divisor = operand as i16;
             if divisor == 0 {
                 divide_error(cpu);
                 return Ok(());
