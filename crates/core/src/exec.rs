@@ -333,15 +333,21 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0x40..=0x47 => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, true)?,
         0x48..=0x4F => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, false)?,
         // FE /0 and /1 are INC and DEC on a byte; FF /0 and /1 are the word
-        // forms, and FF /6 is PUSH.
+        // forms; FF /6 and FF /7 are PUSH, and FE /7 is its byte form.
         0xFE => {
             let m = decode_from(cpu)?;
-            let up = match m.reg & 0b111 {
-                0 => true,
-                1 => false,
+            match m.reg & 0b111 {
+                0 => inc_dec(cpu, m.rm, 8, true)?,
+                1 => inc_dec(cpu, m.rm, 8, false)?,
+                // `/7` is PUSH, in the byte form: FE is the byte opcode of the
+                // pair and the 8086 takes the width from it (Shirriff, "More
+                // FE holes"). `SP` moves by two whichever width is pushed.
+                7 => {
+                    let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 8);
+                    push(&mut cpu.mem, &mut cpu.regs, value);
+                }
                 _ => return Err(ExecError::UnknownOpcode(opcode)),
-            };
-            inc_dec(cpu, m.rm, 8, up)?;
+            }
         }
         0x50..=0x57 => {
             let reg = Reg16::from_bits(opcode & 0b111);
@@ -1079,9 +1085,20 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // can wind CF around and back.
         0x2 => rotate_through_carry(value, count, bits, carry_in, true),
         0x3 => rotate_through_carry(value, count, bits, carry_in, false),
-        // 0b100 SHL, 0b110 SAL (identical), 0b101 SHR, 0b111 SAR
-        0x4 | 0x6 => shift_left(value, count, bits),
+        // 0b100 SHL, 0b101 SHR, 0b111 SAR.
+        0x4 => shift_left(value, count, bits),
         0x5 => shift_right(value, count, bits, false),
+        // 0b110 is SETMO, not a shift. Table 4-13 prints `(not used)` for this
+        // digit, but the Group Decode ROM latches the second byte's bits 5-3
+        // into the ALU's X register, and operation 6 selects SETMO: "simply
+        // returns FF or FFFF, for a byte or word operation respectively"
+        // (Shirriff). The shared rotate microcode then writes that back, so
+        // the operand ends up holding all ones. Treating it as SAL instead
+        // ran the 80186 instruction and errored about nothing.
+        //
+        // A count of zero still does nothing: the `CL` microcode loops `CL`
+        // times, so with `CL = 0` the ALU is never selected at all.
+        0x6 => (if count == 0 { value } else { width(bits) }, false),
         _ => shift_right(value, count, bits, true),
     };
 
@@ -1135,7 +1152,9 @@ fn signed_overflow_shift(before: u16, after: u16, op: u8, bits: u8, cf: bool) ->
             let top = before & msb(bits) != 0;
             top && (after & lsb(bits) == 0) || !top && (after & lsb(bits) != 0)
         }
-        0x4 | 0x6 => before & msb(bits) != 0 && after & msb(bits) == 0,
+        0x4 => before & msb(bits) != 0 && after & msb(bits) == 0,
+        // SETMO is not a shift at all, so it has no shift overflow; it lands
+        // here with `after` already all ones, which the `_` arm also covers.
         _ => false,
     }
 }
@@ -1512,7 +1531,11 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match m.reg & 0b111 {
         0x0 => inc_dec(cpu, m.rm, 16, true)?,
         0x1 => inc_dec(cpu, m.rm, 16, false)?,
-        0x6 => {
+        // `/6` is PUSH r/m16 and `/7` is PUSH r/m16 again. Table 4-13 prints
+        // `(not used)` for `111`, but the second byte's bits 5-3 replace bits
+        // 2-0 of the opcode, so `FF /7` becomes `FF` with the `110` selection
+        // and runs the same PUSH microcode (Shirriff, "The hole in group 2").
+        0x6 | 0x7 => {
             let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
             push(&mut cpu.mem, &mut cpu.regs, value);
         }
@@ -1566,8 +1589,12 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let ax = cpu.regs.word(Reg16::Ax);
     let dx = cpu.regs.word(Reg16::Dx);
     let (lo, hi) = match (bits, op) {
-        // ---- TEST r/m, imm: an AND that discards its result
-        (_, 0x0) => {
+        // ---- TEST r/m, imm: an AND that discards its result. Digit `/1` is
+        // `(not used)` in Table 4-13, but the 8086's microcode for this group
+        // matches the instruction bits `1111000?`, so `/1` runs the same three
+        // micro-instructions as `/0` and the two are the same instruction
+        // (Shirriff, "The hole in group 1: TEST").
+        (_, 0x0 | 0x1) => {
             let right = if bits == 16 {
                 fetch_u16(&cpu.mem, &mut cpu.regs)
             } else {
@@ -2903,9 +2930,22 @@ mod tests {
 
     #[test]
     fn unknown_opcode_is_reported_not_swallowed() {
-        // FF /7 is not defined on an 8086. /2 and /4 are, and are tested.
-        let mut cpu = cpu_with(&[0xFF, 0x38]);
-        assert_eq!(cpu.step(), Err(ExecError::UnsupportedFFGroup(7)));
+        // FE /2 is `(not used)` on an 8086: the chip runs CALL rm microcode
+        // there but reads a byte where the target address is, so there is no
+        // architectural encoding to reproduce. FF /2, its word counterpart, is
+        // CALL and is tested separately.
+        let mut cpu = cpu_with(&[0xFE, 0x16]);
+        assert_eq!(cpu.step(), Err(ExecError::UnknownOpcode(0xFE)));
+    }
+
+    #[test]
+    fn ff_three_and_five_reject_a_register_operand() {
+        // 11 011 000: FF /3 with mod=11 names a register, and a far pointer
+        // is four bytes of memory. The 8086 has no encoding for it.
+        let mut cpu = cpu_with(&[0xFF, 0xD8]);
+        assert_eq!(cpu.step(), Err(ExecError::UnsupportedFFGroup(3)));
+        let mut cpu = cpu_with(&[0xFF, 0xE8]);
+        assert_eq!(cpu.step(), Err(ExecError::UnsupportedFFGroup(5)));
     }
 
     #[test]

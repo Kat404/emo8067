@@ -1063,3 +1063,635 @@ fn escape_consumes_its_modrm_and_touches_nothing() {
     assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "ESC writes no register");
     assert_eq!(c.regs.flags.0, before, "Table 2-21: ESC has no flag row");
 }
+
+// ============================================== AUDIT-6: the /digit-level gate
+
+/// What the 8086's own Group Decode ROM resolves one `(opcode, /digit)` pair to.
+///
+/// `Runs` is an instruction: its mnemonic, the value it must leave at the
+/// probe's memory operand, and the `SP` it must leave behind. `Hole` is a digit
+/// position the 8086 has no usable instruction in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Slot {
+    /// `(mnemonic, value at DS:0100 afterwards, SP afterwards)`
+    Runs(&'static str, u16, u16),
+    /// No instruction on an 8086. The reason lives in [`HOLES`].
+    Hole,
+}
+
+/// The ModR/M groups the 8086 resolves through the `reg` field of the second
+/// byte, with the names Intel gives them.
+///
+/// Shirriff, *Holes in two-byte opcodes*: "These fall into four categories
+/// which Intel labeled `Immed`, `Shift`, `Group 1`, and `Group 2`, corresponding
+/// to opcodes 80-83, D0-D3, F6-F7, and FE-FF."
+///
+/// Two candidates in the brief's list are **not** groups and are deliberately
+/// absent:
+///
+/// * `C0`/`C1` are not shift-by-immediate. Table 4-13 prints them `(not used)`
+///   and Shirriff shows they run `RET`/`RET i16`, which is what this core
+///   implements; there is no digit to resolve.
+/// * `D8`-`DF` are `ESC 0`-`ESC 7`. The escape index is the *first* byte's low
+///   three bits, not the ModR/M `reg` field, so ESC has no `/digit` at all.
+const GROUPS: &[(&str, &[u8])] = &[
+    ("Immed", &[0x80, 0x81, 0x82, 0x83]),
+    ("Shift", &[0xD0, 0xD1, 0xD2, 0xD3]),
+    ("Group 1", &[0xF6, 0xF7]),
+    ("Group 2", &[0xFE, 0xFF]),
+];
+
+/// Every `(opcode, /digit)` pair in the table above, written out.
+///
+/// **The count `96` is a literal, not `GROUPS.iter().map(..).sum()`.** Deriving
+/// it is the defect the first gate in this project shipped with: independent
+/// verification mutated the exclusion list, the derived expectation moved with
+/// it, and the gate stayed green while gating nothing. The same rule applies
+/// here in both directions — `DIGITS` is complete (nothing outside it), and the
+/// literals below fix how many of its entries are holes.
+///
+/// Columns of [`Slot::Runs`] are read off the sources, not off the core: each
+/// is `operand after the instruction` and `SP after the instruction` for the
+/// probe state [`digit_cpu`] builds. `ROL` and `SHL` share a column because
+/// they *are* the same operation on the operand and differ only in `OF`; the
+/// digit that must not share a column with them is `/6`, which is why SETMO's
+/// `FFh`/`FFFFh` is here.
+const DIGITS: &[(u8, u8, Slot)] = &[
+    // ---- "Immed": 80 r/m8,i8 | 81 r/m16,i16 | 82 r/m8,i8 | 83 r/m16,i8:sx.
+    // 003Ch AND/OR/XOR/ADD/SUB with 000Fh, carry in, per Table 4-13.
+    (0x80, 0, Slot::Runs("ADD r/m8,i8", 0x004B, 0x0100)),
+    (0x80, 1, Slot::Runs("OR r/m8,i8", 0x003F, 0x0100)),
+    (0x80, 2, Slot::Runs("ADC r/m8,i8", 0x004C, 0x0100)),
+    (0x80, 3, Slot::Runs("SBB r/m8,i8", 0x002C, 0x0100)),
+    (0x80, 4, Slot::Runs("AND r/m8,i8", 0x000C, 0x0100)),
+    (0x80, 5, Slot::Runs("SUB r/m8,i8", 0x002D, 0x0100)),
+    (0x80, 6, Slot::Runs("XOR r/m8,i8", 0x0033, 0x0100)),
+    (0x80, 7, Slot::Runs("CMP r/m8,i8", 0x003C, 0x0100)),
+    (0x81, 0, Slot::Runs("ADD r/m16,i16", 0x004B, 0x0100)),
+    (0x81, 1, Slot::Runs("OR r/m16,i16", 0x003F, 0x0100)),
+    (0x81, 2, Slot::Runs("ADC r/m16,i16", 0x004C, 0x0100)),
+    (0x81, 3, Slot::Runs("SBB r/m16,i16", 0x002C, 0x0100)),
+    (0x81, 4, Slot::Runs("AND r/m16,i16", 0x000C, 0x0100)),
+    (0x81, 5, Slot::Runs("SUB r/m16,i16", 0x002D, 0x0100)),
+    (0x81, 6, Slot::Runs("XOR r/m16,i16", 0x0033, 0x0100)),
+    (0x81, 7, Slot::Runs("CMP r/m16,i16", 0x003C, 0x0100)),
+    // Table 4-13 prints `(not used)` for 82 /1, /4 and /6, but the Group Decode
+    // ROM latches the second byte's bits 5-3 into the X register for the whole
+    // Immed group, so all eight ALU selections run on 82 exactly as on 80.
+    // Intel's table lists only the digits that are not redundant.
+    (0x82, 0, Slot::Runs("ADD r/m8,i8", 0x004B, 0x0100)),
+    (0x82, 1, Slot::Runs("OR r/m8,i8", 0x003F, 0x0100)),
+    (0x82, 2, Slot::Runs("ADC r/m8,i8", 0x004C, 0x0100)),
+    (0x82, 3, Slot::Runs("SBB r/m8,i8", 0x002C, 0x0100)),
+    (0x82, 4, Slot::Runs("AND r/m8,i8", 0x000C, 0x0100)),
+    (0x82, 5, Slot::Runs("SUB r/m8,i8", 0x002D, 0x0100)),
+    (0x82, 6, Slot::Runs("XOR r/m8,i8", 0x0033, 0x0100)),
+    (0x82, 7, Slot::Runs("CMP r/m8,i8", 0x003C, 0x0100)),
+    (0x83, 0, Slot::Runs("ADD r/m16,i8:sx", 0x004B, 0x0100)),
+    (0x83, 1, Slot::Runs("OR r/m16,i8:sx", 0x003F, 0x0100)),
+    (0x83, 2, Slot::Runs("ADC r/m16,i8:sx", 0x004C, 0x0100)),
+    (0x83, 3, Slot::Runs("SBB r/m16,i8:sx", 0x002C, 0x0100)),
+    (0x83, 4, Slot::Runs("AND r/m16,i8:sx", 0x000C, 0x0100)),
+    (0x83, 5, Slot::Runs("SUB r/m16,i8:sx", 0x002D, 0x0100)),
+    (0x83, 6, Slot::Runs("XOR r/m16,i8:sx", 0x0033, 0x0100)),
+    (0x83, 7, Slot::Runs("CMP r/m16,i8:sx", 0x003C, 0x0100)),
+    // ---- "Group 1": F6 r/m8 | F7 r/m16. 003Ch and the AL/AX zero the probe
+    // starts with, so MUL/IMUL/DIV/IDIV write registers and leave memory be.
+    (0xF6, 0, Slot::Runs("TEST r/m8,i8", 0x003C, 0x0100)),
+    (
+        0xF6,
+        1,
+        Slot::Runs("TEST r/m8,i8 (undocumented)", 0x003C, 0x0100),
+    ),
+    (0xF6, 2, Slot::Runs("NOT r/m8", 0x00C3, 0x0100)),
+    (0xF6, 3, Slot::Runs("NEG r/m8", 0x00C4, 0x0100)),
+    (0xF6, 4, Slot::Runs("MUL r/m8", 0x003C, 0x0100)),
+    (0xF6, 5, Slot::Runs("IMUL r/m8", 0x003C, 0x0100)),
+    (0xF6, 6, Slot::Runs("DIV r/m8", 0x003C, 0x0100)),
+    (0xF6, 7, Slot::Runs("IDIV r/m8", 0x003C, 0x0100)),
+    (0xF7, 0, Slot::Runs("TEST r/m16,i16", 0x003C, 0x0100)),
+    (
+        0xF7,
+        1,
+        Slot::Runs("TEST r/m16,i16 (undoc.)", 0x003C, 0x0100),
+    ),
+    (0xF7, 2, Slot::Runs("NOT r/m16", 0xFFC3, 0x0100)),
+    (0xF7, 3, Slot::Runs("NEG r/m16", 0xFFC4, 0x0100)),
+    (0xF7, 4, Slot::Runs("MUL r/m16", 0x003C, 0x0100)),
+    (0xF7, 5, Slot::Runs("IMUL r/m16", 0x003C, 0x0100)),
+    (0xF7, 6, Slot::Runs("DIV r/m16", 0x003C, 0x0100)),
+    (0xF7, 7, Slot::Runs("IDIV r/m16", 0x003C, 0x0100)),
+    // ---- "Shift": D0/D2 r/m8 and D1/D3 r/m16, all shifting 003Ch once with
+    // the carry set. `110` is the SETMO hole: not a shift at all, all ones.
+    (0xD0, 0, Slot::Runs("ROL r/m8,1", 0x0078, 0x0100)),
+    (0xD0, 1, Slot::Runs("ROR r/m8,1", 0x001E, 0x0100)),
+    (0xD0, 2, Slot::Runs("RCL r/m8,1", 0x0079, 0x0100)),
+    (0xD0, 3, Slot::Runs("RCR r/m8,1", 0x009E, 0x0100)),
+    (0xD0, 4, Slot::Runs("SHL r/m8,1", 0x0078, 0x0100)),
+    (0xD0, 5, Slot::Runs("SHR r/m8,1", 0x001E, 0x0100)),
+    (0xD0, 6, Slot::Runs("SETMO (undocumented)", 0x00FF, 0x0100)),
+    (0xD0, 7, Slot::Runs("SAR r/m8,1", 0x001E, 0x0100)),
+    (0xD1, 0, Slot::Runs("ROL r/m16,1", 0x0078, 0x0100)),
+    (0xD1, 1, Slot::Runs("ROR r/m16,1", 0x001E, 0x0100)),
+    (0xD1, 2, Slot::Runs("RCL r/m16,1", 0x0079, 0x0100)),
+    (0xD1, 3, Slot::Runs("RCR r/m16,1", 0x801E, 0x0100)),
+    (0xD1, 4, Slot::Runs("SHL r/m16,1", 0x0078, 0x0100)),
+    (0xD1, 5, Slot::Runs("SHR r/m16,1", 0x001E, 0x0100)),
+    (0xD1, 6, Slot::Runs("SETMO (undocumented)", 0xFFFF, 0x0100)),
+    (0xD1, 7, Slot::Runs("SAR r/m16,1", 0x001E, 0x0100)),
+    (0xD2, 0, Slot::Runs("ROL r/m8,CL", 0x0078, 0x0100)),
+    (0xD2, 1, Slot::Runs("ROR r/m8,CL", 0x001E, 0x0100)),
+    (0xD2, 2, Slot::Runs("RCL r/m8,CL", 0x0079, 0x0100)),
+    (0xD2, 3, Slot::Runs("RCR r/m8,CL", 0x009E, 0x0100)),
+    (0xD2, 4, Slot::Runs("SHL r/m8,CL", 0x0078, 0x0100)),
+    (0xD2, 5, Slot::Runs("SHR r/m8,CL", 0x001E, 0x0100)),
+    (0xD2, 6, Slot::Runs("SETMO (undocumented)", 0x00FF, 0x0100)),
+    (0xD2, 7, Slot::Runs("SAR r/m8,CL", 0x001E, 0x0100)),
+    (0xD3, 0, Slot::Runs("ROL r/m16,CL", 0x0078, 0x0100)),
+    (0xD3, 1, Slot::Runs("ROR r/m16,CL", 0x001E, 0x0100)),
+    (0xD3, 2, Slot::Runs("RCL r/m16,CL", 0x0079, 0x0100)),
+    (0xD3, 3, Slot::Runs("RCR r/m16,CL", 0x801E, 0x0100)),
+    (0xD3, 4, Slot::Runs("SHL r/m16,CL", 0x0078, 0x0100)),
+    (0xD3, 5, Slot::Runs("SHR r/m16,CL", 0x001E, 0x0100)),
+    (0xD3, 6, Slot::Runs("SETMO (undoc.)", 0xFFFF, 0x0100)),
+    (0xD3, 7, Slot::Runs("SAR r/m16,CL", 0x001E, 0x0100)),
+    // ---- "Group 2": FE r/m8 | FF r/m16.
+    (0xFE, 0, Slot::Runs("INC r/m8", 0x003D, 0x0100)),
+    (0xFE, 1, Slot::Runs("DEC r/m8", 0x003B, 0x0100)),
+    (0xFE, 2, Slot::Hole),
+    (0xFE, 3, Slot::Hole),
+    (0xFE, 4, Slot::Hole),
+    (0xFE, 5, Slot::Hole),
+    (0xFE, 6, Slot::Hole),
+    (
+        0xFE,
+        7,
+        Slot::Runs("PUSH r/m8 (undocumented)", 0x003C, 0x00FE),
+    ),
+    (0xFF, 0, Slot::Runs("INC r/m16", 0x003D, 0x0100)),
+    (0xFF, 1, Slot::Runs("DEC r/m16", 0x003B, 0x0100)),
+    (0xFF, 2, Slot::Runs("CALL r/m16", 0x003C, 0x00FE)),
+    (0xFF, 3, Slot::Runs("CALL m16:16", 0x003C, 0x00FC)),
+    (0xFF, 4, Slot::Runs("JMP r/m16", 0x003C, 0x0100)),
+    (0xFF, 5, Slot::Runs("JMP m16:16", 0x003C, 0x0100)),
+    (0xFF, 6, Slot::Runs("PUSH r/m16", 0x003C, 0x00FE)),
+    (0xFF, 7, Slot::Runs("PUSH r/m16 (undoc.)", 0x003C, 0x00FE)),
+];
+
+/// The digits with no 8086 instruction behind them, and the source that says so.
+///
+/// A hole here is a claim about the silicon, so every row names where it was
+/// read. `Table 4-13` is the Intel 8086 Family User's Manual's decoding guide
+/// as transcribed in `odd/research/documentation-guide.md` §1.3; `Shirriff` is
+/// *Undocumented 8086 instructions, explained by the microcode*.
+const HOLES: &[(u8, u8, &str)] = &[
+    (
+        0xFE,
+        2,
+        "Table 4-13 prints `(not used)`: only INC and DEC are defined for FE. \
+         Shirriff shows the 8086 runs the CALL rm microcode here, but with a \
+         byte-wide operand the target address and the pushed return address \
+         are both read a byte at a time, so what it computes depends on the \
+         bus rather than on the architecture. Not emulated.",
+    ),
+    (
+        0xFE,
+        3,
+        "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the CALL \
+         FAR rm microcode here, but it reads the new CS and the pushed old CS \
+         and PC as bytes, so the frame it writes depends on the bus. Not \
+         emulated.",
+    ),
+    (
+        0xFE,
+        4,
+        "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the JMP rm \
+         microcode here, but it reads a byte where the target address is, so \
+         the destination depends on the bus. Not emulated.",
+    ),
+    (
+        0xFE,
+        5,
+        "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the JMP \
+         FAR rm microcode here, but it reads the offset and the segment as \
+         bytes, so the destination depends on the bus. Not emulated.",
+    ),
+    (
+        0xFE,
+        6,
+        "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the PUSH rm \
+         microcode for FE /6 exactly as it does for FE /7, decrementing SP by \
+         two and writing only the byte, so SS:SP+1 keeps stale stack data. \
+         Out of AUDIT-6's scope, which named the /7 row; a one-line addition \
+         to the same arm.",
+    ),
+];
+
+/// One digit's worth of instruction, on a CPU whose state is fixed.
+///
+/// `opcode`, a ModR/M byte of `mod=00 reg=<digit> rm=110` — the direct form, so
+/// the operand is `DS:0100` — a `disp16` of `0100h`, and three spare bytes that
+/// serve as the immediate for whichever form the opcode takes.
+///
+/// The state is chosen so that the digits *within* a group produce different
+/// answers: `003Ch` against an immediate of `000Fh` with the carry already set
+/// separates all eight ALU operations, and the carry in also separates `RCL`
+/// and `RCR` from `ROL` and `ROR`. `CL` is 1 so the variable-shift opcodes
+/// reach their ALU at all.
+///
+/// `DF` is left clear. It is not set here and must not be set in a helper: it
+/// governs the string operations, and the `PUSH` rows below would have made
+/// that look like a stack-direction defect.
+fn digit_cpu(opcode: u8, digit: u8) -> Cpu {
+    assert!(
+        digit < 8,
+        "a ModR/M reg field is three bits: digit {digit} does not exist"
+    );
+    let modrm = 0b00_000_110 | (digit << 3);
+    let mut c = Cpu::new();
+    c.mem
+        .load_at(0x10000, &[opcode, modrm, 0x00, 0x01, 0x0F, 0x00, 0x00])
+        .unwrap();
+    c.regs.set_segment(Seg::Cs, 0x1000);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Ss, 0x3000);
+    c.regs.set_word(Reg16::Sp, 0x0100);
+    c.regs.set_byte(Reg8::Cl, 1);
+    c.mem.write_u16(0x2000, 0x0100, 0x003C);
+    c.regs.flags.0 = CF;
+    c
+}
+
+/// Every ModR/M `/digit` an 8086 group defines, and every digit it does not.
+///
+/// This is the second-byte counterpart to
+/// [`every_first_opcode_byte_the_8086_defines_decodes`], which cannot see any of
+/// it: a first-byte gate passes with the whole `reg` column wrong. Four such
+/// holes were open when this was written — `F6 /1`, `F7 /1`, `D0`-`D3 /6` and
+/// `FE`/`FF /7` — and `D0`-`D3 /6` was the dangerous one, because it did not
+/// error: it fell through to the 80186 `SAL` alias and executed the wrong
+/// instruction without a word.
+///
+/// The gate cannot go vacuous:
+///
+/// * `96`, `5` and `91` below are literals, never derived from a list of
+///   exclusions. Editing `HOLES` alone therefore fails on three separate
+///   counts at once.
+/// * `DIGITS` must be exactly the product of `GROUPS` and the eight `/digit`
+///   values — no missing key, no stray key, no duplicate.
+/// * Every hole in `HOLES` must appear in `DIGITS` as a `Hole` and every `Hole`
+///   in `DIGITS` must appear in `HOLES`, so neither table can be changed alone.
+/// * Every hole carries a reason naming the source that settles it.
+/// * Every `Runs` entry is executed and must leave the operand and the stack
+///   pointer where the sources say, which is what a `SHL`-shaped `SETMO` and a
+///   "decodes without erroring" check both fail.
+#[test]
+fn every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole() {
+    // Pinned literally. See the doc comment: a derived count is the defect the
+    // first gate shipped with.
+    const DIGIT_PAIRS: usize = 96;
+    const HOLE_COUNT: usize = 5;
+    const INSTRUCTION_COUNT: usize = 91;
+
+    // ---- the table is exactly the groups times the eight /digit values.
+    let mut keys: Vec<(u8, u8)> = Vec::with_capacity(DIGITS.len());
+    for &(op, digit, _) in DIGITS {
+        assert!(
+            digit < 8,
+            "DIGITS holds a {digit}, and a ModR/M reg field is three bits"
+        );
+        assert!(
+            !keys.contains(&(op, digit)),
+            "DIGITS names {op:#04x} /{digit} twice"
+        );
+        keys.push((op, digit));
+    }
+    assert_eq!(
+        keys.len(),
+        DIGIT_PAIRS,
+        "DIGITS must hold every (opcode, /digit) pair the 8086 resolves"
+    );
+    let mut expected: Vec<(u8, u8)> = GROUPS
+        .iter()
+        .flat_map(|(_, opcodes)| opcodes.iter())
+        .flat_map(|&op| (0..8u8).map(move |digit| (op, digit)))
+        .collect();
+    expected.sort_unstable();
+    let mut listed = keys.clone();
+    listed.sort_unstable();
+    assert_eq!(
+        listed, expected,
+        "DIGITS must be exactly GROUPS x the eight /digit values"
+    );
+
+    // ---- holes and instructions agree in both directions, and the literal
+    // counts agree with both. This is the part a mutation cannot survive.
+    let holes: Vec<(u8, u8)> = DIGITS
+        .iter()
+        .filter(|(_, _, slot)| *slot == Slot::Hole)
+        .map(|&(op, digit, _)| (op, digit))
+        .collect();
+    let instructions = DIGITS.len() - holes.len();
+    assert_eq!(holes.len(), HOLE_COUNT, "the 8086 has five /digit holes");
+    assert_eq!(
+        instructions, INSTRUCTION_COUNT,
+        "the other 91 /digit positions are instructions"
+    );
+    for &(op, digit, why) in HOLES {
+        assert!(
+            holes.contains(&(op, digit)),
+            "HOLES names {op:#04x} /{digit}, which DIGITS does not hold as a hole"
+        );
+        assert!(
+            why.contains("Table 4-13") || why.contains("Shirriff"),
+            "{op:#04x} /{digit}: a hole must name the source that settles it"
+        );
+        assert!(
+            why.len() >= 80,
+            "{op:#04x} /{digit}: a hole needs a one-line reason, not a gesture"
+        );
+    }
+    for &(op, digit) in &holes {
+        assert!(
+            HOLES.iter().any(|&(h, d, _)| (h, d) == (op, digit)),
+            "DIGITS holds {op:#04x} /{digit} as a hole that HOLES never explains"
+        );
+    }
+
+    // ---- and the machine agrees with the table.
+    for &(op, digit, slot) in DIGITS {
+        let mut c = digit_cpu(op, digit);
+        let name = format!("{op:#04x} /{digit}");
+        match slot {
+            Slot::Hole => {
+                assert_eq!(
+                    c.step(),
+                    Err(ExecError::UnknownOpcode(op)),
+                    "{name} is a hole and must not decode"
+                );
+            }
+            Slot::Runs(mnemonic, out, sp) => {
+                c.step()
+                    .unwrap_or_else(|e| panic!("{name} is {mnemonic} and must decode: {e:?}"));
+                assert_eq!(
+                    c.mem.read_u16(0x2000, 0x0100),
+                    out,
+                    "{name} is {mnemonic}: wrong value left at the operand"
+                );
+                assert_eq!(
+                    c.regs.word(Reg16::Sp),
+                    sp,
+                    "{name} is {mnemonic}: wrong stack pointer"
+                );
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------ AUDIT-6: /digit
+//
+// The gate above walks the 256 *first* bytes. It is structurally blind to the
+// second one, so the four known holes all sat in it unnoticed:
+//
+// * `F6 /1`, `F7 /1` — Table 4-13 prints `(not used)`, but the microcode
+//   matches `1111000?` and so runs the `/0` TEST, which is why the manual's
+//   own digit table has `TEST` on both `/0` and `/1` for the `F6`/`F7` column.
+// * `D0`-`D3 /6` — the manual prints `(not used)`; the 8086 selects the ALU's
+//   SETMO operation and stores all ones.
+// * `FE /7`, `FF /7` — the manual prints `(not used)`; the 8086 runs PUSH.
+
+/// The FLAGS pattern every test below starts from.
+///
+/// `CF` is set so that `ADC`/`SBB` differ from `ADD`/`SUB`, and `AF` is set so
+/// that "left alone" is a claim about a flag that actually *had* a value worth
+/// preserving. `DF` is deliberately **not** set: it governs the string
+/// operations, and a helper that presets it changes what a later push does.
+fn status_before() -> u16 {
+    CF | AF
+}
+
+/// `F6 /1` and `F7 /1` are `TEST r/m, imm`: an AND whose result is discarded.
+///
+/// Table 4-13 prints `(not used)` for `001` in the `F6`/`F7` column, but the
+/// 8086's microcode entry for this group matches the instruction bits
+/// `1111000?`, so `/1` runs the same three micro-instructions as `/0`. The
+/// observable is therefore identical to `F6 /0`, `84` and `85`: `ZF`, `SF` and
+/// `PF` from the **low byte** of the result, `CF` and `OF` cleared, `AF`
+/// untouched, and nothing written back.
+///
+/// The two opcodes are checked with immediates that a decoder reading the
+/// wrong number of bytes cannot fake: `F6` ANDs `34h` with `F0h` for `30h`,
+/// while `F7` ANDs `1234h` with the *word* `0F03h` for `0202h`.
+#[test]
+fn f6_one_and_f7_one_are_test_against_an_immediate() {
+    // (opcode, immediate bytes, expected flags, instruction length in bytes)
+    for (opcode, imm, want_zf, want_pf, length) in [
+        (0xF6u8, &[0xF0u8][..], false, true, 5usize), // 34h AND F0h = 30h
+        (0xF7, &[0x0F, 0x03], false, false, 6),       // 1234h AND 0F03h = 0202h
+    ] {
+        let mut code = vec![opcode, 0b00_001_110, 0x00, 0x01];
+        code.extend_from_slice(imm);
+        let mut c = cpu(&code);
+        c.regs.set_segment(Seg::Ds, 0x2000);
+        c.mem.write_u16(0x2000, 0x0100, 0x1234);
+        c.regs.flags.0 = status_before();
+        let info = c.step().unwrap();
+
+        assert_eq!(
+            c.regs.flags.get(ZF),
+            want_zf,
+            "{opcode:#04x} /1: ZF must come from the AND, not from the operand"
+        );
+        assert!(
+            !c.regs.flags.get(SF) && !c.regs.flags.get(CF) && !c.regs.flags.get(OF),
+            "{opcode:#04x} /1: the result is positive, so S is clear and C and O are cleared"
+        );
+        assert_eq!(
+            c.regs.flags.get(PF),
+            want_pf,
+            "{opcode:#04x} /1: PF is the parity of the low byte of the AND"
+        );
+        assert!(
+            c.regs.flags.get(AF),
+            "{opcode:#04x} /1: TEST is a logic operation and leaves AF alone"
+        );
+        assert_eq!(
+            c.mem.read_u16(0x2000, 0x0100),
+            0x1234,
+            "{opcode:#04x} /1: the AND result is discarded"
+        );
+        assert_eq!(
+            info.next_ip as usize, length,
+            "{opcode:#04x} /1: opcode + ModR/M + disp16 + the immediate"
+        );
+    }
+}
+
+/// `F6 /1` is `TEST r/m8` and `F7 /1` is `TEST r/m16`: the same digit, the same
+/// flags, and a different immediate width. The second byte of `F7 /1`'s
+/// immediate is what separates them — read one byte too few and the AND
+/// becomes zero.
+#[test]
+fn f7_one_reads_a_word_immediate_and_f6_one_a_byte() {
+    // 1234h AND 0F03h = 0202h, so ZF is clear.
+    let mut c = cpu(&[0xF7, 0b00_001_110, 0x00, 0x01, 0x0F, 0x03]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.mem.write_u16(0x2000, 0x0100, 0x1234);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+    assert!(
+        !c.regs.flags.get(ZF),
+        "1234h AND 0003h would be zero; 0F03h is not"
+    );
+
+    // 34h AND 03h is 00h, so ZF is set.
+    let mut c = cpu(&[0xF6, 0b00_001_110, 0x00, 0x01, 0x03]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.mem.write_u16(0x2000, 0x0100, 0x1234);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+    assert!(c.regs.flags.get(ZF), "34h AND 03h is zero");
+}
+
+/// `D0`-`D3 /6` is SETMO: the operand takes all ones.
+///
+/// Table 4-13 prints `(not used)` for `110` in the Shift table. The 8086 does
+/// not error and does not shift either: `/6` selects the ALU's SETMO operation,
+/// which returns `FFh` or `FFFFh`, and the shared shift microcode
+/// (`M -> tmpB, XI tmpB` then `S -> M`) writes that back to the operand. Before
+/// this was fixed the digit fell through to the 80186 `SAL` alias and quietly
+/// executed the wrong instruction.
+#[test]
+fn d0_to_d3_six_store_all_ones() {
+    for (opcode, value) in [
+        (0xD0u8, 0x00FFu16), // byte
+        (0xD1, 0xFFFF),
+        (0xD2, 0x00FF), // byte, count from CL
+        (0xD3, 0xFFFF), // word, count from CL
+    ] {
+        let mut c = cpu(&[opcode, 0b00_110_110, 0x00, 0x01]);
+        c.regs.set_segment(Seg::Ds, 0x2000);
+        c.mem.write_u16(0x2000, 0x0100, 0x003C);
+        c.regs.set_byte(Reg8::Cl, 1); // the D2/D3 count, so the digit is reached
+        c.regs.flags.0 = status_before();
+        c.step().unwrap();
+
+        assert_eq!(
+            c.mem.read_u16(0x2000, 0x0100),
+            value,
+            "{opcode:#04x} /6 must store all ones, not shift the operand"
+        );
+    }
+}
+
+/// SETMO's flags are the flags of the value it produced. `FFh` has eight set
+/// bits, so parity is even and `PF` is set; it is never zero, so `ZF` is
+/// clear; its top bit is set, so `SF` is set. A logic operation does not write
+/// `AF`, so the `AF` the instruction found is the `AF` it leaves.
+#[test]
+fn setmo_flags_are_the_flags_of_the_result() {
+    let mut c = cpu(&[0xD1, 0b00_110_110, 0x00, 0x01]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.mem.write_u16(0x2000, 0x0100, 0x0000);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+
+    assert!(c.regs.flags.get(SF), "FFFFh is negative");
+    assert!(!c.regs.flags.get(ZF), "FFFFh is not zero");
+    assert!(
+        c.regs.flags.get(PF),
+        "FFh has eight set bits, an even count"
+    );
+    assert!(!c.regs.flags.get(CF) && !c.regs.flags.get(OF));
+    assert!(
+        c.regs.flags.get(AF),
+        "SETMO is not an addition and writes no AF"
+    );
+}
+
+/// A `CL` count of zero changes nothing, flags included. That rule holds for
+/// every digit in the Shift group and SETMO is no exception: the variable-shift
+/// microcode loops `CL` times, so with `CL = 0` the ALU is never selected and
+/// the operand keeps the value it had.
+#[test]
+fn setmo_with_a_zero_count_changes_nothing() {
+    let mut c = cpu(&[0xD3, 0b00_110_110, 0x00, 0x01]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.mem.write_u16(0x2000, 0x0100, 0x1234);
+    c.regs.set_byte(Reg8::Cl, 0);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+
+    assert_eq!(
+        c.mem.read_u16(0x2000, 0x0100),
+        0x1234,
+        "CL = 0 leaves the operand alone"
+    );
+    assert_eq!(c.regs.flags.0, status_before(), "CL = 0 writes no flag");
+}
+
+/// `FE /7` and `FF /7` are `PUSH r/m`. Table 4-13 prints `(not used)` for both,
+/// and the 8086 runs PUSH anyway: bits 5-3 of the ModR/M byte replace bits 2-0
+/// of the opcode, so both become `FF` with the `110` selection that is PUSH.
+///
+/// `SP` falls by two and the value lands at the new `SS:SP`. The decrement is
+/// unconditional: the stack that follows `DF` arrived with the 80186, and here
+/// `DF` is set *on* to prove it.
+///
+/// Shirriff's listing for `FE /6` — the same PUSH microcode `FE /7` reaches —
+/// writes one *byte* at `SS:SP` and leaves the byte above it stale. The width
+/// this test pins is the operand width, which is what the manual's own
+/// byte-column/word-column split for `FE`/`FF` means; the pushed word is
+/// therefore zero-extended here rather than half a word of stale stack.
+#[test]
+fn fe_seven_and_ff_seven_push_the_operand() {
+    // FF /7, the word form, with DF deliberately set.
+    let mut c = cpu(&[0xFF, 0b00_111_110, 0x00, 0x01]);
+    stack_grows_down(&c);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Ss, 0x3000);
+    c.mem.write_u16(0x2000, 0x0100, 0xBEEF);
+    c.mem.write_u16(0x3000, 0x0100, 0x1111); // the slot the push will land in
+    c.regs.flags.set(DF, true);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Sp), 0x00FE, "the 8086 stack ignores DF");
+    assert_eq!(c.mem.read_u16(0x3000, 0x00FE), 0xBEEF);
+
+    // FE /7, the byte form: it reads a byte, so what it pushes is 00EFh rather
+    // than the whole BEEFh word.
+    let mut c = cpu(&[0xFE, 0b00_111_110, 0x00, 0x01]);
+    stack_grows_down(&c);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Ss, 0x3000);
+    c.mem.write_u16(0x2000, 0x0100, 0xBEEF);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Sp), 0x00FE);
+    assert_eq!(
+        c.mem.read_u16(0x3000, 0x00FE) & 0x00FF,
+        0xEF,
+        "FE /7 reads its operand as a byte"
+    );
+    assert_eq!(
+        c.mem.read_u16(0x2000, 0x0100),
+        0xBEEF,
+        "PUSH reads the operand and leaves it where it was"
+    );
+}
+
+/// PUSH writes no flag. It is the same instruction as `FF /6`, and neither
+/// form may disturb the status flags the instruction found.
+#[test]
+fn push_from_group_two_writes_no_flag() {
+    let mut c = cpu(&[0xFF, 0b00_111_110, 0x00, 0x01]);
+    stack_grows_down(&c);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Ss, 0x3000);
+    c.mem.write_u16(0x2000, 0x0100, 0xBEEF);
+    c.regs.flags.0 = status_before();
+    c.step().unwrap();
+
+    assert_eq!(c.regs.flags.0, status_before(), "PUSH writes no flag");
+}
