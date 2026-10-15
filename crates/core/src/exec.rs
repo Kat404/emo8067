@@ -261,15 +261,12 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // `LOCK` is accepted on any byte it covers, matching the hardware: the
     // 8086 drives LOCK# and has no invalid-opcode trap to object. A later
     // segment override simply replaces an earlier one rather than composing.
-    let mut lock = false;
     while let Some(next) = prefix_effect(opcode) {
         if let Some(seg) = next {
             cpu.seg_override = Some(seg);
         }
-        lock = true;
         opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
     }
-    let _ = lock;
 
     let result = dispatch(cpu, opcode);
     // Cleared even on a fault, so a pending override cannot leak into the
@@ -300,11 +297,9 @@ fn prefix_effect(opcode: u8) -> Option<Option<Seg>> {
 
 /// Run one instruction whose opcode byte has already been fetched.
 ///
-/// `F0` needs this separate from [`step`]: LOCK is a prefix, so the
-/// instruction it covers runs from here rather than from a second fetch in
-/// [`step`]. Everything else reaches the dispatcher through [`step`] alone.
-///
-/// There is deliberately no catch-all arm: the 8086 leaves no first opcode
+/// Prefixes never reach here: [`step`] consumes a whole run of them before
+/// calling this, so a prefix byte is unreachable by construction and says
+/// so. That is also why this match has no catch-all arm: the 8086 leaves no first opcode
 /// byte undecoded, so all 256 are matched below and a future hole becomes a
 /// compile error rather than a runtime surprise. [`ExecError::UnknownOpcode`]
 /// still comes from the helpers, for a `/digit` or a `mod` the 8086 does not
@@ -325,9 +320,8 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // Segment pushes and pops also live inside 0x00..=0x3F, at 06, 0E,
         // 16 and 1E, so they are matched here for the same reason.
         0x06 | 0x07 | 0x0E | 0x0F | 0x16 | 0x17 | 0x1E | 0x1F => segment_push_pop(cpu, opcode)?,
-        // The four segment override prefixes sit in the same quarter of the
-        // table as `DAA`, `AAA` and the ALU groups, so they are matched ahead
-        // of them. Nothing else in `00..=3F` may be allowed to see these bytes.
+        // `DAA`, `DAS`, `AAA` and `AAS` sit inside `00..=3F`, so they are
+        // matched before the arithmetic groups or they are never reached.
         0x27 => daa(cpu, true),
         0x2F => daa(cpu, false),
         0x37 => aaa(cpu, true),
@@ -1538,13 +1532,13 @@ fn jmp_far_immediate(cpu: &mut crate::Cpu) {
 /// `2E` CS, `36` SS and `3E` DS. Each one changes the segment the *next*
 /// instruction's memory operand addresses through, and nothing else about it.
 ///
-/// The covered instruction is dispatched from here, like `LOCK` and like
-/// `REP`, so the prefix and what it modifies retire as one step and `IP` lands
-/// past both. The override is on the [`crate::Cpu`] for exactly that long: set
-/// on the way in, dropped on the way out even when the instruction faults, so
-/// one prefix binds to one instruction and never leaks into the one after it.
-/// Two prefixes in front of the same instruction therefore leave the *later*
-/// one in force rather than composing the two.
+/// A pending override is on the [`crate::Cpu`] from the prefix byte until the
+/// instruction it covers retires, set on the way in and dropped on the way out
+/// even when that instruction faults, so one prefix binds to one instruction
+/// and never leaks into the next. Two prefixes therefore leave the *later* one
+/// in force rather than composing, which is what the Group Decode ROM's
+/// "column 32 loads the segment latches" implies: one set of latches, loaded
+/// once per byte.
 ///
 /// The segment a memory operand addresses through: the pending override if a
 /// prefix byte named one, otherwise `DS`.

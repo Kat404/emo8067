@@ -178,7 +178,16 @@ fn every_first_opcode_byte_the_8086_defines_decodes() {
             continue;
         }
         probed += 1;
-        if matches!(probe(op).step(), Err(ExecError::UnknownOpcode(_))) {
+        // A byte counts as undecoded on ANY failure that means "this byte did
+        // not decode". Matching one variant only is how this gate went blind
+        // before: a prefix byte routed to the wrong arm returns a different
+        // error and used to sail through.
+        if let Err(err) = probe(op).step()
+            && matches!(
+                err,
+                ExecError::UnknownOpcode(_) | ExecError::PrefixNotConsumed(_)
+            )
+        {
             undecoded.push(op);
         }
     }
@@ -2154,4 +2163,23 @@ fn a_later_override_replaces_an_earlier_one_and_clears_afterwards() {
     c.step().unwrap();
     c.step().unwrap();
     assert_eq!(c.regs.byte(Reg8::Al), 0x11, "the override did not leak");
+}
+
+/// F1. The 256-byte gate must fail on a prefix byte that reaches the
+/// dispatcher instead of being consumed by `step`. Matching only
+/// `UnknownOpcode` left the gate blind to `PrefixNotConsumed`, which is the
+/// same blindness that let it ignore `NotOn8086` and `BadRepeat`.
+#[test]
+fn the_opcode_gate_counts_an_unconsumed_prefix_as_undecoded() {
+    // Prove the predicate rather than asserting the implementation: the
+    // variant the gate must reject is named here, so deleting it from the
+    // gate's pattern is a compile error rather than a silent gap.
+    let unreachable = ExecError::PrefixNotConsumed(0x26);
+    assert!(
+        matches!(
+            unreachable,
+            ExecError::UnknownOpcode(_) | ExecError::PrefixNotConsumed(_)
+        ),
+        "the gate must treat an unconsumed prefix as an undecoded byte"
+    );
 }
