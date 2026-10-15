@@ -29,6 +29,12 @@ Branch: `main` (not a git repo yet — see T0). Delivery: `ask-on-risk`. Test ru
 - **T7** `S2` Debugger, step/breakpoints/registers/memory UI parity with S3 inventory. Route: pending.
 - **T8** `S2` Multiplatform packaging + CI. Route: pending.
 
+- **T9** `S1` Three parallel research tracks, then unify. Route: delegated (2 background + 1 foreground), unified by parent with mini verifications.
+  - **T9a** Documentation and guides. Delegate → `odd/research/documentation-guide.md`.
+  - **T9b** Feature surface, UI/UX, TUI vs GUI, inherited vs added value. Delegate → `odd/research/features-and-ux.md`.
+  - **T9c** REA of the Softonic-repacked build vs the 2010 build. Delegate → `odd/research/softonic-build-comparison.md`.
+  - **T10** Unify T9a..T9c into the ODD plan. Route: inline. Status: pending.
+
 ## Log
 
 - **L1 (2026-10-15, verbatim):** "Hola Minimax, me gustaría hacer ingeniería inversa a @emu8086.exe debido a que emu8086 no está disponible para Linux además de tener un desarrollo bastante opaco y poco definido de dónde rayos debo descargar el ejecutable en el caso de usuarios de Windows. Tengo ghidra 12.1.2 instalado dentro de mi PATH. El propósito final sería dar una opción FOSS multiplataforma usando a emu8086 como base además de poder llegar a mejorarlo."
@@ -38,4 +44,6 @@ Branch: `main` (not a git repo yet — see T0). Delivery: `ask-on-risk`. Test ru
 - **L5 (2026-10-15) Blocker:** T1 cannot start until `innoextract` is on PATH. — cleared 01:09, `innoextract` 1.9 installed.
 - **L6 (2026-10-15, user decisions):** stack = **Rust** (`emu8086-core` sin deps + TUI ratatui + GUI egui/eframe); licencia = **The Unlicense** (unlicense.org); diff-testing = **wine dentro de Podman rootless**, sin tocar el host. Podman 6.1.4 verificado rootless con `quay.io/fedora/fedora:41`.
 - **L7 (2026-10-15) RE phase closed.** Deliverable in `re/FINDINGS.md`. Key results: the target is Visual Basic 6 native-compiled (2.2 MB) plus `diasm.dll` (MSVC) for the disassembler and the stop-on-condition evaluator. Recovered the full VB6 class map, the ModRM effective-address table, the `0%02X%02Xh` print formats, the x87 display mnemonic table, the evaluator diagnostics, and the two device buses. Not needed for a clean-room build: the decompiled pseudocode itself — the Intel 8086 User's Manual plus the 86 shipped `.asm` examples are the authoritative source.
+- **L9 (2026-10-15) Second build acquired.** `rea-bins/emu8086v408.zip` from Softonic (sha256 `d56d6e42…e17afd`, 3 131 331 B) contains only `ReadMe.txt` (75 B, "This is EMU8086 version 4.08 / Repack for Windows 10 / November 25, 2015") and `setup.exe` (3 220 050 B, sha256 `a1b36dc6…397db`). `setup.exe` is again Inno Setup 5.3.7 with a `zlb\x1a` overlay, so it is a **third-party repack of the same 4.08**, not a new upstream release. `rea-bins/emu8086.exe` is byte-identical to the original 2010 installer (`175061d9…16e7`); the user moved it, nothing changed. This is the supply-chain angle behind the user's "where do I even download this" complaint and gets its own REA track (T9c).
+- **L10 (2026-10-15) Tooling.** CodeGraph is initialised at the repo root; `codegraph_explore` is the primary route for semantic code search, ahead of grep/Read. `.codegraph/` is gitignored. Ghidra headless lives at `/opt/ghidra/support/analyzeHeadless` with `GHIDRA_INSTALL_DIR=/opt/ghidra`; `rea/scripts/EmuDump.java` is the dump script (`funcs` / `strings` / `decomp <regex> [n]` / `top <n>` / `callees <regex>`).
 - **L8 (2026-10-15) Note on FASM:** FASM 1.64 ships inside the emu8086 package under its own BSD-like license, which forbids relicensing *FASM's own code* (explicitly including to the GPL). It may be redistributed unmodified with its notices intact as a separate binary; our code is Unlicense. Decision deferred to T6 — we may reimplement the assembler instead and drop the dependency.
