@@ -2562,6 +2562,116 @@ fn rep_with_a_zero_count_runs_no_iterations() {
     assert_eq!(c.mem.read_u8(0x9000, 0x0300), 0xFF, "nothing was written");
 }
 
+/// `REP` or `REPNE` in front of a multiply negates the product, and in front
+/// of a signed divide negates the quotient.
+///
+/// The source is the microcode itself, extracted from an 8086 die and
+/// disassembled by Andrew Jenner (reenigne.org/blog/8086-microcode-disassembled/):
+/// "Using the REP or REPNE prefix with a MUL or IMUL instruction negates the
+/// product. Using the REP or REPNE prefix with an IDIV instruction negates the
+/// quotient." The multiply and divide microcode flips its internal F1 flag once
+/// per negative sign in the inputs, and the REP prefix is what loads that flag,
+/// so the sign of the result is inverted as a side effect. Nothing about the
+/// FLAGS register changes: MUL, IMUL and IDIV define none of them, and the
+/// inversion happens in the result, not in a flag.
+///
+/// `DIV` is unsigned and has no sign handling to invert, and neither does the
+/// byte form of `MUL` differently from the word form.
+#[test]
+fn rep_negates_a_multiply_and_a_signed_divide() {
+    // F7 E1 = MUL CX: mod=11, reg=/4, rm=CX. 3 * 5 = 15, negated to -15.
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1]);
+    c.regs.set_word(Reg16::Ax, 3);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.step().unwrap();
+    assert_eq!(
+        (c.regs.word(Reg16::Ax), c.regs.word(Reg16::Dx)),
+        (0xFFF1, 0xFFFF),
+        "15 negated to FFF1h with the high half sign-extended"
+    );
+
+    // The same instruction without the prefix still multiplies plainly.
+    let mut plain = cpu(&[0xF7, 0xE1]);
+    plain.regs.set_word(Reg16::Ax, 3);
+    plain.regs.set_word(Reg16::Cx, 5);
+    plain.step().unwrap();
+    assert_eq!(
+        (plain.regs.word(Reg16::Ax), plain.regs.word(Reg16::Dx)),
+        (0x000F, 0x0000),
+        "without REP nothing is negated"
+    );
+
+    // F7 F9 = IDIV CX. 100 / 5 = 20, negated to -20.
+    let mut c = cpu(&[0xF2, 0xF7, 0xF9]);
+    c.regs.set_word(Reg16::Dx, 0);
+    c.regs.set_word(Reg16::Ax, 100);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        (-20i32) as u16,
+        "REPNE negated the quotient to FFECH"
+    );
+}
+
+/// `DIV` is unsigned, so its microcode has no sign flag to invert and the
+/// latch reaches nobody: `F3 F6 F1` divides exactly like a bare `F6 F1`. This
+/// is the negative control for the test above — without it, a latch that was
+/// honoured everywhere by accident would still pass.
+#[test]
+fn rep_does_not_change_an_unsigned_divide() {
+    let mut c = cpu(&[0xF3, 0xF6, 0xF1]); // DIV CL
+    c.regs.set_word(Reg16::Ax, 0x0064);
+    c.regs.set_byte(Reg8::Cl, 0x07);
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 14, "100 / 7 = 14 remainder 2");
+    assert_eq!(c.regs.byte(Reg8::Ah), 2);
+}
+
+/// The inversion is in the result, never in FLAGS: a multiply defines CF and OF
+/// and REP must not disturb them.
+#[test]
+fn rep_does_not_change_the_flags_of_a_multiply() {
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1]);
+    c.regs.set_word(Reg16::Ax, 3);
+    c.regs.set_word(Reg16::Cx, 5);
+    let before = c.regs.flags;
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.flags.0 & (CF | OF),
+        before.0 & (CF | OF),
+        "a product that fits sets neither, with or without REP"
+    );
+
+    // An overflowing product still sets both with REP in front.
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1]);
+    c.regs.set_word(Reg16::Ax, 0x8000);
+    c.regs.set_word(Reg16::Cx, 0x0002);
+    c.step().unwrap();
+    assert!(
+        c.regs.flags.get(CF) && c.regs.flags.get(OF),
+        "0x8000 * 2 does not fit in AX, and REP did not hide it"
+    );
+}
+
+/// The latch is consumed by the multiply it covered. A `MUL` after a `REP MUL`
+/// multiplies plainly, exactly like one after any other instruction.
+#[test]
+fn the_rep_latch_does_not_outlive_the_multiply_it_negated() {
+    let mut c = cpu(&[0xF3, 0xF7, 0xE1, 0xF7, 0xE1]);
+    c.regs.set_word(Reg16::Ax, 3);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0xFFF1, "the first MUL was negated");
+    c.regs.set_word(Reg16::Ax, 3);
+    c.step().unwrap();
+    assert_eq!(
+        (c.regs.word(Reg16::Ax), c.regs.word(Reg16::Dx)),
+        (0x000F, 0x0000),
+        "the second MUL is plain"
+    );
+}
+
 /// `REPE CMPSB` stops at the first pair that does not compare equal, and the
 /// comparison that stopped it has already been made: both pointers and the
 /// count account for it.

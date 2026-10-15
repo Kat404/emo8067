@@ -1742,6 +1742,20 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         _ => return Err(ExecError::UnknownOpcode(opcode)),
     };
 
+    let (lo, hi) = if inverts(cpu, op) {
+        // The multiply and divide microcode flips its internal F1 flag once per
+        // negative sign in the inputs, and a REP prefix is what loads that flag,
+        // so the result comes out inverted (Andrew Jenner, from the microcode
+        // extracted from an 8086 die: "Using the REP or REPNE prefix with a MUL
+        // or IMUL instruction negates the product"). The inversion is in the
+        // result: these opcodes define CF and OF from the magnitude, and the
+        // negation of a fitting result still fits, so neither flag moves.
+        let (neg_lo, carry) = lo.overflowing_neg();
+        (neg_lo, if carry { !hi } else { hi })
+    } else {
+        (lo, hi)
+    };
+
     if bits == 8 {
         cpu.regs.set_word(Reg16::Ax, (lo & 0x00FF) | (hi << 8));
     } else {
@@ -1749,6 +1763,16 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         cpu.regs.set_word(Reg16::Dx, hi);
     }
     Ok(())
+}
+
+/// Whether the pending repeat latch inverts this multiply or divide result.
+///
+/// `MUL`, `IMUL` and `IDIV` sign their results and read the latch; `DIV` is
+/// unsigned and has no sign to invert. `TEST`, `NOT` and `NEG` are not
+/// multiplies at all: `/digit` is used to reach them, and each returns before
+/// this point, so only `/4`, `/5`, `/6` and `/7` can arrive here.
+fn inverts(cpu: &crate::Cpu, digit: u8) -> bool {
+    cpu.rep.is_some() && matches!(digit & 0b111, 0x4 | 0x5 | 0x7)
 }
 
 /// `MUL`/`IMUL` define CF and OF together: both set when the product did not
