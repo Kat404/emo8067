@@ -255,6 +255,13 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
 /// `F0` needs this separate from [`step`]: LOCK is a prefix, so the
 /// instruction it covers runs from here rather than from a second fetch in
 /// [`step`]. Everything else reaches the dispatcher through [`step`] alone.
+///
+/// There is deliberately no catch-all arm: the 8086 leaves no first opcode
+/// byte undecoded, so all 256 are matched below and a future hole becomes a
+/// compile error rather than a runtime surprise. [`ExecError::UnknownOpcode`]
+/// still comes from the helpers, for a `/digit` or a `mod` the 8086 does not
+/// have. The gate that keeps the claim true is
+/// `every_first_opcode_byte_the_8086_defines_decodes`.
 fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match opcode {
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
@@ -299,17 +306,20 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0xC6 | 0xC7 => mov_to_immediate(cpu, opcode)?,
         0xC4 | 0xC5 => load_far_pointer(cpu, opcode)?,
         // ---- control transfer
-        0x70..=0x7F => jcc(cpu, opcode)?,
+        // `60`-`6F` are not in Table 4-13 at all, but the 8086 runs its
+        // conditional-jump microcode for the whole bit pattern `011?????`
+        // and takes the condition from the low nibble, so they alias `70`-`7F`.
+        0x60..=0x7F => jcc(cpu, (opcode & 0x0F) | 0x70)?,
         0xE8 => call_relative(cpu)?,
         0xE9 | 0xEB => jmp_relative(cpu, opcode)?,
-        0xC2 | 0xC3 => ret(cpu, opcode)?,
-        0xCA | 0xCB => ret_far(cpu, opcode),
+        0xC0..=0xC3 => ret(cpu, opcode)?,
+        0xC8..=0xCB => ret_far(cpu, opcode),
         0xCC | 0xCD => int(cpu, opcode)?,
         0xCE => into(cpu),
         0xCF => iret(cpu),
         0x9A => call_far_immediate(cpu),
         0xEA => jmp_far_immediate(cpu),
-        0xF0 => lock(cpu)?,
+        0xF0 | 0xF1 => lock(cpu)?,
         0xFF => ff_group(cpu, opcode)?,
         // ---- string operations, ports and segment transfers
         0xA4..=0xA7 | 0xAA..=0xAF => string_op(cpu, opcode)?,
@@ -320,7 +330,12 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0xD0..=0xD3 => shift_group(cpu, opcode)?,
         0xD4 => aam(cpu),
         0xD5 => aad(cpu),
+        // `D6` is `SALC`, an alias for `AL = CF ? FFh : 00h`. The opcode
+        // table prints it as not used; the 8086 runs it as its own entry.
+        0xD6 => salc(cpu),
         0xD7 => xlat(cpu),
+        // `D8`-`DF` are `ESC 0`-`ESC 7`, the gateway to an 8087.
+        0xD8..=0xDF => escape(cpu)?,
         0x40..=0x47 => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, true)?,
         0x48..=0x4F => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, false)?,
         // FE /0 and /1 are INC and DEC on a byte; FF /0 and /1 are the word
@@ -400,7 +415,6 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let word = pop(&cpu.mem, &mut cpu.regs);
             cpu.regs.flags = Flags::popped(word);
         }
-        other => return Err(ExecError::UnknownOpcode(other)),
     }
     Ok(())
 }
@@ -1346,9 +1360,12 @@ fn call_relative(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
     Ok(())
 }
 
-/// `C3` returns, `C2` returns and releases `imm16` bytes of arguments.
+/// `C3` returns, `C2` returns and releases `imm16` bytes of arguments, and
+/// `C0`/`C1` are the same two encodings without the immediate: the 8086 runs
+/// its `RET` microcode for the bit pattern `1100?0?0`, so bit 0 is what
+/// separates `C2 iw` from `C3`.
 fn ret(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
-    let adjust = if opcode == 0xC2 {
+    let adjust = if matches!(opcode, 0xC0 | 0xC2) {
         take_u16(&cpu.mem, &mut cpu.regs)
     } else {
         0
@@ -1381,9 +1398,10 @@ fn iret(cpu: &mut crate::Cpu) {
 }
 
 /// `CA` is `RETF` and `CB` is `RETF iw`. The stack order is the mirror of
-/// [`call_far_immediate`]: IP comes off first, then CS.
+/// [`call_far_immediate`]: IP comes off first, then CS. `C8` and `C9` are
+/// the same two encodings without the immediate, as for [`ret`].
 fn ret_far(cpu: &mut crate::Cpu, opcode: u8) {
-    let release = if opcode == 0xCB {
+    let release = if matches!(opcode, 0xC8 | 0xCA) {
         take_u16(&cpu.mem, &mut cpu.regs)
     } else {
         0
@@ -1424,11 +1442,29 @@ fn jmp_far_immediate(cpu: &mut crate::Cpu) {
     cpu.regs.set_segment(Seg::Cs, segment);
 }
 
-/// `F0` is `LOCK`. It changes no arithmetic on an 8086 and the manual defines
-/// no timing for it, so the instruction it covers runs as it would alone.
+/// `F0` is `LOCK`, and `F1` is a second one. `F1` is decoded in logic rather
+/// than microcode, and the Group Decode ROM gives it the same outputs as
+/// `F0`. LOCK changes no arithmetic on an 8086 and the manual defines no
+/// timing for it, so the instruction it covers runs as it would alone.
 fn lock(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
     let covered = fetch_u8(&cpu.mem, &mut cpu.regs);
     dispatch(cpu, covered)
+}
+
+/// `D6` is `SALC`: `AL` takes the carry, all-ones when `CF` is set. The
+/// opcode table prints it as not used, but the 8086 gives it its own microcode
+/// entry and Intel's own test for a copied part is whether it answers.
+fn salc(cpu: &mut crate::Cpu) {
+    let carry = cpu.regs.flags.get(CF);
+    cpu.regs.set_byte(Reg8::Al, if carry { 0xFF } else { 0x00 });
+}
+
+/// `D8`-`DF` are `ESC 0`-`ESC 7`, the gateway to an 8087. With no
+/// coprocessor on the bus nothing performs the operand access the ModR/M
+/// byte names, so all that is left of the instruction is its length.
+fn escape(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
+    let _ = decode_from(cpu)?;
+    Ok(())
 }
 
 /// `D4 ib` is `AAM`: AL splits into a quotient in AL and a remainder in AH,
@@ -1495,6 +1531,26 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         0x4 => {
             cpu.regs.ip = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+        }
+        // `FF /3` and `FF /5` are the inter-segment `CALL` and `JMP`. Both
+        // take a four-byte pointer at the effective address, offset word
+        // first; the manual gives them a memory operand and no flags.
+        0x3 | 0x5 => {
+            let Operand::Mem { seg, base, disp } = m.rm else {
+                return Err(ExecError::UnsupportedFFGroup(m.reg & 0b111));
+            };
+            let at = offset_of(&cpu.regs, base, disp);
+            let segment_base = cpu.regs.segment(seg);
+            let offset = cpu.mem.read_u16(segment_base, at);
+            let segment = cpu.mem.read_u16(segment_base, at.wrapping_add(2));
+            if m.reg & 0b111 == 0x3 {
+                let cs = cpu.regs.segment(Seg::Cs);
+                let ret = cpu.regs.ip;
+                push(&mut cpu.mem, &mut cpu.regs, cs);
+                push(&mut cpu.mem, &mut cpu.regs, ret);
+            }
+            cpu.regs.ip = offset;
+            cpu.regs.set_segment(Seg::Cs, segment);
         }
         other => return Err(ExecError::UnsupportedFFGroup(other)),
     }
@@ -3208,8 +3264,10 @@ mod tests {
     /// `iw` bytes of arguments.
     #[test]
     fn retf_pops_ip_then_cs_and_releases_arguments() {
-        // CB 04 00 = RETF 4
-        let mut cpu = cpu_at(&[0xCB, 0x04, 0x00]);
+        // CA 04 00 = RETF 4. Table 4-13 puts the immediate on CA; CB is the
+        // bare far return. The microcode entry agrees: the `RET/RETF iw`
+        // routine runs for `1100?0?0`, i.e. C0, C2, C8 and CA.
+        let mut cpu = cpu_at(&[0xCA, 0x04, 0x00]);
         cpu.regs.set_segment(Seg::Ss, 0x2000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.mem.write_u16(0x2000, 0x0100, 0x0777); // IP, read at SP
@@ -3225,8 +3283,8 @@ mod tests {
         );
         assert!(cpu.regs.flags.get(CF), "RETF touches no flag");
 
-        // CA carries no immediate and so releases nothing.
-        let mut cpu = cpu_at(&[0xCA]);
+        // CB carries no immediate and so releases nothing.
+        let mut cpu = cpu_at(&[0xCB]);
         cpu.regs.set_segment(Seg::Ss, 0x2000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.mem.write_u16(0x2000, 0x0100, 0x0999); // IP

@@ -4,8 +4,9 @@
 //! wrong, so each is pinned here with the bytes that trigger it.
 
 use emo8067_core::Cpu;
+use emo8067_core::StopReason;
 use emo8067_core::exec::ExecError;
-use emo8067_core::flags::{AF, CF, OF, ONE, PF, SF, ZF};
+use emo8067_core::flags::{AF, CF, DF, IF, OF, ONE, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 
 fn cpu(code: &[u8]) -> Cpu {
@@ -15,6 +16,21 @@ fn cpu(code: &[u8]) -> Cpu {
     c.regs.set_segment(Seg::Ss, 0x1000);
     c.regs.set_word(Reg16::Sp, 0x0100);
     c
+}
+
+/// Assert the stack still grows downward before a test that reads or writes
+/// it.
+///
+/// `PUSH` and `POP` follow `DF`, so a setup helper that set *every* status
+/// flag would silently reverse the 8086 stack and turn a correct
+/// implementation into a failing test — or, worse, hide a real one. No helper
+/// in this file sets `DF`; this states that where it matters instead of
+/// leaving it to a comment.
+fn stack_grows_down(c: &Cpu) {
+    assert!(
+        !c.regs.flags.get(DF),
+        "DF must be clear: PUSH/POP follow it"
+    );
 }
 
 fn run(c: &mut Cpu, n: usize) {
@@ -118,41 +134,88 @@ fn opcode_0f_pops_cs() {
     );
 }
 
-/// A sweep over the encodings still absent, so the gap is visible rather than
-/// assumed. This fails until T11 completes; it is the to-do list, not a claim.
+/// Bytes the 8086 leaves with no instruction at all: **none**. The list is
+/// empty because every one of the 256 first opcode bytes decodes. The 8086
+/// Family User's Manual's Table 4-13 prints 23 of them as `(not used)`, and
+/// every one of those 23 executes something — they are the undocumented
+/// instructions, not holes.
+///
+/// Sources, both primary:
+///
+/// * Ken Shirriff, *Undocumented 8086 instructions, explained by the
+///   microcode*, <http://www.righto.com/2023/07/undocumented-8086-instructions.html>.
+///   Its "Holes in the opcode table" section walks `D6` (SALC), `0F`
+///   (`POP CS`), `60`-`6F` (aliases for `70`-`7F`), `C0`/`C8`
+///   (`RET`/`RETF` imm16), `C1`/`C9` (`RET`/`RETF`) and `F1` (a second
+///   `LOCK` prefix), showing the microcode each one runs.
+/// * Andrew Jenner's disassembly of the real 8086 microcode ROM,
+///   <https://github.com/reenigne/reenigne/blob/master/8088/8086_microcode/8086_microcode.cpp>.
+///   Its Group Decode ROM annotation table names `SALC`, `RET`, `RETF`,
+///   `RET/RETF iw`, `Jcond cb` and `ESC` as categories of the 8086's own
+///   decoder — the same conclusion from the silicon side.
+///
+/// An empty list here is the finding, not an omission. The earlier version of
+/// this gate listed eleven real 8086 encodings as missing and was `#[ignore]`d;
+/// U6 emptied it, the loop body stopped running, and the gate stopped gating
+/// without anybody noticing. `probed` is asserted below for exactly that
+/// reason.
 #[test]
-#[ignore = "T11 is incomplete: these 8086 encodings are not implemented yet"]
-fn the_encodings_that_are_still_missing_are_listed_here() {
-    // Every 8086 opcode still absent. This is the gate for T11: it stays
-    // ignored until the list is empty, and un-ignoring it before then is
-    // the point.
-    let missing: Vec<u8> = vec![
-        0x84, 0x85, // TEST r/m, r
-        0x9A, 0x9B, // CALL far, WAIT
-        0xCA, 0xCB, // RETF, RETF iw
-        0xCE, // INTO
-        0xD4, 0xD5, // AAM, AAD
-        0xD7, // XLAT
-        0xEA, // JMP far
-        0xF0, // LOCK
-    ];
-    for op in missing {
-        let mut c = Cpu::new();
-        assert!(
-            c.mem
-                .load_at(0x10000, &[op, 0xC3, 0x06, 0x20, 0x00, 0x0A])
-                .is_ok(),
-            "the probe program must fit"
-        );
-        c.regs.set_segment(Seg::Cs, 0x1000);
-        c.regs.set_segment(Seg::Ss, 0x1000);
-        c.regs.set_word(Reg16::Sp, 0x0100);
-        assert_ne!(
-            c.step(),
-            Err(ExecError::UnknownOpcode(op)),
-            "{op:#04x} is a real 8086 opcode and should not be reported unknown"
-        );
+fn every_first_opcode_byte_the_8086_defines_decodes() {
+    /// The hole list. Empty, and it stays empty: see the doc comment.
+    const HOLES: &[u8] = &[];
+    /// Defined bytes that no opcode-byte-alone probe can reach. These four
+    /// are the segment override prefixes `26` (ES), `2E` (CS), `36` (SS) and
+    /// `3E` (DS). They are prefixes, not instructions — the byte is only half
+    /// of an instruction whose other half is the one it modifies — and the
+    /// decoder has no prefix state yet (task U7). They are excluded rather
+    /// than counted as holes because the 8086 does execute them.
+    const NOT_AN_OPCODE_ALONE: &[u8] = &[0x26, 0x2E, 0x36, 0x3E];
+
+    let mut probed = 0usize;
+    let mut undecoded = vec![];
+    for op in 0u16..=0xFF {
+        let op = op as u8;
+        if HOLES.contains(&op) || NOT_AN_OPCODE_ALONE.contains(&op) {
+            continue;
+        }
+        probed += 1;
+        if matches!(probe(op).step(), Err(ExecError::UnknownOpcode(_))) {
+            undecoded.push(op);
+        }
     }
+
+    assert_eq!(
+        probed,
+        256 - NOT_AN_OPCODE_ALONE.len(),
+        "the sweep must visit every byte it does not exclude, or it asserts nothing"
+    );
+    let named: Vec<String> = undecoded.iter().map(|b| format!("{b:#04x}")).collect();
+    assert!(
+        undecoded.is_empty(),
+        "the 8086 leaves no first opcode byte undefined, so these must decode: {}",
+        named.join(", ")
+    );
+}
+
+/// A CPU holding one instruction whose opcode is `op`, plus whatever that
+/// opcode needs behind it.
+fn probe(op: u8) -> Cpu {
+    // `F2`/`F3` are prefixes and need a string operation behind them. For
+    // everything else `C3` is the cheapest possible filler: `mod=11` means it
+    // needs no displacement, touches no memory and leaves the stack alone.
+    let filler = if matches!(op, 0xF2 | 0xF3) {
+        0xA4
+    } else {
+        0xC3
+    };
+    let mut c = Cpu::new();
+    c.mem
+        .load_at(0x10000, &[op, filler, 0xA4, 0x06, 0x20, 0x00, 0x0A])
+        .unwrap();
+    c.regs.set_segment(Seg::Cs, 0x1000);
+    c.regs.set_segment(Seg::Ss, 0x2000);
+    c.regs.set_word(Reg16::Sp, 0x0100);
+    c
 }
 
 /// `8C` with a register destination is an 80186 encoding. The 8086 has no
@@ -577,4 +640,426 @@ fn power_on_flags_already_carry_the_fixed_one() {
         0x0002,
         "PUSHF image {image:#06x} lacks bit 1"
     );
+}
+
+// ---------------------------------------------------------------------------
+// U6 — the eleven opcodes that unit added. Every expectation below is taken
+// from `documentation-guide.md` §1.4 (Table 2-21), not from what the
+// implementation happens to do.
+// ---------------------------------------------------------------------------
+
+/// `9A` is `CALL FAR PTR16:16`. Table 2-21 leaves all nine flags blank. The
+/// push order is the observable that is easy to get backwards.
+#[test]
+fn call_far_pushes_cs_before_the_return_address() {
+    let mut c = cpu(&[0x9A, 0x30, 0x00, 0x00, 0x50]); // CALL FAR 5000:0030h
+    stack_grows_down(&c);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+
+    // PUSH predecrements, so the word pushed last sits lowest. CS first means
+    // the return address is at SS:00FCh and CS is at SS:00FEh, which is the
+    // order RETF pops back.
+    assert_eq!(c.mem.read_u16(0x1000, 0x00FC), 5, "IP after five bytes");
+    assert_eq!(c.mem.read_u16(0x1000, 0x00FE), 0x1000, "CS pushed first");
+    assert_eq!(c.regs.word(Reg16::Sp), 0x00FC);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x5000);
+    assert_eq!(c.regs.ip, 0x0030);
+    assert!(c.regs.flags.get(CF), "Table 2-21: CALL writes no flag");
+}
+
+/// `CE` is `INTO`, one byte, and only when `OF` is set. With `OF` clear it
+/// must be a complete no-op: no frame, no vector, no flag.
+#[test]
+fn into_moves_nothing_at_all_when_overflow_is_clear() {
+    let mut c = cpu(&[0xCE]);
+    stack_grows_down(&c);
+    c.regs.flags.set(OF, false);
+    c.regs.flags.set(CF, true);
+    let before = c.regs.flags.0;
+    c.step().unwrap();
+
+    assert_eq!(c.regs.ip, 1, "one byte");
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "no frame was pushed");
+    assert_eq!(c.regs.segment(Seg::Cs), 0x1000, "no vector was taken");
+    assert_eq!(c.regs.flags.0, before, "INTO with OF clear changes nothing");
+}
+
+/// With `OF` set, `INTO` is the type 4 interrupt. Table 2-21 marks IF and TF
+/// as `0` and leaves the other seven blank.
+#[test]
+fn into_takes_vector_four_with_interrupts_and_trap_off() {
+    let mut c = cpu(&[0xCE]);
+    stack_grows_down(&c);
+    c.regs.flags.set(OF, true);
+    c.regs.flags.set(IF, true);
+    c.regs.flags.set(TF, true);
+    c.mem.write_u16(0x0000, 4 * 4, 0x0700);
+    c.mem.write_u16(0x0000, 4 * 4 + 2, 0x9000);
+    c.step().unwrap();
+
+    assert_eq!(c.stop_reason, StopReason::Interrupt(4));
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.ip, 0x0700);
+    assert!(!c.regs.flags.get(IF), "Table 2-21: INTO clears IF");
+    assert!(!c.regs.flags.get(TF), "Table 2-21: INTO clears TF");
+}
+
+/// Table 2-21 gives `AAM` S, Z and P as `X` and the rest `U`. The microcode
+/// takes them from the **remainder**: AL = 14h over base 10 gives the
+/// quotient 02h in AH and the remainder 00h in AL, and only the remainder
+/// sets ZF.
+#[test]
+fn aam_takes_its_flags_from_the_remainder() {
+    let mut c = cpu(&[0xD4, 0x0A]);
+    c.regs.set_byte(Reg8::Al, 0x14);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x02, "the quotient");
+    assert_eq!(c.regs.byte(Reg8::Al), 0x00, "the remainder");
+    assert!(
+        c.regs.flags.get(ZF),
+        "flags come from the remainder, not 02h"
+    );
+    assert!(!c.regs.flags.get(SF));
+    assert!(c.regs.flags.get(PF), "00h has even parity");
+    assert_eq!(c.regs.ip, 2);
+}
+
+/// A zero immediate is a divide by zero, so the type 0 interrupt fires. The
+/// manual leaves the quotient and the remainder undefined, so this core
+/// writes neither.
+#[test]
+fn aam_with_a_zero_base_takes_the_divide_error() {
+    let mut c = cpu(&[0xD4, 0x00]);
+    stack_grows_down(&c);
+    c.regs.flags.set(IF, true);
+    c.mem.write_u16(0x0000, 0x0000, 0x0400);
+    c.mem.write_u16(0x0000, 0x0002, 0x0500);
+    c.regs.set_byte(Reg8::Al, 0x37);
+    c.step().unwrap();
+
+    assert_eq!(c.stop_reason, StopReason::Interrupt(0));
+    assert_eq!(c.regs.segment(Seg::Cs), 0x0500);
+    assert_eq!(c.regs.ip, 0x0400);
+    assert!(
+        !c.regs.flags.get(IF),
+        "the handler runs with interrupts off"
+    );
+    assert_eq!(c.regs.byte(Reg8::Al), 0x37, "undefined, so not written");
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100 - 6, "FLAGS, CS, IP pushed");
+}
+
+/// Table 2-21 gives `AAD` S, Z and P as `X`. The result is a *byte*: with
+/// AH = FFh and AL = FFh the 16-bit sum is 0AF5h, and AH has to come out
+/// clear rather than carrying.
+#[test]
+fn aad_clears_ah_even_when_the_sum_runs_past_ffh() {
+    let mut c = cpu(&[0xD5, 0x0A]);
+    c.regs.set_byte(Reg8::Ah, 0xFF);
+    c.regs.set_byte(Reg8::Al, 0xFF);
+    c.step().unwrap();
+
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x00F5,
+        "FFh*10h+FFh = 0AF5h, and only the low byte survives"
+    );
+    assert!(c.regs.flags.get(SF), "F5h is negative");
+    assert!(!c.regs.flags.get(ZF));
+    assert!(c.regs.flags.get(PF), "F5h has six bits set");
+    assert_eq!(c.regs.ip, 2);
+}
+
+/// `D7` indexes `DS:[BX+AL]` with AL read as a **signed** byte, and Table
+/// 2-21 leaves all nine flags blank.
+#[test]
+fn xlat_uses_a_signed_index() {
+    let mut c = cpu(&[0xD7]);
+    c.regs.set_word(Reg16::Bx, 0x0100);
+    c.regs.set_byte(Reg8::Al, 0x80); // -128 signed, +128 unsigned
+    c.mem.write_u8(0x0000, 0x0080, 0x5A); // 0100h - 80h
+    c.mem.write_u8(0x0000, 0x0180, 0x11); // 0100h + 80h
+    let before = c.regs.flags.0;
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "the index is signed");
+    assert_eq!(c.regs.ip, 1);
+    assert_eq!(c.regs.flags.0, before, "Table 2-21: XLAT writes no flag");
+}
+
+/// `9B` is `WAIT`. Nothing drives the coprocessor's TEST pin here, so the
+/// wait is already over and the instruction retires having touched nothing.
+#[test]
+fn wait_retires_without_touching_anything() {
+    let mut c = cpu(&[0x9B]);
+    let before = c.regs.flags.0;
+    let info = c.step().unwrap();
+
+    assert_eq!(info.next_ip, 1);
+    assert!(!c.halted, "WAIT is not HALT");
+    assert_eq!(c.regs.flags.0, before, "Table 2-21: WAIT writes no flag");
+}
+
+/// `F0` is `LOCK`, a prefix with no flag row. The covered instruction runs
+/// exactly as it would alone and the pair retires as one step.
+#[test]
+fn lock_runs_the_instruction_it_covers() {
+    let mut c = cpu(&[0xF0, 0x40]); // LOCK INC AX
+    c.regs.set_word(Reg16::Ax, 0xFFFF);
+    c.regs.flags.set(CF, true);
+    let info = c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0000);
+    assert_eq!(info.next_ip, 2, "the prefix belongs to the instruction");
+    assert!(
+        c.regs.flags.get(ZF),
+        "the covered instruction wrote its flags"
+    );
+    assert!(c.regs.flags.get(CF), "INC leaves CF alone");
+}
+
+/// `FF /3` and `FF /5` are the far `CALL` and `JMP` through a four-byte
+/// pointer in memory: offset word first, segment word second. Table 4-13
+/// gives both a memory operand and no flags.
+#[test]
+fn ff_three_and_five_are_the_far_call_and_the_far_jump() {
+    // FF 1E 3412 = CALL FAR [1234h]
+    let mut c = cpu(&[0xFF, 0x1E, 0x34, 0x12]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x0000, 0x1234, 0x0700);
+    c.mem.write_u16(0x0000, 0x1236, 0x9000);
+    c.step().unwrap();
+
+    assert_eq!(c.mem.read_u16(0x1000, 0x00FC), 4, "the return address");
+    assert_eq!(c.mem.read_u16(0x1000, 0x00FE), 0x1000, "CS pushed first");
+    assert_eq!(c.regs.word(Reg16::Sp), 0x00FC);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.ip, 0x0700);
+
+    // FF 2E 3412 = JMP FAR [1234h]: the same pointer, nothing pushed.
+    let mut c = cpu(&[0xFF, 0x2E, 0x34, 0x12]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x0000, 0x1234, 0x0700);
+    c.mem.write_u16(0x0000, 0x1236, 0x9000);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "a jump pushes nothing");
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.ip, 0x0700);
+
+    // mod=11 names a register, and a register holds no four-byte pointer.
+    for code in [&[0xFF, 0xDB][..], &[0xFF, 0xEB][..]] {
+        let mut c = cpu(code);
+        assert!(
+            c.step().is_err(),
+            "{code:02X?} is not a pointer and must not be executed"
+        );
+    }
+}
+
+/// `EA` is `JMP FAR PTR16:16`: the same pointer `9A` reads, with no push and
+/// no flag.
+#[test]
+fn jmp_far_reads_the_pointer_without_pushing() {
+    let mut c = cpu(&[0xEA, 0x30, 0x00, 0x00, 0x50]); // JMP FAR 5000:0030h
+    stack_grows_down(&c);
+    c.regs.flags.set(CF, true);
+    let before = c.regs.flags.0;
+    c.step().unwrap();
+
+    assert_eq!(c.regs.segment(Seg::Cs), 0x5000);
+    assert_eq!(c.regs.ip, 0x0030);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "a jump pushes nothing");
+    assert_eq!(c.regs.flags.0, before, "Table 2-21: JMP writes no flag");
+}
+
+/// `CA iw` is `RETF iw` and `CB` is `RETF`: pop IP, then CS, then release the
+/// argument bytes. Table 4-13 puts the immediate on `CA`, and Shirriff's
+/// microcode agrees — the `RET/RETF iw` entry runs for `1100?0?0`, which is
+/// `C0`, `C2`, `C8` and `CA` and nothing else. Table 2-21 leaves every flag
+/// blank for both forms.
+#[test]
+fn retf_pops_ip_then_cs_and_releases_the_arguments() {
+    let mut c = cpu(&[0xCA, 0x00, 0x04]); // RETF 0400h
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700); // IP
+    c.mem.write_u16(0x1000, 0x0102, 0x9000); // CS
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    // Both pops land first, so the release is added to 0104h, not to 0100h.
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0104 + 0x0400,
+        "arguments released"
+    );
+
+    let mut c = cpu(&[0xCB]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700);
+    c.mem.write_u16(0x1000, 0x0102, 0x9000);
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0104, "CB releases nothing");
+}
+
+/// Table 2-21 gives `TEST` `0` under OF and CF, `X` under S, Z and P, and
+/// `U` under AF. This core answers `U` by leaving the flag exactly as it
+/// stood, and neither form writes a result.
+#[test]
+fn test_rm_r_leaves_af_alone_and_writes_no_result() {
+    // 84 D8 = TEST AL, BL
+    let mut c = cpu(&[0x84, 0xD8]);
+    c.regs.set_byte(Reg8::Al, 0xFF);
+    c.regs.set_byte(Reg8::Bl, 0x0F);
+    c.regs.flags.set(AF, true);
+    c.regs.flags.set(OF, true);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+
+    let f = c.regs.flags;
+    assert!(f.get(AF), "AF is U and this core leaves it alone");
+    assert!(!f.get(OF) && !f.get(CF), "Table 2-21: TEST clears both");
+    assert!(!f.get(ZF) && !f.get(SF), "FFh and 0Fh give 0Fh");
+    assert!(f.get(PF), "F0h has four bits set");
+    assert_eq!(c.regs.byte(Reg8::Al), 0xFF, "TEST stores nothing");
+    assert_eq!(c.regs.ip, 2);
+
+    // 85 D8 = TEST AX, BX
+    let mut c = cpu(&[0x85, 0xD8]);
+    c.regs.set_word(Reg16::Ax, 0x1234);
+    c.regs.set_word(Reg16::Bx, 0x1000);
+    c.regs.flags.set(AF, true);
+    c.step().unwrap();
+
+    assert!(c.regs.flags.get(AF));
+    assert!(!c.regs.flags.get(ZF), "1234h and 1000h give 1000h");
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "TEST stores nothing");
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT-4 — the bytes Table 4-13 prints as `(not used)`. Every one of them
+// decodes on an 8086; the sources are on the gate's doc comment above.
+// ---------------------------------------------------------------------------
+
+/// `60`-`6F` alias `70`-`7F`: the conditional-jump microcode runs for the
+/// whole bit pattern `011?????` and the condition is the low nibble.
+#[test]
+fn sixty_to_sixf_are_the_conditional_jumps() {
+    // 62h is JB, so with CF set it jumps past the next instruction.
+    let mut c = cpu(&[0x62, 0x02, 0xEB, 0x00, 0x90]);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 4, "60h-6Fh alias 70h-7Fh");
+
+    // Each alias must behave exactly like the documented byte it shadows.
+    for (alias, real) in [(0x60u8, 0x70u8), (0x67, 0x77), (0x6F, 0x7F)] {
+        for cf in [false, true] {
+            let mut a = cpu(&[alias, 0x04, 0xC3]);
+            let mut b = cpu(&[real, 0x04, 0xC3]);
+            a.regs.flags.set(CF, cf);
+            b.regs.flags.set(CF, cf);
+            a.step().unwrap();
+            b.step().unwrap();
+            assert_eq!(a.regs.ip, b.regs.ip, "{alias:#04x} vs {real:#04x}");
+            assert_eq!(
+                a.regs.flags.0, b.regs.flags.0,
+                "{alias:#04x} vs {real:#04x}"
+            );
+        }
+    }
+}
+
+/// `D6` is `SALC`, `AL = CF ? FFh : 00h`. The microcode has no flag write.
+#[test]
+fn salc_sets_al_from_the_carry() {
+    for (cf, want) in [(false, 0x00u8), (true, 0xFF)] {
+        let mut c = cpu(&[0xD6]);
+        c.regs.flags.set(CF, cf);
+        c.regs.set_byte(Reg8::Al, 0x5A);
+        let before = c.regs.flags.0;
+        c.step().unwrap();
+        assert_eq!(c.regs.byte(Reg8::Al), want, "CF={cf}");
+        assert_eq!(c.regs.flags.0, before, "CF={cf}: SALC sets no flag");
+        assert_eq!(c.regs.ip, 1);
+    }
+}
+
+/// `C0 iw` is `C2 iw` and `C1` is `C3`: the same microcode, with bit 0
+/// selecting whether the immediate follows.
+#[test]
+fn c0_and_c1_are_the_ret_forms() {
+    let mut c = cpu(&[0xC0, 0x06, 0x00]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700);
+    c.regs.flags.set(CF, true);
+    let before = c.regs.flags.0;
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0102 + 0x0006,
+        "arguments released"
+    );
+    assert_eq!(c.regs.flags.0, before, "RET writes no flag");
+
+    let mut c = cpu(&[0xC1]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700);
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0102, "C1 releases nothing");
+}
+
+/// `C8 iw` is `CA iw` and `C9` is `CB`, for the inter-segment return.
+#[test]
+fn c8_and_c9_are_the_retf_forms() {
+    let mut c = cpu(&[0xC8, 0x02, 0x00]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700);
+    c.mem.write_u16(0x1000, 0x0102, 0x9000);
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0104 + 0x0002);
+
+    let mut c = cpu(&[0xC9]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x1000, 0x0100, 0x0700);
+    c.mem.write_u16(0x1000, 0x0102, 0x9000);
+    c.step().unwrap();
+    assert_eq!(c.regs.ip, 0x0700);
+    assert_eq!(c.regs.segment(Seg::Cs), 0x9000);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0104, "C9 releases nothing");
+}
+
+/// `F1` is `LOCK`. It is decoded in logic rather than microcode, and the
+/// Group Decode ROM gives it the same outputs as `F0`.
+#[test]
+fn f1_is_a_second_lock_prefix() {
+    let mut c = cpu(&[0xF1, 0x40]); // LOCK INC AX
+    c.regs.set_word(Reg16::Ax, 0xFFFF);
+    c.regs.flags.set(CF, true);
+    let info = c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0000);
+    assert_eq!(info.next_ip, 2);
+    assert!(c.regs.flags.get(ZF) && c.regs.flags.get(CF));
+}
+
+/// `D8`-`DF` are `ESC 0`-`ESC 7`, the gateway to an 8087. With no
+/// coprocessor on the bus nothing performs the operand access, so what the
+/// byte leaves behind is its length and nothing else.
+#[test]
+fn escape_consumes_its_modrm_and_touches_nothing() {
+    let mut c = cpu(&[0xD8, 0x06, 0x34, 0x12, 0x90]); // ESC 0 with a disp16
+    c.regs.set_word(Reg16::Ax, 0x1234);
+    let before = c.regs.flags.0;
+    let info = c.step().unwrap();
+
+    assert_eq!(info.next_ip, 4, "opcode + ModR/M + disp16");
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "ESC writes no register");
+    assert_eq!(c.regs.flags.0, before, "Table 2-21: ESC has no flag row");
 }
