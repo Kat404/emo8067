@@ -1222,7 +1222,10 @@ const DIGITS: &[(u8, u8, Slot)] = &[
     (0xFE, 3, Slot::Hole),
     (0xFE, 4, Slot::Hole),
     (0xFE, 5, Slot::Hole),
-    (0xFE, 6, Slot::Hole),
+    // FE/6 is PUSH, and FE/7 reaches the same microcode: bits 5-3 of the
+    // second byte replace bits 2-0, so /7 becomes /6. Both write ONE byte and
+    // take SP down by two (Shirriff, "More FE holes").
+    (0xFE, 6, Slot::Runs("PUSH r/m8 (undoc.)", 0x003C, 0x00FE)),
     (
         0xFE,
         7,
@@ -1275,15 +1278,6 @@ const HOLES: &[(u8, u8, &str)] = &[
         "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the JMP \
          FAR rm microcode here, but it reads the offset and the segment as \
          bytes, so the destination depends on the bus. Not emulated.",
-    ),
-    (
-        0xFE,
-        6,
-        "Table 4-13 prints `(not used)`. Shirriff shows the 8086 runs the PUSH rm \
-         microcode for FE /6 exactly as it does for FE /7, decrementing SP by \
-         two and writing only the byte, so SS:SP+1 keeps stale stack data. \
-         Out of AUDIT-6's scope, which named the /7 row; a one-line addition \
-         to the same arm.",
     ),
 ];
 
@@ -1350,8 +1344,8 @@ fn every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole() {
     // Pinned literally. See the doc comment: a derived count is the defect the
     // first gate shipped with.
     const DIGIT_PAIRS: usize = 96;
-    const HOLE_COUNT: usize = 5;
-    const INSTRUCTION_COUNT: usize = 91;
+    const HOLE_COUNT: usize = 4;
+    const INSTRUCTION_COUNT: usize = 92;
 
     // ---- the table is exactly the groups times the eight /digit values.
     let mut keys: Vec<(u8, u8)> = Vec::with_capacity(DIGITS.len());
@@ -1392,7 +1386,7 @@ fn every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole() {
         .map(|&(op, digit, _)| (op, digit))
         .collect();
     let instructions = DIGITS.len() - holes.len();
-    assert_eq!(holes.len(), HOLE_COUNT, "the 8086 has five /digit holes");
+    assert_eq!(holes.len(), HOLE_COUNT, "the 8086 has four /digit holes");
     assert_eq!(
         instructions, INSTRUCTION_COUNT,
         "the other 91 /digit positions are instructions"

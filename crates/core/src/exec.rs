@@ -82,6 +82,18 @@ pub(crate) fn push(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u
     regs.set_word(Reg16::Sp, new_sp);
 }
 
+/// The byte form of `PUSH`, reached by `FE /6` and `FE /7`.
+///
+/// `DEC2 tmpA` moves the stack pointer by two while `W SS,P0` writes a single
+/// byte, so one byte of whatever was on the stack survives underneath. This is
+/// the microcode's behaviour and not a tidy specification, which is why the
+/// 8086 does not document the encoding.
+fn push_byte(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u8) {
+    let new_sp = regs.word(Reg16::Sp).wrapping_sub(2);
+    mem.write_u8(regs.segment(Seg::Ss), new_sp, value);
+    regs.set_word(Reg16::Sp, new_sp);
+}
+
 fn pop(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
     // The mirror of `push`: unconditional increment, never direction-aware.
     let sp = regs.word(Reg16::Sp);
@@ -339,12 +351,17 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             match m.reg & 0b111 {
                 0 => inc_dec(cpu, m.rm, 8, true)?,
                 1 => inc_dec(cpu, m.rm, 8, false)?,
-                // `/7` is PUSH, in the byte form: FE is the byte opcode of the
-                // pair and the 8086 takes the width from it (Shirriff, "More
-                // FE holes"). `SP` moves by two whichever width is pushed.
-                7 => {
+                // `/6` and `/7` both reach the PUSH microcode: bits 5-3 of
+                // the second byte replace bits 2-0 of the instruction, so
+                // `/7` becomes the `/6` encoding (Shirriff, "More FE holes").
+                //
+                // In byte form the microcode writes ONE byte and decrements
+                // SP by two, leaving one byte of old stack data behind. It
+                // does not push a word: `W SS,P0` writes a byte and
+                // `DEC2` moves SP regardless of the transfer width.
+                6 | 7 => {
                     let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 8);
-                    push(&mut cpu.mem, &mut cpu.regs, value);
+                    push_byte(&mut cpu.mem, &mut cpu.regs, value as u8);
                 }
                 _ => return Err(ExecError::UnknownOpcode(opcode)),
             }
