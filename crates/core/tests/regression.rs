@@ -2168,7 +2168,7 @@ fn a_later_override_replaces_an_earlier_one_and_clears_afterwards() {
 /// F1. The 256-byte gate must fail on a prefix byte that reaches the
 /// dispatcher instead of being consumed by `step`. Matching only
 /// `UnknownOpcode` left the gate blind to `PrefixNotConsumed`, which is the
-/// same blindness that let it ignore `NotOn8086` and `BadRepeat`.
+/// same blindness that let it ignore `NotOn8086` and the deleted `BadRepeat`.
 #[test]
 fn the_opcode_gate_counts_an_unconsumed_prefix_as_undecoded() {
     // Prove the predicate rather than asserting the implementation: the
@@ -2182,4 +2182,341 @@ fn the_opcode_gate_counts_an_unconsumed_prefix_as_undecoded() {
         ),
         "the gate must treat an unconsumed prefix as an undecoded byte"
     );
+}
+
+// ---------------------------------------------------------------------------
+// REP is a latch, not a gate.
+//
+// The 8086's opcode decode sets the segment latches and the REP latch from
+// independent columns, so the order of the prefix bytes cannot matter, and it
+// has no invalid-instruction detection to object to a repeat prefix in front
+// of something that ignores it.
+// ---------------------------------------------------------------------------
+
+/// Everything `REP MOVSB` can be judged on: the count, both pointers, where
+/// `IP` stopped, and the destination bytes.
+type State = (u16, u16, u16, u16, [u8; 4]);
+
+fn movsb_state(c: &Cpu) -> State {
+    let mut moved = [0u8; 4];
+    for (i, byte) in moved.iter_mut().enumerate() {
+        *byte = c.mem.read_u8(0x9000, 0x0300 + i as u16);
+    }
+    (
+        c.regs.word(Reg16::Cx),
+        c.regs.word(Reg16::Si),
+        c.regs.word(Reg16::Di),
+        c.regs.ip,
+        moved,
+    )
+}
+
+/// The machine for a three-iteration `REP MOVSB`, differing only in the bytes
+/// ahead of the opcode.
+fn movsb_after(code: &[u8]) -> (Cpu, State) {
+    let mut c = cpu(code);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 3);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x0000, 0x0020, 0x11);
+    c.mem.write_u8(0x0000, 0x0021, 0x22);
+    c.mem.write_u8(0x0000, 0x0022, 0x33);
+    c.step().expect("REP MOVSB must not fault");
+    let state = movsb_state(&c);
+    (c, state)
+}
+
+/// The state a correct three-iteration `REP MOVSB` reaches: the count spent,
+/// both pointers past three bytes, and the source copied through ES. The `IP`
+/// is the length of the program that reached it.
+const REP_MOVSB_THREE: State = (0, 0x0023, 0x0303, 3, [0x11, 0x22, 0x33, 0x00]);
+
+/// The same three iterations reached behind an 8-byte prefix run, so `IP`
+/// stops one byte further on and nothing else differs.
+const REP_MOVSB_THREE_AFTER_EIGHT: State = (0, 0x0023, 0x0303, 9, [0x11, 0x22, 0x33, 0x00]);
+
+/// `F3 26 A4` used to be `BadRepeat`, because the repeat helper fetched its
+/// own operand byte and rejected anything that was not a string operation.
+/// With REP a latch the two prefixes are independent and either order runs
+/// the same three iterations.
+#[test]
+fn rep_before_a_segment_override_and_the_other_way_round_agree() {
+    let (_, first) = movsb_after(&[0xF3, 0x26, 0xA4]);
+    let (_, second) = movsb_after(&[0x26, 0xF3, 0xA4]);
+    assert_eq!(first, second, "prefix order changed the outcome");
+    assert_eq!(
+        first, REP_MOVSB_THREE,
+        "three MOVSB iterations, destination through ES"
+    );
+}
+
+/// The same with `F2`, the other repeat prefix.
+#[test]
+fn repne_before_a_segment_override_and_the_other_way_round_agree() {
+    let (_, first) = movsb_after(&[0xF2, 0x3E, 0xA4]);
+    let (_, second) = movsb_after(&[0x3E, 0xF2, 0xA4]);
+    assert_eq!(first, second, "prefix order changed the outcome");
+    assert_eq!(
+        first, REP_MOVSB_THREE,
+        "REPNE MOVSB repeats the same way; MOVS has no condition"
+    );
+}
+
+/// A segment override cannot redirect a string operation's destination: on an
+/// 8086 the destination is always ES.
+#[test]
+fn a_segment_override_cannot_redirect_the_string_destination() {
+    let (c, _) = movsb_after(&[0x3E, 0xF3, 0xA4]);
+    assert_eq!(
+        c.mem.read_u8(0x9000, 0x0300),
+        0x11,
+        "the destination went through ES, not the overridden DS"
+    );
+    assert_eq!(c.mem.read_u8(0x0000, 0x0300), 0x00, "and not through DS");
+}
+
+/// A repeat prefix in front of something that is not a string operation is
+/// ignored. The 8086 has no invalid-instruction detection, so refusing it
+/// would be the divergence.
+#[test]
+fn rep_in_front_of_a_nop_is_a_nop() {
+    let mut c = cpu(&[0xF3, 0x90, 0xB0, 0x77]);
+    c.regs.set_word(Reg16::Cx, 0x0005);
+    let info = c.step().expect("F3 90 is not an error");
+    assert_eq!(info.opcode, 0x90, "the covered opcode, not the prefix");
+    assert_eq!(info.next_ip, 2);
+    assert_eq!(
+        c.regs.word(Reg16::Cx),
+        0x0005,
+        "nothing repeated, so nothing consumed the count"
+    );
+    assert_ne!(c.regs.byte(Reg8::Al), 0x77, "the NOP retired unchanged");
+}
+
+/// All 8! orders of `F0 F1 26 2E 36 3E F2 F3` ahead of the same `MOVSB`. The
+/// 8086 sets the segment latches and the REP latch from independent columns
+/// of the decode ROM, so nothing about the outcome can depend on the order.
+#[test]
+fn every_permutation_of_the_prefix_bytes_reaches_the_same_state() {
+    let mut order = [0xF0u8, 0xF1, 0x26, 0x2E, 0x36, 0x3E, 0xF2, 0xF3];
+    let mut orders = Vec::new();
+    permutations(&mut order, 0, &mut orders);
+    assert_eq!(orders.len(), 40320, "8! orderings, not a sample");
+
+    let mut code = [0u8; 9];
+    code[8] = 0xA4;
+    let mut c = cpu(&code);
+    c.regs.set_segment(Seg::Es, 0x9000);
+
+    let mut reference = None;
+    for order in &orders {
+        run_prefixed(&mut c, order);
+        let state = movsb_state(&c);
+        match reference {
+            None => reference = Some(state),
+            Some(want) => assert_eq!(state, want, "prefix order {order:02X?} changed the outcome"),
+        }
+    }
+    assert_eq!(
+        reference,
+        Some(REP_MOVSB_THREE_AFTER_EIGHT),
+        "and the shared state is the right one: three MOVSB iterations"
+    );
+}
+
+/// Generate every permutation of `items`, in place.
+fn permutations<const N: usize>(items: &mut [u8; N], at: usize, out: &mut Vec<[u8; N]>) {
+    if at == N {
+        out.push(*items);
+        return;
+    }
+    for i in at..N {
+        items.swap(at, i);
+        permutations(items, at + 1, out);
+        items.swap(at, i);
+    }
+}
+
+/// Rewrite the code bytes to `order` followed by `MOVSB`, reset everything the
+/// covered instruction touches, and take one step. Reusing one CPU keeps 40320
+/// orderings off the 1 MiB allocator.
+fn run_prefixed(c: &mut Cpu, order: &[u8]) {
+    c.regs.ip = 0;
+    c.regs.set_word(Reg16::Cx, 3);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    for i in 0..4u16 {
+        c.mem.write_u8(0x9000, 0x0300 + i, 0x00);
+    }
+    c.mem.write_u8(0x0000, 0x0020, 0x11);
+    c.mem.write_u8(0x0000, 0x0021, 0x22);
+    c.mem.write_u8(0x0000, 0x0022, 0x33);
+    for (i, byte) in order.iter().enumerate() {
+        c.mem.write_u8(0x1000, i as u16, *byte);
+    }
+    c.mem.write_u8(0x1000, order.len() as u16, 0xA4);
+    c.step().expect("a run of prefixes must not fault");
+}
+
+/// `CX` is tested before each iteration and decremented after it, so the run
+/// ends on the iteration that took the count to zero.
+#[test]
+fn rep_repeats_exactly_cx_times() {
+    let mut c = cpu(&[0xF3, 0xA4]);
+    c.regs.set_word(Reg16::Cx, 3);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Cx),
+        0,
+        "the last iteration decrements too"
+    );
+    assert_eq!(c.regs.word(Reg16::Si), 0x0023);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0303);
+}
+
+/// Intel's pseudocode for REP is `WHILE CountReg <> 0`, so a count that starts
+/// at zero runs no iterations at all. The 65,536-iteration surprise belongs
+/// to `LOOP`, which decrements before it tests; REP tests before it decrements.
+#[test]
+fn rep_with_a_zero_count_runs_no_iterations() {
+    let mut c = cpu(&[0xF3, 0xA4]);
+    c.regs.set_word(Reg16::Cx, 0);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x9000, 0x0300, 0xFF);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Si), 0x0020, "SI did not move");
+    assert_eq!(c.regs.word(Reg16::Di), 0x0300, "DI did not move");
+    assert_eq!(c.mem.read_u8(0x9000, 0x0300), 0xFF, "nothing was written");
+}
+
+/// `REPE CMPSB` stops at the first pair that does not compare equal, and the
+/// comparison that stopped it has already been made: both pointers and the
+/// count account for it.
+#[test]
+fn repe_cmpsb_stops_at_the_first_mismatch() {
+    let mut c = cpu(&[0xF3, 0xA6]);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x0000, 0x0020, 0x11);
+    c.mem.write_u8(0x0000, 0x0021, 0x22);
+    c.mem.write_u8(0x0000, 0x0022, 0x33);
+    c.mem.write_u8(0x9000, 0x0300, 0x11);
+    c.mem.write_u8(0x9000, 0x0301, 0x22);
+    c.mem.write_u8(0x9000, 0x0302, 0x99);
+    c.step().unwrap();
+    assert!(!c.regs.flags.get(ZF), "the third pair did not match");
+    assert_eq!(c.regs.word(Reg16::Cx), 2, "5 counts, 3 comparisons run");
+    assert_eq!(c.regs.word(Reg16::Si), 0x0023);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0303);
+}
+
+/// `REPE CMPSB` over a fully equal block spends the whole count.
+#[test]
+fn repe_cmpsb_runs_the_whole_count_when_every_pair_matches() {
+    let mut c = cpu(&[0xF3, 0xA6]);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 3);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    for i in 0..3u16 {
+        c.mem.write_u8(0x0000, 0x0020 + i, 0x40);
+        c.mem.write_u8(0x9000, 0x0300 + i, 0x40);
+    }
+    c.step().unwrap();
+    assert!(c.regs.flags.get(ZF), "every pair matched");
+    assert_eq!(c.regs.word(Reg16::Cx), 0);
+    assert_eq!(c.regs.word(Reg16::Si), 0x0023);
+}
+
+/// `REPNE` stops at the first pair that *does* match — the mirror image.
+#[test]
+fn repne_cmpsb_stops_at_the_first_match() {
+    let mut c = cpu(&[0xF2, 0xA6]);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 5);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x0000, 0x0020, 0x11);
+    c.mem.write_u8(0x9000, 0x0300, 0x11);
+    c.step().unwrap();
+    assert!(c.regs.flags.get(ZF), "the first pair matched");
+    assert_eq!(c.regs.word(Reg16::Cx), 4);
+    assert_eq!(c.regs.word(Reg16::Si), 0x0021);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0301);
+}
+
+/// `SCAS` takes its condition from the same `ZF` and stops the same way.
+#[test]
+fn repe_scasb_stops_at_the_first_mismatch() {
+    let mut c = cpu(&[0xF3, 0xAE]);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 4);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.regs.set_byte(Reg8::Al, 0x5A);
+    c.mem.write_u8(0x9000, 0x0300, 0x5A);
+    c.mem.write_u8(0x9000, 0x0301, 0x5A);
+    c.mem.write_u8(0x9000, 0x0302, 0x00);
+    c.step().unwrap();
+    assert!(!c.regs.flags.get(ZF), "the third byte did not match");
+    assert_eq!(c.regs.word(Reg16::Cx), 1, "4 counts, 3 comparisons run");
+    assert_eq!(c.regs.word(Reg16::Di), 0x0303);
+}
+
+/// Both latches die with the instruction they cover, so one prefix binds to
+/// one instruction and never leaks into the next.
+#[test]
+fn the_rep_latch_does_not_outlive_its_instruction() {
+    let mut c = cpu(&[0xF3, 0x26, 0xA4, 0xA4]);
+    c.regs.set_segment(Seg::Es, 0x9000);
+    c.regs.set_word(Reg16::Cx, 3);
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x0000, 0x0020, 0x11);
+    c.mem.write_u8(0x0000, 0x0021, 0x22);
+    c.mem.write_u8(0x0000, 0x0022, 0x33);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Di), 0x0303, "three iterations");
+    assert_eq!(
+        c.rep, None,
+        "the REP latch is decoder state, not a register"
+    );
+    assert_eq!(c.seg_override, None);
+
+    // The bare `MOVSB` behind it moves one byte and stops, because the count
+    // is spent and the latch is gone.
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Di),
+        0x0304,
+        "one iteration, not another run"
+    );
+    assert_eq!(c.regs.word(Reg16::Si), 0x0024);
+}
+
+/// The same guarantee on the fault path: a prefix must not outlive an
+/// instruction that faults.
+#[test]
+fn a_faulting_prefixed_instruction_clears_both_latches() {
+    // 8C /r with a register destination is an 80186 encoding.
+    let mut c = cpu(&[0xF3, 0x26, 0x8C, 0xC3]);
+    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8C)));
+    assert_eq!(c.rep, None, "the REP latch must not survive a fault");
+    assert_eq!(c.seg_override, None);
+}
+
+/// A prefixed `StepInfo` names the covered opcode, which is what `LOCK` and
+/// the segment overrides already did. `F3` no longer reports itself.
+#[test]
+fn a_reped_step_reports_the_covered_string_opcode() {
+    let mut c = cpu(&[0xF3, 0xA4]);
+    let info = c.step().unwrap();
+    assert_eq!(info.at, 0);
+    assert_eq!(info.opcode, 0xA4, "the MOVSB, not the F3 in front of it");
+    assert_eq!(info.next_ip, 2, "both bytes are consumed");
 }
