@@ -457,7 +457,7 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let ax = cpu.regs.word(Reg16::Ax) as i16 as u32;
             cpu.regs.set_word(Reg16::Dx, (ax >> 16) as u16);
         }
-        0x9E => {
+        0x9F => {
             // LAHF: AH takes the five status flags. Bit 1 of AH is the fixed
             // 1 of FLAGS rather than a copy of that bit, so ONE is forced in
             // rather than masked through.
@@ -465,7 +465,7 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             cpu.regs
                 .set_byte(Reg8::Ah, ((cpu.regs.flags.0 & status) | ONE) as u8);
         }
-        0x9F => {
+        0x9E => {
             // SAHF: the reverse, and the only flag write of this group.
             let from_ah = u16::from(cpu.regs.byte(Reg8::Ah));
             let status = SF | ZF | AF | PF | CF;
@@ -2348,11 +2348,11 @@ mod tests {
         assert_eq!(cpu.regs.byte(Reg8::Al), 0xA5);
     }
 
-    /// `9E` is `LAHF`: `AH = SF ZF 0 AF 0 PF 1 CF`. No flag moves and AL is
+    /// `9F` is `LAHF`: `AH = SF ZF 0 AF 0 PF 1 CF`. No flag moves and AL is
     /// not touched.
     #[test]
     fn lahf_copies_the_status_flags_into_ah() {
-        let mut cpu = cpu_with(&[0x9E]);
+        let mut cpu = cpu_with(&[0x9F]);
         cpu.regs.set_byte(Reg8::Al, 0x3C);
         cpu.regs.set_byte(Reg8::Ah, 0xFF);
         cpu.regs.flags.set(CF, true);
@@ -2370,11 +2370,11 @@ mod tests {
         );
     }
 
-    /// `9F` is `SAHF`, the reverse, and the only one of these six that moves
+    /// `9E` is `SAHF`, the reverse, and the only one of these six that moves
     /// flags: SF ZF AF PF CF come from AH, OF DF IF TF do not.
     #[test]
     fn sahf_restores_the_five_status_flags_from_ah() {
-        let mut cpu = cpu_with(&[0x9F]);
+        let mut cpu = cpu_with(&[0x9E]);
         cpu.regs.set_byte(Reg8::Ah, 0x45); // bits 0, 2 and 6
         cpu.regs.flags.set(CF, false);
         cpu.regs.flags.set(AF, true);

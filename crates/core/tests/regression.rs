@@ -679,7 +679,7 @@ fn lahf_places_exactly_the_status_flags_and_a_fixed_one() {
     ] {
         let mut c = Cpu::new();
         c.regs.flags.0 = flags;
-        c.mem.load_at(0, &[0x9E]).unwrap();
+        c.mem.load_at(0, &[0x9F]).unwrap();
         c.regs.set_segment(Seg::Cs, 0);
         c.regs.ip = 0;
         c.step().unwrap();
