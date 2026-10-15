@@ -20,8 +20,14 @@ pub enum Base {
 /// One side of an instruction: either a register or a memory reference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operand {
-    Reg8(Reg8),
-    Reg16(Reg16),
+    /// A register, held as the raw 3-bit ModR/M `rm` field.
+    ///
+    /// The field alone cannot say whether that is a byte or a word
+    /// register: encoding `011` names AL in an 8-bit instruction and AX in a
+    /// 16-bit one, and the only thing that knows which is the width bit of
+    /// the opcode. Resolving it here would silently misread every 16-bit
+    /// register operand as its low byte.
+    Reg(u8),
     Seg(Seg),
     /// A memory operand, already resolved to a segment and a 16-bit offset.
     Mem {
@@ -63,11 +69,7 @@ pub fn decode_modrm(code: &[u8], ip: &mut u16, default_seg: Seg) -> Result<ModRm
     if mode == 0b11 {
         return Ok(ModRm {
             reg,
-            rm: match rm {
-                0..=3 => Operand::Reg8(Reg8::from_bits(rm)),
-                4..=7 => Operand::Reg16(Reg16::from_bits(rm)),
-                _ => unreachable!(),
-            },
+            rm: Operand::Reg(rm),
         });
     }
 
@@ -197,10 +199,13 @@ mod tests {
     }
 
     #[test]
-    fn register_mode_splits_eight_and_sixteen_bit() {
-        assert_eq!(rm(0b11_000_011), Operand::Reg8(Reg8::Bl));
-        assert_eq!(rm(0b11_000_100), Operand::Reg16(Reg16::Sp));
-        assert_eq!(rm(0b11_000_110), Operand::Reg16(Reg16::Si));
+    fn register_mode_keeps_the_raw_field() {
+        // The width is not decidable from the ModR/M byte alone, so the
+        // decoder must not guess: `011` is AL in one instruction and AX in
+        // another, and only the caller knows which.
+        assert_eq!(rm(0b11_000_011), Operand::Reg(0b011));
+        assert_eq!(rm(0b11_000_100), Operand::Reg(0b100));
+        assert_eq!(rm(0b11_000_110), Operand::Reg(0b110));
     }
 
     #[test]

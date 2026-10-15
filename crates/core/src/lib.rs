@@ -46,6 +46,7 @@ pub enum StopReason {
     /// `HLT` executed with `IF=1`. Resumes on an interrupt.
     Halted,
     /// An interrupt vector was taken.
+    /// An `INT n` was taken. `n` is the vector number.
     Interrupt(u8),
 }
 
@@ -53,6 +54,35 @@ impl Cpu {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Take an `INT n`, the way an 8086 does.
+    ///
+    /// Pushes FLAGS, then CS, then IP; clears TF and IF; and vectors
+    /// through the interrupt table at physical `0000:0000 + 4 * n`. The
+    /// return address is whatever `IP` holds, so a fault raised part way
+    /// through an instruction returns after that instruction unless the
+    /// decoder advanced `IP` past its operands first.
+    pub fn interrupt(&mut self, n: u8) {
+        use crate::regs::Seg;
+
+        let at = u16::from(n) * 4;
+        let offset = self.mem.read_u16(0x0000, at);
+        let segment = self.mem.read_u16(0x0000, at + 2);
+
+        let pushed = self.regs.flags.pushed();
+        crate::exec::push(&mut self.mem, &mut self.regs, pushed);
+        self.regs.flags.set(crate::flags::TF, false);
+        self.regs.flags.set(crate::flags::IF, false);
+
+        let cs = self.regs.segment(Seg::Cs);
+        crate::exec::push(&mut self.mem, &mut self.regs, cs);
+        let ip = self.regs.ip;
+        crate::exec::push(&mut self.mem, &mut self.regs, ip);
+
+        self.regs.set_segment(Seg::Cs, segment);
+        self.regs.ip = offset;
+        self.stop_reason = StopReason::Interrupt(n);
     }
 
     /// Execute exactly one instruction.

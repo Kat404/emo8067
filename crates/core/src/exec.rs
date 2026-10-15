@@ -1,6 +1,6 @@
 //! Fetch, decode, execute.
 
-use crate::flags::{AF, CF, DF, Flags, OF, PF, SF, ZF, parity_even};
+use crate::flags::{AF, CF, DF, Flags, OF, PF, SF, TF, ZF, parity_even};
 use crate::memory::Memory;
 use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
 use crate::regs::{Reg8, Reg16, Seg};
@@ -50,12 +50,16 @@ fn fetch_u16(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
 }
 
 /// Push a word onto `SS:SP`, honouring the direction flag.
-fn push(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u16) {
+///
+/// The 8086 predecrements: `SP` moves first and the operand lands at the new
+/// `SS:SP`. `DF` flips which way the stack grows, so with `DF=1` the push
+/// postincrements instead.
+pub(crate) fn push(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u16) {
     let sp = regs.word(Reg16::Sp);
     let new_sp = if regs.flags.get(DF) {
-        sp.wrapping_sub(2)
-    } else {
         sp.wrapping_add(2)
+    } else {
+        sp.wrapping_sub(2)
     };
     mem.write_u16(regs.segment(Seg::Ss), new_sp, value);
     regs.set_word(Reg16::Sp, new_sp);
@@ -65,9 +69,9 @@ fn pop(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
     let sp = regs.word(Reg16::Sp);
     let value = mem.read_u16(regs.segment(Seg::Ss), sp);
     let new_sp = if regs.flags.get(DF) {
-        sp.wrapping_add(2)
-    } else {
         sp.wrapping_sub(2)
+    } else {
+        sp.wrapping_add(2)
     };
     regs.set_word(Reg16::Sp, new_sp);
     value
@@ -97,8 +101,8 @@ fn offset_of(regs: &crate::regs::Registers, base: Base, disp: u16) -> u16 {
 /// Read an operand at `bits` width (`8` or `16`).
 fn read_operand(mem: &Memory, regs: &crate::regs::Registers, op: Operand, bits: u8) -> u16 {
     match op {
-        Operand::Reg8(r) => u16::from(regs.byte(r)),
-        Operand::Reg16(r) => regs.word(r),
+        Operand::Reg(n) if bits == 8 => u16::from(regs.byte(crate::regs::Reg8::from_bits(n))),
+        Operand::Reg(n) => regs.word(Reg16::from_bits(n)),
         Operand::Mem { seg, base, disp } => {
             let off = offset_of(regs, base, disp);
             if bits == 8 {
@@ -119,8 +123,8 @@ fn write_operand(
     value: u16,
 ) {
     match op {
-        Operand::Reg8(r) => regs.set_byte(r, value as u8),
-        Operand::Reg16(r) => regs.set_word(r, value),
+        Operand::Reg(n) if bits == 8 => regs.set_byte(crate::regs::Reg8::from_bits(n), value as u8),
+        Operand::Reg(n) => regs.set_word(Reg16::from_bits(n), value),
         Operand::Mem { seg, base, disp } => {
             let off = offset_of(regs, base, disp);
             let segv = regs.segment(seg);
@@ -225,6 +229,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0x80..=0x83 => alu_group_imm(cpu, opcode, AluOp::Add)?,
         0x88..=0x8B => alu_group_imm(cpu, opcode, AluOp::Or)?,
         0xA8..=0xAB => alu_group_imm(cpu, opcode, AluOp::Cmp)?,
+        0xF6 | 0xF7 => mul_group(cpu, opcode)?,
         0x40..=0x47 => {
             cpu.regs.set_word(
                 Reg16::from_bits(opcode & 0b111),
@@ -250,6 +255,16 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             let reg = Reg16::from_bits(opcode & 0b111);
             let value = pop(&cpu.mem, &mut cpu.regs);
             cpu.regs.set_word(reg, value);
+        }
+        0x98 => {
+            // CBW: sign-extend AL into AX. No flags.
+            let al = cpu.regs.byte(Reg8::Al) as i8 as i16;
+            cpu.regs.set_word(Reg16::Ax, al as u16);
+        }
+        0x99 => {
+            // CWD: sign-extend AX into DX:AX. No flags.
+            let ax = cpu.regs.word(Reg16::Ax) as i16 as u32;
+            cpu.regs.set_word(Reg16::Dx, (ax >> 16) as u16);
         }
         0x90 => {} // NOP
         0xF4 => {
@@ -319,7 +334,7 @@ fn alu_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             } else {
                 u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
             };
-            let ax = Operand::Reg16(Reg16::Ax);
+            let ax = Operand::Reg(Reg16::Ax as u8);
             let left = read_operand(&cpu.mem, &cpu.regs, ax, bits);
             let result = apply(cpu, op, left, imm, bits, mask);
             if op != AluOp::Cmp {
@@ -361,6 +376,141 @@ fn alu_group_imm(cpu: &mut crate::Cpu, opcode: u8, op: AluOp) -> Result<(), Exec
         write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
     }
     Ok(())
+}
+
+/// Execute `MUL IMUL DIV IDIV` at `0xF6` (byte) and `0xF7` (word).
+///
+/// The manual defines only CF and OF for `MUL`/`IMUL`, and none of the six
+/// for `DIV`/`IDIV`, so every other flag is left exactly as it was. A fault
+/// takes the type 0 interrupt; the manual leaves the quotient and remainder
+/// undefined in that case, so they are not written.
+fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode == 0xF6 { 8 } else { 16 };
+    let m = decode_from(cpu)?;
+    let op = m.reg & 0b111;
+    let operand = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+
+    let ax = cpu.regs.word(Reg16::Ax);
+    let dx = cpu.regs.word(Reg16::Dx);
+    let (lo, hi) = match (bits, op) {
+        // ---- unsigned multiply
+        (8, 4) => {
+            let a = u16::from(cpu.regs.byte(Reg8::Al));
+            let product = a * u16::from(operand as u8);
+            set_mul_flags(cpu, (product >> 8) == 0);
+            ((product & 0x00FF) as u16, (product >> 8) as u16)
+        }
+        (16, 4) => {
+            let product = u32::from(ax) * u32::from(operand as u16);
+            set_mul_flags(cpu, (product >> 16) == 0);
+            (product as u16, (product >> 16) as u16)
+        }
+        // ---- signed multiply
+        // A signed product overflowed unless the high half is a sign
+        // extension of the low half: (-1) * (-1) = 1 is fine, but
+        // (-128) * (-1) = 128 is not, because 0xFF80 is not 0xFF80-as-a-
+        // sign-extension of its own low byte.
+        (8, 5) => {
+            let a = i16::from(cpu.regs.byte(Reg8::Al) as i8);
+            let product = a * i16::from(operand as u8 as i8);
+            let as_word = product as u16;
+            let low = as_word & 0x00FF;
+            let expected = low as u8 as i8 as i16 as u16;
+            set_mul_flags(cpu, as_word == expected);
+            (low, as_word >> 8)
+        }
+        (16, 5) => {
+            let a = i32::from(ax as i16);
+            let product = a * i32::from(operand as u16 as i16);
+            let as_word = product as u32;
+            let low = as_word as u16;
+            let expected = (low as i16 as i32 as u32) >> 16;
+            set_mul_flags(cpu, (as_word >> 16) == expected);
+            (low, (as_word >> 16) as u16)
+        }
+        // ---- unsigned divide
+        (8, 6) => {
+            let divisor = operand as u8;
+            if divisor == 0 {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let quotient = ax / u16::from(divisor);
+            if quotient > 0xFF {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let remainder = (ax % u16::from(divisor)) as u8;
+            (quotient, u16::from(remainder))
+        }
+        (16, 6) => {
+            let divisor = operand as u16;
+            if divisor == 0 {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let wide = (u32::from(dx) << 16) | u32::from(ax);
+            let quotient = wide / u32::from(divisor);
+            if quotient > u32::from(u16::MAX) {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let remainder = wide % u32::from(divisor);
+            (quotient as u16, remainder as u16)
+        }
+        // ---- signed divide
+        (8, 7) => {
+            let divisor = operand as u8 as i8;
+            if divisor == 0 {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let quotient = (ax as i16) / i16::from(divisor);
+            if !(-128..=127).contains(&quotient) {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let remainder = (ax as i16) % i16::from(divisor);
+            ((quotient as u8) as u16, (remainder as u8) as u16)
+        }
+        (16, 7) => {
+            let divisor = operand as u16 as i16;
+            if divisor == 0 {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let dividend = ((u32::from(dx) << 16) | u32::from(ax)) as i32;
+            let quotient = dividend / i32::from(divisor);
+            if !(-32768..=32767).contains(&quotient) {
+                divide_error(cpu);
+                return Ok(());
+            }
+            let remainder = dividend % i32::from(divisor);
+            (quotient as u16, remainder as u16)
+        }
+        _ => return Err(ExecError::UnknownOpcode(opcode)),
+    };
+
+    if bits == 8 {
+        cpu.regs.set_word(Reg16::Ax, (lo & 0x00FF) | (hi << 8));
+    } else {
+        cpu.regs.set_word(Reg16::Ax, lo);
+        cpu.regs.set_word(Reg16::Dx, hi);
+    }
+    Ok(())
+}
+
+/// `MUL`/`IMUL` define CF and OF together: both set when the product did not
+/// fit, both clear when it did.
+fn set_mul_flags(cpu: &mut crate::Cpu, fits: bool) {
+    let f = &mut cpu.regs.flags;
+    f.set(CF, !fits);
+    f.set(OF, !fits);
+}
+
+/// Take the divide-error interrupt: vector 0 through the interrupt table.
+fn divide_error(cpu: &mut crate::Cpu) {
+    cpu.interrupt(0);
 }
 
 const fn alu_op(index: u8) -> AluOp {
@@ -453,8 +603,19 @@ impl RegArg {
 mod tests {
     use super::*;
     use crate::Cpu;
-    use crate::flags::{AF, OF, SF, ZF};
+    use crate::flags::{AF, CF, DF, IF, OF, SF, ZF};
     use crate::regs::Registers;
+
+    /// Build a CPU with `code` at `1000:0000`, clear of the interrupt
+    /// vector table. The IVT is genuinely at `0000:0000` on real hardware, so
+    /// a test that vectors an interrupt must not also park code there.
+    fn cpu_at(code: &[u8]) -> Cpu {
+        let mut cpu = Cpu::new();
+        assert!(cpu.mem.load_at(0x10000, code).is_ok());
+        cpu.regs.set_segment(Seg::Cs, 0x1000);
+        cpu.regs.ip = 0;
+        cpu
+    }
 
     /// Build a CPU with `code` at `CS:0000`, code segment 0.
     fn cpu_with(code: &[u8]) -> Cpu {
@@ -604,8 +765,9 @@ mod tests {
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.regs.set_word(Reg16::Ax, 0xBEEF);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
-        assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0xBEEF);
+        // The 8086 predecrements, so the operand lands below the old SP.
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FE);
+        assert_eq!(cpu.mem.read_u16(0x1000, 0x00FE), 0xBEEF);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.word(Reg16::Bx), 0xBEEF);
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100);
@@ -619,8 +781,33 @@ mod tests {
         cpu.regs.flags.set(DF, true);
         cpu.regs.set_word(Reg16::Ax, 0x1234);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FE);
-        assert_eq!(cpu.mem.read_u16(0x1000, 0x00FE), 0x1234);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
+        assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
+    }
+
+    #[test]
+    fn sixteen_bit_modrm_register_operands_use_the_whole_word() {
+        // 01 C3 is ADD BX, AX: reg field 000 names AX, r/m field 011 names BX,
+        // and r/m is the destination. BX = 0x1234 + AX = 0x1111 -> 0x2345.
+        // Reading BX as its low byte would silently produce 0x1245.
+        let mut cpu = cpu_with(&[0x01, 0xC3]);
+        cpu.regs.set_word(Reg16::Bx, 0x1234);
+        cpu.regs.set_word(Reg16::Ax, 0x1111);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Bx), 0x2345);
+    }
+
+    #[test]
+    fn eight_bit_modrm_register_operands_stay_eight_bit() {
+        // 00 D8 is ADD AL, BL: reg field 011 names BL, r/m field 000 names AL,
+        // and r/m is the destination. It must not touch the upper halves.
+        let mut cpu = cpu_with(&[0x00, 0xD8]);
+        cpu.regs.set_word(Reg16::Ax, 0xAA01);
+        cpu.regs.set_word(Reg16::Bx, 0xBB01);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x02);
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0xAA, "AH untouched");
+        assert_eq!(cpu.regs.byte(Reg8::Bh), 0xBB, "BH untouched");
     }
 
     #[test]
@@ -681,6 +868,229 @@ mod tests {
         cpu.mem.write_u16(0x0000, 0x0400, 0x1000);
         cpu.step().unwrap();
         assert_eq!(cpu.mem.read_u16(0x0000, 0x0400), 0x2234);
+    }
+
+    // ---- MUL / IMUL / DIV / IDIV -------------------------------------------------
+    // Flag expectations come from documentation-guide.md §1.4, transcribed from the
+    // Intel 8086 Family User's Manual: MUL and IMUL define only CF and OF; DIV and
+    // IDIV define none of the six.
+
+    #[test]
+    fn mul8_writes_the_full_ax() {
+        // F6 /4 = MUL BL.  15 * 15 = 225, which still fits in a byte.
+        let mut cpu = cpu_with(&[0xF6, 0xE3]);
+        cpu.regs.set_byte(Reg8::Al, 0x0F);
+        cpu.regs.set_byte(Reg8::Bl, 0x0F);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x00E1);
+        assert!(!cpu.regs.flags.get(CF) && !cpu.regs.flags.get(OF));
+
+        // 16 * 16 = 256 does not fit, and that is the same instruction.
+        let mut cpu = cpu_with(&[0xF6, 0xE3]);
+        cpu.regs.set_byte(Reg8::Al, 0x10);
+        cpu.regs.set_byte(Reg8::Bl, 0x10);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x0100);
+        assert!(cpu.regs.flags.get(CF) && cpu.regs.flags.get(OF));
+    }
+
+    #[test]
+    fn mul8_signals_overflow_through_cf_and_of_only() {
+        // 0xFF * 0xFF = 0xFE01: AH is not zero, so the product did not fit.
+        let mut cpu = cpu_with(&[0xF6, 0xE3]);
+        cpu.regs.set_byte(Reg8::Al, 0xFF);
+        cpu.regs.set_byte(Reg8::Bl, 0xFF);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(SF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xFE01);
+        assert!(cpu.regs.flags.get(CF) && cpu.regs.flags.get(OF));
+        // The manual leaves these undefined, so an implementation must not
+        // invent values for them. Leaving them untouched is the only choice
+        // that cannot be wrong.
+        assert!(cpu.regs.flags.get(ZF) && cpu.regs.flags.get(SF));
+    }
+
+    #[test]
+    fn mul16_produces_a_32_bit_result_in_dx_ax() {
+        // F7 /4 = MUL BX.  0x00FF * 0x00FF = 0xFE01, which fits in 16 bits, so
+        // DX is zero and neither CF nor OF is raised.
+        let mut cpu = cpu_with(&[0xF7, 0xE3]);
+        cpu.regs.set_word(Reg16::Ax, 0x00FF);
+        cpu.regs.set_word(Reg16::Bx, 0x00FF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xFE01);
+        assert_eq!(cpu.regs.word(Reg16::Dx), 0x0000);
+        assert!(!cpu.regs.flags.get(CF) && !cpu.regs.flags.get(OF));
+    }
+
+    #[test]
+    fn mul16_signals_overflow_when_dx_is_not_zero() {
+        let mut cpu = cpu_with(&[0xF7, 0xE3]);
+        cpu.regs.set_word(Reg16::Ax, 0xFFFF);
+        cpu.regs.set_word(Reg16::Bx, 0xFFFF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Dx), 0xFFFE);
+        assert!(cpu.regs.flags.get(CF) && cpu.regs.flags.get(OF));
+    }
+
+    #[test]
+    fn imul8_treats_operands_as_signed() {
+        // F6 /5 = IMUL BL.  0xFF * 0xFF = (-1) * (-1) = 1, which fits exactly.
+        let mut cpu = cpu_with(&[0xF6, 0xEB]);
+        cpu.regs.set_byte(Reg8::Al, 0xFF);
+        cpu.regs.set_byte(Reg8::Bl, 0xFF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x0001);
+        assert!(!cpu.regs.flags.get(CF) && !cpu.regs.flags.get(OF));
+    }
+
+    #[test]
+    fn imul8_signals_overflow_when_ah_is_not_a_sign_extension() {
+        // (-128) * (-1) = 128. The result is 0x0080, which is *not* a sign
+        // extension of its own low byte 0x80, so it did not fit in a signed
+        // byte: 128 is one past the maximum of 127.
+        let mut cpu = cpu_with(&[0xF6, 0xEB]);
+        cpu.regs.set_byte(Reg8::Al, 0x80);
+        cpu.regs.set_byte(Reg8::Bl, 0xFF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x0080);
+        assert!(cpu.regs.flags.get(CF) && cpu.regs.flags.get(OF));
+    }
+
+    #[test]
+    fn div8_splits_ax_into_quotient_and_remainder() {
+        // F6 /6 = DIV BL.  100 / 7 = 14 remainder 2.
+        let mut cpu = cpu_with(&[0xF6, 0xF3]);
+        cpu.regs.set_word(Reg16::Ax, 100);
+        cpu.regs.set_byte(Reg8::Bl, 7);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 14);
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 2);
+    }
+
+    #[test]
+    fn div8_by_zero_raises_the_divide_error_interrupt() {
+        let mut cpu = cpu_at(&[0xF6, 0xF3]);
+        cpu.regs.set_word(Reg16::Ax, 100);
+        cpu.regs.set_byte(Reg8::Bl, 0);
+        install_vector(&mut cpu, 0, 0x0000, 0x0100);
+        cpu.step().unwrap();
+        assert_eq!(cpu.stop_reason, crate::StopReason::Interrupt(0));
+        assert_eq!(cpu.regs.ip, 0x0100, "vectored to the type 0 handler");
+    }
+
+    #[test]
+    fn div8_raises_an_interrupt_when_the_quotient_does_not_fit() {
+        // 511 / 1 has a quotient of 511, far wider than AL.
+        let mut cpu = cpu_at(&[0xF6, 0xF3]);
+        cpu.regs.set_word(Reg16::Ax, 0x01FF);
+        cpu.regs.set_byte(Reg8::Bl, 1);
+        install_vector(&mut cpu, 0, 0x0000, 0x0200);
+        cpu.step().unwrap();
+        assert_eq!(cpu.stop_reason, crate::StopReason::Interrupt(0));
+        assert_eq!(cpu.regs.ip, 0x0200);
+    }
+
+    #[test]
+    fn idiv8_divides_signed_and_truncates_toward_zero() {
+        // F6 /7 = IDIV BL.  -10 / 3 = -3 remainder -1.  Truncation toward zero
+        // is what x86 does, not floor division.
+        let mut cpu = cpu_with(&[0xF6, 0xFB]);
+        cpu.regs.set_word(Reg16::Ax, 0xFFF6); // -10
+        cpu.regs.set_byte(Reg8::Bl, 0x03);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xFD, "quotient -3");
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0xFF, "remainder -1");
+    }
+
+    #[test]
+    fn div16_uses_the_full_dx_ax_dividend() {
+        // F7 /6 = DIV BX.  0x0000_0064 / 7 = 14 remainder 2.
+        let mut cpu = cpu_with(&[0xF7, 0xF3]);
+        cpu.regs.set_word(Reg16::Dx, 0);
+        cpu.regs.set_word(Reg16::Ax, 100);
+        cpu.regs.set_word(Reg16::Bx, 7);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 14);
+        assert_eq!(cpu.regs.word(Reg16::Dx), 2);
+    }
+
+    #[test]
+    fn idiv16_divides_signed() {
+        // F7 /7 = IDIV BX.  -1000 / 7 = -142 remainder -6.
+        let mut cpu = cpu_with(&[0xF7, 0xFB]);
+        cpu.regs.set_word(Reg16::Dx, 0xFFFF);
+        cpu.regs.set_word(Reg16::Ax, 0xFC18); // -1000
+        cpu.regs.set_word(Reg16::Bx, 7);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), (-142i16) as u16);
+        assert_eq!(cpu.regs.word(Reg16::Dx), (-6i16) as u16);
+    }
+
+    #[test]
+    fn idiv16_raises_an_interrupt_when_the_quotient_does_not_fit() {
+        // 0x7FFF_7FFF / 1 has a quotient far outside the signed 16-bit range.
+        let mut cpu = cpu_at(&[0xF7, 0xFB]);
+        cpu.regs.set_word(Reg16::Dx, 0x7FFF);
+        cpu.regs.set_word(Reg16::Ax, 0x7FFF);
+        cpu.regs.set_word(Reg16::Bx, 1);
+        install_vector(&mut cpu, 0, 0x0000, 0x0300);
+        cpu.step().unwrap();
+        assert_eq!(cpu.stop_reason, crate::StopReason::Interrupt(0));
+    }
+
+    #[test]
+    fn cbw_and_cwd_sign_extend_without_touching_flags() {
+        // 98 = CBW, 99 = CWD.
+        let mut cpu = cpu_with(&[0x98, 0x99]);
+        cpu.regs.set_byte(Reg8::Al, 0x80);
+        cpu.regs.flags.set(ZF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xFF80);
+        assert!(cpu.regs.flags.get(ZF), "CBW must not touch flags");
+        cpu.regs.set_word(Reg16::Ax, 0x8000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Dx), 0xFFFF);
+        assert!(cpu.regs.flags.get(ZF), "CWD must not touch flags");
+    }
+
+    #[test]
+    fn a_divide_error_clears_if_and_pushes_the_return_state() {
+        let mut cpu = cpu_at(&[0xF6, 0xF3]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.set_word(Reg16::Ax, 100);
+        cpu.regs.set_byte(Reg8::Bl, 0);
+        cpu.regs.flags.set(IF, true);
+        install_vector(&mut cpu, 0, 0x0000, 0x0400);
+        let cs = cpu.regs.segment(Seg::Cs);
+        // The faulting instruction returns control to the instruction *after*
+        // it, so the pushed IP is where the decoder stopped, not where it
+        // started. F6 F3 is two bytes, so the return address is 2.
+        let pushed_ip = cpu.regs.ip + 2;
+        let pushed = cpu.regs.flags.pushed();
+        cpu.step().unwrap();
+
+        assert!(
+            !cpu.regs.flags.get(IF),
+            "the handler runs with interrupts off"
+        );
+        // FLAGS, then CS, then IP, pushed in that order on an 8086.
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100 - 6);
+        // PUSH predecrements, so the last thing pushed sits lowest.
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), pushed, "FLAGS");
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FC), cs, "CS");
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FA), pushed_ip, "IP");
+    }
+
+    /// Point vector `n` at `handler_offset` within `handler_segment`, the way
+    /// the interrupt table in physical memory `0000:0000` works: offset first,
+    /// segment second.
+    fn install_vector(cpu: &mut Cpu, n: u8, handler_segment: u16, handler_offset: u16) {
+        cpu.mem.write_u16(0x0000, u16::from(n) * 4, handler_offset);
+        cpu.mem
+            .write_u16(0x0000, u16::from(n) * 4 + 2, handler_segment);
     }
 
     #[test]
