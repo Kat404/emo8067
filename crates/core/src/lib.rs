@@ -23,6 +23,20 @@ pub mod regs;
 use memory::Memory;
 use regs::{Registers, Seg};
 
+/// Which repeat prefix a `F2`/`F3` byte set on the REP latch.
+///
+/// `F3` is `REPE`/`REPZ` and `F2` is `REPNE`/`REPNZ`. Like
+/// [`Cpu::seg_override`] this is decoder state rather than a register: the
+/// 8086 holds it in a latch, no program can read it, and it is dead as soon as
+/// the instruction it covers retires.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rep {
+    /// `F3`: repeat while the comparison says equal, i.e. while `ZF` is set.
+    Rep,
+    /// `F2`: repeat while the comparison says unequal, i.e. while `ZF` is clear.
+    RepNe,
+}
+
 /// The whole processor state.
 #[derive(Clone, Debug, Default)]
 pub struct Cpu {
@@ -41,6 +55,14 @@ pub struct Cpu {
     /// modifies are dispatched from different arms — the one sets this, the
     /// other reads it, ten functions away.
     pub seg_override: Option<Seg>,
+    /// The repeat prefix the pending instruction carries, for the instruction
+    /// that comes next.
+    ///
+    /// Same reasoning as [`Cpu::seg_override`], and the same reason it is a
+    /// separate field rather than something `seg_override` could encode: the
+    /// 8086 sets the two from independent columns of the opcode decode, so
+    /// neither order of the two prefix bytes can matter.
+    pub rep: Option<Rep>,
     /// Set when an instruction asked to stop: `HLT`, a triple fault, or an
     /// interrupt request that is not yet serviceable.
     pub halted: bool,
@@ -71,6 +93,7 @@ impl Cpu {
             regs: Registers::new(),
             mem: Memory::new(),
             seg_override: None,
+            rep: None,
             halted: false,
             stop_reason: StopReason::None,
         }
