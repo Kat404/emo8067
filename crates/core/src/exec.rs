@@ -241,7 +241,21 @@ fn sub_overflow(a: u16, b: u16, result: u16, bits: u8) -> bool {
 pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     let at = cpu.regs.ip;
     let opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
+    dispatch(cpu, opcode)?;
 
+    Ok(crate::StepInfo {
+        at,
+        opcode,
+        next_ip: cpu.regs.ip,
+    })
+}
+
+/// Run one instruction whose opcode byte has already been fetched.
+///
+/// `F0` needs this separate from [`step`]: LOCK is a prefix, so the
+/// instruction it covers runs from here rather than from a second fetch in
+/// [`step`]. Everything else reaches the dispatcher through [`step`] alone.
+fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match opcode {
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
         // The BCD adjustments sit inside 0x00..=0x3F, so they must be
@@ -266,6 +280,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xA9 => cmp_accumulator(cpu, 16)?,
         0xF6 | 0xF7 => mul_group(cpu, opcode)?,
         // ---- MOV and friends. None of these modify FLAGS.
+        0x84 | 0x85 => test_against_register(cpu, opcode)?,
         0x86 | 0x87 => xchg_memory(cpu, opcode)?,
         0x88..=0x8B => mov_group(cpu, opcode)?,
         0x8C..=0x8E => mov_group(cpu, opcode)?,
@@ -288,8 +303,13 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xE8 => call_relative(cpu)?,
         0xE9 | 0xEB => jmp_relative(cpu, opcode)?,
         0xC2 | 0xC3 => ret(cpu, opcode)?,
+        0xCA | 0xCB => ret_far(cpu, opcode),
         0xCC | 0xCD => int(cpu, opcode)?,
+        0xCE => into(cpu),
         0xCF => iret(cpu),
+        0x9A => call_far_immediate(cpu),
+        0xEA => jmp_far_immediate(cpu),
+        0xF0 => lock(cpu)?,
         0xFF => ff_group(cpu, opcode)?,
         // ---- string operations, ports and segment transfers
         0xA4..=0xA7 | 0xAA..=0xAF => string_op(cpu, opcode)?,
@@ -298,6 +318,9 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xE0..=0xE3 => loop_op(cpu, opcode)?,
         // ---- shifts and rotates
         0xD0..=0xD3 => shift_group(cpu, opcode)?,
+        0xD4 => aam(cpu),
+        0xD5 => aad(cpu),
+        0xD7 => xlat(cpu),
         0x40..=0x47 => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, true)?,
         0x48..=0x4F => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, false)?,
         // FE /0 and /1 are INC and DEC on a byte; FF /0 and /1 are the word
@@ -345,6 +368,10 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             let status = SF | ZF | AF | PF | CF;
             cpu.regs.flags.0 = (cpu.regs.flags.0 & !status) | (from_ah & status);
         }
+        // `9B` is `WAIT`: the processor idles until the coprocessor drops its
+        // TEST pin. Nothing here drives that pin, so the wait is already over
+        // and the instruction retires having touched nothing at all.
+        0x9B => {}
         // 90 is XCHG AX, AX, which is the NOP. Handling 91..=97 here keeps
         // the overlap explicit rather than duplicated.
         0x90..=0x97 => {
@@ -375,12 +402,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         }
         other => return Err(ExecError::UnknownOpcode(other)),
     }
-
-    Ok(crate::StepInfo {
-        at,
-        opcode,
-        next_ip: cpu.regs.ip,
-    })
+    Ok(())
 }
 
 /// Execute one of the eight ALU groups, `0x00..=0x3F`.
@@ -554,6 +576,25 @@ fn mov_accumulator_offset(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecEr
         }
         other => return Err(ExecError::UnknownOpcode(other)),
     }
+    Ok(())
+}
+
+/// `84 /r` and `85 /r` are `TEST r/m, r`: an AND whose result is thrown away,
+/// so this is `alu_logic` without the write-back. Table 2-21 marks AF
+/// undefined, and leaving it as it stood is a valid answer to `U`.
+fn test_against_register(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let bits: u8 = if opcode & 1 != 0 { 16 } else { 8 };
+    let m = decode_from(cpu)?;
+    let right = RegArg::from_bits(m.reg & 0b111, bits).read(&cpu.regs);
+    let left = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+    alu_logic(
+        left,
+        right,
+        LogicOp::And,
+        width_mask(bits),
+        bits,
+        &mut cpu.regs.flags,
+    );
     Ok(())
 }
 
@@ -1337,6 +1378,100 @@ fn iret(cpu: &mut crate::Cpu) {
     cpu.regs.ip = ip;
     cpu.regs.set_segment(Seg::Cs, cs);
     cpu.regs.flags = Flags::popped(flags);
+}
+
+/// `CA` is `RETF` and `CB` is `RETF iw`. The stack order is the mirror of
+/// [`call_far_immediate`]: IP comes off first, then CS.
+fn ret_far(cpu: &mut crate::Cpu, opcode: u8) {
+    let release = if opcode == 0xCB {
+        take_u16(&cpu.mem, &mut cpu.regs)
+    } else {
+        0
+    };
+    cpu.regs.ip = pop(&cpu.mem, &mut cpu.regs);
+    let cs = pop(&cpu.mem, &mut cpu.regs);
+    cpu.regs.set_segment(Seg::Cs, cs);
+    let sp = cpu.regs.word(Reg16::Sp).wrapping_add(release);
+    cpu.regs.set_word(Reg16::Sp, sp);
+}
+
+/// `CE` is `INTO`: the type 4 interrupt, and only when OF is set. One byte,
+/// so the address the interrupt pushes is the one after it.
+fn into(cpu: &mut crate::Cpu) {
+    if cpu.regs.flags.get(OF) {
+        cpu.interrupt(4);
+    }
+}
+
+/// `9A` is `CALL FAR PTR16:16`. CS is pushed first and the return address
+/// second, which leaves IP on top for `CA`/`CB` to find.
+fn call_far_immediate(cpu: &mut crate::Cpu) {
+    let offset = take_u16(&cpu.mem, &mut cpu.regs);
+    let segment = take_u16(&cpu.mem, &mut cpu.regs);
+    let cs = cpu.regs.segment(Seg::Cs);
+    let ret = cpu.regs.ip;
+    push(&mut cpu.mem, &mut cpu.regs, cs);
+    push(&mut cpu.mem, &mut cpu.regs, ret);
+    cpu.regs.ip = offset;
+    cpu.regs.set_segment(Seg::Cs, segment);
+}
+
+/// `EA` is `JMP FAR PTR16:16`: the same pointer `9A` reads, with no push.
+fn jmp_far_immediate(cpu: &mut crate::Cpu) {
+    let offset = take_u16(&cpu.mem, &mut cpu.regs);
+    let segment = take_u16(&cpu.mem, &mut cpu.regs);
+    cpu.regs.ip = offset;
+    cpu.regs.set_segment(Seg::Cs, segment);
+}
+
+/// `F0` is `LOCK`. It changes no arithmetic on an 8086 and the manual defines
+/// no timing for it, so the instruction it covers runs as it would alone.
+fn lock(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
+    let covered = fetch_u8(&cpu.mem, &mut cpu.regs);
+    dispatch(cpu, covered)
+}
+
+/// `D4 ib` is `AAM`: AL splits into a quotient in AL and a remainder in AH,
+/// in whatever base the immediate names. Table 2-21 leaves OF, AF and CF
+/// undefined, so only S, Z and P are written.
+fn aam(cpu: &mut crate::Cpu) {
+    let base = fetch_u8(&cpu.mem, &mut cpu.regs);
+    if base == 0 {
+        divide_error(cpu);
+        return;
+    }
+    let al = cpu.regs.byte(Reg8::Al);
+    cpu.regs.set_byte(Reg8::Ah, al / base);
+    let rem = al % base;
+    cpu.regs.set_byte(Reg8::Al, rem);
+    set_result_flags(u16::from(rem), 8, &mut cpu.regs.flags);
+}
+
+/// `D5 ib` is `AAD`: AH folds into AL and the 16-bit sum leaves AH clear.
+/// Same undefined flags and same divide-by-zero fault as [`aam`].
+fn aad(cpu: &mut crate::Cpu) {
+    let base = fetch_u8(&cpu.mem, &mut cpu.regs);
+    if base == 0 {
+        divide_error(cpu);
+        return;
+    }
+    // The sum is an 8-bit result: AH clears even when the arithmetic ran past
+    // FFh, so masking here is what makes `set_word` write a zero into AH.
+    let al = (u16::from(cpu.regs.byte(Reg8::Ah)) * u16::from(base)
+        + u16::from(cpu.regs.byte(Reg8::Al)))
+        & 0x00FF;
+    cpu.regs.set_word(Reg16::Ax, al);
+    set_result_flags(al, 8, &mut cpu.regs.flags);
+}
+
+/// `D7` is `XLAT`: AL takes DS:[BX + AL], the index read as a signed byte.
+/// No flags move.
+fn xlat(cpu: &mut crate::Cpu) {
+    let index = cpu.regs.byte(Reg8::Al) as i8 as i16 as u16;
+    let at = cpu.regs.word(Reg16::Bx).wrapping_add(index);
+    let table = cpu.regs.segment(Seg::Ds);
+    let value = cpu.mem.read_u8(table, at);
+    cpu.regs.set_byte(Reg8::Al, value);
 }
 
 /// The `FF` group. Only the near `CALL` and `JMP` are implemented here; the
@@ -2985,6 +3120,315 @@ mod tests {
         cpu.mem.write_u16(0x0000, u16::from(n) * 4, handler_offset);
         cpu.mem
             .write_u16(0x0000, u16::from(n) * 4 + 2, handler_segment);
+    }
+
+    /// `84 /r` and `85 /r` are `TEST r/m, r`: an AND whose result is
+    /// discarded. Table 2-21 clears OF and CF, sets S/Z/P from the result and
+    /// marks AF undefined, so AF has to survive untouched.
+    #[test]
+    fn test_against_a_register_ands_and_discards_the_result() {
+        // 84 D8 = TEST AL, BL: F0h and 3Ch share 30h.
+        let mut cpu = cpu_with(&[0x84, 0xD8]);
+        cpu.regs.set_byte(Reg8::Al, 0xF0);
+        cpu.regs.set_byte(Reg8::Bl, 0x3C);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.regs.flags.set(AF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xF0, "TEST stores nothing");
+        assert_eq!(cpu.regs.byte(Reg8::Bl), 0x3C, "neither operand moves");
+        assert_eq!(cpu.regs.ip, 2);
+        let f = cpu.regs.flags;
+        assert!(!f.get(CF) && !f.get(OF), "TEST clears both");
+        assert!(f.get(AF), "AF is undefined, so it is left alone");
+        assert!(!f.get(ZF) && !f.get(SF), "30h is neither zero nor negative");
+        assert!(f.get(PF), "30h has two set bits");
+
+        // 85 D8 = TEST AX, BX: 0100h and 0100h share 0100h. Reading either
+        // operand as a byte would AND two zeros and wrongly set ZF.
+        let mut cpu = cpu_with(&[0x85, 0xD8]);
+        cpu.regs.set_word(Reg16::Ax, 0x0100);
+        cpu.regs.set_word(Reg16::Bx, 0x0100);
+        cpu.step().unwrap();
+        assert!(!cpu.regs.flags.get(ZF), "85 is the word form");
+        assert!(!cpu.regs.flags.get(SF));
+        assert!(cpu.regs.flags.get(PF), "0100h has two set bits");
+        assert_eq!(cpu.regs.ip, 2);
+    }
+
+    /// `9A` is `CALL FAR PTR16:16`. CS goes down before the return address,
+    /// so a later RETF finds IP on top of the stack.
+    #[test]
+    fn call_far_pushes_cs_then_the_return_address() {
+        // 9A 34 12 78 56 = CALL FAR 5678h:1234h
+        let mut cpu = cpu_at(&[0x9A, 0x34, 0x12, 0x78, 0x56]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(ZF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x1234, "the low immediate word is the offset");
+        assert_eq!(
+            cpu.regs.segment(Seg::Cs),
+            0x5678,
+            "the high word is the segment"
+        );
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FE),
+            0x1000,
+            "CS went down first, so it is the higher word"
+        );
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FC),
+            0x0005,
+            "the return address is on top, past the four immediate bytes"
+        );
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FC);
+        let f = cpu.regs.flags;
+        assert!(f.get(CF) && f.get(ZF), "CALL touches no flag");
+    }
+
+    /// `9B` is `WAIT`: the processor idles until the coprocessor drops its
+    /// TEST pin. Nothing here drives that pin, so the wait is already over.
+    #[test]
+    fn wait_is_one_byte_and_moves_nothing() {
+        let mut cpu = cpu_with(&[0x9B, 0x90]);
+        cpu.regs.set_word(Reg16::Ax, 0x1234);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(SF, true);
+        cpu.regs.flags.set(AF, true);
+        let info = cpu.step().unwrap();
+        assert_eq!(info.next_ip, 1, "WAIT is one byte");
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x1234);
+        let f = cpu.regs.flags;
+        assert!(f.get(CF) && f.get(SF) && f.get(AF), "WAIT touches no flag");
+    }
+
+    /// `CA` is `RETF` and `CB` is `RETF iw`: pop IP, then CS, then release
+    /// `iw` bytes of arguments.
+    #[test]
+    fn retf_pops_ip_then_cs_and_releases_arguments() {
+        // CB 04 00 = RETF 4
+        let mut cpu = cpu_at(&[0xCB, 0x04, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0777); // IP, read at SP
+        cpu.mem.write_u16(0x2000, 0x0102, 0x6000); // CS
+        cpu.regs.flags.set(CF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0777);
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x6000);
+        assert_eq!(
+            cpu.regs.word(Reg16::Sp),
+            0x0108,
+            "four argument bytes released on top of the two pops"
+        );
+        assert!(cpu.regs.flags.get(CF), "RETF touches no flag");
+
+        // CA carries no immediate and so releases nothing.
+        let mut cpu = cpu_at(&[0xCA]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0999); // IP
+        cpu.mem.write_u16(0x2000, 0x0102, 0x5000); // CS
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0999);
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x5000);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0104);
+    }
+
+    /// `CE` is `INTO`: the type 4 interrupt, taken only when OF is set.
+    #[test]
+    fn into_vectors_only_when_overflow_is_set() {
+        let mut cpu = cpu_at(&[0xCE]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        install_vector(&mut cpu, 4, 0x7000, 0x0500);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 1, "OF is clear, so nothing was taken");
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100, "the stack did not move");
+
+        let mut cpu = cpu_at(&[0xCE]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.flags.set(OF, true);
+        cpu.regs.flags.set(IF, true);
+        install_vector(&mut cpu, 4, 0x7000, 0x0500);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0500);
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x7000);
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FA), 1, "INTO is one byte");
+        assert!(
+            !cpu.regs.flags.get(IF),
+            "the handler runs with interrupts off"
+        );
+    }
+
+    /// `D4 ib` is `AAM`: AL splits into a quotient in AL and a remainder in
+    /// AH. Table 2-21 leaves OF, AF and CF undefined, so only S, Z and P are
+    /// written; a zero divisor is the same divide error DIV takes.
+    #[test]
+    fn aam_splits_al_into_the_base_the_immediate_names() {
+        // D4 0A = AAM 10, the BCD case: 9 * 9 = 51h is eight tens and a one.
+        let mut cpu = cpu_with(&[0xD4, 0x0A]);
+        cpu.regs.set_byte(Reg8::Al, 0x51);
+        cpu.regs.flags.set(AF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x08, "51h / 10");
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x01, "51h mod 10");
+        assert_eq!(cpu.regs.ip, 2, "AAM carries an immediate");
+        let f = cpu.regs.flags;
+        assert!(
+            f.get(AF) && f.get(CF) && f.get(OF),
+            "undefined means untouched"
+        );
+        assert!(!f.get(ZF) && !f.get(SF), "the quotient is neither");
+        assert!(!f.get(PF), "one set bit is odd parity");
+
+        // The base really is the immediate, not a hidden ten: 2Ah / 16h is
+        // two sixteens and an Ah, where / 10 would give four and two.
+        let mut cpu = cpu_with(&[0xD4, 0x10]);
+        cpu.regs.set_byte(Reg8::Al, 0x2A);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x02, "2Ah / 16h");
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x0A, "2Ah mod 16h");
+
+        let mut cpu = cpu_at(&[0xD4, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        install_vector(&mut cpu, 0, 0x4000, 0x0600);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0600, "a zero divisor is the divide error");
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x4000);
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FA),
+            2,
+            "both bytes were fetched"
+        );
+    }
+
+    /// `D5 ib` is `AAD`: AH folds into AL and is then cleared. Same undefined
+    /// flags and same divide-by-zero fault as AAM.
+    #[test]
+    fn aad_folds_ah_into_al_and_clears_ah() {
+        // D5 0A = AAD 10 on the BCD number 093Ch: 09h * 10 + 3Ch = 0096h.
+        let mut cpu = cpu_with(&[0xD5, 0x0A]);
+        cpu.regs.set_word(Reg16::Ax, 0x093C);
+        cpu.regs.flags.set(AF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x0096, "the sum clears AH");
+        assert_eq!(cpu.regs.ip, 2);
+        let f = cpu.regs.flags;
+        assert!(
+            f.get(AF) && f.get(CF) && f.get(OF),
+            "undefined means untouched"
+        );
+        assert!(
+            !f.get(ZF) && f.get(SF),
+            "0096h is negative read as a signed byte"
+        );
+        assert!(f.get(PF), "0096h has four set bits");
+
+        // The multiplier really is the immediate: 093Ch in base 16 is
+        // 09h * 16h + 3Ch = 00CCh, not the 0096h a hard-coded ten gives.
+        let mut cpu = cpu_with(&[0xD5, 0x10]);
+        cpu.regs.set_word(Reg16::Ax, 0x093C);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x00CC);
+
+        // The sum can run past FFh, and AH still has to end up clear: only the
+        // low byte of AH * base + AL is the result, so FF01h gives 01FFh.
+        let mut cpu = cpu_with(&[0xD5, 0x02]);
+        cpu.regs.set_word(Reg16::Ax, 0xFF01);
+        cpu.step().unwrap();
+        assert_eq!(
+            cpu.regs.word(Reg16::Ax),
+            0x00FF,
+            "FFh * 2 + 1h is 01FFh, and only its low byte survives"
+        );
+
+        let mut cpu = cpu_at(&[0xD5, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        install_vector(&mut cpu, 0, 0x4000, 0x0600);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0600, "a zero divisor is the divide error");
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FA),
+            2,
+            "both bytes were fetched"
+        );
+    }
+
+    /// `D7` is `XLAT`: AL takes DS:[BX + AL] with the index read as a signed
+    /// byte. No flag moves.
+    #[test]
+    fn xlat_reads_ds_bx_plus_a_signed_al() {
+        let mut cpu = cpu_with(&[0xD7]);
+        cpu.regs.set_word(Reg16::Bx, 0x0020);
+        cpu.regs.set_byte(Reg8::Al, 0x05);
+        cpu.mem.write_u8(0x0000, 0x0025, 0x5A);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(ZF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x5A);
+        assert_eq!(cpu.regs.ip, 1, "XLAT is one byte");
+        let f = cpu.regs.flags;
+        assert!(f.get(CF) && f.get(ZF), "XLAT touches no flag");
+
+        // FFh is -1, so the table is read at 0020h - 1.
+        let mut cpu = cpu_with(&[0xD7]);
+        cpu.regs.set_word(Reg16::Bx, 0x0020);
+        cpu.regs.set_byte(Reg8::Al, 0xFF);
+        cpu.mem.write_u8(0x0000, 0x001F, 0x77);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x77, "the index is signed");
+    }
+
+    /// `EA` is `JMP FAR PTR16:16`: the far pointer is loaded and nothing is
+    /// pushed, unlike `9A`.
+    #[test]
+    fn jmp_far_loads_the_pointer_and_pushes_nothing() {
+        // EA 34 12 78 56 = JMP FAR 5678h:1234h
+        let mut cpu = cpu_at(&[0xEA, 0x34, 0x12, 0x78, 0x56]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.flags.set(CF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x1234, "the low immediate word is the offset");
+        assert_eq!(
+            cpu.regs.segment(Seg::Cs),
+            0x5678,
+            "the high word is the segment"
+        );
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100, "JMP pushes nothing");
+        assert!(cpu.regs.flags.get(CF), "JMP touches no flag");
+    }
+
+    /// `F0` is `LOCK`, a prefix that changes no arithmetic on an 8086, so the
+    /// instruction it precedes runs exactly as it would alone. The manual
+    /// defines no timing for it and this core has no lockable memory.
+    #[test]
+    fn lock_runs_the_instruction_it_prefixes_unchanged() {
+        // F0 04 05 = LOCK ADD AL, 5
+        let mut cpu = cpu_with(&[0xF0, 0x04, 0x05]);
+        cpu.regs.set_byte(Reg8::Al, 0x03);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x08, "the prefixed ADD ran");
+        assert_eq!(cpu.regs.ip, 3, "the prefix and its instruction");
+
+        let mut plain = cpu_with(&[0x04, 0x05]);
+        plain.regs.set_byte(Reg8::Al, 0x03);
+        plain.step().unwrap();
+        assert_eq!(
+            cpu.regs.flags.0 & (CF | ZF | SF | OF | AF | PF),
+            plain.regs.flags.0 & (CF | ZF | SF | OF | AF | PF),
+            "LOCK must leave the arithmetic exactly as the bare ADD did"
+        );
     }
 
     #[test]
