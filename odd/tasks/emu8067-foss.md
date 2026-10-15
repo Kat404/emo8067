@@ -30,10 +30,44 @@ Branch: `main` (not a git repo yet — see T0). Delivery: `ask-on-risk`. Test ru
 - **T8** `S2` Multiplatform packaging + CI. Route: pending.
 
 - **T9** `S1` Three parallel research tracks, then unify. Route: delegated (2 background + 1 foreground), unified by parent with mini verifications.
-  - **T9a** Documentation and guides. Delegate → `odd/research/documentation-guide.md`.
-  - **T9b** Feature surface, UI/UX, TUI vs GUI, inherited vs added value. Delegate → `odd/research/features-and-ux.md`.
-  - **T9c** REA of the Softonic-repacked build vs the 2010 build. Delegate → `odd/research/softonic-build-comparison.md`.
-  - **T10** Unify T9a..T9c into the ODD plan. Route: inline. Status: pending.
+  - **T9a** Documentation and guides. Delegate → `odd/research/documentation-guide.md` (939 lines, 25 sources). **done** — verified by parent: Intel manual URL returns HTTP 200 `application/pdf`; ratatui 0.30.2 / egui 0.36.2 / eframe 0.36.2 / proptest 1.12.0 confirmed against the crates.io API.
+  - **T9b** Feature surface, UI/UX, TUI vs GUI, inherited vs added value. Delegate → `odd/research/features-and-ux.md` (710 lines, 133 features, 16 gaps). **done** — verified by parent: feature-ID count matches the totals table; every cited `docs-txt` file exists.
+  - **T9c** REA of the Softonic-repacked build vs the 2010 build. Delegate → `odd/research/softonic-build-comparison.md` (524 lines). **done** — verified by parent: `app/emu8086.exe` and `funcs.tsv` hashes identical across both builds; Security Directory empty on both installers.
+  - **T10** Unify T9a..T9c into the ODD plan. Route: inline. **done** — see `## Unified plan` below.
+
+## Unified plan
+
+Three reports, 2 173 lines, cross-checked by the parent. What they collectively settle:
+
+**RE phase is closed.** Track 3 proved the Softonic repack carries zero code change: 275 binaries byte-identical, `funcs.tsv` hash `8a4ed1fd…` reproduced from an independent Ghidra pass, 11 differing bytes in the Inno stub, all 43 file differences confined to documentation text and four images. No further reverse engineering of this product is warranted.
+
+**The spec now has a citable primary source.** The Intel 8086 Family User's Manual (Oct 1979) is publicly reachable as a scanned PDF on Internet Archive Bitsavers. That replaces "write from memory and from the reference product" with a real oracle: the 256-entry opcode map, the per-instruction flag table and the `INT n`/`IRET` sequence are all transcribed from it. `documentation-guide.md` §1.4 becomes the source of truth for flag tests.
+
+**There is no shortcut on crates.io.** No mature 8086 core exists; every actively maintained x86 crate targets 32/64-bit mode instead of real mode, and the closest hobby projects are single releases from 2019 and 2023. Writing `crates/core` from the manual is therefore also the only route that does not bet the project on abandoned code. The dependency-free core is load-bearing, not stylistic.
+
+**eframe 0.36 broke its own API.** The `App::update(ctx, frame)` signature was replaced by `App::ui(ui, frame)` plus `App::logic`. Most published egui tutorials no longer compile. The GUI estimate must assume greenfield work against 0.36.2, not a tutorial walkthrough.
+
+**UI decision: TUI primary, GUI deferred.** The product's whole value surface is text; ratatui 0.30.2 keeps the dependency budget honest where eframe pulls wgpu; a terminal is the only frontend that works over SSH and in CI. `features-and-ux.md` §4.3.
+
+**Reordered build sequence** (from `features-and-ux.md` §6, cross-checked against the research):
+
+- **T11 — complete `crates/core` against the manual.** All 256 opcodes, flag semantics driven by `documentation-guide.md` §1.4, `MUL`/`DIV`/`IMUL`/`IDIV` with their undefined-flag and divide-error cases, the segment and interrupt machinery. Exit criterion: the 86 shipped `.asm` examples run headless to the same halt state as the reference reports.
+- **T12 — headless batch runner and `.asm` test harness.** A CLI that assembles and runs a file and prints registers, flags and memory. Exit criterion: every example in `re/extracted/app/examples/` produces a deterministic, checked-in golden state. This is what makes T13..T16 safe to change.
+- **T13 — assembler.** MASM-style syntax, the full directive set, the 13-rule `STRICT_SYNTAX` matrix recovered in `re/FINDINGS.md`, macro expansion, `#make_com#`/`#make_exe#`/`#make_bin#`/`#make_boot#`, and the `.binf` load-state format.
+- **T14 — disassembler.** Must reproduce the canonical output recovered in `re/FINDINGS.md`: hex as `0%02X%02Xh`, logical addresses as `SSSS:OOOO`, and the x87 mnemonic table that the reference decodes for display without executing.
+- **T15 — device and interrupt bus.** Replace the drive-root `C:\emu8086.io` file with an in-process trait plus a framed socket transport. This removes the administrator-rights requirement entirely rather than relocating the file. Only traffic lights, stepper motor and robot have documented port maps; the other four shipped devices have none and need a decision (T9b GAP).
+- **T16 — TUI debugger.** Panelled layout: disassembly, registers plus flags, memory hex/ASCII with virtual scrolling over 1 MiB, stack, breakpoints, variables. Stop-on-condition evaluator first, because it is already specified down to its error strings in `re/FINDINGS.md`.
+- **T17 — packaging and CI.** Cross-compile to Windows and macOS, ship binaries per platform.
+- **T18 — GUI, only after T16 is stable.** egui 0.36.2, `App::ui` + `App::logic`, not the tutorial API.
+
+**Decisions that need the maintainer, not more research:**
+
+1. **Spec-pure or reference-compatible?** Two behaviours are marked *inferred* and the two answers diverge. (a) A 16-bit word straddling the top of the bus: `crates/core` currently fetches each byte through its own `segment:offset`, so it wraps; the reference may read the pair as contiguous. (b) `PUSHF` reading FLAGS bits 12-15 as one — architecturally correct for an 8086, but undetermined for the reference. Pick one per behaviour and say so in the core.
+2. **Crate naming.** The research used `emu8067`, `emu8086-core` and `emu8066-core`. The shipped crate is `emu8086-core`; decide before anything is published.
+3. **The source editor.** Whether to inherit the reference's roughly 70-hotkey editor at all, or ship assembler input as plain files with external tooling.
+4. **The seven VB6 device executables.** Drop them, or shim them over the new socket transport for compatibility.
+
+**Known gaps carried forward:** the word "breakpoint" appears zero times across all 34 reference documentation files even though `frmTrapping` proves the mechanism exists, so breakpoint syntax is a design choice rather than a recovered fact. `innoextract` cannot expose the installer's compiled script, so `[Run]`/`[Registry]`/`[Tasks]` differences between the two installers are unknown. osdev.org returns HTTP 403 to programmatic fetches, making it a manual-reading source only. The BIOS/DOS service coverage in `documentation-guide.md` §3 is the thinnest section and will need the manual's Appendix A before the DOS layer is trustworthy.
 
 ## Log
 
@@ -46,4 +80,6 @@ Branch: `main` (not a git repo yet — see T0). Delivery: `ask-on-risk`. Test ru
 - **L7 (2026-10-15) RE phase closed.** Deliverable in `re/FINDINGS.md`. Key results: the target is Visual Basic 6 native-compiled (2.2 MB) plus `diasm.dll` (MSVC) for the disassembler and the stop-on-condition evaluator. Recovered the full VB6 class map, the ModRM effective-address table, the `0%02X%02Xh` print formats, the x87 display mnemonic table, the evaluator diagnostics, and the two device buses. Not needed for a clean-room build: the decompiled pseudocode itself — the Intel 8086 User's Manual plus the 86 shipped `.asm` examples are the authoritative source.
 - **L9 (2026-10-15) Second build acquired.** `rea-bins/emu8086v408.zip` from Softonic (sha256 `d56d6e42…e17afd`, 3 131 331 B) contains only `ReadMe.txt` (75 B, "This is EMU8086 version 4.08 / Repack for Windows 10 / November 25, 2015") and `setup.exe` (3 220 050 B, sha256 `a1b36dc6…397db`). `setup.exe` is again Inno Setup 5.3.7 with a `zlb\x1a` overlay, so it is a **third-party repack of the same 4.08**, not a new upstream release. `rea-bins/emu8086.exe` is byte-identical to the original 2010 installer (`175061d9…16e7`); the user moved it, nothing changed. This is the supply-chain angle behind the user's "where do I even download this" complaint and gets its own REA track (T9c).
 - **L10 (2026-10-15) Tooling.** CodeGraph is initialised at the repo root; `codegraph_explore` is the primary route for semantic code search, ahead of grep/Read. `.codegraph/` is gitignored. Ghidra headless lives at `/opt/ghidra/support/analyzeHeadless` with `GHIDRA_INSTALL_DIR=/opt/ghidra`; `rea/scripts/EmuDump.java` is the dump script (`funcs` / `strings` / `decomp <regex> [n]` / `top <n>` / `callees <regex>`).
+- **L11 (2026-10-15) Track results.** T9c: the Softonic repack is the same binary, so the RE phase is closed. T9a: the Intel 8086 Family User's Manual is on Internet Archive and becomes the authoritative opcode and flag source; no mature 8086 core exists on crates.io, so writing the core is also the only route not bet on abandoned code; eframe 0.36 replaced `App::update` with `App::ui` + `App::logic`. T9b: 133 features to inherit, 16 gaps, TUI primary and GUI deferred. Parent verification: Intel PDF HTTP 200 `application/pdf`; crates.io versions ratatui 0.30.2 / egui 0.36.2 / eframe 0.36.2 / proptest 1.12.0 confirmed; `app/emu8086.exe` and `funcs.tsv` hashes identical across both reference builds.
+- **L12 (2026-10-15) Correction retracted.** The earlier claim that `analyzeHeadless` was absent from `PATH` was wrong; the package installs it as `ghidra-analyzeHeadless`. Recorded in `odd/tooling.md` with the lesson: verify a negative before asserting it.
 - **L8 (2026-10-15) Note on FASM:** FASM 1.64 ships inside the emu8086 package under its own BSD-like license, which forbids relicensing *FASM's own code* (explicitly including to the GPL). It may be redistributed unmodified with its notices intact as a separate binary; our code is Unlicense. Decision deferred to T6 — we may reimplement the assembler instead and drop the dependency.
