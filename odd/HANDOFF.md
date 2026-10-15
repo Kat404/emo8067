@@ -34,13 +34,13 @@ The core covers the whole 8086 instruction set including 24 undocumented opcodes
 
 ## Open items, in the order they should be taken
 
-### 1. String operations ignore the segment override on their source side — and this makes a test vacuous
+### 1. CLOSED — string operations now honour the segment override on their source side
 
-**The one real bug left.** `string_op_once` in `crates/core/src/exec.rs` reads the `SI` side through `DS` unconditionally. The manual is explicit that the *only* thing a segment override cannot reach is the **destination** of a string instruction: Vol. 1, "the only exception is the destination operand of a string instruction which must be in the extra segment", and Vol. 2 p. 2-112 uses `REP MOVS DESTINATION, ES:SOURCE` as its worked example. `STOS` and `SCAS` are correctly ES-only; `MOVS`, `CMPS`, `LODS` are wrong.
+**Closed in `fe16b6c`.** `string_op_once` in `crates/core/src/exec.rs` read the `SI` side through `DS` unconditionally; it now reads `operand_seg(cpu)`, and the `shortcut:` comment that admitted the divergence is gone. The manual is explicit that the *only* thing a segment override cannot reach is the **destination** of a string instruction: Vol. 1, "the only exception is the destination operand of a string instruction which must be in the extra segment", and Vol. 2 p. 2-112 uses `REP MOVS DESTINATION, ES:SOURCE` as its worked example. `STOS` and `SCAS` are still ES-only; `MOVS`, `CMPS`, `LODS` now obey the override.
 
-Introduced by `5bdb235` (U7), before the F5 baseline.
+Introduced by `5bdb235` (U7), before the F5 baseline, and fixed after the F5 baseline.
 
-**It also makes `every_permutation_of_the_prefix_bytes_reaches_the_same_state` vacuous** — that test passes because the override is dropped, so it cannot influence anything, not because order genuinely cannot matter. Fixing the override requires replacing that test with one whose orderings actually vary the result; a ready-written replacement is in the verification report for F5.
+The vacuous `every_permutation_of_the_prefix_bytes_reaches_the_same_state` is gone. It permuted all four segment overrides and still agreed, because the override could not influence anything. In its place: a test that puts one override on the `SI` side of `MOVS`/`CMPS`/`LODS`, a test that pins last-override-wins, a guard that `STOS`/`SCAS` stay in `ES`, and the order-independence claim kept over `F0 F1 F2 F3` only, the four bytes whose latches come from independent decode columns. Suite after the fix: 215 green (5 + 114 + 96).
 
 ### 2. `CX = 0` with `REP` — manual and silicon may disagree
 
@@ -99,7 +99,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 
 ## Next session, in order
 
-1. Fix the string-source segment override (item 1), and replace the now-vacuous permutation test with the one in the F5 verification report.
+1. ~~Fix the string-source segment override (item 1)~~ — done in `fe16b6c`; its replacement permutation test had to be written from scratch, because the F5 verification report it referred to is in neither memory nor the repo.
 2. Decide item 2 with a primary source, and record it the way `A8`/`A9` was recorded.
 3. Correct the five stale briefs (item 4) — they are actively misleading.
 4. Then `T12`: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`); what remains is running the 86 shipped `.asm` examples, which needs `T13`, the assembler.
