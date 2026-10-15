@@ -1,5 +1,5 @@
 [package]
-name = "emu8086-core"
+name = "emo8067-core"
 description = "Clean-room Intel 8086/8088 emulator core. No dependencies."
 version.workspace = true
 edition.workspace = true

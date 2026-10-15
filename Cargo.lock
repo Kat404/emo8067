@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "emu8086-core"
+name = "emo8067-core"
 version = "0.1.0"

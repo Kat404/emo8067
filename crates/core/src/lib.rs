@@ -1,4 +1,4 @@
-//! `emu8086-core` — a clean-room Intel 8086/8088 emulator core.
+//! `emo8067-core` — a clean-room Intel 8086/8088 emulator core.
 //!
 //! This crate has no dependencies and no I/O. Everything it knows about
 //! the processor comes from the public Intel 8086/8088 architecture

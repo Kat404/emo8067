@@ -60,7 +60,14 @@ Three reports, 2 173 lines, cross-checked by the parent. What they collectively 
 - **T17 — packaging and CI.** Cross-compile to Windows and macOS, ship binaries per platform.
 - **T18 — GUI, only after T16 is stable.** egui 0.36.2, `App::ui` + `App::logic`, not the tutorial API.
 
-**Decisions that need the maintainer, not more research:**
+**Decisions taken 2026-10-15 (maintainer):**
+
+1. **Spec-pure, not reference-compatible.** Where the architecture manual and the reference product's observable behaviour diverge, this project implements the manual. Applied to both open behaviours: a 16-bit word is read from `EA+1` masked to 20 bits rather than from a re-wrapped offset, and `PUSHF` reads FLAGS bits 12-15 as one. Pinned by `the_high_byte_does_not_return_to_the_segment_base` and `push_reads_the_undefined_bits_as_one`.
+2. **The project is `emo8067`**, matching the repository directory. The core crate is `emo8067-core` (`crates/core/`), leaving the bare name free for a future CLI binary.
+3. **Editor: minimal, and only if time permits.** A cursor, insert and save inside the TUI. The reference's roughly 70 hotkeys, syntax colouring, macro editor and symbol-table viewer are not inherited. Ship plain `.asm` files with external tooling first.
+4. **Devices: in-process trait plus socket transport.** Reimplement the three with a documented port map — traffic lights (port 4), stepper motor (port 7), robot (ports 9/10/11) — as in-process `Device` implementations, and expose a framed socket transport so third-party devices written against the old `emu8086.io` file protocol keep working. The remaining five (`Simple`, `LED_Display`, `Thermometer`, `Printer`, `VGA_STATE`) have no documented port map and are declared unsupported rather than guessed at.
+
+**Superseded concerns, kept for the record:**
 
 1. **Spec-pure or reference-compatible?** Two behaviours are marked *inferred* and the two answers diverge. (a) A 16-bit word straddling the top of the bus: `crates/core` currently fetches each byte through its own `segment:offset`, so it wraps; the reference may read the pair as contiguous. (b) `PUSHF` reading FLAGS bits 12-15 as one — architecturally correct for an 8086, but undetermined for the reference. Pick one per behaviour and say so in the core.
 2. **Crate naming.** The research used `emu8067`, `emu8086-core` and `emu8066-core`. The shipped crate is `emu8086-core`; decide before anything is published.
