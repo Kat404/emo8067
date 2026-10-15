@@ -165,3 +165,59 @@ fn lea_uses_the_offset_alone() {
         "the segment is not part of an offset"
     );
 }
+
+/// Each string operation may only advance the pointer it actually used.
+/// Advancing both corrupted `DI` on LODS and `SI` on STOS and SCAS.
+#[test]
+fn lods_advances_only_si() {
+    let mut c = cpu(&[0xAC]); // LODSB
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u8(0x0000, 0x0020, 0x5A);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Si), 0x0021);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0300, "LODS must not touch DI");
+}
+
+#[test]
+fn stos_advances_only_di() {
+    let mut c = cpu(&[0xAA]); // STOSB
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.regs.set_byte(Reg8::Al, 0x5A);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Di), 0x0301);
+    assert_eq!(c.regs.word(Reg16::Si), 0x0020, "STOS must not touch SI");
+}
+
+#[test]
+fn scas_advances_only_di() {
+    let mut c = cpu(&[0xAE]); // SCASB
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Di), 0x0301);
+    assert_eq!(c.regs.word(Reg16::Si), 0x0020, "SCAS must not touch SI");
+}
+
+#[test]
+fn movs_advances_both_pointers() {
+    let mut c = cpu(&[0xA4]); // MOVSB
+    c.regs.set_word(Reg16::Si, 0x0020);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Si), 0x0021);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0301);
+}
+
+#[test]
+fn rep_lods_advances_only_si() {
+    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAC]);
+    c.regs.set_word(Reg16::Di, 0x0300);
+    c.mem.write_u16(0x0000, 0x0020, 0x0000);
+    for _ in 0..3 {
+        c.step().unwrap();
+    }
+    assert_eq!(c.regs.word(Reg16::Si), 0x0023);
+    assert_eq!(c.regs.word(Reg16::Di), 0x0300, "REP LODS must not touch DI");
+}

@@ -568,6 +568,10 @@ fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let es = cpu.regs.segment(Seg::Es);
     let mut si = cpu.regs.word(Reg16::Si);
     let mut di = cpu.regs.word(Reg16::Di);
+    let _uses_si = matches!(opcode, 0xA4..=0xA7 | 0xAC | 0xAD);
+    let _uses_di = !matches!(opcode, 0xAC | 0xAD);
+    let uses_si = matches!(opcode, 0xA4..=0xA7 | 0xAC | 0xAD);
+    let uses_di = !matches!(opcode, 0xAC | 0xAD);
 
     macro_rules! bump {
         ($ptr:expr) => {
@@ -644,10 +648,17 @@ fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         other => return Err(ExecError::UnknownOpcode(other)),
     }
-    bump!(si);
-    bump!(di);
-    cpu.regs.set_word(Reg16::Si, si);
-    cpu.regs.set_word(Reg16::Di, di);
+    // Only the pointer the operation actually used may move. MOVS and CMPS
+    // touch both; STOS and SCAS only DI; LODS only SI. Advancing both
+    // corrupted whichever pointer the caller was relying on.
+    if uses_si {
+        bump!(si);
+        cpu.regs.set_word(Reg16::Si, si);
+    }
+    if uses_di {
+        bump!(di);
+        cpu.regs.set_word(Reg16::Di, di);
+    }
     Ok(())
 }
 
@@ -785,8 +796,14 @@ fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 p.wrapping_add(step)
             }
         };
-        cpu.regs.set_word(Reg16::Si, bump(si));
-        cpu.regs.set_word(Reg16::Di, bump(di));
+        // Same rule as outside a repeat: LODS owns SI alone, STOS and SCAS
+        // own DI alone, and only MOVS and CMPS touch both.
+        if matches!(next, 0xA4..=0xA7 | 0xAC | 0xAD) {
+            cpu.regs.set_word(Reg16::Si, bump(si));
+        }
+        if !matches!(next, 0xAC | 0xAD) {
+            cpu.regs.set_word(Reg16::Di, bump(di));
+        }
 
         // REPE and REPNE stop at the first pair that fails their condition.
         if compare_op {
