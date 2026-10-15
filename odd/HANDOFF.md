@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 114 + 2 + 109 + 0 passed, 0 failed   (230)
+cargo test --workspace   0 + 5 + 115 + 4 + 8 + 109 + 0 passed   (241)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     71ea3a8   (signed; every commit in this session is GPG-signed)
+HEAD                     7dafe45   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -24,6 +24,7 @@ Two gates, both live, both proved to fail when broken:
 |---|---|
 | `every_first_opcode_byte_the_8086_defines_decodes` | all 256 first opcode bytes, `probed == 256` literal, no exclusions |
 | `every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole` | 96 `(opcode, /digit)` pairs, `96`, `5` and `91` as literals, cross-checked in both directions |
+| `the_word_register_field_names_the_register_intel_table_4_9_says` | all eight `B8`..`BF` encodings, plus the same field in a ModR/M byte. Written against instruction bytes, not the API, because the API is where the encoding mistake hid |
 | `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
@@ -117,6 +118,9 @@ Every architecture bug this project shipped came from the same place — **reaso
 | `BP` default segment | one default segment for every base |
 | string-source segment override | a prefix that reaches a memory operand reaches every one of them |
 | `LAHF`/`SAHF` transposed | `9E` and `9F` are adjacent, so swapping them changes nothing structurally — and two unit tests asserted the wrong opcode's behaviour, so code and test agreed |
+| the 16-bit REG field | `Reg16`'s discriminants run in the order `words` wants, not the order Intel assigns the field, and `from_bits` was the identity on them. Five of eight registers were named wrong, and **twenty-one tests encoded the wrong table**, so the wrong answer was confirmed from both sides |
+
+That last one is the shape worth remembering. It is not a slip in one place: a project's tests are usually written in the same vocabulary as its code, so when a shared assumption is wrong, the tests do not merely fail to catch it — they **assert it**. Twenty-one tests agreed with each other and with the emulator about a register encoding that no 8086 has ever used. Only running a whole program, whose bytes came from a table rather than from the API, could break that agreement.
 | `REP` negates `MUL`/`IMUL`/`IDIV` | dismissed, because "the multiply reads no flags" conflated FLAGS with the internal `F1` latch |
 | `A8`/`A9` | the same claim in reverse: a source said silicon runs `CMP` and that was adopted with no citation |
 
@@ -168,9 +172,10 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 2. ~~Decide item 2 with a primary source~~ — done; microcode settles `CX = 0`, and it is not an erratum.
 3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
 4. **Decide the oracle question** in "A second cause" above — the cheap semantic gate first, and whether §1.3 becomes a derived document gated on the hardware captures. It is a decision before it is a task, and it changes what the next unit is allowed to trust.
-5. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`.
-6. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`); what remains is running the 86 shipped `.asm` examples. Note that `re/` currently contains **no** `.asm` files — the 86 examples are not in the tree, so this needs either locating them in the extracted reference build or writing them.
-7. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
+5. **Grow the program corpus.** `crates/core/tests/programs.rs` has eight programs and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. It also found its own author's share of encoding errors: four of the eight were hand-assembled wrongly and the emulator was right every time. Twenty more programs covering the areas still untested end to end — `INT`/`IRET`, `REP` with `DF` set, a far `CALL`/`RET`, `XLAT` with a negative index, segment arithmetic, a self-checking loop — before anything else is built on top.
+6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus now makes its value concrete: twenty-one tests had to be hand-re-encoded against Intel's table, which is exactly the work an assembler does once and for all.
+7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). Note that `re/` currently contains **no** `.asm` files — the 86 examples are not in the tree, so this needs either locating them in the extracted reference build or writing them.
+8. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
 
 ## Files worth reading first
 
