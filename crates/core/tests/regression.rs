@@ -2222,24 +2222,41 @@ fn movsb_after(code: &[u8]) -> (Cpu, State) {
     c.mem.write_u8(0x0000, 0x0020, 0x11);
     c.mem.write_u8(0x0000, 0x0021, 0x22);
     c.mem.write_u8(0x0000, 0x0022, 0x33);
-    // A segment override reaches the SI side, so a test whose prefix names a
-    // segment other than DS needs the source bytes to exist there too.
-    c.mem.write_u8(0x9000, 0x0020, 0x11);
-    c.mem.write_u8(0x9000, 0x0021, 0x22);
-    c.mem.write_u8(0x9000, 0x0022, 0x33);
+    // A segment override reaches the SI side, so a test whose prefix names ES
+    // reads the source from here. These bytes are deliberately DIFFERENT from
+    // DS's: identical bytes in both segments would let a dropped override pass
+    // unnoticed, which is how the old permutation test stayed green while the
+    // override was being discarded.
+    c.mem.write_u8(0x9000, 0x0020, 0xAA);
+    c.mem.write_u8(0x9000, 0x0021, 0xBB);
+    c.mem.write_u8(0x9000, 0x0022, 0xCC);
     c.step().expect("REP MOVSB must not fault");
     let state = movsb_state(&c);
     (c, state)
 }
 
-/// The state a correct three-iteration `REP MOVSB` reaches: the count spent,
-/// both pointers past three bytes, and the source copied through ES. The `IP`
-/// is the length of the program that reached it.
+/// The state a correct three-iteration `REP MOVSB` reaches when nothing
+/// overrides the source: the count spent, both pointers past three bytes, and
+/// `DS`'s bytes copied through `ES`. The `IP` is the length of the program that
+/// reached it.
 const REP_MOVSB_THREE: State = (0, 0x0023, 0x0303, 3, [0x11, 0x22, 0x33, 0x00]);
+
+/// The same three iterations behind a prefix that names `ES` as the source
+/// segment. The moved bytes are `ES`'s, which is what makes it a different
+/// state rather than the same one reached by another route.
+const REP_MOVSB_THREE_FROM_ES: State = (0, 0x0023, 0x0303, 3, [0xAA, 0xBB, 0xCC, 0x00]);
 
 /// The same three iterations reached behind a 4-byte prefix run, so `IP`
 /// stops one byte further on and nothing else differs.
 const REP_MOVSB_THREE_AFTER_FOUR: State = (0, 0x0023, 0x0303, 5, [0x11, 0x22, 0x33, 0x00]);
+
+/// The three iterations behind a 5-byte run that ends in an override naming
+/// the source. `ES`'s bytes moved, because `ES` is now the source.
+const REP_MOVSB_THREE_FROM_ES_AFTER_FIVE: State = (0, 0x0023, 0x0303, 6, [0xAA, 0xBB, 0xCC, 0x00]);
+
+/// The three iterations behind the same 5-byte run ending in `3E`, which names
+/// `DS` — the segment the bytes came from in the first place.
+const REP_MOVSB_THREE_AFTER_FIVE: State = (0, 0x0023, 0x0303, 6, [0x11, 0x22, 0x33, 0x00]);
 
 /// `F3 26 A4` used to be `BadRepeat`, because the repeat helper fetched its
 /// own operand byte and rejected anything that was not a string operation.
@@ -2251,8 +2268,8 @@ fn rep_before_a_segment_override_and_the_other_way_round_agree() {
     let (_, second) = movsb_after(&[0x26, 0xF3, 0xA4]);
     assert_eq!(first, second, "prefix order changed the outcome");
     assert_eq!(
-        first, REP_MOVSB_THREE,
-        "three MOVSB iterations, destination through ES"
+        first, REP_MOVSB_THREE_FROM_ES,
+        "three MOVSB iterations, source through ES and destination through ES"
     );
 }
 
@@ -2425,6 +2442,51 @@ fn every_order_of_lock_and_the_repeat_prefixes_reaches_the_same_state() {
     );
 }
 
+/// The 96 orderings this commit would otherwise have dropped: `F0 F1 F2 F3`
+/// around a *single* segment override. Dropping the eight-byte permutation
+/// took these with it, and they are the case the fix makes interesting — one
+/// override cannot compete with another, so order provably cannot matter, and
+/// the state must be the one that override names. All four overrides are
+/// checked, so `26`/`2E`/`36`/`3E` each have to reach their own segment.
+#[test]
+fn every_order_around_a_single_segment_override_reaches_the_same_state() {
+    for (prefix, state) in [
+        (0x26u8, REP_MOVSB_THREE_FROM_ES_AFTER_FIVE),
+        (0x3Eu8, REP_MOVSB_THREE_AFTER_FIVE),
+    ] {
+        let mut order = [0xF0u8, 0xF1, 0xF2, 0xF3];
+        let mut orders = Vec::new();
+        permutations(&mut order, 0, &mut orders);
+        assert_eq!(orders.len(), 24, "4! orderings per override, not a sample");
+
+        let mut code = [0u8; 6];
+        code[5] = 0xA4;
+        let mut c = cpu(&code);
+        c.regs.set_segment(Seg::Es, 0x9000);
+
+        let mut reference = None;
+        for permutation in &orders {
+            let mut run = [0u8; 5];
+            run[4] = prefix;
+            run[..4].copy_from_slice(permutation);
+            run_prefixed(&mut c, &run);
+            let got = movsb_state(&c);
+            match reference {
+                None => reference = Some(got),
+                Some(want) => assert_eq!(
+                    got, want,
+                    "prefix order {permutation:02X?} around {prefix:02X} changed the outcome"
+                ),
+            }
+        }
+        assert_eq!(
+            reference,
+            Some(state),
+            "and the shared state is the right one for override {prefix:02X}"
+        );
+    }
+}
+
 /// Generate every permutation of `items`, in place.
 fn permutations<const N: usize>(items: &mut [u8; N], at: usize, out: &mut Vec<[u8; N]>) {
     if at == N {
@@ -2439,8 +2501,12 @@ fn permutations<const N: usize>(items: &mut [u8; N], at: usize, out: &mut Vec<[u
 }
 
 /// Rewrite the code bytes to `order` followed by `MOVSB`, reset everything the
-/// covered instruction touches, and take one step. Reusing one CPU keeps 40320
-/// orderings off the 1 MiB allocator.
+/// covered instruction touches, and take one step. Reusing one CPU keeps every
+/// ordering off the 1 MiB allocator.
+///
+/// Both source segments are seeded with different bytes, because an override
+/// can name either one and a test that cannot tell them apart would pass with
+/// the override dropped.
 fn run_prefixed(c: &mut Cpu, order: &[u8]) {
     c.regs.ip = 0;
     c.regs.set_word(Reg16::Cx, 3);
@@ -2452,6 +2518,9 @@ fn run_prefixed(c: &mut Cpu, order: &[u8]) {
     c.mem.write_u8(0x0000, 0x0020, 0x11);
     c.mem.write_u8(0x0000, 0x0021, 0x22);
     c.mem.write_u8(0x0000, 0x0022, 0x33);
+    c.mem.write_u8(0x9000, 0x0020, 0xAA);
+    c.mem.write_u8(0x9000, 0x0021, 0xBB);
+    c.mem.write_u8(0x9000, 0x0022, 0xCC);
     for (i, byte) in order.iter().enumerate() {
         c.mem.write_u8(0x1000, i as u16, *byte);
     }

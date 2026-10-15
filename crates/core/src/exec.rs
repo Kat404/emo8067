@@ -297,12 +297,16 @@ enum Prefix {
 /// What a prefix byte contributes. `None` means the byte is not a prefix, so
 /// the loop in [`step`] stops and dispatches it as an opcode.
 ///
-/// The segment latch and the REP latch are set by independent columns of the
-/// 8086's opcode decode, so the order of the prefix bytes cannot matter: `F3
-/// 26 A4` and `26 F3 A4` reach the same state. The 8086 also has no
-/// invalid-instruction detection at all, so a repeat prefix in front of
-/// something that is not a string operation is not an error — the latch is
-/// simply read by nobody and dies with the instruction.
+/// The REP latch and the LOCK latch come from columns of the 8086's opcode
+/// decode independent of the segment latch's, so `F3 26 A4` and `26 F3 A4`
+/// reach the same state. Two *segment* overrides are the exception: the decode
+/// ROM **loads** the segment latch rather than combining with it, so a later
+/// override replaces an earlier one and `36 2E AC` reads through CS while
+/// `2E 36 AC` reads through SS.
+///
+/// The 8086 has no invalid-instruction detection at all, so a repeat prefix in
+/// front of something that is not a string operation is not an error — the
+/// latch is simply read by nobody and dies with the instruction.
 fn prefix_effect(opcode: u8) -> Option<Prefix> {
     match opcode {
         0xF0 | 0xF1 => Some(Prefix::Lock),
@@ -801,10 +805,12 @@ fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let word = opcode & 1 != 0;
     let step: u16 = if word { 2 } else { 1 };
-    // The source side obeys a segment override like any other memory operand.
+    // The source side obeys a segment override like any other memory operand,
+    // so this is the default `DS` unless a prefix named another segment — under
+    // `26` it holds ES, and source and destination become the same register.
     // The destination is the one thing an override cannot reach, so it stays
     // pinned to ES below, and `STOS`/`SCAS` read and write that ES:DI directly.
-    let ds = cpu.regs.segment(operand_seg(cpu));
+    let src = cpu.regs.segment(operand_seg(cpu));
     let es = cpu.regs.segment(Seg::Es);
     let mut si = cpu.regs.word(Reg16::Si);
     let mut di = cpu.regs.word(Reg16::Di);
@@ -824,9 +830,9 @@ fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match opcode {
         0xA4 | 0xA5 => {
             let value = if word {
-                cpu.mem.read_u16(ds, si)
+                cpu.mem.read_u16(src, si)
             } else {
-                u16::from(cpu.mem.read_u8(ds, si))
+                u16::from(cpu.mem.read_u8(src, si))
             };
             if word {
                 cpu.mem.write_u16(es, di, value)
@@ -836,9 +842,9 @@ fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         0xA6 | 0xA7 => {
             let a = if word {
-                cpu.mem.read_u16(ds, si)
+                cpu.mem.read_u16(src, si)
             } else {
-                u16::from(cpu.mem.read_u8(ds, si))
+                u16::from(cpu.mem.read_u8(src, si))
             };
             let b = if word {
                 cpu.mem.read_u16(es, di)
@@ -861,9 +867,9 @@ fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         0xAC | 0xAD => {
             let value = if word {
-                cpu.mem.read_u16(ds, si)
+                cpu.mem.read_u16(src, si)
             } else {
-                u16::from(cpu.mem.read_u8(ds, si))
+                u16::from(cpu.mem.read_u8(src, si))
             };
             if word {
                 cpu.regs.set_word(Reg16::Ax, value)
