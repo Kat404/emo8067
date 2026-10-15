@@ -365,3 +365,22 @@ fn int_pushes_the_frame_before_reading_the_vector() {
     assert_eq!(c.regs.segment(Seg::Cs), 0x5000, "vector still resolved");
     assert_eq!(c.regs.ip, 0x0600);
 }
+
+/// Port N must be physical byte N. The implementation used to pass the port
+/// as a segment, which lands on N * 16, while the comment claimed byte N.
+#[test]
+fn a_port_is_the_byte_with_that_number() {
+    // E4 60 = IN AL, 60h
+    let mut c = cpu(&[0xE4, 0x60]);
+    c.mem.write_u8(0x0000, 0x60, 0x5A);
+    c.mem.write_u8(0x0600, 0x0000, 0x99); // what segment=0x60 would have hit
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "byte 0x60, not 0x600");
+
+    // E6 60 = OUT 60h, AL
+    let mut c = cpu(&[0xE6, 0x60]);
+    c.regs.set_byte(Reg8::Al, 0xC3);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u8(0x0000, 0x60), 0xC3);
+    assert_eq!(c.mem.read_u8(0x0600, 0x0000), 0x00);
+}

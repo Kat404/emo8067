@@ -820,9 +820,13 @@ fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     Ok(())
 }
 
-/// `IN` and `OUT`. On this bare machine a port *N* is byte *N* of physical
+/// `IN` and `OUT`. On this bare machine port *N* is byte *N* of physical
 /// memory, which keeps the core free of any device policy; the device bus
 /// proper is the `Device` trait's job, not the CPU's.
+///
+/// Port *N* maps to physical *N*, not to segment *N*. Reading it as
+/// `segment = N, offset = 0` would land on `N * 16`, which is what this
+/// used to do while claiming otherwise.
 fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let immediate = matches!(opcode, 0xE4..=0xE7);
     let port = if immediate {
@@ -834,9 +838,9 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match opcode {
         0xE4 | 0xE5 => {
             let v = if word {
-                cpu.mem.read_u16(port, 0)
+                cpu.mem.read_u16(0x0000, port)
             } else {
-                u16::from(cpu.mem.read_u8(port, 0))
+                u16::from(cpu.mem.read_u8(0x0000, port))
             };
             if word {
                 cpu.regs.set_word(Reg16::Ax, v)
@@ -846,9 +850,9 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         0xEC | 0xED => {
             let v = if word {
-                cpu.mem.read_u16(port, 0)
+                cpu.mem.read_u16(0x0000, port)
             } else {
-                u16::from(cpu.mem.read_u8(port, 0))
+                u16::from(cpu.mem.read_u8(0x0000, port))
             };
             if word {
                 cpu.regs.set_word(Reg16::Ax, v)
@@ -863,9 +867,9 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 u16::from(cpu.regs.byte(Reg8::Al))
             };
             if word {
-                cpu.mem.write_u16(port, 0, v)
+                cpu.mem.write_u16(0x0000, port, v)
             } else {
-                cpu.mem.write_u8(port, 0, v as u8)
+                cpu.mem.write_u8(0x0000, port, v as u8)
             }
         }
         0xEE | 0xEF => {
@@ -875,9 +879,9 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 u16::from(cpu.regs.byte(Reg8::Al))
             };
             if word {
-                cpu.mem.write_u16(port, 0, v)
+                cpu.mem.write_u16(0x0000, port, v)
             } else {
-                cpu.mem.write_u8(port, 0, v as u8)
+                cpu.mem.write_u8(0x0000, port, v as u8)
             }
         }
         other => return Err(ExecError::UnknownOpcode(other)),
@@ -1802,12 +1806,13 @@ mod tests {
     fn in_and_out_reach_a_port() {
         // E4 ib = IN AL, imm8.  E6 ib = OUT imm8, AL.
         let mut cpu = cpu_with(&[0xE4, 0x60, 0xE6, 0x61]);
-        cpu.mem.write_u8(0x0060, 0, 0xC3); // the device bus is byte N of the port file
+        // Port 0x60 is physical byte 0x60: segment 0, offset 0x60.
+        cpu.mem.write_u8(0x0000, 0x60, 0xC3);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.byte(Reg8::Al), 0xC3);
         cpu.regs.set_byte(Reg8::Al, 0x5A);
         cpu.step().unwrap();
-        assert_eq!(cpu.mem.write_u8(0x0061, 0, 0x5A), ());
+        assert_eq!(cpu.mem.read_u8(0x0000, 0x61), 0x5A, "port 61 took the byte");
     }
 
     #[test]
@@ -1815,13 +1820,13 @@ mod tests {
         // ED = IN AX, DX.  EF = OUT DX, AX.  EC and EE are the byte forms.
         let mut cpu = cpu_with(&[0xED, 0xEF]);
         cpu.regs.set_word(Reg16::Dx, 0x70);
-        cpu.mem.write_u16(0x0070, 0, 0xBEEF);
+        cpu.mem.write_u16(0x0000, 0x70, 0xBEEF);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.word(Reg16::Ax), 0xBEEF);
         cpu.regs.set_word(Reg16::Ax, 0x1234);
         cpu.regs.set_word(Reg16::Dx, 0x71);
         cpu.step().unwrap();
-        assert_eq!(cpu.mem.read_u16(0x0071, 0), 0x1234);
+        assert_eq!(cpu.mem.read_u16(0x0000, 0x71), 0x1234);
     }
 
     #[test]
