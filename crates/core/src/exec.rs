@@ -296,8 +296,19 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xE0..=0xE3 => loop_op(cpu, opcode)?,
         // ---- shifts and rotates
         0xD0..=0xD3 => shift_group(cpu, opcode)?,
-        0x40..=0x47 => inc_dec(cpu, Reg16::from_bits(opcode & 0b111), true)?,
-        0x48..=0x4F => inc_dec(cpu, Reg16::from_bits(opcode & 0b111), false)?,
+        0x40..=0x47 => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, true)?,
+        0x48..=0x4F => inc_dec(cpu, Operand::Reg(opcode & 0b111), 16, false)?,
+        // FE /0 and /1 are INC and DEC on a byte; FF /0 and /1 are the word
+        // forms, and FF /6 is PUSH.
+        0xFE => {
+            let m = decode_from(cpu)?;
+            let up = match m.reg & 0b111 {
+                0 => true,
+                1 => false,
+                _ => return Err(ExecError::UnknownOpcode(opcode)),
+            };
+            inc_dec(cpu, m.rm, 8, up)?;
+        }
         0x50..=0x57 => {
             let reg = Reg16::from_bits(opcode & 0b111);
             let value = cpu.regs.word(reg);
@@ -1172,17 +1183,18 @@ fn aaa(cpu: &mut crate::Cpu, add: bool) {
 /// `INC` and `DEC` on a 16-bit register. They set the same flags as a
 /// subtraction but leave `CF` alone, which is the whole point of having them
 /// separately from `ADD` and `SUB`.
-fn inc_dec(cpu: &mut crate::Cpu, reg: Reg16, up: bool) -> Result<(), ExecError> {
-    let before = cpu.regs.word(reg);
+fn inc_dec(cpu: &mut crate::Cpu, op: Operand, bits: u8, up: bool) -> Result<(), ExecError> {
+    let mask = width(bits);
+    let before = read_operand(&cpu.mem, &cpu.regs, op, bits) & mask;
     let after = if up {
-        before.wrapping_add(1)
+        before.wrapping_add(1) & mask
     } else {
-        before.wrapping_sub(1)
+        before.wrapping_sub(1) & mask
     };
-    cpu.regs.set_word(reg, after);
+    write_operand(&mut cpu.mem, &mut cpu.regs, op, bits, after);
     let f = &mut cpu.regs.flags;
-    f.set(OF, sign_bit(before, 16) != sign_bit(after, 16));
-    f.set(SF, sign_bit(after, 16));
+    f.set(OF, sign_bit(before, bits) != sign_bit(after, bits));
+    f.set(SF, sign_bit(after, bits));
     f.set(ZF, after == 0);
     f.set(AF, (before ^ after) & 0x10 != 0);
     f.set(PF, crate::flags::parity_even(after as u8));
@@ -1277,6 +1289,12 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let _ = opcode;
     let m = decode_from(cpu)?;
     match m.reg & 0b111 {
+        0x0 => inc_dec(cpu, m.rm, 16, true)?,
+        0x1 => inc_dec(cpu, m.rm, 16, false)?,
+        0x6 => {
+            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+            push(&mut cpu.mem, &mut cpu.regs, value);
+        }
         0x2 => {
             // CALL near r/m16: push the next instruction, load the operand.
             let ret = cpu.regs.ip;
@@ -1307,6 +1325,39 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let ax = cpu.regs.word(Reg16::Ax);
     let dx = cpu.regs.word(Reg16::Dx);
     let (lo, hi) = match (bits, op) {
+        // ---- TEST r/m, imm: an AND that discards its result
+        (_, 0x0) => {
+            let right = if bits == 16 {
+                fetch_u16(&cpu.mem, &mut cpu.regs)
+            } else {
+                u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
+            };
+            let result = read_operand(&cpu.mem, &cpu.regs, m.rm, bits) & right;
+            let f = &mut cpu.regs.flags;
+            f.set(CF, false);
+            f.set(OF, false);
+            set_result_flags(result, bits, f);
+            return Ok(());
+        }
+        // ---- NOT r/m: complement, no flags at all
+        (_, 0x2) => {
+            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+            let result = !value & width(bits);
+            write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
+            return Ok(());
+        }
+        // ---- NEG r/m
+        (_, 0x3) => {
+            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
+            let result = value.wrapping_neg() & width(bits);
+            write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
+            let f = &mut cpu.regs.flags;
+            f.set(CF, value != 0);
+            // NEG overflows only for the minimum value, which is its own negative.
+            f.set(OF, sign_bit(value, bits) && sign_bit(result, bits));
+            set_result_flags(result, bits, f);
+            return Ok(());
+        }
         // ---- unsigned multiply
         (8, 4) => {
             let a = u16::from(cpu.regs.byte(Reg8::Al));

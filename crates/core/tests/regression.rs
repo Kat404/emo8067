@@ -384,3 +384,113 @@ fn a_port_is_the_byte_with_that_number() {
     assert_eq!(c.mem.read_u8(0x0000, 0x60), 0xC3);
     assert_eq!(c.mem.read_u8(0x0600, 0x0000), 0x00);
 }
+
+/// U4: group 1 against memory. TEST, NOT and NEG, INC and DEC on a byte or
+/// word memory operand, and PUSH r/m16.
+#[test]
+fn test_against_memory_ands_and_discards_the_result() {
+    // F7 06 3412 7809 = TEST WORD [1234h], 0978h
+    let mut c = cpu(&[0xF7, 0x06, 0x34, 0x12, 0xCB, 0xED]);
+    c.mem.write_u16(0x0000, 0x1234, 0x1234);
+    c.regs.flags.set(CF, true);
+    c.regs.flags.set(OF, true);
+    c.step().unwrap();
+    assert_eq!(
+        c.mem.read_u16(0x0000, 0x1234),
+        0x1234,
+        "TEST stores nothing"
+    );
+    assert!(c.regs.flags.get(ZF), "1234h and EDCBh share no bit");
+    assert!(
+        !c.regs.flags.get(CF) && !c.regs.flags.get(OF),
+        "TEST clears both"
+    );
+}
+
+#[test]
+fn neg_sets_carry_from_the_operand_and_overflow_only_from_the_minimum() {
+    // F7 1E 3412 = NEG WORD [1234h]
+    let mut c = cpu(&[0xF7, 0x1E, 0x34, 0x12]);
+    c.mem.write_u16(0x0000, 0x1234, 0x0001);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0xFFFF);
+    assert!(c.regs.flags.get(CF), "negating a non-zero sets CF");
+    assert!(!c.regs.flags.get(OF));
+
+    // NEG 8000h is 8000h, and it overflows because the value is its own
+    // negative. CF is set because the operand was not zero.
+    let mut c = cpu(&[0xF7, 0x1E, 0x34, 0x12]);
+    c.mem.write_u16(0x0000, 0x1234, 0x8000);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0x8000);
+    assert!(c.regs.flags.get(CF), "the operand was not zero");
+    assert!(c.regs.flags.get(OF), "negating the minimum value overflows");
+
+    // NEG of zero is zero and clears CF.
+    let mut c = cpu(&[0xF7, 0x1E, 0x34, 0x12]);
+    c.mem.write_u16(0x0000, 0x1234, 0x0000);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0x0000);
+    assert!(!c.regs.flags.get(CF), "negating zero clears CF");
+    assert!(!c.regs.flags.get(OF));
+}
+
+#[test]
+fn not_leaves_every_flag_alone() {
+    let mut c = cpu(&[0xF7, 0x16, 0x34, 0x12]); // NOT WORD [1234h]
+    c.mem.write_u16(0x0000, 0x1234, 0x00FF);
+    c.regs.flags.set(ZF, true);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0xFF00);
+    assert!(
+        c.regs.flags.get(ZF) && c.regs.flags.get(CF),
+        "NOT touches nothing"
+    );
+}
+
+#[test]
+fn inc_and_dec_work_on_a_memory_operand() {
+    // FE 06 3412 = INC BYTE [1234h]
+    let mut c = cpu(&[0xFE, 0x06, 0x34, 0x12]);
+    c.mem.write_u8(0x0000, 0x1234, 0xFF);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u8(0x0000, 0x1234), 0x00);
+    assert!(c.regs.flags.get(ZF) && c.regs.flags.get(AF));
+    assert!(c.regs.flags.get(CF), "INC leaves CF alone");
+
+    // FE 0E 3412 = DEC BYTE [1234h]
+    let mut c = cpu(&[0xFE, 0x0E, 0x34, 0x12]);
+    c.mem.write_u8(0x0000, 0x1234, 0x01);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u8(0x0000, 0x1234), 0x00);
+    assert!(c.regs.flags.get(ZF));
+}
+
+#[test]
+fn ff_zero_and_one_are_the_word_inc_and_dec() {
+    // FF 06 3412 = INC WORD [1234h]
+    let mut c = cpu(&[0xFF, 0x06, 0x34, 0x12]);
+    c.mem.write_u16(0x0000, 0x1234, 0x00FF);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0x0100);
+
+    // FF 0E 3412 = DEC WORD [1234h]
+    let mut c = cpu(&[0xFF, 0x0E, 0x34, 0x12]);
+    c.mem.write_u16(0x0000, 0x1234, 0x0100);
+    c.step().unwrap();
+    assert_eq!(c.mem.read_u16(0x0000, 0x1234), 0x00FF);
+}
+
+#[test]
+fn ff_six_pushes_a_memory_word() {
+    // FF 36 3412 = PUSH WORD [1234h]
+    let mut c = cpu(&[0xFF, 0x36, 0x34, 0x12]);
+    c.regs.set_segment(Seg::Ss, 0x2000);
+    c.regs.set_word(Reg16::Sp, 0x0100);
+    c.mem.write_u16(0x0000, 0x1234, 0xCAFE);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Sp), 0x00FE);
+    assert_eq!(c.mem.read_u16(0x2000, 0x00FE), 0xCAFE);
+}
