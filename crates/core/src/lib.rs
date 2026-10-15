@@ -66,10 +66,11 @@ impl Cpu {
     pub fn interrupt(&mut self, n: u8) {
         use crate::regs::Seg;
 
-        let at = u16::from(n) * 4;
-        let offset = self.mem.read_u16(0x0000, at);
-        let segment = self.mem.read_u16(0x0000, at + 2);
-
+        // The 8086 microcode pushes first and reads the vector afterwards:
+        // FLAGS, then CS, then IP, then the bus cycles that fetch the new
+        // CS:IP from the table at 0000:0000. Reading the vector before the
+        // pushes is observably different when SS:SP overlaps physical zero,
+        // because the pushes land on the table entry they just read.
         let pushed = self.regs.flags.pushed();
         crate::exec::push(&mut self.mem, &mut self.regs, pushed);
         self.regs.flags.set(crate::flags::TF, false);
@@ -79,6 +80,10 @@ impl Cpu {
         crate::exec::push(&mut self.mem, &mut self.regs, cs);
         let ip = self.regs.ip;
         crate::exec::push(&mut self.mem, &mut self.regs, ip);
+
+        let at = u16::from(n) * 4;
+        let offset = self.mem.read_u16(0x0000, at);
+        let segment = self.mem.read_u16(0x0000, at + 2);
 
         self.regs.set_segment(Seg::Cs, segment);
         self.regs.ip = offset;

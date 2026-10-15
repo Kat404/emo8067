@@ -273,7 +273,7 @@ fn rcr_rolls_the_old_carry_into_the_top() {
 fn rotating_by_zero_is_a_no_op_and_does_not_panic() {
     // D3 C0 = ROL AX, CL with CL = 0. CL=16 is also a zero rotation on a word.
     for cl in [0u8, 16] {
-        let mut c = cpu(&[0xB9, cl as u8, 0x00, 0xD3, 0xC0]);
+        let mut c = cpu(&[0xB9, cl, 0x00, 0xD3, 0xC0]);
         c.regs.set_word(Reg16::Ax, 0x1234);
         c.regs.flags.set(CF, true);
         c.step().unwrap(); // MOV CX, cl
@@ -306,4 +306,62 @@ fn rotate_reports_the_bit_that_left() {
     c.step().unwrap();
     assert_eq!(c.regs.byte(Reg8::Al), 0x01, "0000_1000 ror 3");
     assert!(!c.regs.flags.get(CF), "bit 2 of 0000_1000 is clear");
+}
+
+/// The shifts update ZF, SF and PF from the result. Table 2-21 marks only O
+/// and C, but the manual's prose for the same instructions and the silicon
+/// both say the arithmetic flags move.
+#[test]
+fn a_shift_updates_the_arithmetic_flags() {
+    // SHR AX, 1 on 0001h gives zero, so ZF is set.
+    let mut c = cpu(&[0xD1, 0xE8]);
+    c.regs.set_word(Reg16::Ax, 0x0001);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0000);
+    assert!(c.regs.flags.get(ZF), "a shift to zero must set ZF");
+    assert!(!c.regs.flags.get(SF));
+    assert!(c.regs.flags.get(CF), "bit 0 was the bit that left");
+
+    // SHL AX, 1 on 8000h makes SF set.
+    let mut c = cpu(&[0xD1, 0xE0]);
+    c.regs.set_word(Reg16::Ax, 0x8000);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0000);
+    assert!(c.regs.flags.get(CF), "bit 15 was the bit that left");
+    assert!(c.regs.flags.get(ZF), "the result is zero");
+    assert!(!c.regs.flags.get(SF), "and zero is not negative");
+}
+
+/// A rotate leaves the arithmetic flags undefined, so it must not touch them.
+#[test]
+fn a_rotate_leaves_the_arithmetic_flags_alone() {
+    let mut c = cpu(&[0xD1, 0xC0]); // ROL AX, 1
+    c.regs.set_word(Reg16::Ax, 0x0001);
+    c.regs.flags.set(ZF, true);
+    c.regs.flags.set(SF, true);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0002);
+    assert!(
+        c.regs.flags.get(ZF) && c.regs.flags.get(SF),
+        "undefined means untouched"
+    );
+}
+
+/// The 8086 pushes the frame before it reads the vector. With SS:SP over the
+/// table itself, the pushes land on the entry they are about to read.
+#[test]
+fn int_pushes_the_frame_before_reading_the_vector() {
+    // Put the stack on top of the interrupt table, with a known vector.
+    let mut c = cpu(&[0xCD, 0x21]);
+    c.regs.set_segment(Seg::Ss, 0x0000);
+    c.regs.set_word(Reg16::Sp, 0x0010);
+    c.mem.write_u16(0x0000, 0x21 * 4, 0x0600);
+    c.mem.write_u16(0x0000, 0x21 * 4 + 2, 0x5000);
+    c.step().unwrap();
+
+    // SP 0x0010 predecrements to 0x000E, which is vector 0x21's offset slot
+    // minus two. The IP pushed overwrote physical 0x0E, and 0x84..0x85 is
+    // vector 0x21's own offset at 0x84, so the entry survives here.
+    assert_eq!(c.regs.segment(Seg::Cs), 0x5000, "vector still resolved");
+    assert_eq!(c.regs.ip, 0x0600);
 }

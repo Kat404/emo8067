@@ -976,6 +976,14 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         if count == 1 {
             f.set(OF, signed_overflow_shift(value, result, op, bits, cf));
         }
+        // The shifts update ZF, SF and PF from the result. Table 2-21 marks
+        // only O and C, but the manual's own prose for the same instructions
+        // says the arithmetic flags are updated, and silicon does it. Under
+        // the project's erratum rule, silicon wins. The rotates leave all
+        // three alone: there they are undefined.
+        if !rotates {
+            set_result_flags(result, bits, f);
+        }
     }
     write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
     Ok(())
