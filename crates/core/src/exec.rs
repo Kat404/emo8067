@@ -18,6 +18,8 @@ pub enum ExecError {
     SegmentTransfer(u8),
     /// An `FF` /digit this build does not implement yet.
     UnsupportedFFGroup(u8),
+    /// A `REP` or `REPNE` prefix that is not followed by a string operation.
+    BadRepeat(u8, u8),
     /// `LEA` with a register operand, where there is no address to compute.
     /// The manual does not define this encoding on an 8086.
     BadLea(u8),
@@ -238,6 +240,9 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
         // The BCD adjustments sit inside 0x00..=0x3F, so they must be
         // matched before the arithmetic groups or they are never reached.
+        // Segment pushes and pops also live inside 0x00..=0x3F, at 06, 0E,
+        // 16 and 1E, so they are matched here for the same reason.
+        0x06 | 0x07 | 0x0E | 0x16 | 0x17 | 0x1E | 0x1F => segment_push_pop(cpu, opcode)?,
         0x27 => daa(cpu, true),
         0x2F => daa(cpu, false),
         0x37 => aaa(cpu, true),
@@ -275,6 +280,11 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xCC | 0xCD => int(cpu, opcode)?,
         0xCF => iret(cpu),
         0xFF => ff_group(cpu, opcode)?,
+        // ---- string operations, ports and segment transfers
+        0xA4..=0xA7 | 0xAA..=0xAF => string_op(cpu, opcode)?,
+        0xF2 | 0xF3 => repeat_prefix(cpu, opcode)?,
+        0xE4..=0xE7 | 0xEC..=0xEF => port_op(cpu, opcode)?,
+        0xE0..=0xE3 => loop_op(cpu, opcode)?,
         // ---- shifts and rotates
         0xD0..=0xD3 => shift_group(cpu, opcode)?,
         0x40..=0x47 => {
@@ -532,6 +542,324 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     Ok(())
 }
 
+/// The string operations at `A4`..`AF`. Each advances or decrements its
+/// implicit pointer by the operand size, following `DF`.
+fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let word = opcode & 1 != 0;
+    let step: u16 = if word { 2 } else { 1 };
+    let ds = cpu.regs.segment(Seg::Ds);
+    let es = cpu.regs.segment(Seg::Es);
+    let mut si = cpu.regs.word(Reg16::Si);
+    let mut di = cpu.regs.word(Reg16::Di);
+
+    macro_rules! bump {
+        ($ptr:expr) => {
+            if cpu.regs.flags.get(DF) {
+                $ptr = $ptr.wrapping_sub(step)
+            } else {
+                $ptr = $ptr.wrapping_add(step)
+            }
+        };
+    }
+
+    match opcode {
+        0xA4 | 0xA5 => {
+            let value = if word {
+                cpu.mem.read_u16(ds, si)
+            } else {
+                u16::from(cpu.mem.read_u8(ds, si))
+            };
+            if word {
+                cpu.mem.write_u16(es, di, value)
+            } else {
+                cpu.mem.write_u8(es, di, value as u8)
+            }
+        }
+        0xA6 | 0xA7 => {
+            let a = if word {
+                cpu.mem.read_u16(ds, si)
+            } else {
+                u16::from(cpu.mem.read_u8(ds, si))
+            };
+            let b = if word {
+                cpu.mem.read_u16(es, di)
+            } else {
+                u16::from(cpu.mem.read_u8(es, di))
+            };
+            compare(cpu, a, b, word);
+        }
+        0xAA | 0xAB => {
+            let value = if word {
+                cpu.regs.word(Reg16::Ax)
+            } else {
+                u16::from(cpu.regs.byte(Reg8::Al))
+            };
+            if word {
+                cpu.mem.write_u16(es, di, value)
+            } else {
+                cpu.mem.write_u8(es, di, value as u8)
+            }
+        }
+        0xAC | 0xAD => {
+            let value = if word {
+                cpu.mem.read_u16(ds, si)
+            } else {
+                u16::from(cpu.mem.read_u8(ds, si))
+            };
+            if word {
+                cpu.regs.set_word(Reg16::Ax, value)
+            } else {
+                cpu.regs.set_byte(Reg8::Al, value as u8)
+            }
+        }
+        0xAE | 0xAF => {
+            let a = if word {
+                cpu.regs.word(Reg16::Ax)
+            } else {
+                u16::from(cpu.regs.byte(Reg8::Al))
+            };
+            let b = if word {
+                cpu.mem.read_u16(es, di)
+            } else {
+                u16::from(cpu.mem.read_u8(es, di))
+            };
+            compare(cpu, a, b, word);
+        }
+        other => return Err(ExecError::UnknownOpcode(other)),
+    }
+    bump!(si);
+    bump!(di);
+    cpu.regs.set_word(Reg16::Si, si);
+    cpu.regs.set_word(Reg16::Di, di);
+    Ok(())
+}
+
+/// `CMPS` and `SCAS` compare and set ZF, CF and OF. `a` is the minuend.
+fn compare(cpu: &mut crate::Cpu, a: u16, b: u16, word: bool) {
+    let result = a.wrapping_sub(b);
+    let f = &mut cpu.regs.flags;
+    f.set(ZF, result == 0);
+    f.set(CF, a < b);
+    let bits = if word { 16 } else { 8 };
+    f.set(
+        OF,
+        sign_bit(a, bits) != sign_bit(b, bits) && sign_bit(result, bits) != sign_bit(a, bits),
+    );
+}
+
+/// `F2` and `F3` are prefixes: `REPNE` and `REPE` apply to the string
+/// operation that follows. The whole repeat happens inside one step, so the
+/// instruction reports its real length rather than the two bytes of the
+/// prefix pair.
+fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let next = fetch_u8(&cpu.mem, &mut cpu.regs);
+    if !(0xA4..=0xA7).contains(&next) && !(0xAA..=0xAF).contains(&next) {
+        return Err(ExecError::BadRepeat(opcode, next));
+    }
+    let word = next & 1 != 0;
+    let step: u16 = if word { 2 } else { 1 };
+    let compare_op = matches!(next, 0xA6 | 0xA7 | 0xAE | 0xAF);
+    let mut cx = cpu.regs.word(Reg16::Cx);
+
+    while cx != 0 {
+        let si = cpu.regs.word(Reg16::Si);
+        let di = cpu.regs.word(Reg16::Di);
+        let ds = cpu.regs.segment(Seg::Ds);
+        let es = cpu.regs.segment(Seg::Es);
+
+        match next {
+            0xA4 | 0xA5 => {
+                let v = if word {
+                    cpu.mem.read_u16(ds, si)
+                } else {
+                    u16::from(cpu.mem.read_u8(ds, si))
+                };
+                if word {
+                    cpu.mem.write_u16(es, di, v)
+                } else {
+                    cpu.mem.write_u8(es, di, v as u8)
+                }
+            }
+            0xA6 | 0xA7 => {
+                let a = if word {
+                    cpu.mem.read_u16(ds, si)
+                } else {
+                    u16::from(cpu.mem.read_u8(ds, si))
+                };
+                let b = if word {
+                    cpu.mem.read_u16(es, di)
+                } else {
+                    u16::from(cpu.mem.read_u8(es, di))
+                };
+                compare(cpu, a, b, word);
+            }
+            0xAA | 0xAB => {
+                let v = if word {
+                    cpu.regs.word(Reg16::Ax)
+                } else {
+                    u16::from(cpu.regs.byte(Reg8::Al))
+                };
+                if word {
+                    cpu.mem.write_u16(es, di, v)
+                } else {
+                    cpu.mem.write_u8(es, di, v as u8)
+                }
+            }
+            _ => {
+                let a = if word {
+                    cpu.regs.word(Reg16::Ax)
+                } else {
+                    u16::from(cpu.regs.byte(Reg8::Al))
+                };
+                let b = if word {
+                    cpu.mem.read_u16(es, di)
+                } else {
+                    u16::from(cpu.mem.read_u8(es, di))
+                };
+                compare(cpu, a, b, word);
+            }
+        }
+
+        cx = cx.wrapping_sub(1);
+        cpu.regs.set_word(Reg16::Cx, cx);
+
+        let backwards = cpu.regs.flags.get(DF);
+        let bump = |p: u16| {
+            if backwards {
+                p.wrapping_sub(step)
+            } else {
+                p.wrapping_add(step)
+            }
+        };
+        cpu.regs.set_word(Reg16::Si, bump(si));
+        cpu.regs.set_word(Reg16::Di, bump(di));
+
+        // REPE and REPNE stop at the first pair that fails their condition.
+        if compare_op {
+            let keep_going = if opcode == 0xF3 {
+                cpu.regs.flags.get(ZF)
+            } else {
+                !cpu.regs.flags.get(ZF)
+            };
+            if !keep_going {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `IN` and `OUT`. On this bare machine a port *N* is byte *N* of physical
+/// memory, which keeps the core free of any device policy; the device bus
+/// proper is the `Device` trait's job, not the CPU's.
+fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let immediate = matches!(opcode, 0xE4..=0xE7);
+    let port = if immediate {
+        u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
+    } else {
+        cpu.regs.word(Reg16::Dx)
+    };
+    let word = opcode & 1 != 0;
+    match opcode {
+        0xE4 | 0xE5 => {
+            let v = if word {
+                cpu.mem.read_u16(port, 0)
+            } else {
+                u16::from(cpu.mem.read_u8(port, 0))
+            };
+            if word {
+                cpu.regs.set_word(Reg16::Ax, v)
+            } else {
+                cpu.regs.set_byte(Reg8::Al, v as u8)
+            }
+        }
+        0xEC | 0xED => {
+            let v = if word {
+                cpu.mem.read_u16(port, 0)
+            } else {
+                u16::from(cpu.mem.read_u8(port, 0))
+            };
+            if word {
+                cpu.regs.set_word(Reg16::Ax, v)
+            } else {
+                cpu.regs.set_byte(Reg8::Al, v as u8)
+            }
+        }
+        0xE6 | 0xE7 => {
+            let v = if word {
+                cpu.regs.word(Reg16::Ax)
+            } else {
+                u16::from(cpu.regs.byte(Reg8::Al))
+            };
+            if word {
+                cpu.mem.write_u16(port, 0, v)
+            } else {
+                cpu.mem.write_u8(port, 0, v as u8)
+            }
+        }
+        0xEE | 0xEF => {
+            let v = if word {
+                cpu.regs.word(Reg16::Ax)
+            } else {
+                u16::from(cpu.regs.byte(Reg8::Al))
+            };
+            if word {
+                cpu.mem.write_u16(port, 0, v)
+            } else {
+                cpu.mem.write_u8(port, 0, v as u8)
+            }
+        }
+        other => return Err(ExecError::UnknownOpcode(other)),
+    }
+    Ok(())
+}
+
+/// `PUSH`/`POP` of a segment register, at 06/07, 0E/16/1E and 17/1F.
+fn segment_push_pop(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let seg = match opcode {
+        0x06 => Seg::Es,
+        0x0E => Seg::Cs,
+        0x16 => Seg::Ss,
+        0x1E => Seg::Ds,
+        0x07 => Seg::Es,
+        0x17 => Seg::Ss,
+        0x1F => Seg::Ds,
+        other => return Err(ExecError::UnknownOpcode(other)),
+    };
+    let popping = matches!(opcode, 0x07 | 0x17 | 0x1F);
+    if popping {
+        let v = pop(&cpu.mem, &mut cpu.regs);
+        cpu.regs.set_segment(seg, v);
+    } else {
+        let v = cpu.regs.segment(seg);
+        push(&mut cpu.mem, &mut cpu.regs, v);
+    }
+    Ok(())
+}
+
+/// `LOOP`, `LOOPZ`, `LOOPNZ` and `JCXZ`.
+fn loop_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let rel = take_disp8(&cpu.mem, &mut cpu.regs);
+    let cx = cpu.regs.word(Reg16::Cx);
+    if opcode == 0xE3 {
+        if cx == 0 {
+            cpu.regs.ip = (i32::from(cpu.regs.ip as i16) + i32::from(rel)) as u16;
+        }
+        return Ok(());
+    }
+    let cx = cx.wrapping_sub(1);
+    cpu.regs.set_word(Reg16::Cx, cx);
+    let take = match opcode {
+        0xE0 => !cpu.regs.flags.get(ZF),
+        0xE1 => cpu.regs.flags.get(ZF),
+        _ => cx != 0,
+    };
+    if take {
+        cpu.regs.ip = (i32::from(cpu.regs.ip as i16) + i32::from(rel)) as u16;
+    }
+    Ok(())
+}
+
 /// Group 2, `0xD0..=0xD3`: the seven shifts and rotates, by one or by `CL`.
 ///
 /// `D0`/`D1` shift by one; `D2`/`D3` take the count from `CL`. The count is
@@ -597,8 +925,9 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 const fn msb(bits: u8) -> u16 {
     if bits == 8 { 0x80 } else { 0x8000 }
 }
-const fn lsb(bits: u8) -> u16 {
-    if bits == 8 { 0x01 } else { 0x0001 }
+/// Bit 0 is bit 0 at either width.
+const fn lsb(_bits: u8) -> u16 {
+    0x0001
 }
 const fn width(bits: u8) -> u16 {
     if bits == 8 { 0x00FF } else { 0xFFFF }
@@ -1236,6 +1565,179 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
         assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
+    }
+
+    // ---- string operations, ports and segment transfers --------------------------
+
+    #[test]
+    fn stos_writes_ax_to_es_di_and_advances_by_two() {
+        // AB = STOSW. DF clear, so DI advances by the operand size.
+        let mut cpu = cpu_with(&[0xAB]);
+        cpu.regs.set_segment(Seg::Es, 0x3000);
+        cpu.regs.set_word(Reg16::Di, 0x0010);
+        cpu.regs.set_word(Reg16::Ax, 0x1234);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x3000, 0x0010), 0x1234);
+        assert_eq!(cpu.regs.word(Reg16::Di), 0x0012);
+    }
+
+    #[test]
+    fn the_direction_flag_reverses_every_string_operation() {
+        // DF set: DI decrements, and the store lands below the start.
+        let mut cpu = cpu_with(&[0xAB]);
+        cpu.regs.set_segment(Seg::Es, 0x3000);
+        cpu.regs.set_word(Reg16::Di, 0x0010);
+        cpu.regs.set_word(Reg16::Ax, 0x1234);
+        cpu.regs.flags.set(DF, true);
+        cpu.step().unwrap();
+        // The store happens at the current DI; DF moves the pointer for the
+        // *next* operation, so the word lands at 0x0010 and DI ends at 0x000E.
+        assert_eq!(cpu.mem.read_u16(0x3000, 0x0010), 0x1234);
+        assert_eq!(cpu.regs.word(Reg16::Di), 0x000E);
+    }
+
+    #[test]
+    fn movsb_moves_one_byte_and_advances_both_pointers() {
+        // A4 = MOVSB. Source DS:SI, destination ES:DI.
+        let mut cpu = cpu_with(&[0xA4]);
+        cpu.regs.set_segment(Seg::Ds, 0x4000);
+        cpu.regs.set_segment(Seg::Es, 0x5000);
+        cpu.regs.set_word(Reg16::Si, 0x0020);
+        cpu.regs.set_word(Reg16::Di, 0x0030);
+        cpu.mem.write_u8(0x4000, 0x0020, 0x99);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u8(0x5000, 0x0030), 0x99);
+        assert_eq!(cpu.regs.word(Reg16::Si), 0x0021);
+        assert_eq!(cpu.regs.word(Reg16::Di), 0x0031);
+    }
+
+    #[test]
+    fn lods_and_scas_read_through_ds() {
+        // AC = LODSB (AD is LODSW), AE = SCASB compares against AL.
+        let mut cpu = cpu_with(&[0xAC]);
+        cpu.regs.set_segment(Seg::Ds, 0x4000);
+        cpu.regs.set_word(Reg16::Si, 0x0020);
+        cpu.mem.write_u8(0x4000, 0x0020, 0x7E);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x7E);
+        assert_eq!(cpu.regs.word(Reg16::Si), 0x0021);
+
+        let mut cpu = cpu_with(&[0xAE]);
+        cpu.regs.set_segment(Seg::Es, 0x5000);
+        cpu.regs.set_word(Reg16::Di, 0x0030);
+        cpu.regs.set_byte(Reg8::Al, 0x7E);
+        cpu.mem.write_u8(0x5000, 0x0030, 0x7E);
+        cpu.step().unwrap();
+        assert!(cpu.regs.flags.get(ZF), "the bytes match");
+        assert_eq!(cpu.regs.word(Reg16::Di), 0x0031);
+    }
+
+    #[test]
+    fn rep_stosb_fills_until_the_count_reaches_zero() {
+        // F3 AB = REP STOSB, CX = 4.
+        let mut cpu = cpu_with(&[0xF3, 0xAA]);
+        cpu.regs.set_segment(Seg::Es, 0x3000);
+        cpu.regs.set_word(Reg16::Di, 0x0000);
+        cpu.regs.set_word(Reg16::Cx, 0x0004);
+        cpu.regs.set_byte(Reg8::Al, 0x2A);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x3000, 0x0000), 0x2A2A);
+        assert_eq!(cpu.mem.read_u16(0x3000, 0x0002), 0x2A2A);
+        assert_eq!(cpu.regs.word(Reg16::Cx), 0x0000);
+    }
+
+    #[test]
+    fn repe_repeats_while_the_bytes_are_equal() {
+        // F3 A6 = REPE CMPSB. Three equal bytes then a different one.
+        let mut cpu = cpu_with(&[0xF3, 0xA6]);
+        cpu.regs.set_segment(Seg::Ds, 0x4000);
+        cpu.regs.set_segment(Seg::Es, 0x5000);
+        cpu.regs.set_word(Reg16::Si, 0x0000);
+        cpu.regs.set_word(Reg16::Di, 0x0000);
+        cpu.regs.set_word(Reg16::Cx, 0x0004);
+        for i in 0..3u16 {
+            cpu.mem.write_u8(0x4000, i, 0x11);
+            cpu.mem.write_u8(0x5000, i, 0x11);
+        }
+        cpu.mem.write_u8(0x4000, 3, 0x22);
+        cpu.mem.write_u8(0x5000, 3, 0x33);
+        cpu.step().unwrap();
+        assert_eq!(
+            cpu.regs.word(Reg16::Cx),
+            0x0000,
+            "the mismatch still consumed its count"
+        );
+        assert!(!cpu.regs.flags.get(ZF));
+    }
+
+    #[test]
+    fn in_and_out_reach_a_port() {
+        // E4 ib = IN AL, imm8.  E6 ib = OUT imm8, AL.
+        let mut cpu = cpu_with(&[0xE4, 0x60, 0xE6, 0x61]);
+        cpu.mem.write_u8(0x0060, 0, 0xC3); // the device bus is byte N of the port file
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xC3);
+        cpu.regs.set_byte(Reg8::Al, 0x5A);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.write_u8(0x0061, 0, 0x5A), ());
+    }
+
+    #[test]
+    fn in_and_out_through_dx_use_the_word_register() {
+        // ED = IN AX, DX.  EF = OUT DX, AX.  EC and EE are the byte forms.
+        let mut cpu = cpu_with(&[0xED, 0xEF]);
+        cpu.regs.set_word(Reg16::Dx, 0x70);
+        cpu.mem.write_u16(0x0070, 0, 0xBEEF);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0xBEEF);
+        cpu.regs.set_word(Reg16::Ax, 0x1234);
+        cpu.regs.set_word(Reg16::Dx, 0x71);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x0071, 0), 0x1234);
+    }
+
+    #[test]
+    fn push_and_pop_segment_registers() {
+        // 06 = PUSH ES, 07 = POP ES. The 8086 permits ES, CS, SS and DS but
+        // not the flag word on the segment stack.
+        let mut cpu = cpu_at(&[0x06, 0x07]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.set_segment(Seg::Es, 0x6000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FE);
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), 0x6000);
+        cpu.regs.set_segment(Seg::Es, 0x0000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.segment(Seg::Es), 0x6000);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100);
+    }
+
+    #[test]
+    fn loop_family_counts_cx_and_checks_the_flags() {
+        // E2 = LOOP. E0 = LOOPNE, E1 = LOOPE, E3 = JCXZ.
+        let mut cpu = cpu_with(&[0xE2, 0xFE]);
+        cpu.regs.set_word(Reg16::Cx, 1);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0002, "CX hit zero, so fall through");
+        assert_eq!(cpu.regs.word(Reg16::Cx), 0x0000);
+
+        let mut cpu = cpu_with(&[0xE2, 0xFE]);
+        cpu.regs.set_word(Reg16::Cx, 3);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0000, "still counting, so jump back");
+
+        // JCXZ jumps when CX is zero without touching it.
+        let mut cpu = cpu_with(&[0xE3, 0x10]);
+        cpu.regs.set_word(Reg16::Cx, 0);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0012);
+        assert_eq!(cpu.regs.word(Reg16::Cx), 0);
+
+        let mut cpu = cpu_with(&[0xE3, 0x10]);
+        cpu.regs.set_word(Reg16::Cx, 1);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0002);
     }
 
     // ---- shifts, rotates and BCD -------------------------------------------------
