@@ -234,6 +234,78 @@ fn al_ff(c: &mut Cpu) {
     al(0xFF, c)
 }
 
+/// The 16-bit REG field is **not** the order `Reg16`'s discriminants run in.
+/// Intel Table 4-9 gives `011` to `SP` and `111` to `BX`, while the 8-bit field
+/// gives `011` to `BL` and `100` to `AH`. Reading a hardware field through the
+/// discriminant order permutes five of the eight registers, and every test
+/// written as `set_word(Reg16::Bx, ..)` then agrees with it, so nothing notices.
+///
+/// This gate goes through instruction bytes rather than the API, because the
+/// API is where the mistake hides.
+#[test]
+fn the_word_register_field_names_the_register_intel_table_4_9_says() {
+    // B8+r is MOV r16, imm16, and the low three bits of the opcode carry the
+    // very same field a ModR/M byte would.
+    let table = [
+        (0xB8u8, Reg16::Ax, "AX"),
+        (0xB9, Reg16::Cx, "CX"),
+        (0xBA, Reg16::Dx, "DX"),
+        (0xBB, Reg16::Sp, "SP"),
+        (0xBC, Reg16::Bp, "BP"),
+        (0xBD, Reg16::Si, "SI"),
+        (0xBE, Reg16::Di, "DI"),
+        (0xBF, Reg16::Bx, "BX"),
+    ];
+    for (opcode, want, name) in table {
+        let mut c = machine(&[opcode, 0x34, 0x12]);
+        seed(&mut c, false);
+        c.step().unwrap();
+        assert_eq!(
+            c.regs.word(want),
+            0x1234,
+            "{opcode:#04x} is MOV {name},1234h"
+        );
+        for (_, other, _) in table {
+            if other != want {
+                assert_ne!(
+                    c.regs.word(other),
+                    0x1234,
+                    "{opcode:#04x} must not touch {other:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The same field inside a ModR/M byte. `8B /r` is `MOV r16, r/m16`, so the r/m
+/// field is the source here, and a ModR/M byte is read as a *word* register
+/// field because the width comes from the opcode, not the byte.
+#[test]
+fn the_modrm_register_operand_follows_the_same_field() {
+    let table = [
+        (0xC0u8, Reg16::Ax, "AX"),
+        (0xC1, Reg16::Cx, "CX"),
+        (0xC2, Reg16::Dx, "DX"),
+        (0xC3, Reg16::Sp, "SP"),
+        (0xC4, Reg16::Bp, "BP"),
+        (0xC5, Reg16::Si, "SI"),
+        (0xC6, Reg16::Di, "DI"),
+        (0xC7, Reg16::Bx, "BX"),
+    ];
+    for (modrm, source, name) in table {
+        let mut c = machine(&[0x8B, modrm]);
+        // Registers start at zero, so writing the source after building the
+        // machine is enough — including when the source is AX itself.
+        c.regs.set_word(source, 0x1234);
+        c.step().unwrap();
+        assert_eq!(
+            c.regs.word(Reg16::Ax),
+            0x1234,
+            "8B {modrm:#04x} is MOV AX,{name}"
+        );
+    }
+}
+
 fn cases() -> Vec<Case> {
     use emo8067_core::regs::Reg16::Ax;
     let string_setup = |c: &mut Cpu| {

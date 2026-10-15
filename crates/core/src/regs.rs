@@ -63,18 +63,30 @@ pub enum Reg16 {
 }
 
 impl Reg16 {
-    /// Decode from the 3-bit field used by ModR/M and opcode bytes.
+    /// Decode the 3-bit REG or R/M field of an instruction to a 16-bit
+    /// register, in the order Intel's Table 4-9 gives.
+    ///
+    /// That order is **not** the order this enum's discriminants run in, and
+    /// the difference is the whole point of this function. For 16-bit
+    /// operands the hardware assigns `011` to `SP` and `111` to `BX`, whereas
+    /// the 8-bit field assigns `011` to `BL` and `100` to `AH`. An enum laid
+    /// out alphabetically puts `BX` third, which is the layout this project
+    /// uses for `Registers::words`, so reading a hardware field through the
+    /// discriminant order silently swaps five of the eight registers.
+    ///
+    /// Anything that wants the *discriminant* — the index into
+    /// [`Registers::words`] — must not come here; index `words` directly.
     #[must_use]
     pub const fn from_bits(bits: u8) -> Self {
         match bits & 0b111 {
             0 => Self::Ax,
             1 => Self::Cx,
             2 => Self::Dx,
-            3 => Self::Bx,
-            4 => Self::Sp,
-            5 => Self::Bp,
-            6 => Self::Si,
-            _ => Self::Di,
+            3 => Self::Sp,
+            4 => Self::Bp,
+            5 => Self::Si,
+            6 => Self::Di,
+            _ => Self::Bx,
         }
     }
 
@@ -148,12 +160,18 @@ impl Registers {
     }
 
     /// Read an 8-bit register, folding `reg + 4` into the high half.
+    ///
+    /// The parent word is found by indexing `words` directly, because
+    /// [`Reg8`]'s order (`AL CL DL BL AH CH DH BH`) matches the *discriminant*
+    /// order of [`Reg16`] (`AX CX DX BX ...`), not the hardware REG field order
+    /// that [`Reg16::from_bits`] decodes.
     #[must_use]
     pub const fn byte(&self, reg: Reg8) -> u8 {
-        if (reg as u8) < 4 {
-            (self.word(Reg16::from_bits(reg as u8)) & 0x00FF) as u8
+        let idx = reg as usize;
+        if idx < 4 {
+            (self.words[idx] & 0x00FF) as u8
         } else {
-            (self.word(Reg16::from_bits((reg as u8) - 4)) >> 8) as u8
+            (self.words[idx - 4] >> 8) as u8
         }
     }
 
@@ -203,10 +221,29 @@ mod tests {
     fn encoding_numbers_round_trip() {
         for bits in 0..8u8 {
             assert_eq!(Reg8::from_bits(bits) as u8, bits);
-            assert_eq!(Reg16::from_bits(bits) as u8, bits);
         }
         for bits in 0..4u8 {
             assert_eq!(Seg::from_bits(bits) as u8, bits);
+        }
+    }
+
+    /// Intel Table 4-9, 16-bit column: `011` is `SP` and `111` is `BX`. This
+    /// is the encoding that differs from the 8-bit one, and getting it wrong
+    /// permutes five of the eight registers without any other test noticing.
+    #[test]
+    fn the_word_register_field_follows_intel_table_4_9() {
+        let expected = [
+            Reg16::Ax,
+            Reg16::Cx,
+            Reg16::Dx,
+            Reg16::Sp,
+            Reg16::Bp,
+            Reg16::Si,
+            Reg16::Di,
+            Reg16::Bx,
+        ];
+        for (bits, want) in expected.iter().enumerate() {
+            assert_eq!(Reg16::from_bits(bits as u8), *want, "field {bits:03b}");
         }
     }
 

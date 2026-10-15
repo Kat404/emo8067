@@ -129,7 +129,7 @@ fn a8_leaves_af_alone_the_way_test_does() {
 /// A catch-all match arm over `AC..=AF` ran `SCAS` for `LODSB`.
 #[test]
 fn repe_lodsb_loads_the_byte_into_al() {
-    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAC]);
+    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAC]);
     c.mem.write_u8(0x0000, 0x0020, 0x5A);
     run(&mut c, 3);
     assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "REPE LODSB must load AL");
@@ -139,7 +139,7 @@ fn repe_lodsb_loads_the_byte_into_al() {
 
 #[test]
 fn rep_lodsw_loads_the_word_into_ax() {
-    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAD]);
+    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAD]);
     c.mem.write_u16(0x0000, 0x0020, 0xBEEF);
     run(&mut c, 3);
     assert_eq!(c.regs.word(Reg16::Ax), 0xBEEF);
@@ -356,7 +356,7 @@ fn movs_advances_both_pointers() {
 
 #[test]
 fn rep_lods_advances_only_si() {
-    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAC]);
+    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAC]);
     c.regs.set_word(Reg16::Di, 0x0300);
     c.mem.write_u16(0x0000, 0x0020, 0x0000);
     for _ in 0..3 {
@@ -994,7 +994,7 @@ fn test_rm_r_leaves_af_alone_and_writes_no_result() {
     assert_eq!(c.regs.ip, 2);
 
     // 85 D8 = TEST AX, BX
-    let mut c = cpu(&[0x85, 0xD8]);
+    let mut c = cpu(&[0x85, 0xF8]);
     c.regs.set_word(Reg16::Ax, 0x1234);
     c.regs.set_word(Reg16::Bx, 0x1000);
     c.regs.flags.set(AF, true);
@@ -1899,7 +1899,7 @@ fn lea_under_an_override_still_computes_the_offset_alone() {
 #[test]
 fn an_override_in_front_of_a_register_operand_is_consumed_and_forgotten() {
     // 26 03 C3 is ADD AX, BX with mod=11: no memory, so ES goes nowhere.
-    let mut c = four_segments(&[0x26, 0x03, 0xC3, 0xA1, 0x00, 0x01]);
+    let mut c = four_segments(&[0x26, 0x03, 0xC7, 0xA1, 0x00, 0x01]);
     c.regs.set_word(Reg16::Ax, 0x0010);
     c.regs.set_word(Reg16::Bx, 0x0002);
     c.step().unwrap();

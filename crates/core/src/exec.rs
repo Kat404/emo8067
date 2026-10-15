@@ -2116,7 +2116,7 @@ mod tests {
 
     #[test]
     fn push_and_pop_round_trip() {
-        let mut cpu = cpu_with(&[0x50, 0x5B]); // PUSH AX ; POP BX
+        let mut cpu = cpu_with(&[0x50, 0x5F]); // PUSH AX ; POP BX
         cpu.regs.set_segment(Seg::Ss, 0x1000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.regs.set_word(Reg16::Ax, 0xBEEF);
@@ -2634,7 +2634,7 @@ mod tests {
     #[test]
     fn jmp_indirect_takes_its_target_from_an_operand() {
         // FF /4 = JMP near r/m16.
-        let mut cpu = cpu_with(&[0xFF, 0xE7]); // JMP DI
+        let mut cpu = cpu_with(&[0xFF, 0xE6]); // JMP DI
         cpu.regs.set_word(Reg16::Di, 0x1234);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.ip, 0x1234);
@@ -2705,7 +2705,7 @@ mod tests {
     #[test]
     fn call_indirect_pushes_and_loads_from_the_operand() {
         // FF /2 = CALL near r/m16.
-        let mut cpu = cpu_at(&[0xFF, 0xD7]); // CALL DI
+        let mut cpu = cpu_at(&[0xFF, 0xD6]); // CALL DI
         cpu.regs.set_segment(Seg::Ss, 0x2000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.regs.set_word(Reg16::Di, 0x0300);
@@ -2877,8 +2877,8 @@ mod tests {
 
     #[test]
     fn mov_between_registers_in_both_directions() {
-        // 89 C3 = MOV BX, AX.  8B D8 = MOV BX, AX.
-        for code in [vec![0x89, 0xC3], vec![0x8B, 0xD8]] {
+        // 89 C7 = MOV BX, AX.  8B F8 = MOV BX, AX.
+        for code in [vec![0x89, 0xC7], vec![0x8B, 0xF8]] {
             let mut cpu = cpu_with(&code);
             cpu.regs.set_word(Reg16::Ax, 0x1111);
             cpu.regs.set_word(Reg16::Bx, 0x1234);
@@ -2963,8 +2963,8 @@ mod tests {
 
     #[test]
     fn xchg_swaps_two_registers_without_touching_flags() {
-        // 93 is XCHG AX, BX. Plain 0x90 is NOP and never reads a ModR/M byte.
-        let mut cpu = cpu_with(&[0x93]);
+        // 97 is XCHG AX, BX. Plain 0x90 is NOP and never reads a ModR/M byte.
+        let mut cpu = cpu_with(&[0x97]);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.regs.set_word(Reg16::Bx, 0x2222);
         cpu.regs.flags.set(SF, true);
@@ -2976,9 +2976,9 @@ mod tests {
 
     #[test]
     fn xchg_word_form_still_swaps_through_a_modrm_byte() {
-        // 87 D8 = XCHG AX, BX by ModR/M, and 87 06 34 12 = XCHG [1234h], AX.
+        // 87 C7 = XCHG AX, BX by ModR/M, and 87 06 34 12 = XCHG [1234h], AX.
         // 93 does the same job in one byte, so only this form reads the queue.
-        let mut cpu = cpu_with(&[0x87, 0xD8]);
+        let mut cpu = cpu_with(&[0x87, 0xC7]);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.regs.set_word(Reg16::Bx, 0x2222);
         cpu.step().unwrap();
@@ -3019,10 +3019,10 @@ mod tests {
 
     #[test]
     fn sixteen_bit_modrm_register_operands_use_the_whole_word() {
-        // 01 C3 is ADD BX, AX: reg field 000 names AX, r/m field 011 names BX,
+        // 01 C7 is ADD BX, AX: reg field 000 names AX, r/m field 111 names BX,
         // and r/m is the destination. BX = 0x1234 + AX = 0x1111 -> 0x2345.
         // Reading BX as its low byte would silently produce 0x1245.
-        let mut cpu = cpu_with(&[0x01, 0xC3]);
+        let mut cpu = cpu_with(&[0x01, 0xC7]);
         cpu.regs.set_word(Reg16::Bx, 0x1234);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.step().unwrap();
@@ -3161,7 +3161,7 @@ mod tests {
     fn mul16_produces_a_32_bit_result_in_dx_ax() {
         // F7 /4 = MUL BX.  0x00FF * 0x00FF = 0xFE01, which fits in 16 bits, so
         // DX is zero and neither CF nor OF is raised.
-        let mut cpu = cpu_with(&[0xF7, 0xE3]);
+        let mut cpu = cpu_with(&[0xF7, 0xE7]);
         cpu.regs.set_word(Reg16::Ax, 0x00FF);
         cpu.regs.set_word(Reg16::Bx, 0x00FF);
         cpu.step().unwrap();
@@ -3172,7 +3172,7 @@ mod tests {
 
     #[test]
     fn mul16_signals_overflow_when_dx_is_not_zero() {
-        let mut cpu = cpu_with(&[0xF7, 0xE3]);
+        let mut cpu = cpu_with(&[0xF7, 0xE7]);
         cpu.regs.set_word(Reg16::Ax, 0xFFFF);
         cpu.regs.set_word(Reg16::Bx, 0xFFFF);
         cpu.step().unwrap();
@@ -3253,7 +3253,7 @@ mod tests {
     #[test]
     fn div16_uses_the_full_dx_ax_dividend() {
         // F7 /6 = DIV BX.  0x0000_0064 / 7 = 14 remainder 2.
-        let mut cpu = cpu_with(&[0xF7, 0xF3]);
+        let mut cpu = cpu_with(&[0xF7, 0xF7]);
         cpu.regs.set_word(Reg16::Dx, 0);
         cpu.regs.set_word(Reg16::Ax, 100);
         cpu.regs.set_word(Reg16::Bx, 7);
@@ -3265,7 +3265,7 @@ mod tests {
     #[test]
     fn idiv16_divides_signed() {
         // F7 /7 = IDIV BX.  -1000 / 7 = -142 remainder -6.
-        let mut cpu = cpu_with(&[0xF7, 0xFB]);
+        let mut cpu = cpu_with(&[0xF7, 0xFF]);
         cpu.regs.set_word(Reg16::Dx, 0xFFFF);
         cpu.regs.set_word(Reg16::Ax, 0xFC18); // -1000
         cpu.regs.set_word(Reg16::Bx, 7);
@@ -3363,7 +3363,7 @@ mod tests {
 
         // 85 D8 = TEST AX, BX: 0100h and 0100h share 0100h. Reading either
         // operand as a byte would AND two zeros and wrongly set ZF.
-        let mut cpu = cpu_with(&[0x85, 0xD8]);
+        let mut cpu = cpu_with(&[0x85, 0xF8]);
         cpu.regs.set_word(Reg16::Ax, 0x0100);
         cpu.regs.set_word(Reg16::Bx, 0x0100);
         cpu.step().unwrap();
