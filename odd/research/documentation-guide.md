@@ -153,7 +153,7 @@ Notation, from Table 4-11 and Table 4-19 [1]:
 | **70** | JO short | JNO short | JB/JNAE short | JNB/JAE short | JE/JZ short | JNE/JNZ short | JBE/JNA short | JNBE/JA short | JS short | JNS short | JP/JPE short | JNP/JPO short | JL/JNGE short | JNL/JGE short | JLE/JNG short | JNLE/JG short |
 | **80** | Group 1 ‡2 | Group 1 | Group 1 ‡2 | Group 1 | TEST r/m8,r8 ‡3 | TEST r/m16,r16 ‡3 | XCHG r8,r/m8 | XCHG r16,r/m16 | MOV r/m8,r8 | MOV r/m16,r16 | MOV r8,r/m8 | MOV r16,r/m16 | MOV r16/m16,sreg | LEA r16,r/m16 | MOV sreg,r16/m16 | POP r16/m16 ‡8 |
 | **90** | XCHG AX,AX | XCHG AX,CX | XCHG AX,DX | XCHG AX,BX | XCHG AX,SP | XCHG AX,BP | XCHG AX,SI | XCHG AX,DI | CBW | CWD | CALL far | WAIT | PUSHF | POPF | SAHF | LAHF |
-| **A0** | MOV AL,m8 | MOV AX,m16 | MOV m8,AL | MOV m16,AX ‡4 | MOVS b | MOVS w | CMPS b | CMPS w | CMP AL,i8 ‡5 | CMP AX,i16 ‡5 | STOS b | STOS w | LODS b | LODS w | SCAS b | SCAS w |
+| **A0** | MOV AL,m8 | MOV AX,m16 | MOV m8,AL | MOV m16,AX ‡4 | MOVS b | MOVS w | CMPS b | CMPS w | TEST AL,i8 ‡5 | TEST AX,i16 ‡5 | STOS b | STOS w | LODS b | LODS w | SCAS b | SCAS w |
 | **B0** | MOV AL,i8 | MOV CL,i8 | MOV DL,i8 | MOV BL,i8 | MOV AH,i8 | MOV CH,i8 | MOV DH,i8 | MOV BH,i8 | MOV AX,i16 | MOV CX,i16 | MOV DX,i16 | MOV BX,i16 | MOV SP,i16 | MOV BP,i16 | MOV SI,i16 | MOV DI,i16 |
 | **C0** | RET i16 (intra) ‡8 | RET (intra) ‡8 | RET i16 (intra) | RET (intra) | LES r16,r/m16 | LDS r16,r/m16 | MOV m8,i8 | MOV m16,i16 | RET i16 (inter) ‡8 | RET (inter) ‡8 | RET i16 (inter) | RET (inter) | INT 3 | INT i8 | INTO | IRET |
 | **D0** | Shift ‡6 | Shift | Shift | Shift | AAM i8 | AAD i8 | SALC ‡8 | XLAT | ESC 0 | ESC 1 | ESC 2 | ESC 3 | ESC 4 | ESC 5 | ESC 6 | ESC 7 |

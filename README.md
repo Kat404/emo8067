@@ -28,8 +28,8 @@ source of code.
 The opcode and flag tables in `odd/research/documentation-guide.md` are
 transcribed from the Intel 8086 Family User's Manual. Where the printed
 manual and real silicon disagree, silicon wins and the manual's own print
-is kept and marked as an erratum — most visibly at `A8`/`A9`, which the
-1979 printing calls `TEST` and the hardware executes as `CMP`.
+is kept and marked as an erratum — most visibly at `0F`, which the 1979
+printing lists as unused and the hardware executes as `POP CS`.
 
 ## Layout
 

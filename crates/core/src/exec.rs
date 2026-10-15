@@ -3085,7 +3085,7 @@ mod tests {
 
     #[test]
     fn immediate_to_memory_forms() {
-        // 80 /7 is CMP BYTE [BX], imm8. A8 is CMP AL, imm8 and has no
+        // 80 /7 is CMP BYTE [BX], imm8. A8 is TEST AL, imm8 and has no
         // ModR/M byte at all, so it cannot address memory.
         let mut cpu = cpu_with(&[0x80, 0x3F, 0x11]);
         cpu.regs.set_word(Reg16::Bx, 0x0200);
