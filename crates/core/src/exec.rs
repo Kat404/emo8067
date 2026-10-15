@@ -1,5 +1,6 @@
 //! Fetch, decode, execute.
 
+use crate::Rep;
 use crate::flags::{AF, CF, DF, Flags, IF, OF, ONE, PF, SF, ZF, parity_even};
 use crate::memory::Memory;
 use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
@@ -22,8 +23,6 @@ pub enum ExecError {
     PrefixNotConsumed(u8),
     /// An `FF` /digit this build does not implement yet.
     UnsupportedFFGroup(u8),
-    /// A `REP` or `REPNE` prefix that is not followed by a string operation.
-    BadRepeat(u8, u8),
     /// An encoding that only exists on a later processor, so the 8086
     /// refuses it rather than guessing.
     NotOn8086(u8),
@@ -265,6 +264,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         match effect {
             Prefix::Lock => {}
             Prefix::Segment(seg) => cpu.seg_override = Some(seg),
+            Prefix::Rep(rep) => cpu.rep = Some(rep),
         }
         opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
     }
@@ -290,10 +290,19 @@ enum Prefix {
     Lock,
     /// `26`/`2E`/`36`/`3E`: load the named segment latch.
     Segment(Seg),
+    /// `F3`/`F2`: set the REP latch.
+    Rep(Rep),
 }
 
 /// What a prefix byte contributes. `None` means the byte is not a prefix, so
 /// the loop in [`step`] stops and dispatches it as an opcode.
+///
+/// The segment latch and the REP latch are set by independent columns of the
+/// 8086's opcode decode, so the order of the prefix bytes cannot matter: `F3
+/// 26 A4` and `26 F3 A4` reach the same state. The 8086 also has no
+/// invalid-instruction detection at all, so a repeat prefix in front of
+/// something that is not a string operation is not an error — the latch is
+/// simply read by nobody and dies with the instruction.
 fn prefix_effect(opcode: u8) -> Option<Prefix> {
     match opcode {
         0xF0 | 0xF1 => Some(Prefix::Lock),
@@ -301,6 +310,8 @@ fn prefix_effect(opcode: u8) -> Option<Prefix> {
         0x2E => Some(Prefix::Segment(Seg::Cs)),
         0x36 => Some(Prefix::Segment(Seg::Ss)),
         0x3E => Some(Prefix::Segment(Seg::Ds)),
+        0xF2 => Some(Prefix::Rep(Rep::RepNe)),
+        0xF3 => Some(Prefix::Rep(Rep::Rep)),
         _ => None,
     }
 }
@@ -321,7 +332,7 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // Unreachable by construction, and listed rather than swallowed by a
         // catch-all, because the exhaustive match is what turns a future
         // hole into a compile error.
-        0x26 | 0x2E | 0x36 | 0x3E | 0xF0 | 0xF1 => {
+        0x26 | 0x2E | 0x36 | 0x3E | 0xF0 | 0xF1 | 0xF2 | 0xF3 => {
             return Err(ExecError::PrefixNotConsumed(opcode));
         }
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
@@ -384,7 +395,6 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0xFF => ff_group(cpu, opcode)?,
         // ---- string operations, ports and segment transfers
         0xA4..=0xA7 | 0xAA..=0xAF => string_op(cpu, opcode)?,
-        0xF2 | 0xF3 => repeat_prefix(cpu, opcode)?,
         0xE4..=0xE7 | 0xEC..=0xEF => port_op(cpu, opcode)?,
         0xE0..=0xE3 => loop_op(cpu, opcode)?,
         // ---- shifts and rotates
@@ -754,20 +764,50 @@ fn load_far_pointer(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 }
 
 /// The string operations at `A4`..`AF`. Each advances or decrements its
-/// implicit pointer by the operand size, following `DF`.
+/// implicit pointer by the operand size, following `DF`, and repeats for as
+/// long as the REP latch asks it to.
 fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let Some(rep) = cpu.rep else {
+        return string_op_once(cpu, opcode);
+    };
+
+    // Intel's pseudocode for REP is `WHILE CountReg <> 0`, so the count is
+    // tested before each iteration and decremented after it: the run ends on
+    // the same iteration that brought CX to zero, and a CX that starts at zero
+    // runs no iterations at all.
+    while cpu.regs.word(Reg16::Cx) != 0 {
+        string_op_once(cpu, opcode)?;
+        cpu.regs.set_word(Reg16::Cx, cpu.regs.word(Reg16::Cx) - 1);
+
+        // REPE and REPNE stop at the first pair that fails their condition.
+        // Only the comparisons can fail one; a repeat MOVS runs the full count.
+        if matches!(opcode, 0xA6 | 0xA7 | 0xAE | 0xAF) {
+            let equal = cpu.regs.flags.get(ZF);
+            let keep_going = if matches!(rep, Rep::Rep) {
+                equal
+            } else {
+                !equal
+            };
+            if !keep_going {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// One iteration of a string operation: the transfer, the compare, or the
+/// load, followed by the pointer bumps.
+fn string_op_once(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let word = opcode & 1 != 0;
     let step: u16 = if word { 2 } else { 1 };
     // shortcut: a segment override in front of a string operation is consumed
-    // and discarded here, so the DS:SI side still reads DS. Widening it means
-    // settling the REP interaction first: this loop and `repeat_prefix` are
-    // two copies of the same question and must not answer it differently.
+    // and discarded here, so the DS:SI side still reads DS. The REP latch is
+    // honoured above instead, by `string_op`, not by this body.
     let ds = cpu.regs.segment(Seg::Ds);
     let es = cpu.regs.segment(Seg::Es);
     let mut si = cpu.regs.word(Reg16::Si);
     let mut di = cpu.regs.word(Reg16::Di);
-    let _uses_si = matches!(opcode, 0xA4..=0xA7 | 0xAC | 0xAD);
-    let _uses_di = !matches!(opcode, 0xAC | 0xAD);
     let uses_si = matches!(opcode, 0xA4..=0xA7 | 0xAC | 0xAD);
     let uses_di = !matches!(opcode, 0xAC | 0xAD);
 
@@ -893,130 +933,6 @@ fn cmp_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     };
     compare(cpu, left, right, bits == 16);
-    Ok(())
-}
-
-/// `F2` and `F3` are prefixes: `REPNE` and `REPE` apply to the string
-/// operation that follows. The whole repeat happens inside one step, so the
-/// instruction reports its real length rather than the two bytes of the
-/// prefix pair.
-fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
-    let next = fetch_u8(&cpu.mem, &mut cpu.regs);
-    if !(0xA4..=0xA7).contains(&next) && !(0xAA..=0xAF).contains(&next) {
-        return Err(ExecError::BadRepeat(opcode, next));
-    }
-    let word = next & 1 != 0;
-    let step: u16 = if word { 2 } else { 1 };
-    let compare_op = matches!(next, 0xA6 | 0xA7 | 0xAE | 0xAF);
-    let mut cx = cpu.regs.word(Reg16::Cx);
-
-    // Same shortcut as `string_op`: the DS side of a prefixed repeat still
-    // reads DS. See the note there before changing this one.
-    while cx != 0 {
-        let si = cpu.regs.word(Reg16::Si);
-        let di = cpu.regs.word(Reg16::Di);
-        let ds = cpu.regs.segment(Seg::Ds);
-        let es = cpu.regs.segment(Seg::Es);
-
-        match next {
-            0xA4 | 0xA5 => {
-                let v = if word {
-                    cpu.mem.read_u16(ds, si)
-                } else {
-                    u16::from(cpu.mem.read_u8(ds, si))
-                };
-                if word {
-                    cpu.mem.write_u16(es, di, v)
-                } else {
-                    cpu.mem.write_u8(es, di, v as u8)
-                }
-            }
-            0xA6 | 0xA7 => {
-                let a = if word {
-                    cpu.mem.read_u16(ds, si)
-                } else {
-                    u16::from(cpu.mem.read_u8(ds, si))
-                };
-                let b = if word {
-                    cpu.mem.read_u16(es, di)
-                } else {
-                    u16::from(cpu.mem.read_u8(es, di))
-                };
-                compare(cpu, a, b, word);
-            }
-            0xAA | 0xAB => {
-                let v = if word {
-                    cpu.regs.word(Reg16::Ax)
-                } else {
-                    u16::from(cpu.regs.byte(Reg8::Al))
-                };
-                if word {
-                    cpu.mem.write_u16(es, di, v)
-                } else {
-                    cpu.mem.write_u8(es, di, v as u8)
-                }
-            }
-            0xAC | 0xAD => {
-                // LODS reads DS:SI into AL or AX. A catch-all arm here would
-                // silently run SCAS instead, because AC..AF is two classes.
-                let v = if word {
-                    cpu.mem.read_u16(ds, si)
-                } else {
-                    u16::from(cpu.mem.read_u8(ds, si))
-                };
-                if word {
-                    cpu.regs.set_word(Reg16::Ax, v)
-                } else {
-                    cpu.regs.set_byte(Reg8::Al, v as u8)
-                }
-            }
-            _ => {
-                let a = if word {
-                    cpu.regs.word(Reg16::Ax)
-                } else {
-                    u16::from(cpu.regs.byte(Reg8::Al))
-                };
-                let b = if word {
-                    cpu.mem.read_u16(es, di)
-                } else {
-                    u16::from(cpu.mem.read_u8(es, di))
-                };
-                compare(cpu, a, b, word);
-            }
-        }
-
-        cx = cx.wrapping_sub(1);
-        cpu.regs.set_word(Reg16::Cx, cx);
-
-        let backwards = cpu.regs.flags.get(DF);
-        let bump = |p: u16| {
-            if backwards {
-                p.wrapping_sub(step)
-            } else {
-                p.wrapping_add(step)
-            }
-        };
-        // Same rule as outside a repeat: LODS owns SI alone, STOS and SCAS
-        // own DI alone, and only MOVS and CMPS touch both.
-        if matches!(next, 0xA4..=0xA7 | 0xAC | 0xAD) {
-            cpu.regs.set_word(Reg16::Si, bump(si));
-        }
-        if !matches!(next, 0xAC | 0xAD) {
-            cpu.regs.set_word(Reg16::Di, bump(di));
-        }
-
-        // REPE and REPNE stop at the first pair that fails their condition.
-        if compare_op {
-            let keep_going = if opcode == 0xF3 {
-                cpu.regs.flags.get(ZF)
-            } else {
-                !cpu.regs.flags.get(ZF)
-            };
-            if !keep_going {
-                break;
-            }
-        }
-    }
     Ok(())
 }
 
@@ -1992,10 +1908,8 @@ mod tests {
             prefix_effect(0x3E),
             Some(Prefix::Segment(Seg::Ds))
         ));
-        // 0xF2/0xF3 are the REP latch, which is deliberately not recognised
-        // yet: they still reach `repeat_prefix`.
-        assert!(prefix_effect(0xF2).is_none());
-        assert!(prefix_effect(0xF3).is_none());
+        assert!(matches!(prefix_effect(0xF3), Some(Prefix::Rep(Rep::Rep))));
+        assert!(matches!(prefix_effect(0xF2), Some(Prefix::Rep(Rep::RepNe))));
         assert!(prefix_effect(0x90).is_none(), "NOP is not a prefix");
     }
 
