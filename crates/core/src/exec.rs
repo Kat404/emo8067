@@ -242,7 +242,7 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         // matched before the arithmetic groups or they are never reached.
         // Segment pushes and pops also live inside 0x00..=0x3F, at 06, 0E,
         // 16 and 1E, so they are matched here for the same reason.
-        0x06 | 0x07 | 0x0E | 0x16 | 0x17 | 0x1E | 0x1F => segment_push_pop(cpu, opcode)?,
+        0x06 | 0x07 | 0x0E | 0x0F | 0x16 | 0x17 | 0x1E | 0x1F => segment_push_pop(cpu, opcode)?,
         0x27 => daa(cpu, true),
         0x2F => daa(cpu, false),
         0x37 => aaa(cpu, true),
@@ -253,8 +253,11 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         // ADD, OR and CMP have an accumulator-to-immediate form elsewhere,
         // at 0x0C..0x0D, 0x14..0x15 and 0x3C..0x3D.
         0x80..=0x83 => alu_group_imm(cpu, opcode)?,
-        // CMP also has a dedicated r/m,imm pair at A8/A9; the /digit is 7.
-        0xA8 | 0xA9 => alu_group_imm(cpu, opcode)?,
+        // A8/A9 are CMP AL/AX, imm and carry NO ModR/M byte. Routing them
+        // through the r/m,imm helper made it consume a phantom one and store
+        // to memory instead.
+        0xA8 => cmp_accumulator(cpu, 8)?,
+        0xA9 => cmp_accumulator(cpu, 16)?,
         0xF6 | 0xF7 => mul_group(cpu, opcode)?,
         // ---- MOV and friends. None of these modify FLAGS.
         0x87 => xchg_memory(cpu, opcode)?,
@@ -287,22 +290,8 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
         0xE0..=0xE3 => loop_op(cpu, opcode)?,
         // ---- shifts and rotates
         0xD0..=0xD3 => shift_group(cpu, opcode)?,
-        0x40..=0x47 => {
-            cpu.regs.set_word(
-                Reg16::from_bits(opcode & 0b111),
-                cpu.regs
-                    .word(Reg16::from_bits(opcode & 0b111))
-                    .wrapping_add(1),
-            );
-        }
-        0x48..=0x4F => {
-            cpu.regs.set_word(
-                Reg16::from_bits(opcode & 0b111),
-                cpu.regs
-                    .word(Reg16::from_bits(opcode & 0b111))
-                    .wrapping_sub(1),
-            );
-        }
+        0x40..=0x47 => inc_dec(cpu, Reg16::from_bits(opcode & 0b111), true)?,
+        0x48..=0x4F => inc_dec(cpu, Reg16::from_bits(opcode & 0b111), false)?,
         0x50..=0x57 => {
             let reg = Reg16::from_bits(opcode & 0b111);
             let value = cpu.regs.word(reg);
@@ -638,17 +627,40 @@ fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     Ok(())
 }
 
-/// `CMPS` and `SCAS` compare and set ZF, CF and OF. `a` is the minuend.
+/// `CMPS` and `SCAS` define the same six flags as a subtraction. `a` is the
+/// minuend. Modelling only ZF/CF/OF silently breaks anything that reads the
+/// parity or auxiliary flag after a compare.
 fn compare(cpu: &mut crate::Cpu, a: u16, b: u16, word: bool) {
-    let result = a.wrapping_sub(b);
+    let bits = if word { 16 } else { 8 };
+    let mask = width(bits);
+    let result = a.wrapping_sub(b) & mask;
+    let low = result as u8;
     let f = &mut cpu.regs.flags;
     f.set(ZF, result == 0);
-    f.set(CF, a < b);
-    let bits = if word { 16 } else { 8 };
+    f.set(CF, a & mask < b & mask);
     f.set(
         OF,
         sign_bit(a, bits) != sign_bit(b, bits) && sign_bit(result, bits) != sign_bit(a, bits),
     );
+    f.set(SF, sign_bit(result, bits));
+    f.set(PF, crate::flags::parity_even(low));
+    f.set(AF, (a ^ b ^ result) & 0x10 != 0);
+}
+
+/// `A8`/`A9`: `CMP AL, imm8` and `CMP AX, imm16`. No ModR/M byte, no store.
+fn cmp_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
+    let left = if bits == 16 {
+        cpu.regs.word(Reg16::Ax)
+    } else {
+        u16::from(cpu.regs.byte(Reg8::Al))
+    };
+    let right = if bits == 16 {
+        fetch_u16(&cpu.mem, &mut cpu.regs)
+    } else {
+        u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
+    };
+    compare(cpu, left, right, bits == 16);
+    Ok(())
 }
 
 /// `F2` and `F3` are prefixes: `REPNE` and `REPE` apply to the string
@@ -707,6 +719,20 @@ fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                     cpu.mem.write_u16(es, di, v)
                 } else {
                     cpu.mem.write_u8(es, di, v as u8)
+                }
+            }
+            0xAC | 0xAD => {
+                // LODS reads DS:SI into AL or AX. A catch-all arm here would
+                // silently run SCAS instead, because AC..AF is two classes.
+                let v = if word {
+                    cpu.mem.read_u16(ds, si)
+                } else {
+                    u16::from(cpu.mem.read_u8(ds, si))
+                };
+                if word {
+                    cpu.regs.set_word(Reg16::Ax, v)
+                } else {
+                    cpu.regs.set_byte(Reg8::Al, v as u8)
                 }
             }
             _ => {
@@ -828,9 +854,10 @@ fn segment_push_pop(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0x07 => Seg::Es,
         0x17 => Seg::Ss,
         0x1F => Seg::Ds,
+        0x0F => Seg::Cs,
         other => return Err(ExecError::UnknownOpcode(other)),
     };
-    let popping = matches!(opcode, 0x07 | 0x17 | 0x1F);
+    let popping = matches!(opcode, 0x07 | 0x0F | 0x17 | 0x1F);
     if popping {
         let v = pop(&cpu.mem, &mut cpu.regs);
         cpu.regs.set_segment(seg, v);
@@ -1059,6 +1086,26 @@ fn aaa(cpu: &mut crate::Cpu, add: bool) {
     let f = &mut cpu.regs.flags;
     f.set(AF, carry);
     f.set(CF, carry);
+}
+
+/// `INC` and `DEC` on a 16-bit register. They set the same flags as a
+/// subtraction but leave `CF` alone, which is the whole point of having them
+/// separately from `ADD` and `SUB`.
+fn inc_dec(cpu: &mut crate::Cpu, reg: Reg16, up: bool) -> Result<(), ExecError> {
+    let before = cpu.regs.word(reg);
+    let after = if up {
+        before.wrapping_add(1)
+    } else {
+        before.wrapping_sub(1)
+    };
+    cpu.regs.set_word(reg, after);
+    let f = &mut cpu.regs.flags;
+    f.set(OF, sign_bit(before, 16) != sign_bit(after, 16));
+    f.set(SF, sign_bit(after, 16));
+    f.set(ZF, after == 0);
+    f.set(AF, (before ^ after) & 0x10 != 0);
+    f.set(PF, crate::flags::parity_even(after as u8));
+    Ok(())
 }
 
 /// The sixteen conditional jumps at `0x70..=0x7F`, each with an `rel8`.
@@ -2324,8 +2371,9 @@ mod tests {
 
     #[test]
     fn immediate_to_memory_forms() {
-        // A8 /7 is CMP BYTE [BX], imm8.
-        let mut cpu = cpu_with(&[0xA8, 0x3F, 0x11]);
+        // 80 /7 is CMP BYTE [BX], imm8. A8 is CMP AL, imm8 and has no
+        // ModR/M byte at all, so it cannot address memory.
+        let mut cpu = cpu_with(&[0x80, 0x3F, 0x11]);
         cpu.regs.set_word(Reg16::Bx, 0x0200);
         cpu.mem.write_u8(0x0000, 0x0200, 0x11);
         cpu.step().unwrap();
