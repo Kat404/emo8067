@@ -52,9 +52,9 @@ Three reports, 2 173 lines, cross-checked by the parent. What they collectively 
 **Reordered build sequence** (from `features-and-ux.md` §6, cross-checked against the research):
 
 - **T11 — complete `crates/core` against the manual.** All 256 opcodes, flag semantics driven by `documentation-guide.md` §1.4, `MUL`/`DIV`/`IMUL`/`IDIV` with their undefined-flag and divide-error cases, the segment and interrupt machinery. Exit criterion: the 86 shipped `.asm` examples run headless to the same halt state as the reference reports.
-  - **T11a** ALU groups, stack, `MUL`/`IMUL`/`DIV`/`IDIV`, `CBW`/`CWD`, interrupt sequence. **done** — 54 tests; commits `d727abb` `fdc2bdb` `e723306` `ad1c649`.
-  - **T11b** `MOV` in all eight encodings, `XCHG`, `LEA`. Route: inline. Status: in progress.
-  - **T11c** Control transfer: `JMP`, the sixteen `Jcc`, `CALL`, `RET`, `INT n`, `IRET`. Route: inline. Status: pending.
+  - **T11a** ALU groups, stack, `MUL`/`IMUL`/`DIV`/`IDIV`, `CBW`/`CWD`, interrupt sequence. **done** — commits `d727abb` `fdc2bdb` `e723306` `ad1c649`.
+  - **T11b** `MOV` in all eight encodings, `XCHG`, `LEA`. **done** — commit `bd7c57f`.
+  - **T11c** Control transfer: `JMP` near/short/indirect, the sixteen `Jcc`, `CALL` near/indirect, `RET` and `RET iw`, `INT n`, `INT 3`, `IRET`. **done** — commit `571ee01`, 78 tests.
   - **T11e** **Repair the opcode map in `odd/research/documentation-guide.md`.** Found 2026-10-15: §1.3 row `0x80` is short — it is missing `0x87` and every entry from `0x88` through `0x8F`, which is exactly where `MOV r/m,r`, `MOV r,r/m`, `MOV Sreg`, `LEA` and `POP r/m` live. Row `0xA0` labels `A8`/`A9` as `TEST r/m,imm` when hardware implements `CMP r/m,imm`. Both rows contradict the manual and contradict `crates/core`, which is checked against real encodings. The map is this project's chosen oracle, so it has to be re-transcribed from the manual pages before it is trusted for anything built on top of it. Until then, `crates/core` is the authority for opcode allocation, not the guide.
   - **T11d** Shifts and rotates, string group with `DF`/`REP`, `IN`/`OUT`, segment transfers, `DAA`/`DAS`/`AAA`/`AAS`. Route: inline. Status: pending.
   - **Ordering correction (2026-10-15):** T12's exit criterion as originally written — "the 86 shipped `.asm` examples run headless" — was unreachable, because assembling `.asm` is T13. T12 is therefore split: the runner itself is testable immediately against hand-assembled bytes, and the example corpus becomes the exit criterion only after T13. U3 (runner) is built before U4 (assembler).
