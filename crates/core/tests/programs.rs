@@ -623,3 +623,370 @@ fn checksums_a_block_with_xor() {
     assert_eq!(c.regs.byte(Reg8::Al), checksum, "sixteen XORs");
     assert_eq!(c.regs.byte(Reg8::Ah), 0, "AH was zeroed and never touched");
 }
+
+// ---------------------------------------------------------------------------
+// Third batch. What the first two could not reach: a program reading its own
+// instruction stream, an interrupt vector as a control-flow tool, code that
+// rewrites itself, a stack that has to unwind in order, a search with a
+// conditional branch in it, and two segments live at once.
+// ---------------------------------------------------------------------------
+
+/// Read a byte out of the program's own instruction stream and branch on it.
+///
+/// ```asm
+///     mov  al, CS:[0009h]
+///     cmp  al, 5Ah
+///     jz   0008h
+///     hlt
+///         db 5Ah
+/// ```
+#[test]
+fn reads_a_byte_of_its_own_instruction_stream() {
+    let mut c = machine(&[
+        0x2E, 0xA0, 0x09, 0x00, // mov al, CS:[0009h]
+        0x3C, 0x5A, // cmp al, 5Ah
+        0x74, 0x01, // jz 0009h  (next is +8, target is +9)
+        0xF4, // 0008: hlt, reached only if the byte was not 5Ah
+        0x5A, // 0009: the sentinel the program read
+        0xF4, // 000A: the sentinel is a POP DX, so the program needs its own halt
+    ]);
+
+    run(&mut c, 100);
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x5A,
+        "the byte came from the program's own code"
+    );
+    assert_eq!(
+        c.regs.ip, 11,
+        "IP executed the sentinel and then the halt after it"
+    );
+}
+
+/// `REP` with a zero count executes nothing at all — the rule the microcode
+/// settles at ROM `0x112`, seen here end to end.
+///
+/// ```asm
+///     mov  si, 0100h
+///     mov  di, 0200h
+///     mov  cx, 0
+///     rep  movsb
+///     hlt
+/// ```
+#[test]
+fn rep_with_a_zero_count_writes_nothing() {
+    let mut c = machine(&[
+        0xBD, 0x00, 0x01, // mov si, 0100h
+        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xB9, 0x00, 0x00, // mov cx, 0
+        0xF3, 0xA4, // rep movsb
+        0xF4, // hlt
+    ]);
+    at(&mut c, DATA, 0x0100, &[0x11; 16]);
+    at(&mut c, EXTRA, 0x0200, &[0x22; 16]);
+
+    run(&mut c, 100);
+    assert_eq!(c.regs.word(Reg16::Si), 0x0100, "SI never moved");
+    assert_eq!(c.regs.word(Reg16::Di), 0x0200, "DI never moved");
+    assert_eq!(c.regs.word(Reg16::Cx), 0, "CX is still zero");
+    assert_eq!(c.mem.read_u8(EXTRA, 0x0200), 0x22, "and nothing was copied");
+}
+
+/// Two nested calls, so the stack has to unwind in the right order.
+///
+/// ```asm
+///     mov  ax, 1
+///     call outer
+///     hlt
+/// outer:
+///     inc  ax
+///     call inner
+///     inc  ax
+///     ret
+/// inner:
+///     inc  ax
+///     inc  ax
+///     ret
+/// ```
+#[test]
+fn nested_calls_unwind_the_stack_in_order() {
+    let mut c = machine(&[
+        0xB8, 0x01, 0x00, // 0000: mov ax, 1
+        0xE8, 0x01, 0x00, // 0003: call outer  (next is +6, outer is +7)
+        0xF4, // 0006: hlt
+        0x40, // 0007: outer: inc ax
+        0xE8, 0x02, 0x00, // 0008: call inner (next is +11, inner is +13)
+        0x40, // 0011: inc ax
+        0xC3, // 0012: ret
+        0x40, // 0013: inner: inc ax
+        0x40, // 0014: inc ax
+        0xC3, // 0015: ret
+    ]);
+    let stack = c.regs.word(Reg16::Sp);
+
+    run(&mut c, 100);
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        5,
+        "1, plus outer, plus inner twice, plus outer again"
+    );
+    assert_eq!(c.regs.word(Reg16::Sp), stack, "both frames came back off");
+}
+
+/// Write the machine code into memory and then jump into it.
+///
+/// ```asm
+///     mov  di, 0200h
+///     mov  ax, 34B8h          ; the word B8 34h, which reads as MOV AX,1234h
+///     mov  [di], ax
+///     mov  di, 0202h
+///     mov  ax, F412h          ; the word 12 F4h, which reads as 12h then HLT
+///     mov  [di], ax
+///     jmp  far 1000h:0200h
+/// ```
+///
+/// The store goes through `DS` and the jump goes through `CS`, so the same
+/// physical address is written as data and executed as code.
+#[test]
+fn writes_its_own_code_and_then_jumps_into_it() {
+    let mut c = machine(&[
+        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xB8, 0xB8, 0x34, // mov ax, 34B8h
+        0x89,
+        0x05, // mov [di], ax   (mod=00, rm=101 is [DI]; C6 was mod=11, a register move)   (r/m is the destination: DI is 110b)
+        0xBE, 0x02, 0x02, // mov di, 0202h
+        0xB8, 0x12, 0xF4, // mov ax, F412h
+        0x89, 0x05, // mov [di], ax   (mod=00, rm=101 is [DI]; C6 was mod=11, a register move)
+        0xEA, 0x00, 0x02, 0x00, 0x10, // jmp far 1000h:0200h
+    ]);
+
+    run(&mut c, 100);
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1234,
+        "the patched code ran: B8 34 12h is MOV AX,1234h"
+    );
+    assert_eq!(c.regs.ip, 0x0204, "and the F4h it also wrote stopped it");
+}
+
+/// Two segments live at once, with an override in the middle of it.
+///
+/// ```asm
+///     mov  si, 0100h
+///     mov  al, [si]         ; DS:0100
+///     mov  bl, cs:[si]     ; the same offset in CS
+///     hlt
+/// ```
+#[test]
+fn reads_two_segments_at_the_same_offset() {
+    let mut c = machine(&[
+        0xBD, 0x00, 0x01, // mov si, 0100h
+        0x8A, 0x04, // mov al, [si]
+        0x2E, 0x8A, 0x1C, // mov bl, cs:[si]
+        0xF4, // hlt
+    ]);
+    // The two segments must genuinely differ, or the test reads one byte twice.
+    c.regs.set_segment(Seg::Ds, 0x3000);
+    at(&mut c, 0x3000, 0x0100, &[0xA1]);
+    at(&mut c, CODE, 0x0100, &[0xB2]);
+
+    run(&mut c, 100);
+    assert_eq!(c.regs.byte(Reg8::Al), 0xA1, "the first read took DS");
+    assert_eq!(c.regs.byte(Reg8::Bl), 0xB2, "and the second took CS");
+}
+
+/// A signed multiply followed by the divide that undoes it, across `DX:AX`.
+///
+/// ```asm
+///     mov  ax, FFFCh        ; -4
+///     mov  bx, 0007h
+///     imul bx               ; DX:AX = -28
+///     mov  cx, dx
+///     idiv bx               ; -28 / 7 = -4, remainder 0
+///     hlt
+/// ```
+#[test]
+fn a_signed_divide_undoes_a_signed_multiply() {
+    let mut c = machine(&[
+        0xB8, 0xFC, 0xFF, // mov ax, FFFCh
+        0xBF, 0x07, 0x00, // mov bx, 0007h
+        0xF7, 0xEF, // imul bx
+        0x8B, 0xCA, // mov cx, dx
+        0xF7, 0xFF, // idiv bx
+        0xF4, // hlt
+    ]);
+
+    run(&mut c, 100);
+    assert_eq!(c.regs.word(Reg16::Ax), 0xFFFC, "the quotient is -4 again");
+    assert_eq!(c.regs.word(Reg16::Dx), 0, "and the remainder is zero");
+    assert_eq!(c.regs.word(Reg16::Cx), 0xFFFF, "the product had DX = FFFFh");
+}
+
+/// A linear search: a comparison, a conditional branch, and a loop — the shape
+/// of almost every program that does something.
+///
+/// ```asm
+///     mov  si, 0100h
+///     mov  cx, 0008h
+///     mov  al, 2Ah
+/// search:
+///     cmp  [si], al
+///     je   found
+///     inc  si
+///     loop search
+///     mov  bx, 0FFFFh       ; not found
+///     jmp  done
+/// found:
+///     mov  bx, si
+/// done:
+///     hlt
+/// ```
+#[test]
+fn searches_an_array_and_reports_where_it_stopped() {
+    let mut c = machine(&[
+        0xBD, 0x00, 0x01, // 0000: mov si, 0100h
+        0xB9, 0x08, 0x00, // 0003: mov cx, 8
+        0xB0, 0x2A, // 0006: mov al, 2Ah
+        0x38, 0x04, // 0008: cmp [si], al
+        0x74, 0x0E, // 0010: je found   (next is +12, found is +26)
+        0x45, // 0012: inc si
+        0xE2, 0xF9, // 0013: loop search (next is +15, search is +8)
+        0xBF, 0xFF, 0xFF, // 0015: mov bx, FFFFh
+        0xEB, 0x09, // 0018: jmp done    (next is +20, done is +29)
+        0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // 0020: padding
+        0x8B, 0xFD, // 0026: found: mov bx, si
+        0xF4, // 0029: done: hlt
+    ]);
+    let mut haystack = [0x11u8; 8];
+    haystack[3] = 0x2A;
+    at(&mut c, DATA, 0x0100, &haystack);
+
+    run(&mut c, 200);
+    assert_eq!(
+        c.regs.word(Reg16::Bx),
+        0x0103,
+        "BX holds the address of the match, which is what a search returns"
+    );
+}
+
+/// The same search when the needle is absent, so the other branch is exercised.
+///
+/// ```asm
+///     mov  si, 0100h
+///     mov  cx, 0008h
+///     mov  al, 2Ah
+/// search:
+///     cmp  [si], al
+///     je   found
+///     inc  si
+///     loop search
+///     mov  bx, 0FFFFh
+///     jmp  done
+/// found:
+///     mov  bx, si
+/// done:
+///     hlt
+/// ```
+#[test]
+fn a_search_that_finds_nothing_returns_the_sentinel() {
+    let mut c = machine(&[
+        0xBD, 0x00, 0x01, // 0000: mov si, 0100h
+        0xB9, 0x08, 0x00, // 0003: mov cx, 8
+        0xB0, 0x2A, // 0006: mov al, 2Ah
+        0x38, 0x04, // 0008: cmp [si], al
+        0x74, 0x0E, // 0010: je found
+        0x45, // 0012: inc si
+        0xE2, 0xF9, // 0013: loop search
+        0xBF, 0xFF, 0xFF, // 0015: mov bx, FFFFh
+        0xEB, 0x09, // 0018: jmp done
+        0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // 0020: padding
+        0x8B, 0xFD, // 0026: found: mov bx, si
+        0xF4, // 0029: done: hlt
+    ]);
+    at(&mut c, DATA, 0x0100, &[0x11; 8]);
+
+    run(&mut c, 200);
+    assert_eq!(
+        c.regs.word(Reg16::Bx),
+        0xFFFF,
+        "the sentinel, not an address"
+    );
+}
+
+/// Push three and pop three in the other order, which is the only proof the
+/// stack really is a stack.
+///
+/// ```asm
+///     mov  ax, 1111h
+///     mov  bx, 2222h
+///     mov  cx, 3333h
+///     push ax
+///     push bx
+///     push cx
+///     pop  dx
+///     pop  si
+///     pop  di
+///     hlt
+/// ```
+#[test]
+fn the_stack_gives_back_what_was_pushed_last_first() {
+    let mut c = machine(&[
+        0xB8, 0x11, 0x11, // mov ax, 1111h
+        0xBF, 0x22, 0x22, // mov bx, 2222h
+        0xB9, 0x33, 0x33, // mov cx, 3333h
+        0x50, // push ax
+        0x57, // push bx   (50+r, and BX is 111b)
+        0x51, // push cx
+        0x5A, // pop dx    (58+r)
+        0x5D, // pop si    (SI is 101b)
+        0x5E, // pop di    (DI is 110b)
+        0xF4, // hlt
+    ]);
+    let stack = c.regs.word(Reg16::Sp);
+
+    run(&mut c, 100);
+    assert_eq!(
+        c.regs.word(Reg16::Dx),
+        0x3333,
+        "the last push comes back first"
+    );
+    assert_eq!(c.regs.word(Reg16::Si), 0x2222);
+    assert_eq!(c.regs.word(Reg16::Di), 0x1111, "and the first push last");
+    assert_eq!(c.regs.word(Reg16::Sp), stack, "with SP back where it began");
+}
+
+/// `REPE CMPSB` over two buffers, stopping at the first byte that differs.
+///
+/// ```asm
+///     mov  si, 0100h
+///     mov  di, 0200h
+///     mov  cx, 0008h
+///     repe cmpsb
+///     hlt
+/// ```
+#[test]
+fn repe_cmpsb_stops_at_the_first_mismatch_between_two_buffers() {
+    let mut c = machine(&[
+        0xBD, 0x00, 0x01, // mov si, 0100h
+        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xB9, 0x08, 0x00, // mov cx, 8
+        0xF3, 0xA6, // repe cmpsb
+        0xF4, // hlt
+    ]);
+    at(&mut c, DATA, 0x0100, &[1, 2, 3, 4, 5, 6, 7, 8]);
+    at(&mut c, EXTRA, 0x0200, &[1, 2, 3, 9, 5, 6, 7, 8]);
+
+    run(&mut c, 100);
+    assert_eq!(
+        c.regs.word(Reg16::Cx),
+        4,
+        "four comparisons matched before the fifth did not"
+    );
+    assert_eq!(
+        c.regs.word(Reg16::Si),
+        0x0104,
+        "SI sits on the mismatching byte"
+    );
+    assert_eq!(c.regs.word(Reg16::Di), 0x0204, "and DI on the same index");
+    assert!(!c.regs.flags.get(ZF), "ZF clear is what ended the repeat");
+}
