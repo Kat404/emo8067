@@ -1,6 +1,6 @@
 //! Fetch, decode, execute.
 
-use crate::flags::{AF, CF, DF, Flags, OF, PF, SF, TF, ZF, parity_even};
+use crate::flags::{AF, CF, DF, Flags, OF, PF, SF, ZF, parity_even};
 use crate::memory::Memory;
 use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
 use crate::regs::{Reg8, Reg16, Seg};

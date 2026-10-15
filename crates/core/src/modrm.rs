@@ -1,6 +1,6 @@
 //! ModR/M and effective-address decoding for the 8086.
 
-use crate::regs::{Reg8, Reg16, Seg};
+use crate::regs::Seg;
 
 /// The addressing mode selected by the low three bits of a ModR/M byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
