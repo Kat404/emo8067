@@ -52,6 +52,11 @@ Three reports, 2 173 lines, cross-checked by the parent. What they collectively 
 **Reordered build sequence** (from `features-and-ux.md` §6, cross-checked against the research):
 
 - **T11 — complete `crates/core` against the manual.** All 256 opcodes, flag semantics driven by `documentation-guide.md` §1.4, `MUL`/`DIV`/`IMUL`/`IDIV` with their undefined-flag and divide-error cases, the segment and interrupt machinery. Exit criterion: the 86 shipped `.asm` examples run headless to the same halt state as the reference reports.
+  - **T11a** ALU groups, stack, `MUL`/`IMUL`/`DIV`/`IDIV`, `CBW`/`CWD`, interrupt sequence. **done** — 54 tests; commits `d727abb` `fdc2bdb` `e723306` `ad1c649`.
+  - **T11b** `MOV` in all eight encodings, `XCHG`, `LEA`. Route: inline. Status: in progress.
+  - **T11c** Control transfer: `JMP`, the sixteen `Jcc`, `CALL`, `RET`, `INT n`, `IRET`. Route: inline. Status: pending.
+  - **T11d** Shifts and rotates, string group with `DF`/`REP`, `IN`/`OUT`, segment transfers, `DAA`/`DAS`/`AAA`/`AAS`. Route: inline. Status: pending.
+  - **Ordering correction (2026-10-15):** T12's exit criterion as originally written — "the 86 shipped `.asm` examples run headless" — was unreachable, because assembling `.asm` is T13. T12 is therefore split: the runner itself is testable immediately against hand-assembled bytes, and the example corpus becomes the exit criterion only after T13. U3 (runner) is built before U4 (assembler).
 - **T12 — headless batch runner and `.asm` test harness.** A CLI that assembles and runs a file and prints registers, flags and memory. Exit criterion: every example in `re/extracted/app/examples/` produces a deterministic, checked-in golden state. This is what makes T13..T16 safe to change.
 - **T13 — assembler.** MASM-style syntax, the full directive set, the 13-rule `STRICT_SYNTAX` matrix recovered in `re/FINDINGS.md`, macro expansion, `#make_com#`/`#make_exe#`/`#make_bin#`/`#make_boot#`, and the `.binf` load-state format.
 - **T14 — disassembler.** Must reproduce the canonical output recovered in `re/FINDINGS.md`: hex as `0%02X%02Xh`, logical addresses as `SSSS:OOOO`, and the x87 mnemonic table that the reference decodes for display without executing.
