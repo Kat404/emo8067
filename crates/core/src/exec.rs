@@ -16,6 +16,8 @@ pub enum ExecError {
     BadPrefix(u8),
     /// A segment-register transfer opcode reached the ALU dispatcher.
     SegmentTransfer(u8),
+    /// An `FF` /digit this build does not implement yet.
+    UnsupportedFFGroup(u8),
     /// `LEA` with a register operand, where there is no address to compute.
     /// The manual does not define this encoding on an 8086.
     BadLea(u8),
@@ -44,6 +46,15 @@ pub fn fetch_u8(mem: &Memory, regs: &mut crate::regs::Registers) -> u8 {
     let byte = mem.read_u8(regs.segment(Seg::Cs), regs.ip);
     regs.ip = regs.ip.wrapping_add(1);
     byte
+}
+
+fn take_disp8(mem: &Memory, regs: &mut crate::regs::Registers) -> i16 {
+    let raw = fetch_u8(mem, regs);
+    i16::from(raw as i8)
+}
+
+fn take_u16(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
+    fetch_u16(mem, regs)
 }
 
 fn fetch_u16(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
@@ -250,6 +261,14 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             cpu.regs.set_word(reg, imm);
         }
         0xC6 | 0xC7 => mov_to_immediate(cpu, opcode)?,
+        // ---- control transfer
+        0x70..=0x7F => jcc(cpu, opcode)?,
+        0xE8 => call_relative(cpu)?,
+        0xE9 | 0xEB => jmp_relative(cpu, opcode)?,
+        0xC2 | 0xC3 => ret(cpu, opcode)?,
+        0xCC | 0xCD => int(cpu, opcode)?,
+        0xCF => iret(cpu),
+        0xFF => ff_group(cpu, opcode)?,
         0x40..=0x47 => {
             cpu.regs.set_word(
                 Reg16::from_bits(opcode & 0b111),
@@ -502,6 +521,109 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     };
     write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, value);
+    Ok(())
+}
+
+/// The sixteen conditional jumps at `0x70..=0x7F`, each with an `rel8`.
+fn jcc(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let taken = match opcode - 0x70 {
+        0x0 => cpu.regs.flags.get(OF),
+        0x1 => !cpu.regs.flags.get(OF),
+        0x2 => cpu.regs.flags.get(CF),
+        0x3 => !cpu.regs.flags.get(CF),
+        0x4 => cpu.regs.flags.get(ZF),
+        0x5 => !cpu.regs.flags.get(ZF),
+        0x6 => cpu.regs.flags.get(CF) || cpu.regs.flags.get(ZF),
+        0x7 => !cpu.regs.flags.get(CF) && !cpu.regs.flags.get(ZF),
+        0x8 => cpu.regs.flags.get(SF),
+        0x9 => !cpu.regs.flags.get(SF),
+        0xA => cpu.regs.flags.get(PF),
+        0xB => !cpu.regs.flags.get(PF),
+        0xC => cpu.regs.flags.get(SF) != cpu.regs.flags.get(OF),
+        0xD => cpu.regs.flags.get(SF) == cpu.regs.flags.get(OF),
+        0xE => cpu.regs.flags.get(ZF) || (cpu.regs.flags.get(SF) != cpu.regs.flags.get(OF)),
+        _ => !cpu.regs.flags.get(ZF) && (cpu.regs.flags.get(SF) == cpu.regs.flags.get(OF)),
+    };
+    let rel = take_disp8(&cpu.mem, &mut cpu.regs);
+    if taken {
+        cpu.regs.ip = (i32::from(cpu.regs.ip as i16) + i32::from(rel)) as u16;
+    }
+    Ok(())
+}
+
+/// `EB` is the short form and `E9` the near form; both add a signed
+/// displacement to the address of the *next* instruction.
+fn jmp_relative(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let rel: i16 = if opcode == 0xEB {
+        take_disp8(&cpu.mem, &mut cpu.regs)
+    } else {
+        take_u16(&cpu.mem, &mut cpu.regs) as i16
+    };
+    cpu.regs.ip = (i32::from(cpu.regs.ip as i16) + i32::from(rel)) as u16;
+    Ok(())
+}
+
+/// `E8` pushes the address of the next instruction, then adds `rel16` to it.
+fn call_relative(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
+    let rel = take_u16(&cpu.mem, &mut cpu.regs);
+    let ret = cpu.regs.ip;
+    push(&mut cpu.mem, &mut cpu.regs, ret);
+    cpu.regs.ip = (i32::from(ret as i16) + i32::from(rel)) as u16;
+    Ok(())
+}
+
+/// `C3` returns, `C2` returns and releases `imm16` bytes of arguments.
+fn ret(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let adjust = if opcode == 0xC2 {
+        take_u16(&cpu.mem, &mut cpu.regs)
+    } else {
+        0
+    };
+    cpu.regs.ip = pop(&cpu.mem, &mut cpu.regs);
+    let sp = cpu.regs.word(Reg16::Sp).wrapping_add(adjust);
+    cpu.regs.set_word(Reg16::Sp, sp);
+    Ok(())
+}
+
+/// `CC` is `INT 3`, the one-byte breakpoint; `CD ib` is `INT n`.
+fn int(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let vector = if opcode == 0xCC {
+        3
+    } else {
+        fetch_u8(&cpu.mem, &mut cpu.regs)
+    };
+    cpu.interrupt(vector);
+    Ok(())
+}
+
+/// `CF` pops IP, then CS, then FLAGS.
+fn iret(cpu: &mut crate::Cpu) {
+    let ip = pop(&cpu.mem, &mut cpu.regs);
+    let cs = pop(&cpu.mem, &mut cpu.regs);
+    let flags = pop(&cpu.mem, &mut cpu.regs);
+    cpu.regs.ip = ip;
+    cpu.regs.set_segment(Seg::Cs, cs);
+    cpu.regs.flags = Flags::popped(flags);
+}
+
+/// The `FF` group. Only the near `CALL` and `JMP` are implemented here; the
+/// far forms and `INC`/`DEC`/`PUSH` belong to their own units.
+fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    let _ = opcode;
+    let m = decode_from(cpu)?;
+    match m.reg & 0b111 {
+        0x2 => {
+            // CALL near r/m16: push the next instruction, load the operand.
+            let ret = cpu.regs.ip;
+            let target = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+            push(&mut cpu.mem, &mut cpu.regs, ret);
+            cpu.regs.ip = target;
+        }
+        0x4 => {
+            cpu.regs.ip = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+        }
+        other => return Err(ExecError::UnsupportedFFGroup(other)),
+    }
     Ok(())
 }
 
@@ -912,6 +1034,236 @@ mod tests {
         assert_eq!(cpu.mem.read_u16(0x1000, 0x0102), 0x1234);
     }
 
+    // ---- control transfer -------------------------------------------------------
+    // None of these modify FLAGS. IRET restores them, and that is the exception.
+
+    #[test]
+    fn jmp_relative_moves_ip_by_the_signed_displacement() {
+        // E9 rel16 = JMP near, EB rel8 = JMP short.
+        let mut cpu = cpu_with(&[0xE9, 0x10, 0x00]); // +0x10 from 0x0003
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0013);
+
+        let mut cpu = cpu_with(&[0xEB, 0x10]); // +0x10 from 0x0002
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0012);
+
+        // A negative displacement reaches backwards.
+        let mut cpu = cpu_with(&[0xEB, 0xFE]); // -2 from 0x0002
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0000);
+    }
+
+    #[test]
+    fn jmp_indirect_takes_its_target_from_an_operand() {
+        // FF /4 = JMP near r/m16.
+        let mut cpu = cpu_with(&[0xFF, 0xE7]); // JMP DI
+        cpu.regs.set_word(Reg16::Di, 0x1234);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x1234);
+    }
+
+    #[test]
+    fn every_conditional_jump_agrees_with_its_condition() {
+        // opcode, CF, ZF, SF, OF, PF, and whether that combination jumps.
+        // Each row is the flag state its mnemonic names; the same test then
+        // inverts every flag and requires the opposite outcome.
+        // The last column is what the *inverted* flag state does. It is not
+        // always the opposite: CF||ZF is still true when both are cleared.
+        let cases: [(u8, bool, bool, bool, bool, bool, bool); 16] = [
+            (0x70, false, false, false, true, false, false), // JO   overflow
+            (0x71, false, false, false, false, false, false), // JNO  no overflow
+            (0x72, true, false, false, false, false, false), // JB   carry
+            (0x73, false, false, false, false, false, false), // JNB  no carry
+            (0x74, false, true, false, false, false, false), // JZ   zero
+            (0x75, false, false, false, false, false, false), // JNZ  not zero
+            (0x76, true, false, false, false, false, true), // JBE  CF or ZF: clearing both leaves it true
+            (0x77, false, false, false, false, false, false), // JA   neither
+            (0x78, false, false, true, false, false, false), // JS   sign
+            (0x79, false, false, false, false, false, false), // JNS  no sign
+            (0x7A, false, false, false, false, true, false), // JP   parity
+            (0x7B, false, false, false, false, false, false), // JNP  no parity
+            (0x7C, false, false, true, false, false, true), // JL   SF!=OF, symmetric
+            (0x7D, false, false, false, false, false, true), // JGE  SF==OF, symmetric
+            (0x7E, false, true, true, false, false, true),  // JLE  ZF or SF!=OF
+            (0x7F, false, false, false, false, false, false), // JG   not zero and not JL
+        ];
+        for (opcode, cf, zf, sf, of, pf, inverted_jump) in cases {
+            for invert in [false, true] {
+                let bit = |v: bool| v != invert;
+                let mut cpu = cpu_with(&[opcode, 0x10]);
+                let f = &mut cpu.regs.flags;
+                f.set(CF, bit(cf));
+                f.set(ZF, bit(zf));
+                f.set(SF, bit(sf));
+                f.set(OF, bit(of));
+                f.set(PF, bit(pf));
+                cpu.step().unwrap();
+                let expected = if if invert { inverted_jump } else { true } {
+                    0x0012
+                } else {
+                    0x0002
+                };
+                assert_eq!(
+                    cpu.regs.ip, expected,
+                    "opcode {opcode:#04x} with inverted={invert}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn call_pushes_the_return_address_and_jumps() {
+        // E8 rel16 = CALL near. The pushed address is the one after CALL.
+        let mut cpu = cpu_at(&[0xE8, 0x05, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.step().unwrap();
+        // rel16 is measured from the end of the instruction, which is 3.
+        assert_eq!(cpu.regs.ip, 0x0008);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FE);
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), 0x0003, "return address");
+    }
+
+    #[test]
+    fn call_indirect_pushes_and_loads_from_the_operand() {
+        // FF /2 = CALL near r/m16.
+        let mut cpu = cpu_at(&[0xFF, 0xD7]); // CALL DI
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.set_word(Reg16::Di, 0x0300);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0300);
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), 0x0002);
+    }
+
+    #[test]
+    fn ret_returns_to_the_pushed_address() {
+        let mut cpu = cpu_at(&[0xC3]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0405);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0405);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
+    }
+
+    #[test]
+    fn ret_with_an_immediate_also_releases_the_arguments() {
+        // C2 iw = RET near, pop CS:IP then add iw to SP.
+        let mut cpu = cpu_at(&[0xC2, 0x04, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0405);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0405);
+        assert_eq!(
+            cpu.regs.word(Reg16::Sp),
+            0x0106,
+            "popped 2 plus the argument"
+        );
+    }
+
+    #[test]
+    fn call_and_ret_round_trip_returns_to_the_right_place() {
+        // 0000: E8 03 00   CALL 0006
+        // 0003: EB FD      JMP short 0002 -> back to 0000
+        // 0006: C3         RET
+        let mut cpu = cpu_at(&[0xE8, 0x03, 0x00, 0xEB, 0xFD, 0x90, 0xC3]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0006, "into the subroutine");
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0003, "back after the CALL");
+        assert_eq!(
+            cpu.regs.word(Reg16::Sp),
+            0x0100,
+            "the stack is balanced again"
+        );
+    }
+
+    #[test]
+    fn int_vectors_through_the_interrupt_table() {
+        // CD 21 = INT 21h.
+        let mut cpu = cpu_at(&[0xCD, 0x21]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        install_vector(&mut cpu, 0x21, 0x5000, 0x0600);
+        let cs = cpu.regs.segment(Seg::Cs);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x5000);
+        assert_eq!(cpu.regs.ip, 0x0600);
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x00FA);
+        // PUSH predecrements, so FLAGS is highest and IP is lowest.
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FE), 0xF000, "FLAGS");
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FC), cs, "CS");
+        assert_eq!(cpu.mem.read_u16(0x2000, 0x00FA), 0x0002, "return address");
+    }
+
+    #[test]
+    fn int_three_is_the_one_byte_breakpoint() {
+        let mut cpu = cpu_at(&[0xCC]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        install_vector(&mut cpu, 3, 0x0000, 0x0700);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0700);
+        assert_eq!(
+            cpu.mem.read_u16(0x2000, 0x00FA),
+            0x0001,
+            "INT 3 is one byte"
+        );
+    }
+
+    #[test]
+    fn iret_restores_ip_cs_and_flags() {
+        let mut cpu = cpu_at(&[0xCF]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        // SP points at IP, the last thing a handler would have pushed.
+        cpu.regs.set_word(Reg16::Sp, 0x00FC);
+        // IRET pops IP, then CS, then FLAGS, from the top of the stack.
+        cpu.mem.write_u16(0x2000, 0x00FC, 0x0999); // IP, read at SP
+        cpu.mem.write_u16(0x2000, 0x00FE, 0x6000); // CS
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0042); // FLAGS: ZF plus the fixed bit 1
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.ip, 0x0999);
+        assert_eq!(cpu.regs.segment(Seg::Cs), 0x6000);
+        assert!(cpu.regs.flags.get(ZF));
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102);
+    }
+
+    #[test]
+    fn iret_ignores_the_bits_an_8086_cannot_write() {
+        let mut cpu = cpu_at(&[0xCF]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x00FC);
+        cpu.mem.write_u16(0x2000, 0x00FC, 0x0000); // IP
+        cpu.mem.write_u16(0x2000, 0x00FE, 0x0000); // CS
+        // Bit 3 is fixed at zero and bit 12 is not writable on an 8086.
+        cpu.mem.write_u16(0x2000, 0x0100, 0x0008 | 0x1000);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.flags.0 & 0x0008, 0, "bit 3 stays zero");
+        assert_eq!(cpu.regs.flags.0 & 0x1000, 0, "bit 12 is not writable");
+    }
+
+    #[test]
+    fn call_and_jcc_leave_the_flags_untouched() {
+        let mut cpu = cpu_at(&[0xE8, 0x00, 0x00]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(SF, true);
+        cpu.step().unwrap();
+        assert!(cpu.regs.flags.get(CF) && cpu.regs.flags.get(SF));
+
+        let mut cpu = cpu_with(&[0x74, 0x10]);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.step().unwrap();
+        assert!(cpu.regs.flags.get(ZF) && cpu.regs.flags.get(CF));
+    }
+
     // ---- MOV / XCHG / LEA --------------------------------------------------------
     // MOV and XCHG touch no flags at all. Every test below sets a flag first
     // and asserts it afterwards, because "does not modify" is only meaningful
@@ -1095,9 +1447,9 @@ mod tests {
 
     #[test]
     fn unknown_opcode_is_reported_not_swallowed() {
-        // 0F is POP CS on an 8086, so use a byte the 8086 never defined.
-        let mut cpu = cpu_with(&[0xFF]);
-        assert_eq!(cpu.step(), Err(ExecError::UnknownOpcode(0xFF)));
+        // FF /7 is not defined on an 8086. /2 and /4 are, and are tested.
+        let mut cpu = cpu_with(&[0xFF, 0x38]);
+        assert_eq!(cpu.step(), Err(ExecError::UnsupportedFFGroup(7)));
     }
 
     #[test]
