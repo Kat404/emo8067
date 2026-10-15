@@ -162,20 +162,19 @@ fn opcode_0f_pops_cs() {
 #[test]
 fn every_first_opcode_byte_the_8086_defines_decodes() {
     /// The hole list. Empty, and it stays empty: see the doc comment.
+    ///
+    /// There is no second list any more. The four segment override prefixes
+    /// used to be excluded as "not an opcode on its own", which left this gate
+    /// probing 252 bytes; U7 implemented them and the sweep now covers 256, so
+    /// `probed` is pinned to the literal 256 rather than to a subtraction. An
+    /// exclusion list is the exact shape that let this gate go vacuous before.
     const HOLES: &[u8] = &[];
-    /// Defined bytes that no opcode-byte-alone probe can reach. These four
-    /// are the segment override prefixes `26` (ES), `2E` (CS), `36` (SS) and
-    /// `3E` (DS). They are prefixes, not instructions — the byte is only half
-    /// of an instruction whose other half is the one it modifies — and the
-    /// decoder has no prefix state yet (task U7). They are excluded rather
-    /// than counted as holes because the 8086 does execute them.
-    const NOT_AN_OPCODE_ALONE: &[u8] = &[0x26, 0x2E, 0x36, 0x3E];
 
     let mut probed = 0usize;
     let mut undecoded = vec![];
     for op in 0u16..=0xFF {
         let op = op as u8;
-        if HOLES.contains(&op) || NOT_AN_OPCODE_ALONE.contains(&op) {
+        if HOLES.contains(&op) {
             continue;
         }
         probed += 1;
@@ -185,9 +184,8 @@ fn every_first_opcode_byte_the_8086_defines_decodes() {
     }
 
     assert_eq!(
-        probed,
-        256 - NOT_AN_OPCODE_ALONE.len(),
-        "the sweep must visit every byte it does not exclude, or it asserts nothing"
+        probed, 256,
+        "the sweep must visit every byte, or it asserts nothing"
     );
     let named: Vec<String> = undecoded.iter().map(|b| format!("{b:#04x}")).collect();
     assert!(
@@ -200,9 +198,12 @@ fn every_first_opcode_byte_the_8086_defines_decodes() {
 /// A CPU holding one instruction whose opcode is `op`, plus whatever that
 /// opcode needs behind it.
 fn probe(op: u8) -> Cpu {
-    // `F2`/`F3` are prefixes and need a string operation behind them. For
-    // everything else `C3` is the cheapest possible filler: `mod=11` means it
-    // needs no displacement, touches no memory and leaves the stack alone.
+    // `F2`/`F3` are prefixes and need a string operation behind them. The
+    // segment override prefixes `26`/`2E`/`36`/`3E` need nothing in
+    // particular: `C3` is an instruction, which is all a prefix needs behind
+    // it. For everything else `C3` is the cheapest possible filler: `mod=11`
+    // means it needs no displacement, touches no memory and leaves the stack
+    // alone.
     let filler = if matches!(op, 0xF2 | 0xF3) {
         0xA4
     } else {
@@ -1688,4 +1689,234 @@ fn push_from_group_two_writes_no_flag() {
     c.step().unwrap();
 
     assert_eq!(c.regs.flags.0, status_before(), "PUSH writes no flag");
+}
+
+// ---------------------------------------------------------------------------
+// U7 — the four segment override prefixes. `26` names ES, `2E` CS, `36` SS and
+// `3E` DS; each one changes the segment the *next* instruction's memory operand
+// addresses through, and nothing else about it.
+//
+// The rule these tests pin is the segment the override names, not the fact that
+// the byte was accepted: a decoder that consumed `26` and then carried on with
+// DS passes any test that only checks "it did not fault".
+// ---------------------------------------------------------------------------
+
+/// A CPU with `code` at `CS:0000` and the four segment registers on four
+/// different bases, each holding a different word at the same offset.
+///
+/// The bases differ so that reading the wrong segment gives the wrong answer.
+/// A prefix that is parsed and dropped, a decoder that always uses `DS`, and a
+/// decoder that applies the override to the wrong end of the instruction all
+/// land on a different one of these four words.
+///
+/// No status flag is preset here, and none may be: `DF` governs the string
+/// operations, so a helper that set it would make the `PUSH` rows below read
+/// like a stack-direction defect.
+fn four_segments(code: &[u8]) -> Cpu {
+    let mut c = Cpu::new();
+    c.mem.load_at(0x30000, code).unwrap();
+    c.regs.set_segment(Seg::Cs, 0x3000);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Es, 0x5000);
+    c.regs.set_segment(Seg::Ss, 0x4000);
+    c.regs.set_word(Reg16::Sp, 0x0080);
+    c.mem.write_u16(0x2000, 0x0100, 0x1111); // DS
+    c.mem.write_u16(0x3000, 0x0100, 0x2222); // CS
+    c.mem.write_u16(0x4000, 0x0100, 0x3333); // SS
+    c.mem.write_u16(0x5000, 0x0100, 0x4444); // ES
+    c
+}
+
+/// `A1 mo16` is `MOV AX, DS:mo16`, the accumulator form with no ModR/M byte,
+/// and the override reaches it like any other `DS` memory reference. `3E` and
+/// `26` on the identical operand are the whole test: the same bytes, the same
+/// offset, `1111h` through DS and `4444h` through ES.
+#[test]
+fn a_disp16_operand_is_read_through_ds_or_through_the_override() {
+    let mut c = four_segments(&[0xA1, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1111, "no prefix means DS");
+
+    // 3E names DS, which is also the default: the instruction must still run,
+    // and the prefix byte must be part of the same step rather than swallowed.
+    let mut c = four_segments(&[0x3E, 0xA1, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1111,
+        "3E is DS, so it reads what the bare instruction reads"
+    );
+    assert_eq!(
+        c.regs.ip, 4,
+        "the prefix byte and the instruction it covers are one step"
+    );
+
+    // 26 names ES: the same encoding over the same offset, a different answer.
+    let mut c = four_segments(&[0x26, 0xA1, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x4444,
+        "26 is ES: the override was used, not merely accepted"
+    );
+}
+
+/// `2E` reaches the ModR/M memory operand the same way. CS and DS hold
+/// different words, so a decoder that parsed the prefix and then fell back to
+/// the default reads `1111h` here.
+#[test]
+fn two_e_reads_a_modrm_memory_operand_through_cs() {
+    // 8B /r is MOV r16, r/m16; mod=00 rm=110 is the direct form.
+    let mut c = four_segments(&[0x2E, 0x8B, 0b00_000_110, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x2222, "2E is CS");
+
+    let mut c = four_segments(&[0x8B, 0b00_000_110, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1111,
+        "the same instruction without the prefix reads DS"
+    );
+}
+
+/// `36` names SS, which is also where the stack lives — the two must not be
+/// confused. The override chooses the segment for the instruction's *operand*;
+/// `SP`, `PUSH`, `POP` and `BP` addressing all read `SS` directly and never
+/// consult the pending override.
+#[test]
+fn three_six_reads_a_modrm_memory_operand_through_ss() {
+    let mut c = four_segments(&[0x36, 0x8B, 0b00_000_110, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x3333,
+        "36 is SS, and SS is a data segment like any other here"
+    );
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0080,
+        "reading through SS is not touching the stack"
+    );
+}
+
+/// `LEA` takes the address, so the segment is not part of its answer and an
+/// override cannot change it. The operand is still decoded through the
+/// override — that is what keeps the instruction length and the effective
+/// address identical either way — and then `LEA` throws the segment away.
+#[test]
+fn lea_under_an_override_still_computes_the_offset_alone() {
+    // 8D /r is LEA r16, m. Anything that leaked the segment in would put
+    // 4444h, the word ES holds, in AX instead of the offset.
+    let mut c = four_segments(&[0x26, 0x8D, 0b00_000_110, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x0100,
+        "a segment is not part of an offset"
+    );
+
+    let mut c = four_segments(&[0x8D, 0b00_000_110, 0x00, 0x01]);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x0100,
+        "the override changes nothing LEA can see"
+    );
+}
+
+/// A register operand has no segment to override, so a prefix in front of one
+/// is consumed and nothing else happens.
+///
+/// The second instruction matters as much as the first: one prefix binds to
+/// one instruction, so the `A1 mo16` behind the `ADD` must read `DS` again
+/// rather than inherit ES from the prefix three bytes earlier.
+#[test]
+fn an_override_in_front_of_a_register_operand_is_consumed_and_forgotten() {
+    // 26 03 C3 is ADD AX, BX with mod=11: no memory, so ES goes nowhere.
+    let mut c = four_segments(&[0x26, 0x03, 0xC3, 0xA1, 0x00, 0x01]);
+    c.regs.set_word(Reg16::Ax, 0x0010);
+    c.regs.set_word(Reg16::Bx, 0x0002);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0012, "ADD AX, BX still runs");
+    assert_eq!(c.regs.ip, 3, "the prefix is one byte of the same step");
+
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1111,
+        "the prefix is spent: the next instruction reads DS"
+    );
+}
+
+/// `FF /6` has exactly one memory operand — the word it pushes — so `26` sends
+/// *that* read to ES while the write still goes to `SS:SP`. `FE /6` reaches
+/// the same microcode a byte at a time and takes the same view of the segment.
+///
+/// A register push has no memory operand at all: the prefix is consumed and
+/// the push lands on the stack segment exactly as it would have alone.
+#[test]
+fn a_push_reads_its_operand_through_the_override_and_still_writes_ss() {
+    let mut c = four_segments(&[0x26, 0xFF, 0b00_110_110, 0x00, 0x01]);
+    stack_grows_down(&c);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Sp), 0x007E, "SP moved by two, downward");
+    assert_eq!(
+        c.mem.read_u16(0x4000, 0x007E),
+        0x4444,
+        "the word was read through ES and pushed onto SS:SP"
+    );
+    assert_eq!(
+        c.mem.read_u16(0x2000, 0x0100),
+        0x1111,
+        "DS is not where the pushed word came from"
+    );
+
+    // 36 50: PUSH AX with SS named. No memory operand, so the prefix goes
+    // nowhere and the value still lands on the stack segment.
+    let mut c = four_segments(&[0x36, 0x50]);
+    stack_grows_down(&c);
+    c.regs.set_word(Reg16::Ax, 0xBEEF);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Sp), 0x007E);
+    assert_eq!(
+        c.mem.read_u16(0x4000, 0x007E),
+        0xBEEF,
+        "a prefix must not redirect a push to the data segment"
+    );
+
+    // 26 58: POP AX with ES named, off the same stack.
+    let mut c = four_segments(&[0x26, 0x58]);
+    stack_grows_down(&c);
+    c.mem.write_u16(0x4000, 0x0080, 0xBEEF);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0xBEEF,
+        "POP reads SS whatever the prefix named"
+    );
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0082,
+        "pop predecrements on the way in"
+    );
+}
+
+/// `D7` has no ModR/M byte at all: its operand is the implicit `DS:[BX + AL]`
+/// with `AL` read as a signed byte. An override moves the *base segment* and
+/// nothing else, so the index arithmetic is identical either way.
+#[test]
+fn xlat_reads_its_table_through_the_override() {
+    let mut c = four_segments(&[0x26, 0xD7]);
+    c.regs.set_byte(Reg8::Al, 1);
+    c.mem.write_u8(0x5000, 0x0001, 0x5A); // ES:0001
+    c.mem.write_u8(0x2000, 0x0001, 0x3C); // DS:0001
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "26 moves the table to ES");
+
+    let mut c = four_segments(&[0xD7]);
+    c.regs.set_byte(Reg8::Al, 1);
+    c.mem.write_u8(0x2000, 0x0001, 0x3C); // DS:0001
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x3C, "no prefix means DS");
 }

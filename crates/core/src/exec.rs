@@ -276,6 +276,10 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // Segment pushes and pops also live inside 0x00..=0x3F, at 06, 0E,
         // 16 and 1E, so they are matched here for the same reason.
         0x06 | 0x07 | 0x0E | 0x0F | 0x16 | 0x17 | 0x1E | 0x1F => segment_push_pop(cpu, opcode)?,
+        // The four segment override prefixes sit in the same quarter of the
+        // table as `DAA`, `AAA` and the ALU groups, so they are matched ahead
+        // of them. Nothing else in `00..=3F` may be allowed to see these bytes.
+        0x26 | 0x2E | 0x36 | 0x3E => segment_override(cpu, opcode)?,
         0x27 => daa(cpu, true),
         0x2F => daa(cpu, false),
         0x37 => aaa(cpu, true),
@@ -587,7 +591,7 @@ fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 /// within the current data segment, bypassing ModR/M entirely.
 fn mov_accumulator_offset(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let offset = fetch_u16(&cpu.mem, &mut cpu.regs);
-    let segment = cpu.regs.segment(Seg::Ds);
+    let segment = cpu.regs.segment(operand_seg(cpu));
     match opcode {
         0xA0 => {
             let v = cpu.mem.read_u8(segment, offset);
@@ -703,6 +707,10 @@ fn load_far_pointer(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 fn string_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let word = opcode & 1 != 0;
     let step: u16 = if word { 2 } else { 1 };
+    // shortcut: a segment override in front of a string operation is consumed
+    // and discarded here, so the DS:SI side still reads DS. Widening it means
+    // settling the REP interaction first: this loop and `repeat_prefix` are
+    // two copies of the same question and must not answer it differently.
     let ds = cpu.regs.segment(Seg::Ds);
     let es = cpu.regs.segment(Seg::Es);
     let mut si = cpu.regs.word(Reg16::Si);
@@ -851,6 +859,8 @@ fn repeat_prefix(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let compare_op = matches!(next, 0xA6 | 0xA7 | 0xAE | 0xAF);
     let mut cx = cpu.regs.word(Reg16::Cx);
 
+    // Same shortcut as `string_op`: the DS side of a prefixed repeat still
+    // reads DS. See the note there before changing this one.
     while cx != 0 {
         let si = cpu.regs.word(Reg16::Si);
         let di = cpu.regs.word(Reg16::Di);
@@ -1481,6 +1491,40 @@ fn lock(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
     dispatch(cpu, covered)
 }
 
+/// `26`, `2E`, `36` and `3E` are the segment override prefixes: `26` names ES,
+/// `2E` CS, `36` SS and `3E` DS. Each one changes the segment the *next*
+/// instruction's memory operand addresses through, and nothing else about it.
+///
+/// The covered instruction is dispatched from here, like `LOCK` and like
+/// `REP`, so the prefix and what it modifies retire as one step and `IP` lands
+/// past both. The override is on the [`crate::Cpu`] for exactly that long: set
+/// on the way in, dropped on the way out even when the instruction faults, so
+/// one prefix binds to one instruction and never leaks into the one after it.
+/// Two prefixes in front of the same instruction therefore leave the *later*
+/// one in force rather than composing the two.
+fn segment_override(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+    cpu.seg_override = Some(match opcode {
+        0x26 => Seg::Es,
+        0x2E => Seg::Cs,
+        0x36 => Seg::Ss,
+        _ => Seg::Ds,
+    });
+    let covered = fetch_u8(&cpu.mem, &mut cpu.regs);
+    let result = dispatch(cpu, covered);
+    cpu.seg_override = None;
+    result
+}
+
+/// The segment a memory operand addresses through: the pending override if a
+/// prefix byte named one, otherwise `DS`.
+///
+/// Only instructions that actually reach memory consult this. `LEA` takes the
+/// address and discards the segment, and the stack accesses in `push`/`pop`
+/// read `SS` directly, so neither of them may be redirected by a prefix.
+fn operand_seg(cpu: &crate::Cpu) -> Seg {
+    cpu.seg_override.unwrap_or(Seg::Ds)
+}
+
 /// `D6` is `SALC`: `AL` takes the carry, all-ones when `CF` is set. The
 /// opcode table prints it as not used, but the 8086 gives it its own microcode
 /// entry and Intel's own test for a copied part is whether it answers.
@@ -1535,7 +1579,7 @@ fn aad(cpu: &mut crate::Cpu) {
 fn xlat(cpu: &mut crate::Cpu) {
     let index = cpu.regs.byte(Reg8::Al) as i8 as i16 as u16;
     let at = cpu.regs.word(Reg16::Bx).wrapping_add(index);
-    let table = cpu.regs.segment(Seg::Ds);
+    let table = cpu.regs.segment(operand_seg(cpu));
     let value = cpu.mem.read_u8(table, at);
     cpu.regs.set_byte(Reg8::Al, value);
 }
@@ -1806,6 +1850,7 @@ fn apply(cpu: &mut crate::Cpu, op: AluOp, left: u16, right: u16, bits: u8, mask:
 /// The decoder indexes its slice from zero, so it gets a cursor rather than
 /// the absolute `IP`; the consumed length is folded back into `IP` after.
 fn decode_from(cpu: &mut crate::Cpu) -> Result<crate::modrm::ModRm, ExecError> {
+    let default_seg = operand_seg(cpu);
     let seg = cpu.regs.segment(Seg::Cs);
     let start = cpu.regs.ip;
     let mut window = [0u8; 4];
@@ -1813,7 +1858,7 @@ fn decode_from(cpu: &mut crate::Cpu) -> Result<crate::modrm::ModRm, ExecError> {
         *slot = cpu.mem.read_u8(seg, start.wrapping_add(i as u16));
     }
     let mut cursor = 0u16;
-    let result = decode_modrm(&window, &mut cursor, Seg::Ds);
+    let result = decode_modrm(&window, &mut cursor, default_seg);
     cpu.regs.ip = start.wrapping_add(cursor);
     result.map_err(Into::into)
 }

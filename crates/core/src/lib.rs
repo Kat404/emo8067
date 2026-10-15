@@ -21,7 +21,7 @@ pub mod modrm;
 pub mod regs;
 
 use memory::Memory;
-use regs::Registers;
+use regs::{Registers, Seg};
 
 /// The whole processor state.
 #[derive(Clone, Debug, Default)]
@@ -30,6 +30,17 @@ pub struct Cpu {
     pub regs: Registers,
     /// Physical memory.
     pub mem: Memory,
+    /// The segment the pending override prefix named, for the instruction that
+    /// comes next.
+    ///
+    /// This is decoder state, not a register: the 8086 has no register a
+    /// program can read or write that holds it, and it is dead as soon as the
+    /// instruction it covers retires. It lives here rather than in
+    /// [`Registers`] because every field of that is part of the architectural
+    /// register file, and because the prefix byte and the instruction it
+    /// modifies are dispatched from different arms — the one sets this, the
+    /// other reads it, ten functions away.
+    pub seg_override: Option<Seg>,
     /// Set when an instruction asked to stop: `HLT`, a triple fault, or an
     /// interrupt request that is not yet serviceable.
     pub halted: bool,
@@ -59,6 +70,7 @@ impl Cpu {
         Self {
             regs: Registers::new(),
             mem: Memory::new(),
+            seg_override: None,
             halted: false,
             stop_reason: StopReason::None,
         }
