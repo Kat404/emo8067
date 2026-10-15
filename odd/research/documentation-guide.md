@@ -303,10 +303,20 @@ cells where the 1979 print is simply wrong about the chip.
   `TEST` here would silently corrupt memory. **Settled.** The manual print is
   recorded rather than followed: this project implements silicon and files the
   1979 print as a known erratum (decision of 2026-10-15, `odd/tasks/emu8067-foss.md`
-  S1 decision 1 and log entry L15 [21]). *Not independently confirmed in this
-  pass:* no Intel errata sheet for this printing was reachable, so "silicon
-  executes `CMP`" rests on the project's recorded decision rather than on a
-  fetched primary document. Re-verify if an erratum listing becomes reachable.
+  S1 decision 1 and log entry L15 [21]). *Contradicted by microcode, decision
+  kept:* no Intel errata sheet for this printing exists or was reachable — Intel
+  published no errata for the 8086/8088 family at all. But the microcode
+  extracted from an 8086 die points the other way: there is a dedicated
+  `TEST A,i` routine of two opcodes at `0x09c` whose body ANDs the accumulator
+  and discards to `no dest`, while the shared `alu A,i` routine at `0x018`
+  already covers its full sixteen opcodes and ends by writing `SIGMA -> M`,
+  which would overwrite `AL`/`AX` with the difference. If `A8`/`A9` ran that
+  routine, every program that used them would see its accumulator destroyed.
+  The chain rests on a stage-1 opcode count that could not be re-verified here,
+  so confidence is ~0.75 and `CMP` is kept as a **documented divergence**. The
+  experiment that settles it in 30 seconds on real silicon: `B0 05` / `A8 03`,
+  then look at `AL` — `05h` intact means `TEST`, `02h` means `CMP`.
+  Re-verify if a die-level or primary source becomes reachable.
 - **‡6 `D0`–`D3`.** Table 4-14 labels these four cells `Shift` and Table 4-13
   expands them into the `/digit` table above. The manual assigns this set no
   group number, so it is named `Shift` here rather than folded into "Group 2",

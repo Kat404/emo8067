@@ -305,8 +305,10 @@ enum Prefix {
 /// `2E 36 AC` reads through SS.
 ///
 /// The 8086 has no invalid-instruction detection at all, so a repeat prefix in
-/// front of something that is not a string operation is not an error — the
-/// latch is simply read by nobody and dies with the instruction.
+/// front of something that is not a string operation is not an error. Most such
+/// instructions simply never read the latch and it dies with them; the
+/// exception is `MUL`, `IMUL` and `IDIV`, whose microcode tests the same F1
+/// latch and therefore negate their result. See [`inverts`].
 fn prefix_effect(opcode: u8) -> Option<Prefix> {
     match opcode {
         0xF0 | 0xF1 => Some(Prefix::Lock),
@@ -732,13 +734,20 @@ fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let m = decode_from(cpu)?;
     // `8F` is Group 2 with /0 and decodes its ModR/M the ordinary way: `rm`
     // names the destination, so mod=00, 01 and 10 all address memory like
-    // every other memory operand. An earlier revision refused mod=01 and
-    // mod=10 on the strength of a prose note that contradicted this
-    // project's own opcode table and the microcode.
+    // every other memory operand.
     //
-    // mod=11 is the register form, which the documentation calls undefined
-    // for this encoding, so it stays refused: an undefined encoding is a
-    // policy call rather than a guess at behaviour.
+    // The reason is structural, and an earlier revision got the right answer
+    // for the wrong one. No instruction's own microcode can reject a `mod`
+    // value, because the Translation ROM dispatches on `mod` and `rm` and
+    // computes the effective address before that microcode even starts; the
+    // `POP rmw` entry at ROM `0x040` contains no branch at all. An `8F` with
+    // `mod=01` or `mod=10` therefore cannot fail on those grounds.
+    //
+    // mod=11 and reg!=0 stay refused, but as an explicit policy rather than a
+    // hardware claim: the microcode's `M` pseudo-register predicts a register
+    // destination, yet no source establishes what the chip does, so guessing is
+    // not better than documenting the choice. An 8086 settles it in seconds:
+    // point SP at a known value, run `8F C3`, see whether BX changes.
     if m.reg != 0 || m.mod_bits == 0b11 {
         return Err(ExecError::NotOn8086(opcode));
     }

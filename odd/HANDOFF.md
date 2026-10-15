@@ -42,22 +42,30 @@ Introduced by `5bdb235` (U7), before the F5 baseline, and fixed after the F5 bas
 
 The vacuous `every_permutation_of_the_prefix_bytes_reaches_the_same_state` is gone. It permuted all four segment overrides and still agreed, because the override could not influence anything. In its place: a test that puts one override on the `SI` side of `MOVS`/`CMPS`/`LODS`, a test that pins last-override-wins, a guard that `STOS`/`SCAS` stay in `ES`, and the order-independence claim kept over `F0 F1 F2 F3` only, the four bytes whose latches come from independent decode columns. Suite after the fix: 215 green (5 + 114 + 96).
 
-### 2. `CX = 0` with `REP` — manual and silicon may disagree
+### 2. CLOSED — `CX = 0` with `REP`: the manual was right, and it is not an erratum
 
-The code runs **zero** iterations, following the printed manual, Vol. 2 p. 2-41: *"If CX is 0, the string instruction is not executed, and control goes to the following instruction."* The implementer was right and the brief I wrote was wrong. But silicon is widely reported to run one iteration. **Treat as a second erratum candidate, exactly as `A8`/`A9` was.** If silicon wins, `rep_with_a_zero_count_runs_no_iterations` and `a_rep_string_op_with_a_zero_count_executes_nothing` flip together.
+The code runs **zero** iterations, following the printed manual, Vol. 2 p. 2-41. Microcode settles it in the manual's favour: the `RPTS` sub-routine at ROM address `0x112` is the **first** micro-instruction of all four string routines and jumps straight to `RNI` on a zero count — before any memory access, and without decrementing `CX` (Shirriff, *The microcode and hardware in the 8086 processor that perform string operations*). No source was found for the "silicon runs one iteration" folklore. `rep_with_a_zero_count_runs_no_iterations` stays as it is.
 
-### 3. Not checked, and each could hide a defect
+The second test this item said would have to flip alongside it, `a_rep_string_op_with_a_zero_count_executes_nothing`, **does not exist**; there is only one.
 
-- Jenner's microcode listing behind `POP rmw` — the `8F mod=11` claim rests only on his per-routine table.
-- No Intel errata sheet was reachable for `A8`/`A9`; the §1.3 footnote ‡5 records the project's decision, not a fetched primary.
-- The `FF` group's latch interactions have never been re-examined.
-- No silicon `REP` with `CX = 0`.
+### 3. CLOSED except one item — the four gaps, checked against the microcode
+
+- **`POP rmw` / `8F mod`.** The `mod=00/01/10` behaviour was already right, but the *reason* recorded in `pop_to_memory` was wrong: it credited a per-routine table that does not exist. The real reason is structural — the Translation ROM dispatches `mod`/`rm` and computes the effective address before any instruction microcode starts, and the `POP rmw` entry at `0x040` has no branch at all, so no instruction can reject a `mod` value. Rewritten in the code.
+- **Intel errata for `A8`/`A9`.** None exists — Intel published no errata for the 8086/8088 family. Worse for us: the microcode points the **other** way from our decision. A dedicated `TEST A,i` routine of two opcodes sits at `0x09c` (AND, discard to `no dest`), while `alu A,i` at `0x018` already covers its full sixteen and ends in `SIGMA -> M`, which would overwrite `AL`/`AX` with the difference. **Decision: keep `CMP`**, recorded in `documentation-guide.md` ‡5 as a documented divergence with the 30-second experiment that would settle it (`B0 05` / `A8 03`, then look at `AL`). Confidence ~0.75; the chain needs a stage-1 opcode count we could not re-verify.
+- **The `FF` group's latch interactions.** No defect. Jenner: the group opcodes `F6`/`F7`/`FE`/`FF` have no top-level microcode instruction at all, so nothing in that group reads the `REP` latch — the project's "read by nobody" answer was right *for this group*, and the code comment claiming it generally has been corrected, because `MUL`/`IMUL`/`IDIV` do read it.
+- **Silicon `REP` with `CX = 0`.** See item 2. Closed, and the manual is correct.
+
+### 3a. NEW, and it reverses a decision this project had already made
+
+**`REP`/`REPNE` negates the product of `MUL`/`IMUL` and the quotient of `IDIV`.** Jenner, from microcode extracted off an 8086 die: *"Using the REP or REPNE prefix with a MUL or IMUL instruction negates the product. Using the REP or REPNE prefix with an IDIV instruction negates the quotient."* The multiply and divide microcode flips its internal `F1` flag once per negative sign in the inputs, and a `REP` prefix is what loads that flag.
+
+This is the item the F5 brief got **right** and this project dismissed as fiction. The dismissal rested on `mul_group` "reading no flags" — which confuses *the FLAGS register* with *the internal `F1` latch*. Implemented in `ab12c21`. Two banners that called the claim void were themselves wrong and are corrected in the same commit.
 
 ### 4. CLOSED — stale briefs, marked rather than rewritten
 
 Each contained a claim this work overturned. Reading one as current guidance would reintroduce a defect, so each file now carries one banner at the top naming the superseded claims, what is actually true, and the commit where it was settled. **The bodies are unchanged** — the stale claims stay as the record of what was believed, which is why the banners exist instead of edits. Four files, 21 inserted lines, 0 deletions:
 
-- `odd/research/_brief-f5-rep-latch.md` — `CX = 0` does one iteration (manual says zero); `F3` negates an `IDIV` result (**void**: `F7 E1` is `MUL CX` and `mul_group` reads no flags); the eight-prefix-byte permutation claim.
+- `odd/research/_brief-f5-rep-latch.md` — `CX = 0` does one iteration (manual and microcode say zero); `F3` negates an `IDIV` result (**the project had this backwards**: it negates the *product* of `MUL`/`IMUL` and the *quotient* of `IDIV` — see item 3a); the eight-prefix-byte permutation claim.
 - `odd/research/_brief-u6-remaining-opcodes.md:33-35` — silicon does not agree with the "80186 extension" reading of `84`/`85`; both are real 8086 instructions.
 - `odd/research/_brief-u7-segment-prefixes.md` — `F2`/`F3` are prefix latches now, not dispatcher arms; `8F` takes `mod=00`, `01` and `10`.
 - `odd/research/_brief-verify-f5-and-debt.md` — **not in the list above when this item was written**: the same three false claims appear again at ~lines 11-13. A worker found it while doing the other three.
@@ -101,9 +109,9 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 ## Next session, in order
 
 1. ~~Fix the string-source segment override (item 1)~~ — done in `fe16b6c`; its replacement permutation test had to be written from scratch, because the F5 verification report it referred to is in neither memory nor the repo.
-2. Decide item 2 with a primary source, and record it the way `A8`/`A9` was recorded.
+2. ~~Decide item 2 with a primary source~~ — done; microcode settles `CX = 0`, and it is not an erratum.
 3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
-4. Then `T12`: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`); what remains is running the 86 shipped `.asm` examples, which needs `T13`, the assembler.
+4. `T12`: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`); what remains is running the 86 shipped `.asm` examples, which needs `T13`, the assembler.
 
 ## Files worth reading first
 
