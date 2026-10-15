@@ -1,0 +1,18 @@
+[package]
+name = "emo8067-cli"
+description = "Headless runner for the emo8067 8086 core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+emo8067-core = { path = "../core" }
+
+[[bin]]
+name = "emo8067"
+path = "src/main.rs"

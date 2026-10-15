@@ -1,6 +1,6 @@
 //! Fetch, decode, execute.
 
-use crate::flags::{AF, CF, DF, Flags, OF, PF, SF, ZF, parity_even};
+use crate::flags::{AF, CF, DF, Flags, IF, OF, PF, SF, ZF, parity_even};
 use crate::memory::Memory;
 use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
 use crate::regs::{Reg8, Reg16, Seg};
@@ -337,6 +337,10 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
             cpu.stop_reason = crate::StopReason::Halted;
         }
         0xF5 => cpu.regs.flags.set(CF, !cpu.regs.flags.get(CF)), // CMC
+        0xFA => cpu.regs.flags.set(IF, false),                   // CLI
+        0xFB => cpu.regs.flags.set(IF, true),                    // STI
+        0xFC => cpu.regs.flags.set(DF, false),                   // CLD
+        0xFD => cpu.regs.flags.set(DF, true),                    // STD
         0xF8 => cpu.regs.flags.set(CF, false),                   // CLC
         0xF9 => cpu.regs.flags.set(CF, true),                    // STC
         0x9C => {
