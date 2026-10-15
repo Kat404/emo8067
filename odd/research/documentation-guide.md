@@ -294,29 +294,32 @@ cells where the 1979 print is simply wrong about the chip.
 - **‡5 `A8`/`A9`.** Table 4-12, PDF p. 261 / printed 4-22 (`CMP` "Immediate with
   accumulator" = `0011101w`, i.e. `3C`/`3D`) and Table 4-13, PDF p. 271 /
   printed 4-32 (`TEST` "Immediate data and accumulator" = `1010100w`) **both**
-  print `A8`/`A9` as `TEST AL,IMMED8` and `TEST AX,IMMED16`. The standing
-  instruction for this section is that `A8`/`A9` are `CMP` against an immediate
-  with no ModR/M byte, and `crates/core/src/exec.rs` implements
-  `cmp_accumulator` for both (`exec.rs:259`–`exec.rs:260`). The cells record
-  `CMP` because the two differ in exactly the flags they write — `TEST` clears
-  CF and OF and leaves AF undefined, `CMP` sets all six — so a cell reading
-  `TEST` here would silently corrupt memory. **Settled.** The manual print is
-  recorded rather than followed: this project implements silicon and files the
-  1979 print as a known erratum (decision of 2026-10-15, `odd/tasks/emu8067-foss.md`
-  S1 decision 1 and log entry L15 [21]). *Contradicted by microcode, decision
-  kept:* no Intel errata sheet for this printing exists or was reachable — Intel
-  published no errata for the 8086/8088 family at all. But the microcode
-  extracted from an 8086 die points the other way: there is a dedicated
-  `TEST A,i` routine of two opcodes at `0x09c` whose body ANDs the accumulator
-  and discards to `no dest`, while the shared `alu A,i` routine at `0x018`
-  already covers its full sixteen opcodes and ends by writing `SIGMA -> M`,
-  which would overwrite `AL`/`AX` with the difference. If `A8`/`A9` ran that
-  routine, every program that used them would see its accumulator destroyed.
-  The chain rests on a stage-1 opcode count that could not be re-verified here,
-  so confidence is ~0.75 and `CMP` is kept as a **documented divergence**. The
-  experiment that settles it in 30 seconds on real silicon: `B0 05` / `A8 03`,
-  then look at `AL` — `05h` intact means `TEST`, `02h` means `CMP`.
-  Re-verify if a die-level or primary source becomes reachable.
+  print `A8`/`A9` as `TEST AL,IMMED8` and `TEST AX,IMMED16`, and the cells
+  record `TEST`. **Settled, and the manual is right.** `crates/core/src/exec.rs`
+  implements `test_accumulator` for both, so the flags are the AND's: CF and OF
+  clear, `AF` left as it was found. Three independent sources agree:
+
+  1. **Silicon, captured.** `SingleStepTests/8086`, `v1/metadata.json`, built
+     from single-step captures on a real **Intel P80C86A-2 782003 J20 (C)1978**,
+     records `A8` and `A9` with `"flags": ".....a.."` — `AF` undefined and
+     nothing else. That is the signature of an `AND`. It records `3C`/`3D`, the
+     documented `CMP AL/AX, imm`, with no undefined flags at all, because a
+     subtraction defines all six. The 8088 capture (Harris 80C88) agrees.
+  2. **Microcode.** Jenner's public routine table lists `alu r,i 16` — the eight
+     ALU operations at two widths, exactly filling the sixteen slots, and
+     `A8` has bit 7 set so it cannot reach that decode at all — and a separate
+     two-opcode `TEST A,i`, which `A0`–`A3` (`MOV A,[i]` / `MOV [i],A`, listed
+     as their own routines) do not account for. `A8`/`A9` are the only
+     accumulator-against-immediate pair left, so they are that routine, whose
+     body discards to `no dest`.
+  3. **The manual.** 1979 and the 1983 ASM-86 manual both print `TEST`.
+
+  **This reverses an earlier decision of this project**, which ran them as `CMP`
+  for two units on the strength of a secondary source and filed the 1979 print
+  as a known erratum. There is no erratum: Intel published none for the
+  8086/8088 family. The earlier reading was the divergent one, and the
+  observation that exposed it is the same one that caught the REP negation —
+  a plausible claim adopted without a citation that could carry it.
 - **‡6 `D0`–`D3`.** Table 4-14 labels these four cells `Shift` and Table 4-13
   expands them into the `/digit` table above. The manual assigns this set no
   group number, so it is named `Shift` here rather than folded into "Group 2",

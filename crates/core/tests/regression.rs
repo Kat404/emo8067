@@ -39,10 +39,18 @@ fn run(c: &mut Cpu, n: usize) {
     }
 }
 
-/// `A8` is `CMP AL, imm8` and carries no ModR/M byte. Routing it through the
+/// `A8` is `TEST AL, imm8` and carries no ModR/M byte. Routing it through the
 /// shared r/m,imm helper consumed a phantom one and stored to memory.
+///
+/// This project ran it as `CMP` for two units, on the strength of a source that
+/// said so. A real Intel P80C86A-2 says otherwise: the single-step capture in
+/// `SingleStepTests/8086` records `A8` with undefined `AF` and nothing else
+/// undefined, which is the signature of `AND`/`TEST` — `CMP` is a subtraction
+/// and defines all six. `3C`/`3D`, the documented `CMP AL/AX, imm`, are recorded
+/// there with no undefined flags at all. The 1979 manual printed `TEST`, and it
+/// was right.
 #[test]
-fn a8_is_cmp_al_imm8_and_touches_no_memory() {
+fn a8_is_test_al_imm8_and_touches_no_memory() {
     let mut c = cpu(&[0xB0, 0x10, 0xA8, 0x10]);
     c.mem.write_u8(0x0000, 0x0020, 0x77);
     run(&mut c, 2);
@@ -52,19 +60,70 @@ fn a8_is_cmp_al_imm8_and_touches_no_memory() {
         "A8 must not write memory"
     );
     assert_eq!(c.regs.ip, 4, "A8 ib is two bytes");
-    assert_eq!(c.regs.byte(Reg8::Al), 0x10, "CMP stores nothing");
-    assert!(c.regs.flags.get(ZF));
+    assert_eq!(c.regs.byte(Reg8::Al), 0x10, "TEST stores nothing");
+    assert!(
+        !c.regs.flags.get(ZF),
+        "10h AND 10h is 10h, not zero — CMP would have set ZF here"
+    );
 }
 
-/// `A9` is `CMP AX, imm16`, three bytes, still no memory access.
+/// `A9` is `TEST AX, imm16`, three bytes, still no memory access.
 #[test]
-fn a9_is_cmp_ax_imm16_and_touches_no_memory() {
+fn a9_is_test_ax_imm16_and_touches_no_memory() {
     let mut c = cpu(&[0xB8, 0x34, 0x12, 0xA9, 0x34, 0x12]);
     c.mem.write_u8(0x0000, 0x0020, 0x77);
     run(&mut c, 2);
     assert_eq!(c.mem.read_u8(0x0000, 0x0020), 0x77);
     assert_eq!(c.regs.ip, 6, "B8 iw (3) then A9 iw (3)");
-    assert!(c.regs.flags.get(ZF));
+    assert!(
+        !c.regs.flags.get(ZF),
+        "1234h AND 1234h is 1234h, not zero — CMP would have set ZF here"
+    );
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "TEST stores nothing");
+}
+
+/// The flag difference between `TEST` and `CMP`, which is the whole point:
+/// `A8` with `AL = 0` against `01h` must leave `CF` clear, where `CMP` would set
+/// it for the borrow. `0x0F` is the opposite case, and `0x10` differs in parity.
+#[test]
+fn a8_sets_the_flags_of_an_and_not_of_a_subtraction() {
+    let borrow = |al: u8, imm: u8| {
+        let mut c = cpu(&[0xB0, al, 0xA8, imm]);
+        run(&mut c, 2);
+        c.regs.flags
+    };
+
+    // 00h - 01h borrows: CMP would set CF. TEST never does.
+    let f = borrow(0x00, 0x01);
+    assert!(
+        !f.get(CF),
+        "TEST clears CF where CMP would set it for a borrow"
+    );
+    assert!(!f.get(OF));
+    assert!(f.get(ZF), "00h AND 01h is zero, so ZF is set");
+
+    // 0Fh AND 10h is 00h, while 0Fh - 10h is 0FFh: the sign bits differ.
+    let f = borrow(0x0F, 0x10);
+    assert!(f.get(ZF), "0Fh AND 10h is zero");
+    assert!(!f.get(SF), "TEST takes SF from the AND, which is zero");
+
+    // 21h AND 01h is 01h, odd; 21h - 01h is 20h, even. Parity tells them apart.
+    let f = borrow(0x21, 0x01);
+    assert!(!f.get(ZF), "the AND is 01h, not zero");
+    assert!(!f.get(PF), "parity comes from the AND, and 01h is odd");
+}
+
+/// `AF` is undefined after `TEST`, and this project leaves undefined flags
+/// alone rather than inventing a value for them.
+#[test]
+fn a8_leaves_af_alone_the_way_test_does() {
+    let mut c = cpu(&[0xB0, 0x10, 0xA8, 0x01]); // 0x10-0x01 would set AF
+    c.regs.flags.set(AF, false);
+    run(&mut c, 2);
+    assert!(
+        !c.regs.flags.get(AF),
+        "0x10 AND 0x01 says nothing about AF, so the old value stands"
+    );
 }
 
 /// A catch-all match arm over `AC..=AF` ran `SCAS` for `LODSB`.

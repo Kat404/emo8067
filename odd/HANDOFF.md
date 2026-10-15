@@ -51,7 +51,7 @@ The second test this item said would have to flip alongside it, `a_rep_string_op
 ### 3. CLOSED except one item — the four gaps, checked against the microcode
 
 - **`POP rmw` / `8F mod`.** The `mod=00/01/10` behaviour was already right, but the *reason* recorded in `pop_to_memory` was wrong: it credited a per-routine table that does not exist. The real reason is structural — the Translation ROM dispatches `mod`/`rm` and computes the effective address before any instruction microcode starts, and the `POP rmw` entry at `0x040` has no branch at all, so no instruction can reject a `mod` value. Rewritten in the code. **`mod=11` and `reg != 0` stay refused and are now marked OPEN**, not settled: the microcode's `M` pseudo-register predicts a register destination, but the only source that appeared to confirm it never mentions `8F` (see item 4a).
-- **Intel errata for `A8`/`A9`.** None exists — Intel published no errata for the 8086/8088 family. Worse for us: the microcode points the **other** way from our decision. A dedicated `TEST A,i` routine of two opcodes sits at `0x09c` (AND, discard to `no dest`), while `alu A,i` at `0x018` already covers its full sixteen and ends in `SIGMA -> M`, which would overwrite `AL`/`AX` with the difference. **Decision: keep `CMP`**, recorded in `documentation-guide.md` ‡5 as a documented divergence with the 30-second experiment that would settle it (`B0 05` / `A8 03`, then look at `AL`). Confidence ~0.75; the chain needs a stage-1 opcode count we could not re-verify.
+- **Intel errata for `A8`/`A9`.** None exists — Intel published no errata for the 8086/8088 family, so there was never an erratum to file. **The question is now settled against us, by silicon.** `SingleStepTests/8086` (`v1/metadata.json`), captured on a real **Intel P80C86A-2 782003 J20 (C)1978**, records `A8`/`A9` with `AF` and only `AF` undefined — the signature of an `AND` — while `3C`/`3D`, the documented `CMP AL/AX, imm`, are recorded with no undefined flags at all. The 8088 capture agrees. That matches the 1979 manual, the 1983 ASM-86 manual, and Jenner's routine table, where `alu r,i` is full at sixteen and a dedicated two-opcode `TEST A,i` exists. **This project ran `A8`/`A9` as `CMP` for two units and was wrong**; see item 3b.
 - **The `FF` group's latch interactions.** No defect. Jenner: the group opcodes `F6`/`F7`/`FE`/`FF` have no top-level microcode instruction at all, so nothing in that group reads the `REP` latch — the project's "read by nobody" answer was right *for this group*, and the code comment claiming it generally has been corrected, because `MUL`/`IMUL`/`IDIV` do read it.
 - **Silicon `REP` with `CX = 0`.** See item 2. Closed, and the manual is correct.
 
@@ -84,7 +84,17 @@ Still open, and named by the work that did the banners: `documentation-guide.md`
 - **Q2's load-bearing citation does not contain the claim.** The report cited Shirriff's *Undocumented 8086 instructions* as the source for "`8F C0` executes `POP AX`" and "`reg != 0` is ignored". The article has no section on `8F` at all. Its structural argument is in there — the hardware substitutes the pseudo-register `M` with a register when there is no effective address — but that is an inference, not a verified statement.
 - The same author's own caveat, dropped by the report: *"my analysis is based on transistor-level simulation and examining the microcode; I haven't verified the behavior on a physical 8086 processor."* Everything labelled (a) from that work inherits it.
 
-What did survive is the one link the open `A8`/`A9` decision needed: Jenner's **public** routine table lists `alu r,i 16` and `TEST A,i 2`. Eight ALU operations times two widths is exactly sixteen, and `A8`/`A9` are the only accumulator-against-immediate pair left over, so the manual and the microcode now agree and this project is the divergent one. Not yet acted on: the chain is being independently refuted before anything flips.
+What did survive is the one link the `A8`/`A9` decision needed: Jenner's **public** routine table lists `alu r,i 16` and `TEST A,i 2`. Eight ALU operations times two widths is exactly sixteen, and `A8`/`A9` are the only accumulator-against-immediate pair left over, so the manual and the microcode agree and this project was the divergent one. The chain then went to an independent refutation, which could not break it and turned up hardware captures that settle it outright. See item 3b.
+
+### 3b. `A8`/`A9` are `TEST`, decided by silicon, after this project ran them as `CMP` for two units
+
+`SingleStepTests/8086` is single-step captures taken on a real **Intel P80C86A-2 782003 J20 (C)1978**, and its `v1/metadata.json` records which flags each opcode leaves undefined. It records `A8`/`A9` with `"flags": ".....a.."`, `AF` and nothing else — the signature of an `AND` — and `3C`/`3D`, the documented `CMP AL/AX, imm`, with **no** undefined flags, because a subtraction defines all six. The 8088 captures (Harris 80C88) agree. I fetched that file and read those entries directly.
+
+So the 1979 manual printed the truth, the 1983 ASM-86 manual printed the truth, the microcode agrees, and **the only thing that ever said otherwise was a source this project adopted without checking.** `cmp_accumulator` is now `test_accumulator`: CF and OF cleared, `AF` left alone, and nothing written to `AL`/`AX`.
+
+Two things make this the most instructive defect in the file. First, it is the same shape as the REP negation — a true claim dismissed by reasoning where a citation was required — and it happened **twice in one session**, in opposite directions. Second, this project's own record says a reviewer once reported `A8`/`A9` as `TEST` and the parent filed it as false; that reviewer was right, and the ground rule that every external finding is a hypothesis to reproduce had already been violated when the rejection was not reproduced, only argued.
+
+The generalisable lesson: when two projects of evidence disagree and one of them is a named individual's measurement on real silicon, the measurement wins, no matter how well the other side is argued.
 
 The lesson matches every other one in this file. The report was *more* confident than the sources allowed, and the two places to check a research output are its arithmetic and its citations — both of which were checkable in under a minute.
 
@@ -116,7 +126,7 @@ Not one was found by the test suite. Every one was found by a verifier, a microc
 
 Every external finding arrived as a hypothesis to reproduce, never an instruction to execute — and each reviewer has reported at least one false claim:
 
-- `A8`/`A9` reported as `TEST` — **false**, it is `CMP`. Not applied.
+- `A8`/`A9` reported as `TEST` — dismissed as **false**, on the reasoning that a later source said silicon runs `CMP`. **That dismissal was itself the error**: the source had no citation, and a real P80C86A-2 disagrees with it. Applied in the end, after silicon confirmed it.
 - My own U5 brief's `LAHF`/`SAHF` formulas — **false**. The implementer deviated deliberately and was right.
 - My own F5 brief's `CX = 0` and `F3`-negates-`IDIV` — **both false**, caught by the implementer and the verifier.
 

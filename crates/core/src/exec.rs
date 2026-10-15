@@ -356,14 +356,14 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0x00..=0x3F => alu_group(cpu, opcode)?,
         // ---- Group 1: r/m against an immediate. The ModRM /digit selects
         // all eight operations, so this is not three separate groups. Only
-        // ADD, OR and CMP have an accumulator-to-immediate form elsewhere,
-        // at 0x0C..0x0D, 0x14..0x15 and 0x3C..0x3D.
+        // ADD, OR, CMP and TEST have an accumulator-to-immediate form elsewhere,
+        // at 0x0C..0x0D, 0x14..0x15, 0x3C..0x3D and 0xA8..0xA9.
         0x80..=0x83 => alu_group_imm(cpu, opcode)?,
-        // A8/A9 are CMP AL/AX, imm and carry NO ModR/M byte. Routing them
+        // A8/A9 are TEST AL/AX, imm and carry NO ModR/M byte. Routing them
         // through the r/m,imm helper made it consume a phantom one and store
         // to memory instead.
-        0xA8 => cmp_accumulator(cpu, 8)?,
-        0xA9 => cmp_accumulator(cpu, 16)?,
+        0xA8 => test_accumulator(cpu, 8)?,
+        0xA9 => test_accumulator(cpu, 16)?,
         0xF6 | 0xF7 => mul_group(cpu, opcode)?,
         // ---- MOV and friends. None of these modify FLAGS.
         0x84 | 0x85 => test_against_register(cpu, opcode)?,
@@ -940,8 +940,20 @@ fn compare(cpu: &mut crate::Cpu, a: u16, b: u16, word: bool) {
     f.set(AF, (a ^ b ^ result) & 0x10 != 0);
 }
 
-/// `A8`/`A9`: `CMP AL, imm8` and `CMP AX, imm16`. No ModR/M byte, no store.
-fn cmp_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
+/// `A8`/`A9`: `TEST AL, imm8` and `TEST AX, imm16`. No ModR/M byte, no store.
+///
+/// This project ran them as `CMP` for two units. Three things say otherwise:
+/// the 1979 manual prints `TEST`; Jenner's microcode routine table has a
+/// dedicated two-opcode `TEST A,i` routine while the shared accumulator-immediate
+/// ALU routine is already full at its sixteen; and a single-step capture on a
+/// real Intel P80C86A-2 (`SingleStepTests/8086`, `v1/metadata.json`) records
+/// both opcodes with `AF` and only `AF` undefined — the signature of an `AND`.
+/// `3C`/`3D`, the documented `CMP AL/AX, imm`, are recorded there with no
+/// undefined flags at all, because a subtraction defines all six.
+///
+/// So the flags are the AND's, not a difference's: `CF` and `OF` are clear and
+/// `AF` says nothing, which is why it is left exactly as it was found.
+fn test_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
     let left = if bits == 16 {
         cpu.regs.word(Reg16::Ax)
     } else {
@@ -952,7 +964,11 @@ fn cmp_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
     } else {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     };
-    compare(cpu, left, right, bits == 16);
+    let result = left & right;
+    let f = &mut cpu.regs.flags;
+    f.set(CF, false);
+    f.set(OF, false);
+    set_result_flags(result, bits, f);
     Ok(())
 }
 
