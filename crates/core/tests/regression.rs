@@ -575,23 +575,20 @@ fn ff_six_pushes_a_memory_word() {
 /// `matches!(m.rm, Operand::Reg(_))` only ever sees mod=11, so mod=01 and
 /// mod=10 slip through while the comment claims otherwise.
 #[test]
-fn pop_rm16_refuses_every_encoding_the_8086_lacks() {
+fn pop_rm16_refuses_only_what_the_8086_leaves_undefined() {
+    // The register form and a non-zero /digit are undefined for this
+    // encoding. mod=01 and mod=10 are NOT: an earlier revision refused
+    // them on the strength of a prose note that contradicted this
+    // project's own opcode table and the microcode.
     for code in [
-        &[0x8F, 0x46, 0x34][..],       // mod=01 [BP+d8]
-        &[0x8F, 0x85, 0x34, 0x12][..], // mod=10 [BP+d16]
-        &[0x8F, 0x86, 0x34, 0x12][..], // mod=10 [BX+d16]
         &[0x8F, 0xC3][..],             // mod=11
-        &[0x8F, 0x0E, 0x34, 0x12][..], // mod=00 but reg=001
+        &[0x8F, 0x0E, 0x40, 0x00][..], // mod=00 but reg=001
+        &[0x8F, 0x8E, 0x40, 0x00][..], // mod=10 but reg=001
     ] {
         let mut c = cpu(code);
         c.regs.set_word(Reg16::Sp, 0x0100);
         assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)), "{code:02X?}");
         assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
-    }
-    for code in [&[0x8F, 0x06, 0x34, 0x12][..], &[0x8F, 0x00][..]] {
-        let mut c = cpu(code);
-        c.regs.set_word(Reg16::Sp, 0x0100);
-        assert!(c.step().is_ok(), "{code:02X?} is a real 8086 encoding");
     }
 }
 
@@ -2014,4 +2011,65 @@ fn lea_ignores_the_default_segment_entirely() {
     c.regs.set_word(Reg16::Bp, 0x0020);
     c.step().unwrap();
     assert_eq!(c.regs.word(Reg16::Ax), 0x0040, "just the offset");
+}
+
+/// AUDIT-3. `8F` is Group 2 with /0 and decodes its ModR/M the ordinary way:
+/// mod=00, 01 and 10 all address memory. An earlier revision refused mod=01
+/// and mod=10 on the strength of a prose note that contradicted the section's
+/// own cell and the microcode, where the destination is the `rm` field.
+#[test]
+fn pop_rm16_accepts_every_memory_addressing_mode() {
+    // Each form writes to a different offset, so accepting the byte is not
+    // enough: the destination has to be the one the encoding names. The
+    // BP-based forms go to SS, per AUDIT-7, not DS.
+    let cases: [(&[u8], u16, u16, &str); 5] = [
+        (&[0x8F, 0x06, 0x40, 0x00], 0x3000, 0x0040, "mod=00 disp16"),
+        (&[0x8F, 0x47, 0x30], 0x3000, 0x0030, "mod=01 [BX+disp8]"),
+        (
+            &[0x8F, 0x87, 0x30, 0x00],
+            0x3000,
+            0x0030,
+            "mod=10 [BX+disp16]",
+        ),
+        (&[0x8F, 0x00], 0x3000, 0x0000, "mod=00 [BX+SI]"),
+        (
+            &[0x8F, 0x46, 0x30],
+            0x2000,
+            0x0030,
+            "mod=01 [BP+disp8] lands in SS, which the loop set to 2000h",
+        ),
+    ];
+    for (code, dest_seg, want, name) in cases {
+        let mut c = cpu(code);
+        c.regs.set_segment(Seg::Ss, 0x2000);
+        c.regs.set_segment(Seg::Ds, 0x3000);
+        c.regs.set_word(Reg16::Sp, 0x0100);
+        c.regs.set_word(Reg16::Bx, 0x0000);
+        c.regs.set_word(Reg16::Bp, 0x0000);
+        // POP postincrements: it reads SS:0100h and leaves SP at 0102h.
+        c.mem.write_u16(0x2000, 0x0100, 0xCAFE);
+        c.step().unwrap_or_else(|e| panic!("{name}: {e:?}"));
+        assert_eq!(c.regs.word(Reg16::Sp), 0x0102, "{name}: SP did not move");
+        assert_eq!(
+            c.mem.read_u16(dest_seg, want),
+            0xCAFE,
+            "{name}: wrong destination"
+        );
+    }
+}
+
+/// The register form stays refused: the documentation calls it undefined for
+/// this encoding, and an undefined encoding is a policy call rather than a
+/// guess at behaviour.
+#[test]
+fn pop_rm16_still_refuses_the_register_and_non_zero_digits() {
+    for code in [
+        &[0x8F, 0xC3][..],             // mod=11
+        &[0x8F, 0x0E, 0x40, 0x00][..], // reg=001
+    ] {
+        let mut c = cpu(code);
+        c.regs.set_word(Reg16::Sp, 0x0100);
+        assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)), "{code:02X?}");
+        assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
+    }
 }
