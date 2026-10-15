@@ -62,22 +62,29 @@ impl Memory {
 
     /// Read a little-endian word through a `segment:offset` pair.
     ///
-    /// The word is *not* guaranteed to be contiguous on the bus: at
-    /// `FFFF:FFFF` the second byte comes from physical `0x00000`. This is
-    /// faithful, and it matters when the 8086 straddles the wrap.
+    /// The effective address is computed **once**, to 20 bits, and the high
+    /// byte is read from the next physical address. The offset is not
+    /// recomputed from the segment for that second byte, which is what makes
+    /// a word at `offset = 0xFFFF` straddle the top of the bus instead of
+    /// jumping back to the start of the segment. See
+    /// [`Memory::physical`] and the `read_u16` tests.
     #[must_use]
     pub fn read_u16(&self, segment: u16, offset: u16) -> u16 {
-        u16::from_le_bytes([
-            self.read_u8(segment, offset),
-            self.read_u8(segment, offset.wrapping_add(1)),
-        ])
+        let low = Self::physical(segment, offset);
+        let high = (low + 1) & BUS_MASK;
+        u16::from_le_bytes([self.bytes[low as usize], self.bytes[high as usize]])
     }
 
     /// Write a little-endian word through a `segment:offset` pair.
+    ///
+    /// The high byte lands one physical address above the low byte, exactly
+    /// as [`Memory::read_u16`] reads it.
     pub fn write_u16(&mut self, segment: u16, offset: u16, value: u16) {
+        let low = Self::physical(segment, offset);
+        let high = (low + 1) & BUS_MASK;
         let [lo, hi] = value.to_le_bytes();
-        self.write_u8(segment, offset, lo);
-        self.write_u8(segment, offset.wrapping_add(1), hi);
+        self.bytes[low as usize] = lo;
+        self.bytes[high as usize] = hi;
     }
 
     /// Bulk load, honouring the same wrap as [`Memory::physical`].
@@ -137,17 +144,32 @@ mod tests {
     #[test]
     fn a_word_can_straddle_the_top_of_the_bus() {
         let mut m = Memory::new();
-        // Physical 0xFFFF holds the low byte, physical 0x00000 the high one.
-        // Logical FFFF:0010 maps to physical 0x00000, so writing the low half
-        // of the word at FFFF:000F must land just below that.
-        m.write_u8(0xFFFF, 0x000F, 0xEF);
-        m.write_u8(0xFFFF, 0x0010, 0xBE);
+        // F000:FFFF is physical 0xFFFFF, the very last byte on the bus. The
+        // word's high byte must land at physical 0x00000.
+        m.write_u16(0xF000, 0xFFFF, 0xBEEF);
         assert_eq!(m.read_u8(0x0000, 0x0000), 0xBE, "high byte wrapped to 0");
-        assert_eq!(
-            m.read_u16(0xFFFF, 0x000F),
-            0xBEEF,
-            "little-endian across the wrap"
-        );
+        assert_eq!(m.bytes[0xFFFFF], 0xEF, "low byte at the top of the bus");
+    }
+
+    #[test]
+    fn the_high_byte_does_not_return_to_the_segment_base() {
+        let mut m = Memory::new();
+        // FFFF:FFFF is physical 0x0FFEF. Adding one to the *physical*
+        // address gives 0x0FFF0. Recomputing from the segment with a wrapped
+        // offset would instead give 0xFFFF0, which is a different byte.
+        m.write_u16(0xFFFF, 0xFFFF, 0xBEEF);
+        assert_eq!(m.bytes[0x0FFEF], 0xEF, "low byte");
+        assert_eq!(m.bytes[0x0FFF0], 0xBE, "high byte is physical + 1");
+        assert_eq!(m.bytes[0xFFFF0], 0x00, "segment base must not be reused");
+    }
+
+    #[test]
+    fn a_word_reads_the_same_bytes_it_writes() {
+        let mut m = Memory::new();
+        m.write_u16(0x0100, 0x0002, 0x1234);
+        assert_eq!(m.read_u16(0x0100, 0x0002), 0x1234);
+        m.write_u16(0xF000, 0xFFFF, 0x1234);
+        assert_eq!(m.read_u16(0xF000, 0xFFFF), 0x1234);
     }
 
     #[test]
