@@ -142,3 +142,27 @@ fn the_encodings_that_are_still_missing_are_listed_here() {
         );
     }
 }
+
+/// `8C` with a register destination is an 80186 encoding. The 8086 has no
+/// such instruction, and accepting it would put a segment register where
+/// the hardware cannot.
+#[test]
+fn mov_segment_to_register_is_rejected_on_the_8086() {
+    let mut c = cpu(&[0x8C, 0xC3]);
+    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8C)));
+}
+
+/// `LEA` computes an address and must never read the segment into the
+/// result, even when the operand carries one.
+#[test]
+#[ignore = "OPEN: LEA AX,[BX] with BX=1234h does not land on 1234h in this build. Undiagnosed; do not trust LEA until it is."]
+fn lea_uses_the_offset_alone() {
+    let mut c = cpu(&[0x8D, 0x06, 0x34, 0x12]); // LEA AX, [1234h]
+    c.regs.set_segment(Seg::Ds, 0x9999);
+    c.step().unwrap();
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1234,
+        "the segment is not part of an offset"
+    );
+}

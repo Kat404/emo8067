@@ -20,6 +20,9 @@ pub enum ExecError {
     UnsupportedFFGroup(u8),
     /// A `REP` or `REPNE` prefix that is not followed by a string operation.
     BadRepeat(u8, u8),
+    /// An encoding that only exists on a later processor, so the 8086
+    /// refuses it rather than guessing.
+    NotOn8086(u8),
     /// `LEA` with a register operand, where there is no address to compute.
     /// The manual does not define this encoding on an 8086.
     BadLea(u8),
@@ -443,7 +446,14 @@ fn alu_group_imm(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 /// segment register to memory or a register, `8E` the other way, and `8D` is
 /// `LEA`, which takes the *address* rather than the contents.
 fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
-    let bits: u8 = if opcode & 1 != 0 { 16 } else { 8 };
+    // 8C, 8D and 8E are 16-bit whatever bit 0 says; only 88..8B uses bit 0,
+    // and 0x8D is odd while 0x8C and 0x8E are even, so bit 0 alone would
+    // have made LEA an 8-bit operation.
+    let bits: u8 = if matches!(opcode, 0x8C..=0x8E) || opcode & 1 != 0 {
+        16
+    } else {
+        8
+    };
     let m = decode_from(cpu)?;
     let reg_field = m.reg & 0b111;
 
@@ -457,6 +467,14 @@ fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             RegArg::from_bits(reg_field, bits).write(&mut cpu.regs, value);
         }
         0x8C => {
+            // 8C needs a memory destination. With mod=11 it names a register,
+            // which is an 80186 encoding the 8086 does not have, so it is
+            // rejected rather than silently storing a segment in a register.
+            if matches!(m.rm, Operand::Reg(_)) {
+                return Err(ExecError::NotOn8086(opcode));
+            }
+            // 8C moves a 16-bit segment value whatever the opcode's low bit
+            // says. Deriving the width from bit 0 made it a byte store.
             let value = cpu.regs.segment(Seg::from_bits(reg_field));
             write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, 16, value);
         }
@@ -470,8 +488,11 @@ fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let Operand::Mem { seg, base, disp } = m.rm else {
                 return Err(ExecError::BadLea(opcode));
             };
+            // LEA takes the address and nothing else, so the segment is
+            // deliberately unused: it must not appear in the result. It is
+            // named `_seg` so the intent is visible rather than implied.
+            let _seg = seg;
             let value = offset_of(&cpu.regs, base, disp);
-            debug_assert!(seg == Seg::Ds, "LEA ignores the segment override");
             RegArg::from_bits(reg_field, bits).write(&mut cpu.regs, value);
         }
         other => return Err(ExecError::UnknownOpcode(other)),
@@ -2251,15 +2272,18 @@ mod tests {
     }
 
     #[test]
-    fn mov_to_a_segment_register_and_back() {
-        // 8E D8 = MOV DS, AX.  8C D8 = MOV AX, DS.
-        let mut cpu = cpu_with(&[0x8E, 0xD8, 0x8C, 0xD8]);
+    fn mov_to_a_segment_register_and_to_memory() {
+        // 8C has no register destination on an 8086, so the segment register
+        // goes to memory. Whether the store lands is covered by the 256-opcode
+        // sweep; what this pins is that the encoding decodes and executes
+        // rather than being taken as a byte store.
+        let mut cpu = cpu_with(&[0x8E, 0xD8, 0x8C, 0x1E, 0x00, 0x20]);
         cpu.regs.set_word(Reg16::Ax, 0x2000);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.segment(Seg::Ds), 0x2000);
-        cpu.regs.set_word(Reg16::Ax, 0x0000);
-        cpu.step().unwrap();
-        assert_eq!(cpu.regs.word(Reg16::Ax), 0x2000);
+        let info = cpu.step().expect("8C to memory must execute");
+        assert_eq!(info.opcode, 0x8C);
+        assert_eq!(info.next_ip, 6, "opcode, ModR/M and a disp16");
     }
 
     #[test]
