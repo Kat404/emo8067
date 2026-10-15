@@ -100,3 +100,57 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   evidence, it is two readings of one document. What the gate buys is that code
   and document can no longer drift apart silently, and that the next change to
   either has something to fail against.
+
+- **L5 (2026-10-15, audit of Phase 1).** An independent audit of the gates
+  returned *holes found*, with two blockers of its own and two more in
+  `flag_contract.rs`. All four are fixed, and each fix was verified by replaying
+  the audit's own patch.
+
+  1. **`PushesReturn` was a tautology.** The arm returned the *declared* length
+     into the variable the shared assertion compared, so for the `CD`, `9A` and
+     `E8` rows that assertion compared the table with itself. The pushed return
+     address was the only real check. The arm now says so, and states the
+     destination it must land in.
+  2. **`PopsReturn` could not see the immediate's width.** The row's immediate
+     had a low byte equal to its whole value, so a decoder that read one byte
+     released the same number. The immediate is now `0102h`. This is the same
+     mistake as the `E8` row below, and it is the most useful thing the audit
+     found: **a row whose bytes cannot distinguish two implementations is not
+     evidence for either.**
+  3. **A row count bounded below cannot notice deletions.** `>= 50` is now `== 55`,
+     pinned. Writing the number as a guess first, and having the gate catch that
+     the table has 55 rows and not the 72 written, is the cheapest demonstration
+     of why.
+  4. **`flag_contract.rs` could be switched off by editing the file it reads.**
+     Turning the `MOV` row from nine `—` marks into nine `X` marks deletes every
+     assertion about `MOV`, `LEA`, `RET`, `CALL`, `PUSH` and `POP`, and the
+     suite stayed green. A new test counts assertable marks in §1.4 and pins it,
+     so weakening the oracle now fails loudly. Separately, `row_marks` searched
+     the whole document for the first line starting with an instruction name, so
+     a row inserted above the §1.4 heading could hijack it; the search is now
+     confined to §1.4.
+
+  **One correction to the audit.** Its first blocker — a `CALL` that reads a
+  `disp8` and then nudges `IP` one byte forward, passing all 264 tests — is not
+  an escape. With the row's immediate as written (`0003h`), that mutant produces
+  the same pushed address, the same target and the same final `IP` as the
+  correct implementation: it is an *equivalent* mutant, which no observation can
+  distinguish. The fix was the same as blocker 2: give the row an immediate whose
+  high byte is not zero, so reading one byte lands somewhere else. The gate now
+  kills it, and the distinction is recorded because "equivalent mutant" and
+  "escaped mutant" read identically in the output.
+
+  **Still open from the audit, and now the plan's own backlog.**
+  - 22 Group 1 `(opcode, /digit)` rows missing at MOD=00, including `F6 /1` and
+    `F7 /1`, which §1.4 ‡8 documents as real 8086 instructions with **zero**
+    executions anywhere in the suite.
+  - 32 conditional-jump and 4 loop rows carrying a `short` displacement. Partly
+    closed here: nine of them now have rows.
+  - `X` and `U` marks assert nothing, so for `ADD`, `ADC`, `SUB`, `SBB`, `CMP`,
+    `DAA`, `DAS`, `CMPS` and `SCAS` the flag gate proves only that D, I and T are
+    untouched.
+  - Nothing in the repository asserts what an instruction *touches*: a `MOV m8,AL`
+    writing through `ES` instead of `DS` passes everything. That is T3.
+  - In `programs.rs`, the padding bytes of both search programs are never
+    executed, the backwards-copy program asserts pointers but not content, and
+    `run()` never checks where a program halted.

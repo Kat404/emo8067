@@ -94,8 +94,18 @@ enum Ip {
     /// A relative jump whose signed displacement is stated here, so the
     /// expected `IP` is `at + length + displacement`.
     Relative(i16),
-    /// The instruction pushes `at + length` as a return address.
-    PushesReturn,
+    /// The instruction pushes `at + length` as a return address and transfers
+    /// control to `ip` in segment `cs`, or leaves `CS` alone when `cs` is
+    /// `None`.
+    ///
+    /// The destination is part of the claim, and without it this arm is not a
+    /// length check at all. A decoder that reads a `disp8` and then nudges `IP`
+    /// one byte further forward leaves the pushed return address exactly where
+    /// it should be — the right address, returned to — while calling the wrong
+    /// target and skipping a byte of the program. The audit found that mutant
+    /// passing the whole suite, and the only thing that distinguishes it is
+    /// where control ends up.
+    PushesReturn(u16, Option<u16>),
     /// RET pops its return address from the stack and then adds its immediate
     /// to `SP`, so how far the stack moved says whether the immediate was
     /// fetched and what it was. The payload is the immediate's **value**, not
@@ -406,13 +416,18 @@ const ENCODINGS: &[Encoding] = &[
     // carries the interrupt type. CD pushes its return address, so its length is
     // observable on the stack rather than in `IP`.
     Encoding::new(
-        // RET releases whatever the immediate says, so the stack moves by four
-        // here: two for the popped IP and the 0004h the immediate carries.
+        // RET releases whatever the immediate says. The immediate here is
+        // 0102h and not 0004h on purpose: its low byte and its whole value
+        // differ, so a decoder that read only the low byte would release 2
+        // instead of 258 and the stack would land somewhere else. An immediate
+        // whose low byte equals its value cannot tell a two-byte read from a
+        // one-byte one, which is exactly how the first version of this row
+        // measured nothing.
         "C2 RET i16",
-        &[0xC2, 0x04, 0x00],
+        &[0xC2, 0x02, 0x01],
         Components::imm(0xC2, 2),
         3,
-        Ip::PopsReturn(4),
+        Ip::PopsReturn(0x0102),
     ),
     // The far return carries no immediate, so its one byte is pinned by the
     // stack moving four rather than two.
@@ -442,7 +457,8 @@ const ENCODINGS: &[Encoding] = &[
         &[0xCD, 0x21],
         Components::imm(0xCD, 1),
         2,
-        Ip::PushesReturn,
+        // The handler this test installs for type 21h.
+        Ip::PushesReturn(0x0500, Some(0x4000)),
     ),
     // ---- the base for AAM and AAD is an immediate, and it is not always ten
     Encoding::new(
@@ -493,10 +509,19 @@ const ENCODINGS: &[Encoding] = &[
     // displacement is accounted for.
     Encoding::new(
         "E8 CALL near",
-        &[0xE8, 0x03, 0x00],
+        // The immediate is 0103h and not 0003h, and the high byte being
+        // non-zero is the whole point. With a zero high byte, a decoder that
+        // read only the low byte and then nudged IP forward lands on exactly
+        // the same target, pushes the same return address and ends at the same
+        // place: an equivalent mutant, which no observation can distinguish.
+        // The audit called that a blocker and it is worth being precise: the
+        // gate was not fooled, the row simply could not tell the two apart.
+        &[0xE8, 0x03, 0x01],
         Components::imm(0xE8, 2),
         3,
-        Ip::PushesReturn,
+        // rel 0103h from the byte after the instruction, and a near call
+        // leaves CS alone.
+        Ip::PushesReturn(0x0106, None),
     ),
     Encoding::new(
         "E9 JMP near",
@@ -519,7 +544,7 @@ const ENCODINGS: &[Encoding] = &[
         &[0x9A, 0x00, 0x02, 0x00, 0x10],
         Components::imm(0x9A, 4),
         5,
-        Ip::PushesReturn,
+        Ip::PushesReturn(0x0200, Some(0x1000)),
     ),
     // ---- F6 and F7 at /0: TEST against an immediate
     Encoding::new(
@@ -576,11 +601,24 @@ fn vector(c: &mut Cpu, n: u8, segment: u16, offset: u16) {
 
 #[test]
 fn every_encoding_consumes_exactly_what_the_manual_says() {
-    assert!(
-        ENCODINGS.len() >= 50,
-        "the table must stay broad, it has {}",
-        ENCODINGS.len()
+    // Pinned exactly, not as a lower bound. A lower bound cannot notice rows
+    // being deleted; the whole point of the table is that it is the project's
+    // record of what exists, so a row removed from it must fail. The number
+    // below was itself written as a guess first and the gate caught it, which
+    // is the cheapest possible demonstration of why it is pinned rather than
+    // bounded.
+    assert_eq!(
+        ENCODINGS.len(),
+        55,
+        "a deleted row means the record is now wrong, and the gate must say so"
     );
+    // And every row must be findable by its label, or a failure names nothing.
+    for (i, encoding) in ENCODINGS.iter().enumerate() {
+        assert!(
+            !encoding.name.is_empty(),
+            "row {i} has no label to name it by in a failure"
+        );
+    }
     for encoding in ENCODINGS {
         let label = encoding.name;
         // The breakdown has to add up to the length, or a typo in the length
@@ -596,8 +634,9 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
         );
 
         let mut c = machine(encoding.code);
-        if encoding.ip == Ip::PushesReturn {
-            // INT and far CALL read their vector, so the table needs one.
+        if matches!(encoding.ip, Ip::PushesReturn(..)) {
+            // INT and far CALL read their vector, so the table needs one. The
+            // expected destination in each row is stated against it.
             let n = if encoding.code[0] == 0xCD {
                 encoding.code[1]
             } else {
@@ -642,7 +681,19 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
                 // immediate's width is what the stack movement just read off.
                 continue;
             }
-            Ip::PushesReturn => {
+            Ip::PushesReturn(expected_ip, expected_cs) => {
+                assert_eq!(
+                    info.next_ip, expected_ip,
+                    "{label}: it must land where its own bytes say, not merely \
+                     push a correct return address"
+                );
+                if let Some(expected) = expected_cs {
+                    assert_eq!(
+                        c.regs.segment(Seg::Cs),
+                        expected,
+                        "{label}: and into the segment its bytes name"
+                    );
+                }
                 // `IP` belongs to the handler now, so it says nothing about the
                 // length. The pushed return address does: it is the byte just
                 // past the instruction, and finding it on the stack is what
@@ -661,7 +712,13 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
                     info.at.wrapping_add(u16::from(encoding.length)),
                     "{label}: the pushed return address is the byte just past the instruction"
                 );
-                u16::from(encoding.length)
+                // There is deliberately no `consumed` value to assert against
+                // here. Returning the declared length would make the shared
+                // assertion below a tautology for these rows: it would compare
+                // the table with itself. The pushed address is the whole
+                // measurement, and it is what a decoder that read the wrong
+                // number of bytes gets wrong.
+                continue;
             }
         };
         assert_eq!(
