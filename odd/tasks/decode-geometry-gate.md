@@ -47,11 +47,13 @@ the_8086_defines_decodes` proves a byte is not a hole, and
 
 ## Tasks
 
-- **T1** — Length table and gate for every encoding that consumes an immediate
-  and no displacement: `04`–`3D`, `80`–`83` with MOD=00, `A0`–`A3`, `A8`/`A9`,
-  `B0`–`BF`, `C2`, `C6`/`C7` with MOD=00, `CD`, `D4`/`D5`, `E4`–`E7`, `E8`/`E9`,
-  `EA`, `EB`, `F6`/`F7` with MOD=00, `9A`. Route: inline. Mutant: one opcode
-  stops fetching its immediate.
+- **T1** — **DONE in `086c3bf`.** Length table and gate for every encoding that
+  consumes an immediate and no displacement: `04`–`3D`, `80`–`83` at MOD=00,
+  `A0`–`A3`, `A8`/`A9`, `B0`–`BF`, `C2`, `CB`, `C6`/`C7` at MOD=00, `CD`, `D4`/`D5`,
+  `E4`–`E7`, `E8`, `E9`, `EB`, `F6`/`F7` at MOD=00, `9A`. Fifty-six rows.
+  Mutants killed: `JMP short` reading a `disp16`, `TEST AX,i16` reading one
+  immediate byte, `RET i16` dropping its argument, `CALL near` reading a
+  `disp8`.
 - **T2** — The same gate extended to displacements: MOD=01 adds one byte and
   MOD=10 adds two, across every group that has a memory form. Route: inline.
   Mutant: MOD=10 fetches a `disp8`.
@@ -71,3 +73,30 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   other's opcodes, the 16-bit REG field naming five of eight registers wrongly,
   and one test that proved nothing until a mutation survived it. Four gates exist
   now; none of them would have caught the first, second or fourth.
+- **L2 (2026-10-15).** T1 landed in `086c3bf`, and the three ways an encoding's
+  length can be observed were not obvious in advance. A plain instruction leaves
+  `IP` past itself. A relative jump needs its displacement accounted for: the
+  first version exempted control transfers from the check, and a `JMP short`
+  reading a `disp16` **survived** that gate. `INT` and far `CALL` own `IP` — it
+  goes to the handler — so the length has to be read off the pushed return
+  address. `RET` pops its own return address, so `IP` is not its length either,
+  and the stack moves by the pops plus the immediate's value instead, which
+  measures the immediate from the other side. `EA` is excluded on purpose: a far
+  jump leaves no trace of how far it read, so no observation separates a
+  five-byte read from a six-byte one; its length is pinned by its `9A` sibling.
+
+- **L3 (2026-10-15).** Two of the four first mutants proved nothing because they
+  changed nothing — one was a comment, one was a string that did not match — and
+  a fifth failed to compile. Three attempts were needed to test the claim each was
+  meant to test. This is the third time this session that an inert mutant was
+  read as a surviving one, so the rule stands: **a mutant is evidence only once
+  you have seen it fail to compile or visibly change the behaviour under test.**
+  The check costs nothing, which is exactly why it is not optional.
+
+- **L4 (2026-10-15).** The table was written from `documentation-guide.md` §1.3
+  and agreed with the emulator on all fifty-six rows on its first run. That is
+  the expected result when both sides come from the same transcription, and it
+  is why the mutants matter more than the first green run: agreement here is not
+  evidence, it is two readings of one document. What the gate buys is that code
+  and document can no longer drift apart silently, and that the next change to
+  either has something to fail against.
