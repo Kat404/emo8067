@@ -149,16 +149,16 @@ Notation, from Table 4-11 and Table 4-19 [1]:
 | **30** | XOR r/m8,r8 | XOR r/m16,r16 | XOR r8,r/m8 | XOR r16,r/m16 | XOR AL,i8 | XOR AX,i16 | SEG SS: | AAA | CMP r/m8,r8 | CMP r/m16,r16 | CMP r8,r/m8 | CMP r16,r/m16 | CMP AL,i8 | CMP AX,i16 | SEG DS: | AAS |
 | **40** | INC AX | INC CX | INC DX | INC BX | INC SP | INC BP | INC SI | INC DI | DEC AX | DEC CX | DEC DX | DEC BX | DEC SP | DEC BP | DEC SI | DEC DI |
 | **50** | PUSH AX | PUSH CX | PUSH DX | PUSH BX | PUSH SP | PUSH BP | PUSH SI | PUSH DI | POP AX | POP CX | POP DX | POP BX | POP SP | POP BP | POP SI | POP DI |
-| **60** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| **60** | JO short ‡8 | JNO short | JB/JNAE short | JNB/JAE short | JE/JZ short | JNE/JNZ short | JBE/JNA short | JNBE/JA short | JS short | JNS short | JP/JPE short | JNP/JPO short | JL/JNGE short | JNL/JGE short | JLE/JNG short | JNLE/JG short |
 | **70** | JO short | JNO short | JB/JNAE short | JNB/JAE short | JE/JZ short | JNE/JNZ short | JBE/JNA short | JNBE/JA short | JS short | JNS short | JP/JPE short | JNP/JPO short | JL/JNGE short | JNL/JGE short | JLE/JNG short | JNLE/JG short |
-| **80** | Group 1 ‡2 | Group 1 | Group 1 ‡2 | Group 1 | TEST r/m8,r8 ‡3 | TEST r/m16,r16 ‡3 | XCHG r8,r/m8 | XCHG r16,r/m16 | MOV r/m8,r8 | MOV r/m16,r16 | MOV r8,r/m8 | MOV r16,r/m16 | MOV r16/m16,sreg | LEA r16,r/m16 | MOV sreg,r16/m16 | POP r16/m16 |
+| **80** | Group 1 ‡2 | Group 1 | Group 1 ‡2 | Group 1 | TEST r/m8,r8 ‡3 | TEST r/m16,r16 ‡3 | XCHG r8,r/m8 | XCHG r16,r/m16 | MOV r/m8,r8 | MOV r/m16,r16 | MOV r8,r/m8 | MOV r16,r/m16 | MOV r16/m16,sreg | LEA r16,r/m16 | MOV sreg,r16/m16 | POP r16/m16 ‡8 |
 | **90** | XCHG AX,AX | XCHG AX,CX | XCHG AX,DX | XCHG AX,BX | XCHG AX,SP | XCHG AX,BP | XCHG AX,SI | XCHG AX,DI | CBW | CWD | CALL far | WAIT | PUSHF | POPF | SAHF | LAHF |
 | **A0** | MOV AL,m8 | MOV AX,m16 | MOV m8,AL | MOV m16,AX ‡4 | MOVS b | MOVS w | CMPS b | CMPS w | CMP AL,i8 ‡5 | CMP AX,i16 ‡5 | STOS b | STOS w | LODS b | LODS w | SCAS b | SCAS w |
 | **B0** | MOV AL,i8 | MOV CL,i8 | MOV DL,i8 | MOV BL,i8 | MOV AH,i8 | MOV CH,i8 | MOV DH,i8 | MOV BH,i8 | MOV AX,i16 | MOV CX,i16 | MOV DX,i16 | MOV BX,i16 | MOV SP,i16 | MOV BP,i16 | MOV SI,i16 | MOV DI,i16 |
-| **C0** | — | — | RET i16 (intra) | RET (intra) | LES r16,r/m16 | LDS r16,r/m16 | MOV m8,i8 | MOV m16,i16 | — | — | RET i16 (inter) | RET (inter) | INT 3 | INT i8 | INTO | IRET |
-| **D0** | Shift ‡6 | Shift | Shift | Shift | — | AAM i8 | AAD i8 | XLAT | ESC 0 | ESC 1 | ESC 2 | ESC 3 | ESC 4 | ESC 5 | ESC 6 | ESC 7 |
+| **C0** | RET i16 (intra) ‡8 | RET (intra) ‡8 | RET i16 (intra) | RET (intra) | LES r16,r/m16 | LDS r16,r/m16 | MOV m8,i8 | MOV m16,i16 | RET i16 (inter) ‡8 | RET (inter) ‡8 | RET i16 (inter) | RET (inter) | INT 3 | INT i8 | INTO | IRET |
+| **D0** | Shift ‡6 | Shift | Shift | Shift | AAM i8 | AAD i8 | SALC ‡8 | XLAT | ESC 0 | ESC 1 | ESC 2 | ESC 3 | ESC 4 | ESC 5 | ESC 6 | ESC 7 |
 | **E0** | LOOPNE/LOOPNZ short | LOOPE/LOOPZ short | LOOP short | JCXZ short | IN AL,i8 | IN AX,i8 | OUT i8,AL | OUT i8,AX | CALL near | JMP near | JMP far | JMP short (intra) | IN AL,DX | IN AX,DX | OUT DX,AL | OUT DX,AX |
-| **F0** | LOCK | — | REPNE/REPNZ | REP/REPE/REPZ | HLT | CMC | Group 1 | Group 1 | CLC | STC | CLI | STI | CLD | STD | Group 2 ‡7 | Group 2 ‡7 |
+| **F0** | LOCK | LOCK ‡8 | REPNE/REPNZ | REP/REPE/REPZ | HLT | CMC | Group 1 | Group 1 | CLC | STC | CLI | STI | CLD | STD | Group 2 ‡7 | Group 2 ‡7 |
 
 **Group 1 — `80`/`81`/`82`/`83` against an immediate, and `F6`/`F7`** [1] —
 **verified** (Table 4-13, PDF pp. 269–270 / printed 4-30–4-31 and PDF p. 273 /
@@ -167,18 +167,20 @@ printed 4-34):
 | REG | `80` byte, `i8` | `81` word, `i16` | `82` byte, `i8` | `83` word, `i8:sx` | `F6` byte | `F7` word |
 |---|---|---|---|---|---|---|
 | `000` | ADD r/m8,i8 | ADD r/m16,i16 | ADD r/m8,i8 | ADD r/m16,i8:sx | TEST r/m8,i8 | TEST r/m16,i16 |
-| `001` | — | — | — | — | — | — |
+| `001` | OR r/m8,i8 | OR r/m16,i16 | OR r/m8,i8 ‡8 | OR r/m16,i8:sx ‡8 | TEST r/m8,i8 ‡8 | TEST r/m16,i16 ‡8 |
 | `010` | ADC r/m8,i8 | ADC r/m16,i16 | ADC r/m8,i8 | ADC r/m16,i8:sx | NOT r/m8 | NOT r/m16 |
 | `011` | SBB r/m8,i8 | SBB r/m16,i16 | SBB r/m8,i8 | SBB r/m16,i8:sx | NEG r/m8 | NEG r/m16 |
-| `100` | AND r/m8,i8 | AND r/m16,i16 | — | — | MUL r/m8 | MUL r/m16 |
+| `100` | AND r/m8,i8 | AND r/m16,i16 | AND r/m8,i8 ‡8 | AND r/m16,i8:sx ‡8 | MUL r/m8 | MUL r/m16 |
 | `101` | SUB r/m8,i8 | SUB r/m16,i16 | SUB r/m8,i8 | SUB r/m16,i8:sx | IMUL r/m8 | IMUL r/m16 |
-| `110` | XOR r/m8,i8 | XOR r/m16,i16 | — | — | DIV r/m8 | DIV r/m16 |
+| `110` | XOR r/m8,i8 | XOR r/m16,i16 | XOR r/m8,i8 ‡8 | XOR r/m16,i8:sx ‡8 | DIV r/m8 | DIV r/m16 |
 | `111` | CMP r/m8,i8 | CMP r/m16,i16 | CMP r/m8,i8 | CMP r/m16,i8:sx | IDIV r/m8 | IDIV r/m16 |
 
 `83` takes `DATA-SX`, an 8-bit immediate sign-extended to 16 bits (`data if s,
 w=1`, Table 4-12, PDF p. 261 / printed 4-22); there is no 8-bit `83` form. `82`
-is defined on the 8086 and carries the same digit table as `80` except that
-`/1`, `/4` and `/6` print `(not used)` [1].
+carries the same digit table as `80` on the 8086, and `83` carries the same
+table as `81` — including the three logical operations that Table 4-13 blanks
+for both. See footnotes ‡2 and ‡8 for why, and for what the 1979 printing says
+instead.
 
 **Shift — `D0`/`D1`/`D2`/`D3`** [1] — **verified** (Table 4-13, PDF p. 272 /
 printed 4-33):
@@ -191,7 +193,7 @@ printed 4-33):
 | `011` | RCR r/m8,1 | RCR r/m16,1 | RCR r/m8,CL | RCR r/m16,CL |
 | `100` | SHL/SAL r/m8,1 | SHL/SAL r/m16,1 | SHL/SAL r/m8,CL | SHL/SAL r/m16,CL |
 | `101` | SHR r/m8,1 | SHR r/m16,1 | SHR r/m8,CL | SHR r/m16,CL |
-| `110` | — | — | — | — |
+| `110` | SETMO r/m8 ‡8 | SETMO r/m16 ‡8 | SETMO r/m8 ‡8 | SETMO r/m16 ‡8 |
 | `111` | SAR r/m8,1 | SAR r/m16,1 | SAR r/m8,CL | SAR r/m16,CL |
 
 **Group 2 — `FE`/`FF`** [1] — **verified** (Table 4-13, PDF p. 273 / printed
@@ -202,12 +204,12 @@ are register forms [1]:
 |---|---|---|
 | `000` | INC r/m8 | INC MEM16 |
 | `001` | DEC r/m8 | DEC MEM16 |
-| `010` | — | CALL r16/m16 (intra) |
-| `011` | — | CALL m16 (inter) |
-| `100` | — | JMP r16/m16 (intra) |
-| `101` | — | JMP m16 (inter) |
-| `110` | — | PUSH m16 |
-| `111` | — | — |
+| `010` | CALL rm, byte bus ‡8 | CALL r16/m16 (intra) |
+| `011` | CALL rm, byte bus ‡8 | CALL m16 (inter) |
+| `100` | JMP rm, byte bus ‡8 | JMP r16/m16 (intra) |
+| `101` | JMP rm, byte bus ‡8 | JMP m16 (inter) |
+| `110` | PUSH r/m8 ‡8 | PUSH m16 |
+| `111` | PUSH r/m8 ‡8 | PUSH r/m16 ‡8 |
 
 Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
 [1]:
@@ -223,18 +225,23 @@ Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
   **intra**-segment jump. The 8086 has no short inter-segment jump, so `EC` and
   `ED` are `IN AL,DX` and `IN AX,DX`, not the 80186 near-jump forms.
 - **`D4` is `AAM` and `D5` is `AAD`**, each carrying a `00001010` immediate
-  byte. **`D6` is `(not used)`** and **`D7` is `XLAT`**; the ESC range is `D8`
-  to `DF`, so `ESC 0` is `D8` and `ESC 7` is `DF`, not `D6` to `DD`.
-- **`F2` is `REPNE`/`REPNZ`** and **`F3` is `REP`/`REPE`/`REPZ`. `F1` is
-  `(not used)` and `F4` is `HLT`** — `F4` is not an undefined slot.
-- **`84`/`85` are `TEST r/m8,r8` and `TEST r/m16,r16`** in this manual; see
-  footnote ‡3. **`C0`/`C1` are `(not used)`** — they are not shift-by-immediate
-  on the 8086.
+  byte. **`D6` is `SALC`**, `AL` taking the carry; the 8086 implements it and
+  Table 4-13 prints it as `(not used)` — see footnote ‡8. `D7` is `XLAT`, and
+  the ESC range is `D8` to `DF`, so `ESC 0` is `D8` and `ESC 7` is `DF`.
+- **`F2` is `REPNE`/`REPNZ`** and **`F3` is `REP`/`REPE`/`REPZ`. `F1` is a
+  second `LOCK`** and `F4` is `HLT` — neither is an undefined slot. See
+  footnote ‡8.
+- **`84`/`85` are `TEST r/m8,r8` and `TEST r/m16,r16`**, and they are real 8086
+  instructions; footnote ‡3 records the evidence and withdraws the earlier
+  do-not-implement note. **`C0`/`C1` are `RET imm16` and `RET`**, not shifts by
+  immediate; see footnote ‡8.
 - **`8C` and `8E` accept `MOD=000` only**; `8C MOD 1--` and `8E MOD 1--` print
-  `(not used)`. `8F` likewise takes `MOD 000` only, and `8F MOD 001` through
-  `8F MOD 111` are all `(not used)`.
-- **`60`–`6F` are all `(not used)`**, and `C8`/`C9` are `(not used)` — the 8086
-  has no `ENTER`/`LEAVE`.
+  `(not used)`. `8F` takes `MOD 000`, `MOD 001` and `MOD 010` with `REG=000`,
+  decoding the R/M field like any other memory operand; `MOD 011` is not defined
+  for `8F`, and neither is any non-zero `/digit`.
+- **`60`–`6F` are the conditional jumps `70`–`7F`**, with the condition taken
+  from the low four bits, and **`C8`/`C9` are `RETF imm16` and `RETF`**; see
+  footnote ‡8.
 - The reference implementation's own diagnostic for an undefined opcode is
   `"no such opcode in 8086 instruction set"` [19]. For a disassembler the
   `D8`–`DF` range is an 8087/8088 ESC index rather than an illegal opcode [1];
@@ -243,23 +250,42 @@ Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
 
 **Discrepancies found while transcribing.** Every cell carrying a footnote is a
 place where Table 4-13 does not agree with the implementation or with the
-standing instruction for this section. None of them is settled by this manual;
-they are recorded rather than silently reconciled.
+standing instruction for this section. The manual does not settle any of them,
+so they are recorded rather than silently reconciled — but three are now
+settled by evidence *outside* the manual: `82` by the `L8` micro-condition
+(‡2), `84`/`85` by the microcode routine list (‡3) and `A8`/`A9` by this
+project's recorded decision to follow silicon (‡5). Footnote ‡8 collects the
+cells where the 1979 print is simply wrong about the chip.
 
 - **‡1 `0F`.** Table 4-13, PDF p. 267 / printed 4-28 prints `0F` as `(not used)`.
   The cell records `POP CS`, which is what `crates/core/src/exec.rs` executes
   (`segment_push_pop`, `exec.rs:857`). **Unresolved from this source; do not
   change the decoder on the strength of the printed `(not used)`.**
-- **‡2 `82`.** Table 4-13 defines `82` for `/0`, `/2`, `/3`, `/5` and `/7` and
-  prints `(not used)` for `/1`, `/4`, `/6`. Later Intel documentation describes
-  `82` as an alias of `80` on the 8086 and as invalid afterwards. Transcribed as
-  the manual prints it.
+- **‡2 `82`.** Table 4-13, PDF p. 269 / printed 4-30 defines `82` for `/0`,
+  `/2`, `/3`, `/5` and `/7` and prints `(not used)` for `/1`, `/4` and `/6`
+  (re-read from the scan to confirm the three blanks). **Settled in favour of
+  the hardware.** The `L8` micro-condition that chooses byte against word
+  reads bits 0 *and* 1 of the instruction, so only `81` comes out 16-bit and
+  `82` is byte-immediate against a byte operand exactly like `80`; the three
+  digits the table blanks run as `OR`, `AND` and `XOR`, and the cells above now
+  say so [26]. The same reading explains the Intel documentation that omits
+  `82` entirely as redundant and omits the logical operations on `83` as
+  sign-extending [26]. The two forms that are 16-bit are `81` (word immediate)
+  and `83` (byte immediate sign-extended to a word register), so `83 /1`, `/4`
+  and `/6` are `OR`, `AND` and `XOR` on a word with a sign-extended immediate,
+  not `(not used)`.
 - **‡3 `84`/`85`.** Table 4-13, PDF p. 270 / printed 4-31 defines both as
-  `TEST REG8/MEM8,REG8` and `TEST REG16/MEM16,REG16`. The standing instruction
-  for this section is that `84`/`85` are 80186 extensions absent from the 8086.
-  The two disagree and the manual's table is the only evidence available here,
-  so the cells record the manual and the disagreement is flagged. **These two
-  cells must not be implemented until the conflict is settled.**
+  `TEST REG8/MEM8,REG8` and `TEST REG16/MEM16,REG16`, and the 8086 runs them.
+  **Settled: both are real 8086 instructions and are implemented.** The earlier
+  claim that they are 80186 extensions is withdrawn. Two independent checks
+  agree with the table. Jenner's microcode disassembly counts the top-level
+  `TEST rm,r` routine as handling **two** opcodes, with the columns defined as
+  "number of opcodes handled, size of top-level microcode routine" — which is
+  exactly a byte and a word form, and which a one-opcode routine could not be
+  [28]. Shirriff's enumeration of the 8086's opcode holes does not name `84`
+  or `85`, and names `80`–`87` as a single byte/word-selected decode family
+  [26]. Both sources are secondary with respect to the manual but neither
+  contradicts it, and the microcode is the stronger evidence of the two.
 - **‡4 `A3`.** Table 4-13, PDF p. 271 / printed 4-32 prints `A3` as
   `MOV MEM16,AL`, which cannot be a 16-bit move. Table 4-12, PDF p. 261 /
   printed 4-22 gives "Accumulator to memory" as `1010001w`, i.e. `A2` is
@@ -274,15 +300,53 @@ they are recorded rather than silently reconciled.
   `cmp_accumulator` for both (`exec.rs:259`–`exec.rs:260`). The cells record
   `CMP` because the two differ in exactly the flags they write — `TEST` clears
   CF and OF and leaves AF undefined, `CMP` sets all six — so a cell reading
-  `TEST` here would silently corrupt memory. **The manual print is recorded
-  rather than followed; this is a known 1979 erratum, not a transcription slip.**
+  `TEST` here would silently corrupt memory. **Settled.** The manual print is
+  recorded rather than followed: this project implements silicon and files the
+  1979 print as a known erratum (decision of 2026-10-15, `odd/tasks/emu8067-foss.md`
+  S1 decision 1 and log entry L15 [21]). *Not independently confirmed in this
+  pass:* no Intel errata sheet for this printing was reachable, so "silicon
+  executes `CMP`" rests on the project's recorded decision rather than on a
+  fetched primary document. Re-verify if an erratum listing becomes reachable.
 - **‡6 `D0`–`D3`.** Table 4-14 labels these four cells `Shift` and Table 4-13
   expands them into the `/digit` table above. The manual assigns this set no
   group number, so it is named `Shift` here rather than folded into "Group 2",
-  which the manual reserves for `FE`/`FF` (Table 4-14's key).
+  which the manual reserves for `FE`/`FF` (Table 4-14's key). `D0`–`D3` with
+  `REG=110` print `(not used)`, but they run `SETMO`; see ‡8.
 - **‡7 `FE`/`FF`.** Table 4-13 prints `MEM16` for `FF /0` and `FF /1` although
   the R/M field with `MOD=11` selects a register. The digit table follows the
-  manual; the register reading is noted above.
+  manual; the register reading is noted above. The `FE /6` and `FE /7` cells
+  and the `FF /7` cell print `(not used)` and run `PUSH`, and `FE /2`–`/5`
+  reach the `CALL` and `JMP` microcode on an 8-bit bus; see ‡8.
+
+- **‡8. Cells the 1979 print gets wrong about the chip.** Each of these prints
+  `(not used)` or an empty `—` in Table 4-13 and the 8086 runs it. The evidence
+  is the microcode and the Group Decode ROM, not a second reading of the table,
+  so each entry names the listing or bit pattern it rests on.
+
+  | Cell | What the 8086 runs | Evidence |
+  |---|---|---|
+  | `60`–`6F` | the conditional jumps `70`–`7F`, condition from the low four bits | the same microcode runs for the bit pattern `011?????`, i.e. anything from `60` to `7F` [26] |
+  | `C0` | `RET imm16` (intra), same as `C2` | microcode matched on instruction bits `1100?0?0`, executed for `C0`, `C2`, `C8` and `CA`; `FARRET` reads bit 3 to choose near or far [26] |
+  | `C1` | `RET` (intra), same as `C3` | microcode matched on instruction bits `110000?1`, i.e. `C1` and `C3` [26] |
+  | `C8` | `RETF imm16` (inter), same as `CA` | the same `1100?0?0` microcode as `C0`/`C2`; bit 3 clear gives a far return [26] |
+  | `C9` | `RETF` (inter), same as `CB` | microcode matched on instruction bits `110010?1`, i.e. `C9` and `CB`; both have bit 3 set, so both return far [26] |
+  | `D6` | `SALC`: `AL` is `FFh` when `CF` is set and `00h` otherwise, and no flag is written | three micro-instructions, `JMPS CY 2` / `ZERO→AL` / `RNI`, with no flag action [26] |
+  | `F1` | a second `LOCK` | implemented in logic, not microcode; the Group Decode ROM reports `F1` as a one-byte prefix and `LOCK`, with the same outputs as `F0` [26] |
+  | `D0`–`D3 /6` | `SETMO`: the destination becomes `FFh` or `FFFFh` for the operation's width | `REG=110` selects the ALU's `SETMO` operation, and the shift microcode matched on `1101000?` stores its result like any other shift [26] |
+  | `F6 /1`, `F7 /1` | `TEST r/m8,i8`, `TEST r/m16,i16` | the microcode matched on instruction bits `1111000?` is byte and word `TEST rm,i`; bits 5-3 of the second byte replace bits 2-0, so `/1` is processed as `/0` [26] |
+  | `FE /6` | `PUSH r/m8`, writing one byte and decrementing `SP` by two | `REG=110` runs the `PUSH rm` microcode [26] |
+  | `FE /7` | `PUSH r/m8`, identical to `FE /6` | `REG=111` has bits 5-3 replace bits 2-0, so it becomes the `/6` encoding [26] |
+  | `FF /7` | `PUSH r/m16` | the same substitution on the word form [26] |
+  | `FE /2`–`/5` | the `CALL` and `JMP` microcode, reached on an 8-bit bus | `FE /2` falls into `NEARCALL`, `FE /3` into `FARCALL`, `FE /4` and `FE /5` into the intra- and inter-segment `JMP` microcode. Each reads a word through a byte-wide path and pushes only one byte of the return address, so the result is malformed rather than a defined instruction [26] |
+  | `8F` | `POP r/m16` with `MOD=000`, `001` and `010`, `REG=000`; `MOD=011` undefined | Jenner's top-level `POP rmw` routine is one routine handling one opcode, with ordinary ModR/M decoding and no `MOD` test [28]; Table 4-13 prints no `MOD` restriction for `8F` |
+
+  Two of these bear on `step`'s prefix loop rather than on an opcode. The Group
+  Decode ROM sets the `REP` latch from column 31 and loads the segment latches
+  from column 32, so a repeat prefix and a segment override are independent
+  latches and neither can change the other [27]. And the internal `F1` that the
+  multiply and divide microcode reuse as a sign flag is toggled inside that
+  instruction's own `PREIMUL`/`NEGATE` subroutines [29] — no prefix writes it,
+  and the manual states that the repeat prefixes do not affect the flags [1].
 
 ### 1.4 Exact flag effects
 
@@ -1102,6 +1166,32 @@ reference and `vasm` as a TUI reference. Neither is a dependency candidate.
     <https://www.cs.cmu.edu/~ralf/interrupt-list/inter61d.zip> — the served
     archive contained only `INTERRUP.O/P/Q/R`; the `INT 10`/`16`/`21` sections
     were absent, which is why open question 1 is open.
+26. Ken Shirriff, "Undocumented 8086 instructions, explained by the microcode",
+    righto.com, July 2023.
+    <http://www.righto.com/2023/07/undocumented-8086-instructions.html> — the
+    `60`-`6F` alias for `70`-`7F` and the `011?????` pattern; `C0`/`C1`/`C8`/
+    `C9` with their `1100?0?0`, `110000?1` and `110010?1` patterns; `D6` `SALC`
+    and its three micro-instructions; `F1` as a second `LOCK`; `F6`/`F7 /1` as
+    `TEST rm,i`; `D0`-`D3 /6` as `SETMO`; the `FE` holes through `FE /7`; and
+    the `82`/`83` `L8` condition. Secondary source, but the microcode listings
+    it transcribes are primary for §1.3 footnotes ‡2, ‡3 and ‡8.
+27. Ken Shirriff, "The 8086 processor's group decode ROM", righto.com, May 2023.
+    <http://www.righto.com/2023/05/8086-processor-group-decode-rom.html> — Group
+    Decode column 31 sets the `REP` and `REPZ/NZ` latches, column 32 *loads* the
+    segment latches and column 33 sets `LOCK`: three independent columns, so
+    prefix order cannot matter.
+28. Andrew Jenner, "8086 microcode disassembled", reenigne.org.
+    <https://www.reenigne.org/blog/8086-microcode-disassembled/> — the
+    per-routine table whose columns are "number of opcodes handled, size of
+    top-level microcode routine". `TEST rm,r` handles two opcodes and `POP rmw`
+    handles one. Secondary transcription of the die; used in §1.3 footnotes ‡3
+    and ‡8.
+29. Ken Shirriff, "8086 multiplication microcode", righto.com, March 2023.
+    <http://www.righto.com/2023/03/8086-multiplication-microcode.html> — `F1`
+    is an internal flag toggled by `PREIMUL` and `NEGATE` to track the sign of
+    an operand, and read once by `CALL F1 NEGATE` after `CORX`. No prefix sets
+    it. Cited in §1.3 footnote ‡8 to close the question of whether a repeat
+    prefix reaches the multiply and divide microcode.
 
 **Sources consulted and rejected.** `https://wiki.osdev.org/8086` and
 `https://www.osdev.org/wiki/8086` — HTTP 403 on every fetch method (open
