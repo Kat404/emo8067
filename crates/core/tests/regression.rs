@@ -2073,3 +2073,85 @@ fn pop_rm16_still_refuses_the_register_and_non_zero_digits() {
         assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
     }
 }
+
+/// AUDIT-5. Prefix bytes used to be consumed by each prefix arm re-entering
+/// the dispatcher, which cost one host stack frame per byte. About 1,500
+/// consecutive `LOCK` bytes exhausted the stack, and `panic = "abort"` makes
+/// that unrecoverable. Prefixes are now consumed by a loop in `step`, so the
+/// depth of a run costs nothing.
+#[test]
+fn a_long_run_of_prefixes_does_not_exhaust_the_host_stack() {
+    // Four thousand is nearly three times the old ceiling.
+    let run = 4_000u16;
+    let mut image = vec![0xF0u8; run as usize]; // LOCK
+    image.push(0x90); // XCHG AX,AX, the instruction every LOCK covers
+    let mut c = cpu(&image);
+    c.regs.set_word(Reg16::Ax, 0x1234);
+
+    // One step retires the whole run plus the instruction it covers.
+    let info = c.step().expect("a run of prefixes must not fault");
+    assert_eq!(
+        info.next_ip,
+        run + 1,
+        "past every prefix and its instruction"
+    );
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1234,
+        "NOP covered by LOCK is a NOP"
+    );
+}
+
+/// The same must hold for segment override prefixes, which previously cost
+/// two nested frames per byte.
+#[test]
+fn a_long_run_of_segment_overrides_also_stays_flat() {
+    let run = 4_000u16;
+    let mut image = vec![0x26u8; run as usize]; // ES override
+    image.extend_from_slice(&[0x8A, 0x06, 0x40, 0x00]); // MOV AL, ES:[0040h]
+    let mut c = cpu(&image);
+    c.regs.set_segment(Seg::Es, 0x3000);
+    c.mem.write_u8(0x3000, 0x0040, 0x5A);
+
+    let info = c.step().expect("a run of overrides must not fault");
+    assert_eq!(
+        info.next_ip,
+        run + 4,
+        "past every prefix and its instruction"
+    );
+    assert_eq!(c.regs.byte(Reg8::Al), 0x5A);
+}
+
+/// A prefix run and its instruction retire as one step, so `StepInfo` reports
+/// the covered opcode rather than the first prefix byte.
+#[test]
+fn a_prefixed_step_reports_the_covered_opcode() {
+    let mut c = cpu(&[0xF0, 0x3E, 0x90]);
+    let info = c.step().unwrap();
+    assert_eq!(info.at, 0, "the run starts here");
+    assert_eq!(info.opcode, 0x90, "the covered opcode, not the prefix");
+    assert_eq!(info.next_ip, 3);
+}
+
+/// Two segment overrides in a row: the later one replaces the earlier rather
+/// than composing, and the override does not outlive the instruction.
+#[test]
+fn a_later_override_replaces_an_earlier_one_and_clears_afterwards() {
+    let mut c = cpu(&[0x26, 0x36, 0x8A, 0x06, 0x40, 0x00]);
+    c.regs.set_segment(Seg::Es, 0x3000);
+    c.regs.set_segment(Seg::Ss, 0x4000);
+    c.mem.write_u8(0x3000, 0x0040, 0x11);
+    c.mem.write_u8(0x4000, 0x0040, 0x22);
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x22, "the later prefix wins");
+
+    // The next instruction reads through DS again.
+    let mut c = cpu(&[0x36, 0x8A, 0x06, 0x40, 0x00, 0x8A, 0x06, 0x40, 0x00]);
+    c.regs.set_segment(Seg::Ss, 0x4000);
+    c.regs.set_segment(Seg::Ds, 0x3000);
+    c.mem.write_u8(0x4000, 0x0040, 0x22);
+    c.mem.write_u8(0x3000, 0x0040, 0x11);
+    c.step().unwrap();
+    c.step().unwrap();
+    assert_eq!(c.regs.byte(Reg8::Al), 0x11, "the override did not leak");
+}

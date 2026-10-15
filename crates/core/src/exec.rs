@@ -16,6 +16,10 @@ pub enum ExecError {
     BadPrefix(u8),
     /// A segment-register transfer opcode reached the ALU dispatcher.
     SegmentTransfer(u8),
+    /// A prefix byte reached the dispatcher instead of being consumed by
+    /// [`step`]. Unreachable by construction; listed so the match stays
+    /// exhaustive over all 256 byte values.
+    PrefixNotConsumed(u8),
     /// An `FF` /digit this build does not implement yet.
     UnsupportedFFGroup(u8),
     /// A `REP` or `REPNE` prefix that is not followed by a string operation.
@@ -246,14 +250,52 @@ fn sub_overflow(a: u16, b: u16, result: u16, bits: u8) -> bool {
 /// Execute one instruction.
 pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     let at = cpu.regs.ip;
-    let opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
-    dispatch(cpu, opcode)?;
+    let mut opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
+
+    // A run of prefixes is consumed here, in a loop, rather than by each
+    // prefix arm re-entering the dispatcher. Re-entering cost one host stack
+    // frame per prefix byte, and roughly 1,500 consecutive LOCK bytes was
+    // enough to exhaust the host stack, unrecoverably under `panic = "abort"`.
+    // Nothing here recurses, so the depth of a prefix run costs nothing.
+    //
+    // `LOCK` is accepted on any byte it covers, matching the hardware: the
+    // 8086 drives LOCK# and has no invalid-opcode trap to object. A later
+    // segment override simply replaces an earlier one rather than composing.
+    let mut lock = false;
+    while let Some(next) = prefix_effect(opcode) {
+        if let Some(seg) = next {
+            cpu.seg_override = Some(seg);
+        }
+        lock = true;
+        opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
+    }
+    let _ = lock;
+
+    let result = dispatch(cpu, opcode);
+    // Cleared even on a fault, so a pending override cannot leak into the
+    // next instruction.
+    cpu.seg_override = None;
+    result?;
 
     Ok(crate::StepInfo {
         at,
         opcode,
         next_ip: cpu.regs.ip,
     })
+}
+
+/// What a prefix byte contributes: `Some(None)` for LOCK, which carries no
+/// value into the instruction it covers, and `Some(Some(seg))` for a segment
+/// override. `None` means the byte is not a prefix.
+fn prefix_effect(opcode: u8) -> Option<Option<Seg>> {
+    match opcode {
+        0xF0 | 0xF1 => Some(None),
+        0x26 => Some(Some(Seg::Es)),
+        0x2E => Some(Some(Seg::Cs)),
+        0x36 => Some(Some(Seg::Ss)),
+        0x3E => Some(Some(Seg::Ds)),
+        _ => None,
+    }
 }
 
 /// Run one instruction whose opcode byte has already been fetched.
@@ -270,6 +312,13 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
 /// `every_first_opcode_byte_the_8086_defines_decodes`.
 fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     match opcode {
+        // A prefix that reached the dispatcher without `step` consuming it.
+        // Unreachable by construction, and listed rather than swallowed by a
+        // catch-all, because the exhaustive match is what turns a future
+        // hole into a compile error.
+        0x26 | 0x2E | 0x36 | 0x3E | 0xF0 | 0xF1 => {
+            return Err(ExecError::PrefixNotConsumed(opcode));
+        }
         // ---- 0x00..0x3F: the eight arithmetic/logic groups, each in four encodings
         // The BCD adjustments sit inside 0x00..=0x3F, so they must be
         // matched before the arithmetic groups or they are never reached.
@@ -279,7 +328,6 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // The four segment override prefixes sit in the same quarter of the
         // table as `DAA`, `AAA` and the ALU groups, so they are matched ahead
         // of them. Nothing else in `00..=3F` may be allowed to see these bytes.
-        0x26 | 0x2E | 0x36 | 0x3E => segment_override(cpu, opcode)?,
         0x27 => daa(cpu, true),
         0x2F => daa(cpu, false),
         0x37 => aaa(cpu, true),
@@ -329,7 +377,6 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0xCF => iret(cpu),
         0x9A => call_far_immediate(cpu),
         0xEA => jmp_far_immediate(cpu),
-        0xF0 | 0xF1 => lock(cpu)?,
         0xFF => ff_group(cpu, opcode)?,
         // ---- string operations, ports and segment transfers
         0xA4..=0xA7 | 0xAA..=0xAF => string_op(cpu, opcode)?,
@@ -1486,11 +1533,7 @@ fn jmp_far_immediate(cpu: &mut crate::Cpu) {
 /// than microcode, and the Group Decode ROM gives it the same outputs as
 /// `F0`. LOCK changes no arithmetic on an 8086 and the manual defines no
 /// timing for it, so the instruction it covers runs as it would alone.
-fn lock(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
-    let covered = fetch_u8(&cpu.mem, &mut cpu.regs);
-    dispatch(cpu, covered)
-}
-
+///
 /// `26`, `2E`, `36` and `3E` are the segment override prefixes: `26` names ES,
 /// `2E` CS, `36` SS and `3E` DS. Each one changes the segment the *next*
 /// instruction's memory operand addresses through, and nothing else about it.
@@ -1502,19 +1545,7 @@ fn lock(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
 /// one prefix binds to one instruction and never leaks into the one after it.
 /// Two prefixes in front of the same instruction therefore leave the *later*
 /// one in force rather than composing the two.
-fn segment_override(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
-    cpu.seg_override = Some(match opcode {
-        0x26 => Seg::Es,
-        0x2E => Seg::Cs,
-        0x36 => Seg::Ss,
-        _ => Seg::Ds,
-    });
-    let covered = fetch_u8(&cpu.mem, &mut cpu.regs);
-    let result = dispatch(cpu, covered);
-    cpu.seg_override = None;
-    result
-}
-
+///
 /// The segment a memory operand addresses through: the pending override if a
 /// prefix byte named one, otherwise `DS`.
 ///
