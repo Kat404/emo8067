@@ -118,139 +118,309 @@ Table 2-21 [1] (for example `MOV r/m16, i16` = 3–6 bytes, `MOV r/m8, i8` =
 
 ### 1.3 Full 256-opcode map
 
-Transcribed from Table 4-14, Machine Instruction Encoding Matrix [1]
-(PDF pp. 274–275). `b.t.r/m` = byte, "to register"; `b.t.r/m` with source in
-REG = byte, "from register"; `w.` = word; `b.ia` / `w.ia` = immediate to
-accumulator; `b.i` / `w.i` = immediate to register; `b.r/m` = register to
-memory; `m-AL` = memory to accumulator; `i-AL` = immediate to AL; `b.v` =
-variable shift, byte; `d` = direct; `i.d` = intersegment direct; `si.d` = short
-intersegment. All rows **verified**.
+Transcribed from **Table 4-13, Machine Instruction Decoding Guide** [1] (PDF pp.
+266–274 / printed 4-27 to 4-35), which gives the ASM-86 instruction format for
+every first byte in order, and cross-checked against **Table 4-12, 8086
+Instruction Encoding** [1] (PDF pp. 261–265 / printed 4-22 to 4-26) and **Table
+4-14, Machine Instruction Encoding Matrix** [1] (PDF pp. 275–276 / printed 4-36
+to 4-37). One row per opcode `0x00`–`0xFF`; every row has exactly **sixteen**
+cells. `odd/research/verify_opcodes.py` enforces that count and exits non-zero on
+a short row, because one missing cell shifts every later opcode by one and
+silently corrupts the decoder.
+
+Notation, from Table 4-11 and Table 4-19 [1]:
+
+| Token | Meaning (manual identifier) |
+|---|---|
+| `r8` / `r16` | `REG8` / `REG16` — the REG field only, so `AH`/`CH`/`DH`/`BH` are reachable only through `r8` |
+| `r/m8` / `r/m16` | `MEM8` / `MEM16` — the R/M field, so register **or** memory depending on MOD |
+| `m8` / `m16` | memory reached through `ADDR-LO`/`ADDR-HI`, a direct address; no EA is calculated |
+| `i8` / `i16` | `IMMED8` / `IMMED16`; `i8:sx` is `DATA-SX`, an 8-bit immediate auto sign-extended to 16 bits |
+| `sreg` | `SEGREG`, selected by `SR` = `00` ES, `01` CS, `10` SS, `11` DS |
+| `short` | `SHORT-LABEL`, within ±127 bytes of the end of the instruction |
+| `near` / `far` | `NEAR-LABEL`/`NEAR-PROC` (current code segment) / `FAR-LABEL`/`FAR-PROC` (another segment) |
+| `—` | the 8086 does not define this encoding; Table 4-13 prints `(not used)` |
 
 | | +0 | +1 | +2 | +3 | +4 | +5 | +6 | +7 | +8 | +9 | +A | +B | +C | +D | +E | +F |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **00** | ADD b.t,r/m | ADD w.t,r/m | ADD b.t,r/m | ADD w.t,r/m | ADD b,ia | ADD w,ia | PUSH ES | POP ES | OR b.t,r/m | OR w.t,r/m | OR b.t,r/m | OR w.t,r/m | OR b,i | OR w,i | **PUSH CS** | — |
-| **10** | ADC b.t,r/m | ADC w.t,r/m | ADC b.t,r/m | ADC w.t,r/m | ADC b,i | ADC w,i | PUSH SS | POP SS | SBB b.t,r/m | SBB w.t,r/m | SBB b.t,r/m | SBB w.t,r/m | SBB b,i | SBB w,i | **PUSH DS** | POP DS |
-| **20** | AND b.t,r/m | AND w.t,r/m | AND b.t,r/m | AND w.t,r/m | AND b,i | AND w,i | **SEG ES** | **DAA** | SUB b.t,r/m | SUB w.t,r/m | SUB b.t,r/m | SUB w.t,r/m | SUB b,i | SUB w,i | **SEG CS** | **DAS** |
-| **30** | XOR b.t,r/m | XOR w.t,r/m | XOR b.t,r/m | XOR w.t,r/m | XOR b,i | XOR w,i | **SEG SS** | **AAA** | CMP b.t,r/m | CMP w.t,r/m | CMP b.t,r/m | CMP w.t,r/m | CMP b,i | CMP w,i | **SEG DS** | **AAS** |
+| **00** | ADD r/m8,r8 | ADD r/m16,r16 | ADD r8,r/m8 | ADD r16,r/m16 | ADD AL,i8 | ADD AX,i16 | PUSH ES | POP ES | OR r/m8,r8 | OR r/m16,r16 | OR r8,r/m8 | OR r16,r/m16 | OR AL,i8 | OR AX,i16 | PUSH CS | POP CS ‡1 |
+| **10** | ADC r/m8,r8 | ADC r/m16,r16 | ADC r8,r/m8 | ADC r16,r/m16 | ADC AL,i8 | ADC AX,i16 | PUSH SS | POP SS | SBB r/m8,r8 | SBB r/m16,r16 | SBB r8,r/m8 | SBB r16,r/m16 | SBB AL,i8 | SBB AX,i16 | PUSH DS | POP DS |
+| **20** | AND r/m8,r8 | AND r/m16,r16 | AND r8,r/m8 | AND r16,r/m16 | AND AL,i8 | AND AX,i16 | SEG ES: | DAA | SUB r/m8,r8 | SUB r/m16,r16 | SUB r8,r/m8 | SUB r16,r/m16 | SUB AL,i8 | SUB AX,i16 | SEG CS: | DAS |
+| **30** | XOR r/m8,r8 | XOR r/m16,r16 | XOR r8,r/m8 | XOR r16,r/m16 | XOR AL,i8 | XOR AX,i16 | SEG SS: | AAA | CMP r/m8,r8 | CMP r/m16,r16 | CMP r8,r/m8 | CMP r16,r/m16 | CMP AL,i8 | CMP AX,i16 | SEG DS: | AAS |
 | **40** | INC AX | INC CX | INC DX | INC BX | INC SP | INC BP | INC SI | INC DI | DEC AX | DEC CX | DEC DX | DEC BX | DEC SP | DEC BP | DEC SI | DEC DI |
 | **50** | PUSH AX | PUSH CX | PUSH DX | PUSH BX | PUSH SP | PUSH BP | PUSH SI | PUSH DI | POP AX | POP CX | POP DX | POP BX | POP SP | POP BP | POP SI | POP DI |
-| **60** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| **70** | JO | JNO | JB/JNAE | JNB/JAE | JZ/JE | JNZ/JNE | JBE/JNA | JNBE/JA | JS | JNS | JP/JPE | JNP/JPO | JL/JNGE | JNL/JGE | JLE/JNG | JNLE/JG |
-| **80** | **Grp1 ib** | **Grp1 iw** | — | **Grp1 ib sx** | TEST b,r/m | TEST w,r/m | — | XCHG b,r/m | XCHG w,r/m | — | — | — | — | — | — | — |
-| **90** | XCHG AX,AX | XCHG CX,AX | XCHG DX,AX | XCHG BX,AX | XCHG SP,AX | XCHG BP,AX | XCHG SI,AX | XCHG DI,AX | CBW | CWD | **CALL i.d** | WAIT | PUSHF | POPF | SAHF | LAHF |
-| **A0** | MOV m→AL | MOV m→AX | MOV AL→m | MOV AX→m | MOVS b | MOVS w | CMPS b | CMPS w | TEST b,i | TEST w,i | STOS b | STOS w | LODS b | LODS w | SCAS b | SCAS w |
-| **B0** | MOV i→AL | MOV i→CL | MOV i→DL | MOV i→BL | MOV i→AH | MOV i→CH | MOV i→DH | MOV i→BH | MOV i→AX | MOV i→CX | MOV i→DX | MOV i→BX | MOV i→SP | MOV i→BP | MOV i→SI | MOV i→DI |
-| **C0** | — | — | RET iw | RET | **LES** | **LDS** | MOV b,i,r/m | MOV w,i,r/m | — | — | — | — | RETF iw | RETF | **INT 3** | **INT type** | **INTO** | **IRET** |
-| **D0** | Shift b,1 | Shift w,1 | Shift b,v | Shift w,v | — | AAM ib | AAD ib | ESC 0 | ESC 1 | ESC 2 | ESC 3 | ESC 4 | ESC 5 | ESC 6 | ESC 7 |
-| **E0** | LOOPNZ/LOOPNE | LOOPZ/LOOPE | LOOP | JCXZ | IN b,8 | IN w,8 | OUT b,8 | OUT w,8 | CALL d | JMP d | JMP si.d | JMP si.d (short) | IN b,DX | IN w,DX | OUT b,DX | OUT w,DX |
-| **F0** | **LOCK** | — | — | **REP** | **REPNE/REPNZ** | HLT | **Grp1 b** | **Grp1 w** | CLC | STC | CLI | STI | CLD | STD | **Grp2 b** | **Grp2 w** |
+| **60** | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| **70** | JO short | JNO short | JB/JNAE short | JNB/JAE short | JE/JZ short | JNE/JNZ short | JBE/JNA short | JNBE/JA short | JS short | JNS short | JP/JPE short | JNP/JPO short | JL/JNGE short | JNL/JGE short | JLE/JNG short | JNLE/JG short |
+| **80** | Group 1 ‡2 | Group 1 | Group 1 ‡2 | Group 1 | TEST r/m8,r8 ‡3 | TEST r/m16,r16 ‡3 | XCHG r8,r/m8 | XCHG r16,r/m16 | MOV r/m8,r8 | MOV r/m16,r16 | MOV r8,r/m8 | MOV r16,r/m16 | MOV r16/m16,sreg | LEA r16,r/m16 | MOV sreg,r16/m16 | POP r16/m16 |
+| **90** | XCHG AX,AX | XCHG AX,CX | XCHG AX,DX | XCHG AX,BX | XCHG AX,SP | XCHG AX,BP | XCHG AX,SI | XCHG AX,DI | CBW | CWD | CALL far | WAIT | PUSHF | POPF | SAHF | LAHF |
+| **A0** | MOV AL,m8 | MOV AX,m16 | MOV m8,AL | MOV m16,AX ‡4 | MOVS b | MOVS w | CMPS b | CMPS w | CMP AL,i8 ‡5 | CMP AX,i16 ‡5 | STOS b | STOS w | LODS b | LODS w | SCAS b | SCAS w |
+| **B0** | MOV AL,i8 | MOV CL,i8 | MOV DL,i8 | MOV BL,i8 | MOV AH,i8 | MOV CH,i8 | MOV DH,i8 | MOV BH,i8 | MOV AX,i16 | MOV CX,i16 | MOV DX,i16 | MOV BX,i16 | MOV SP,i16 | MOV BP,i16 | MOV SI,i16 | MOV DI,i16 |
+| **C0** | — | — | RET i16 (intra) | RET (intra) | LES r16,r/m16 | LDS r16,r/m16 | MOV m8,i8 | MOV m16,i16 | — | — | RET i16 (inter) | RET (inter) | INT 3 | INT i8 | INTO | IRET |
+| **D0** | Shift ‡6 | Shift | Shift | Shift | — | AAM i8 | AAD i8 | XLAT | ESC 0 | ESC 1 | ESC 2 | ESC 3 | ESC 4 | ESC 5 | ESC 6 | ESC 7 |
+| **E0** | LOOPNE/LOOPNZ short | LOOPE/LOOPZ short | LOOP short | JCXZ short | IN AL,i8 | IN AX,i8 | OUT i8,AL | OUT i8,AX | CALL near | JMP near | JMP far | JMP short (intra) | IN AL,DX | IN AX,DX | OUT DX,AL | OUT DX,AX |
+| **F0** | LOCK | — | REPNE/REPNZ | REP/REPE/REPZ | HLT | CMC | Group 1 | Group 1 | CLC | STC | CLI | STI | CLD | STD | Group 2 ‡7 | Group 2 ‡7 |
 
-All entries marked `—` above are not defined on the 8086. Table 4-13 lists
-several of them explicitly as `(not used)`, e.g. `F6 MOD 001`, `FE MOD 010`
-through `FE MOD 111`, and `FF MOD 111` [1]. The reference implementation's own
-diagnostic for this case is `"no such opcode in 8086 instruction set"` [19].
-For a disassembler, the `D0`–`DF` escape range is an 8087/8088 ESC index rather
-than an illegal opcode [1]; note that the reference implementation decodes the
-80187 mnemonics for display only and does not execute them [19].
+**Group 1 — `80`/`81`/`82`/`83` against an immediate, and `F6`/`F7`** [1] —
+**verified** (Table 4-13, PDF pp. 269–270 / printed 4-30–4-31 and PDF p. 273 /
+printed 4-34):
 
-**Group 1 — `F6`/`F7` and `80`/`81`/`83`** [1] — **verified**:
+| REG | `80` byte, `i8` | `81` word, `i16` | `82` byte, `i8` | `83` word, `i8:sx` | `F6` byte | `F7` word |
+|---|---|---|---|---|---|---|
+| `000` | ADD r/m8,i8 | ADD r/m16,i16 | ADD r/m8,i8 | ADD r/m16,i8:sx | TEST r/m8,i8 | TEST r/m16,i16 |
+| `001` | — | — | — | — | — | — |
+| `010` | ADC r/m8,i8 | ADC r/m16,i16 | ADC r/m8,i8 | ADC r/m16,i8:sx | NOT r/m8 | NOT r/m16 |
+| `011` | SBB r/m8,i8 | SBB r/m16,i16 | SBB r/m8,i8 | SBB r/m16,i8:sx | NEG r/m8 | NEG r/m16 |
+| `100` | AND r/m8,i8 | AND r/m16,i16 | — | — | MUL r/m8 | MUL r/m16 |
+| `101` | SUB r/m8,i8 | SUB r/m16,i16 | SUB r/m8,i8 | SUB r/m16,i8:sx | IMUL r/m8 | IMUL r/m16 |
+| `110` | XOR r/m8,i8 | XOR r/m16,i16 | — | — | DIV r/m8 | DIV r/m16 |
+| `111` | CMP r/m8,i8 | CMP r/m16,i16 | CMP r/m8,i8 | CMP r/m16,i8:sx | IDIV r/m8 | IDIV r/m16 |
 
-| REG | F6 (byte) | F7 (word) | 80/81/83 |
-|---|---|---|---|
-| `000` | TEST r/m8, i8 | TEST r/m16, i16 | TEST |
-| `001` | — | — | — |
-| `010` | NOT r/m8 | NOT r/m16 | — |
-| `011` | NEG r/m8 | NEG r/m16 | — |
-| `100` | MUL r/m8 | MUL r/m16 | — |
-| `101` | IMUL r/m8 | IMUL r/m16 | — |
-| `110` | DIV r/m8 | DIV r/m16 | — |
-| `111` | IDIV r/m8 | IDIV r/m16 | — |
+`83` takes `DATA-SX`, an 8-bit immediate sign-extended to 16 bits (`data if s,
+w=1`, Table 4-12, PDF p. 261 / printed 4-22); there is no 8-bit `83` form. `82`
+is defined on the 8086 and carries the same digit table as `80` except that
+`/1`, `/4` and `/6` print `(not used)` [1].
 
-`83` is the sign-extended-immediate form of Group 1: `data if s: w=01`, i.e. the
-immediate is 8 bits, sign-extended to 16 [1]. There is no 8-bit `83` form.
+**Shift — `D0`/`D1`/`D2`/`D3`** [1] — **verified** (Table 4-13, PDF p. 272 /
+printed 4-33):
 
-**Group 2 — `FE`/`FF`** [1] — **verified**:
+| REG | `D0` byte, count 1 | `D1` word, count 1 | `D2` byte, count CL | `D3` word, count CL |
+|---|---|---|---|---|
+| `000` | ROL r/m8,1 | ROL r/m16,1 | ROL r/m8,CL | ROL r/m16,CL |
+| `001` | ROR r/m8,1 | ROR r/m16,1 | ROR r/m8,CL | ROR r/m16,CL |
+| `010` | RCL r/m8,1 | RCL r/m16,1 | RCL r/m8,CL | RCL r/m16,CL |
+| `011` | RCR r/m8,1 | RCR r/m16,1 | RCR r/m8,CL | RCR r/m16,CL |
+| `100` | SHL/SAL r/m8,1 | SHL/SAL r/m16,1 | SHL/SAL r/m8,CL | SHL/SAL r/m16,CL |
+| `101` | SHR r/m8,1 | SHR r/m16,1 | SHR r/m8,CL | SHR r/m16,CL |
+| `110` | — | — | — | — |
+| `111` | SAR r/m8,1 | SAR r/m16,1 | SAR r/m8,CL | SAR r/m16,CL |
 
-| REG | FE (byte) | FF (word) |
+**Group 2 — `FE`/`FF`** [1] — **verified** (Table 4-13, PDF p. 273 / printed
+4-34). The manual prints `MEM16` for `FF /0` and `FF /1`; with `MOD=11` those
+are register forms [1]:
+
+| REG | `FE` | `FF` |
 |---|---|---|
-| `000` | INC r/m8 | INC r/m16 |
-| `001` | DEC r/m8 | DEC r/m16 |
-| `010` | — | CALL near (r/m16) |
-| `011` | — | CALL far (m16:16) |
-| `100` | — | JMP near (r/m16) |
-| `101` | — | JMP far (m16:16) |
-| `110` | — | PUSH r/m16 |
+| `000` | INC r/m8 | INC MEM16 |
+| `001` | DEC r/m8 | DEC MEM16 |
+| `010` | — | CALL r16/m16 (intra) |
+| `011` | — | CALL m16 (inter) |
+| `100` | — | JMP r16/m16 (intra) |
+| `101` | — | JMP m16 (inter) |
+| `110` | — | PUSH m16 |
 | `111` | — | — |
+
+Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
+[1]:
+
+- **`90` is `XCHG AX,AX`**, printed by the manual as "NOP (exchange AX,AX)". It
+  is the canonical one-byte no-op and is also what an emulator must execute, not
+  a decoder that skips the byte.
+- **`86`/`87` are `XCHG REG8,REG8/MEM8` and `XCHG REG16,REG16/MEM16`** — the
+  REG field is the source when `D=0` and the destination when `D=1`.
+- **`C4` is `LES r16,r/m16`** and **`C5` is `LDS r16,r/m16`**; both read a
+  four-byte pointer through the R/M field.
+- **`EB` is `JMP SHORT-LABEL`**, an `IP-INC8` relative jump, i.e. a short
+  **intra**-segment jump. The 8086 has no short inter-segment jump, so `EC` and
+  `ED` are `IN AL,DX` and `IN AX,DX`, not the 80186 near-jump forms.
+- **`D4` is `AAM` and `D5` is `AAD`**, each carrying a `00001010` immediate
+  byte. **`D6` is `(not used)`** and **`D7` is `XLAT`**; the ESC range is `D8`
+  to `DF`, so `ESC 0` is `D8` and `ESC 7` is `DF`, not `D6` to `DD`.
+- **`F2` is `REPNE`/`REPNZ`** and **`F3` is `REP`/`REPE`/`REPZ`. `F1` is
+  `(not used)` and `F4` is `HLT`** — `F4` is not an undefined slot.
+- **`84`/`85` are `TEST r/m8,r8` and `TEST r/m16,r16`** in this manual; see
+  footnote ‡3. **`C0`/`C1` are `(not used)`** — they are not shift-by-immediate
+  on the 8086.
+- **`8C` and `8E` accept `MOD=000` only**; `8C MOD 1--` and `8E MOD 1--` print
+  `(not used)`. `8F` likewise takes `MOD 000` only, and `8F MOD 001` through
+  `8F MOD 111` are all `(not used)`.
+- **`60`–`6F` are all `(not used)`**, and `C8`/`C9` are `(not used)` — the 8086
+  has no `ENTER`/`LEAVE`.
+- The reference implementation's own diagnostic for an undefined opcode is
+  `"no such opcode in 8086 instruction set"` [19]. For a disassembler the
+  `D8`–`DF` range is an 8087/8088 ESC index rather than an illegal opcode [1];
+  the reference implementation decodes the 80187 mnemonics for display only and
+  does not execute them [19].
+
+**Discrepancies found while transcribing.** Every cell carrying a footnote is a
+place where Table 4-13 does not agree with the implementation or with the
+standing instruction for this section. None of them is settled by this manual;
+they are recorded rather than silently reconciled.
+
+- **‡1 `0F`.** Table 4-13, PDF p. 267 / printed 4-28 prints `0F` as `(not used)`.
+  The cell records `POP CS`, which is what `crates/core/src/exec.rs` executes
+  (`segment_push_pop`, `exec.rs:857`). **Unresolved from this source; do not
+  change the decoder on the strength of the printed `(not used)`.**
+- **‡2 `82`.** Table 4-13 defines `82` for `/0`, `/2`, `/3`, `/5` and `/7` and
+  prints `(not used)` for `/1`, `/4`, `/6`. Later Intel documentation describes
+  `82` as an alias of `80` on the 8086 and as invalid afterwards. Transcribed as
+  the manual prints it.
+- **‡3 `84`/`85`.** Table 4-13, PDF p. 270 / printed 4-31 defines both as
+  `TEST REG8/MEM8,REG8` and `TEST REG16/MEM16,REG16`. The standing instruction
+  for this section is that `84`/`85` are 80186 extensions absent from the 8086.
+  The two disagree and the manual's table is the only evidence available here,
+  so the cells record the manual and the disagreement is flagged. **These two
+  cells must not be implemented until the conflict is settled.**
+- **‡4 `A3`.** Table 4-13, PDF p. 271 / printed 4-32 prints `A3` as
+  `MOV MEM16,AL`, which cannot be a 16-bit move. Table 4-12, PDF p. 261 /
+  printed 4-22 gives "Accumulator to memory" as `1010001w`, i.e. `A2` is
+  `MOV m8,AL` and `A3` is `MOV m16,AX`. The cell follows Table 4-12; the
+  Table 4-13 print is a typographical error in the manual.
+- **‡5 `A8`/`A9`.** Table 4-12, PDF p. 261 / printed 4-22 (`CMP` "Immediate with
+  accumulator" = `0011101w`, i.e. `3C`/`3D`) and Table 4-13, PDF p. 271 /
+  printed 4-32 (`TEST` "Immediate data and accumulator" = `1010100w`) **both**
+  print `A8`/`A9` as `TEST AL,IMMED8` and `TEST AX,IMMED16`. The standing
+  instruction for this section is that `A8`/`A9` are `CMP` against an immediate
+  with no ModR/M byte, and `crates/core/src/exec.rs` implements
+  `cmp_accumulator` for both (`exec.rs:259`–`exec.rs:260`). The cells record
+  `CMP` because the two differ in exactly the flags they write — `TEST` clears
+  CF and OF and leaves AF undefined, `CMP` sets all six — so a cell reading
+  `TEST` here would silently corrupt memory. **The manual print is recorded
+  rather than followed; this is a known 1979 erratum, not a transcription slip.**
+- **‡6 `D0`–`D3`.** Table 4-14 labels these four cells `Shift` and Table 4-13
+  expands them into the `/digit` table above. The manual assigns this set no
+  group number, so it is named `Shift` here rather than folded into "Group 2",
+  which the manual reserves for `FE`/`FF` (Table 4-14's key).
+- **‡7 `FE`/`FF`.** Table 4-13 prints `MEM16` for `FF /0` and `FF /1` although
+  the R/M field with `MOD=11` selects a register. The digit table follows the
+  manual; the register reading is noted above.
 
 ### 1.4 Exact flag effects
 
-Transcribed from Table 2-21, Instruction Set Reference Data [1]. Column order is
-the manual's own `ODITSZAPC`. Legend: `X` modified, `0` cleared, `1` set,
-`U` undefined (state after execution is not architecturally defined),
-`–` unaffected. A blank in the manual means unaffected.
+Transcribed from **Table 2-21, Instruction Set Reference Data** [1] (PDF pp.
+74–90 / printed 2-51 to 2-67), column order `ODITSZAPC`. Legend is **Table 2-18,
+Key to Flag Effects** [1] (PDF p. 73 / printed 2-50):
 
-**verified** for all rows below, with two exceptions flagged inline.
+| Mark | Meaning (Table 2-18) |
+|---|---|
+| *(blank)* → `—` | not altered |
+| `X` | set or cleared according to the result |
+| `0` | cleared to 0 |
+| `1` | set to 1 |
+| `U` | undefined — contains no reliable value |
+| `R` | restored from a previously saved value |
 
-| Instruction | O | D | I | T | S | Z | A | P | C | Note |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `AAA` | U | – | – | – | U | U | **X** | U | **X** | |
-| `AAD` | U | – | – | – | X | X | U | X | X | |
-| `AAM` | U | – | – | – | X | X | U | X | X | |
-| `AAS` | U | – | – | – | U | U | **X** | U | **X** | |
-| `ADC` | X | – | – | – | X | X | X | X | X | all six defined |
-| `ADD` | X | – | – | – | X | X | X | X | X | all six defined |
-| `AND` | **0** | – | – | – | X | X | **U** | X | **0** | CF and OF cleared; **AF undefined** |
-| `OR` | **0** | – | – | – | X | X | **U** | X | **0** | CF and OF cleared; **AF undefined** |
-| `XOR` | **0** | – | – | – | X | X | **U** | X | **0** | CF and OF cleared; **AF undefined** |
-| `TEST` | **0** | – | – | – | X | X | **U** | X | **0** | no result written; **AF undefined** |
-| `CMP` | X | – | – | – | X | X | X | X | X | all six defined |
-| `SUB` | X | – | – | – | X | X | X | X | X | all six defined |
-| `SBB` | X | – | – | – | X | X | X | X | X | all six defined |
-| `DAA` | X | – | – | – | X | X | X | X | X | |
-| `DAS` | U | – | – | – | X | X | X | X | X | OF undefined |
-| `INC` | X | – | – | – | X | X | X | X | **–** | CF unaffected |
-| `DEC` | X | – | – | – | X | X | X | X | **–** | CF unaffected |
-| `NEG` | X | – | – | – | X | X | X | – | **U** | CF undefined |
-| `CMPS` | X | – | – | – | X | X | X | X | X | |
-| `MUL` | X | – | – | – | **U** | **U** | **U** | **U** | X | only CF and OF architecturally defined |
-| `IMUL` | X | – | – | – | **U** | **U** | **U** | **U** | X | only CF and OF architecturally defined |
-| `DIV` | **U** | – | – | – | **U** | **U** | **U** | **U** | **U** | all six undefined on divide |
-| `IDIV` | **U** | – | – | – | **U** | **U** | **U** | **U** | **U** | all six undefined on divide |
-| `SHL/SAL` | X | – | – | – | – | – | – | – | X | |
-| `SHR` | X | – | – | – | – | – | – | – | X | |
-| `SAR` | X | – | – | – | – | – | – | – | X | |
-| `ROL` | X | – | – | – | – | – | – | – | X | |
-| `ROR` | X | – | – | – | – | – | – | – | X | |
-| `RCL` | X | – | – | – | – | – | – | – | X | |
-| `RCR` | X | – | – | – | – | – | – | – | X | |
-| `CLC` | – | – | – | – | – | – | – | – | 0 | |
-| `STC` | – | – | – | – | – | – | – | – | 1 | |
-| `CMC` | – | – | – | – | – | – | – | – | X | |
-| `CLD` | – | 0 | – | – | – | – | – | – | – | |
-| `STD` | – | 1 | – | – | – | – | – | – | – | |
-| `CLI` | – | – | 0 | – | – | – | – | – | – | |
-| `STI` | – | – | 1 | – | – | – | – | – | – | |
-| `INT`, `INTO` | – | – | **0** | **0** | – | – | – | – | – | clears IF and TF |
-| `LAHF`, `SAHF` | – | – | – | – | – | – | – | – | – | |
-| `PUSHF`, `POPF` | – | – | – | – | – | – | – | – | – | POPF writes the poppped word |
-| `MOV`, `LEA`, `LDS`, `LES`, `PUSH`, `POP`, `XCHG`, `IN`, `OUT`, `LODS`, `STOS`, `MOVS`, `XLAT`, `NOP`, `HLT`, `WAIT`, `ESC`, all jumps, `CALL`, `RET`, `IRET`, `CBW`, `CWD`, `NOT`, `REP`, `LOCK` | – | – | – | – | – | – | – | – | – | no arithmetic flag effect |
+`—` and `U` are different and the emulator must keep them apart: `—` means the
+instruction leaves the flag exactly as it found it, `U` means it leaves it in an
+architecturally undefined state. A test must not assert a value for a `U` flag,
+and a test may assert that a `—` flag is preserved.
 
-Rows marked **verified** for `SHL`/`SHR`/`SAR`/`ROL`/`ROR`/`RCL`/`RCR`, `LAHF`,
-`SAHF`, `PUSHF`, `POPF`, `NOT` and `CBW`/`CWD` come from the surrounding manual
-text rather than a cleanly reconstructed flag row; the semantics are stated
-explicitly in the manual's instruction descriptions and the flagged rows above.
-`SAR`, `LAHF` and `POPF` rows are **inferred** from those descriptions. Treat all
-of them as verified-by-specification but re-check against the printed page if a
-test disagrees.
+Each row is the set of flags that holds across **every** operand form the
+instruction has in Table 2-21. Where the forms differ, the note says so. All
+rows **verified** except the three marked below.
 
-Two consequences the brief called out, both **verified**:
+| Instruction | O | D | I | T | S | Z | A | P | C | Note | PDF p. |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `AAA` | U | — | — | — | U | U | X | U | X | | 74 |
+| `AAD` | U | — | — | — | X | X | U | X | U | CF undefined | 74 |
+| `AAM` | U | — | — | — | X | X | U | X | U | CF undefined | 74 |
+| `AAS` | U | — | — | — | U | U | X | U | X | | 74 |
+| `ADC` | X | — | — | — | X | X | X | X | X | same for all six operand forms | 75 |
+| `ADD` | X | — | — | — | X | X | X | X | X | same for all six operand forms | 75 |
+| `AND` | 0 | — | — | — | X | X | U | X | 0 | CF and OF cleared, AF undefined | 75 |
+| `OR` | 0 | — | — | — | X | X | U | X | 0 | CF and OF cleared, AF undefined | 85 |
+| `XOR` | 0 | — | — | — | X | X | U | X | 0 | CF and OF cleared, AF undefined | 90 |
+| `TEST` | 0 | — | — | — | X | X | U | X | 0 | no result written; AF undefined | 90 |
+| `CMP` | X | — | — | — | X | X | X | X | X | no result written | 76 |
+| `SUB` | X | — | — | — | X | X | X | X | X | same for all six operand forms | 90 |
+| `SBB` | X | — | — | — | X | X | X | X | X | same for all six operand forms | 88 |
+| `DAA` | X | — | — | — | X | X | X | X | X | | 77 |
+| `DAS` | U | — | — | — | X | X | X | X | X | OF undefined | 77 |
+| `INC` | X | — | — | — | X | X | X | X | — | **CF not affected**, reg16/reg8/memory all alike | 78 |
+| `DEC` | X | — | — | — | X | X | X | X | — | **CF not affected**, reg16/reg8/memory all alike | 77 |
+| `NEG` | X | — | — | — | X | X | X | X | 1 | CF set to 1; **0 if destination == 0** (footnote to the row) | 85 |
+| `MUL` | X | — | — | — | U | U | U | U | X | only OF and CF architecturally defined | 84 |
+| `IMUL` | X | — | — | — | U | U | U | U | X | only OF and CF architecturally defined | 78 |
+| `DIV` | U | — | — | — | U | U | U | U | U | all six undefined | 77 |
+| `IDIV` | U | — | — | — | U | U | U | U | U | all six undefined | 78 |
+| `CMPS` | X | — | — | — | X | X | X | X | X | | 76 |
+| `SCAS` | X | — | — | — | X | X | X | X | X | | 88 |
+| `SHL`/`SAL` | X | — | — | — | — | — | — | — | X | table row as printed; **contradicted by the prose, see note 8** | 88 |
+| `SHR` | X | — | — | — | — | — | — | — | X | table row as printed; **contradicted by the prose, see note 8** | 89 |
+| `SAR` | X | — | — | — | X | X | U | X | X | **AF undefined**, the only shift/rotate that defines S, Z, P | 88 |
+| `ROL` | X | — | — | — | — | — | — | — | X | | 87 |
+| `ROR` | X | — | — | — | — | — | — | — | X | | 87 |
+| `RCL` | X | — | — | — | — | — | — | — | X | | 86 |
+| `RCR` | X | — | — | — | — | — | — | — | X | | 86 |
+| `CLC` | — | — | — | — | — | — | — | — | 0 | | 76 |
+| `STC` | — | — | — | — | — | — | — | — | 1 | | 89 |
+| `CMC` | — | — | — | — | — | — | — | — | X | | 76 |
+| `CLD` | — | 0 | — | — | — | — | — | — | — | | 76 |
+| `STD` | — | 1 | — | — | — | — | — | — | — | | 89 |
+| `CLI` | — | — | 0 | — | — | — | — | — | — | | 76 |
+| `STI` | — | — | 1 | — | — | — | — | — | — | | 89 |
+| `INT` | — | — | 0 | 0 | — | — | — | — | — | both `INT 3` and `INT i8`; IF and TF cleared | 79 |
+| `INTO` | — | — | 0 | 0 | — | — | — | — | — | same marks as `INT` | 79 |
+| `IRET` | R | R | R | R | R | R | R | R | R | all nine restored from the popped FLAGS word | 79 |
+| `POPF` | R | R | R | R | R | R | R | R | R | all nine replaced from the popped word; prose at PDF p. 56 | 86 |
+| `SAHF` | — | — | — | — | R | R | R | R | R | restores S, Z, A, P, C from AH; O, D, I, T untouched | 87 |
+| `LAHF` | — | — | — | — | — | — | — | — | — | | 82 |
+| `CALL` | — | — | — | — | — | — | — | — | — | near, far, memptr16, regptr16, memptr32 all blank | 75 |
+| `JMP` | — | — | — | — | — | — | — | — | — | short, near, far, memptr16, regptr16 all blank | 81 |
+| all `Jcc` | — | — | — | — | — | — | — | — | — | every conditional jump row is blank | 79–82 |
+| `LOOP`, `LOOPE`/`LOOPZ`, `LOOPNE`/`LOOPNZ`, `JCXZ` | — | — | — | — | — | — | — | — | — | | 83 |
+| `RET` | — | — | — | — | — | — | — | — | — | intra and inter, with and without pop value | 87 |
+| `CBW`, `CWD` | — | — | — | — | — | — | — | — | — | | 75, 77 |
+| `MOV` | — | — | — | — | — | — | — | — | — | every form blank, including the segment-register forms | 84 |
+| `LEA`, `LES`, `LODSI` | — | — | — | — | — | — | — | — | — | | 82 |
+| `LDS` | — | — | — | — | — | — | — | — | — | **ambiguous: Table 2-21 has no `LDS` entry at all**; see below | — |
+| `PUSH`, `POP` | — | — | — | — | — | — | — | — | — | register, segment-register and memory forms all blank | 86, 85 |
+| `PUSHF` | — | — | — | — | — | — | — | — | — | the flags themselves are not affected; prose at PDF p. 56 | 86 |
+| `XCHG` | — | — | — | — | — | — | — | — | — | accumulator, memory and register forms all blank | 90 |
+| `IN`, `OUT` | — | — | — | — | — | — | — | — | — | immediate-port and DX forms both blank | 78, 85 |
+| `MOVS`, `LODS`, `STOS` | — | — | — | — | — | — | — | — | — | the repeat forms inherit the blank row | 84, 83, 89 |
+| `NOT` | — | — | — | — | — | — | — | — | — | | 85 |
+| `NOP` | — | — | — | — | — | — | — | — | — | | 85 |
+| `XLAT` | — | — | — | — | — | — | — | — | — | | 78 |
+| `HLT`, `WAIT` | — | — | — | — | — | — | — | — | — | | 78, 90 |
+| `ESC`, `LOCK`, `REP`/`REPE`/`REPNE` | — | — | — | — | — | — | — | — | — | prefixes; no flag row | 77, 83, 86, 87 |
+| `INTR`, `NMI`, single step | — | — | 0 | 0 | — | — | — | — | — | **not instructions**; timing entries only, footnote to each row | 79, 83, 89 |
+| `SEGMENT` override | — | — | — | — | — | — | — | — | — | not an instruction; timing entry only | 88 |
 
-1. **AF is undefined after every logical operation** — `AND`, `OR`, `XOR`,
-   `TEST` [1]. Do not assert on AF in a unit test of those instructions; assert
-   it is *not required* to hold.
-2. **PF, AF, ZF, SF and OF are all undefined after `MUL`/`IMUL`/`DIV`/`IDIV`**
-   [1]. For `DIV`/`IDIV` even CF and OF are undefined. An emulator may leave the
-   whole arithmetic flag group untouched on divide, and that is conforming.
+Notes on forms and on the rows that differ from an earlier reading of this
+guide, all **verified** [1]:
+
+1. **`INC`/`DEC` leave `CF` alone; `ADD`/`SUB`/`ADC`/`SBB`/`CMP` write it.** Both
+   statements come straight out of Table 2-21 and both are observable: `INC AX`
+   must preserve CF, `ADD AL,1` must not.
+2. **AF is undefined after every logical operation** — `AND`, `OR`, `XOR`,
+   `TEST` [1]. Assert nothing about AF for those; assert only that it is not
+   required to hold.
+3. **`PF`, `AF`, `ZF`, `SF` and `OF` are all `U` after `MUL`/`IMUL`**, and all
+   six including CF are `U` after `DIV`/`IDIV` [1]. An emulator may leave the
+   whole arithmetic flag group untouched on divide and that is conforming.
+4. **`NEG` sets CF**, not "CF undefined" as an earlier draft of this section
+   claimed: Table 2-21 prints `1` under CF with the footnote "*0 if destination
+   == 0" (PDF p. 85) [1]. PF is `X`, not unaffected.
+5. **`AAD`/`AAM` leave CF undefined** — Table 2-21 prints `U` under CF (PDF
+   p. 74) [1]. An earlier draft of this section recorded CF as set.
+6. **`SAR` writes S, Z and P and leaves AF undefined** (PDF p. 88) [1]. An
+   earlier draft recorded every flag except OF and CF as unaffected.
+7. **`LDS` is `ambiguous`.** Table 2-21 skips it — the table runs `LEA`,
+   `LODSI`, `LES` with no `LDS` row at all (PDF p. 82), so there is no
+   `ODITSZAPC` line to transcribe. The `LDS` instruction is defined elsewhere in
+   the manual: Table 4-13 prints `C5 … LDS REG16,MEM16` (PDF p. 272 / printed
+   4-33) and the instruction description at PDF p. 55 describes it as a 32-bit
+   pointer load that does not mention any flag. The row above is therefore
+   **not** traceable to Table 2-21 and is recorded as a gap, not as verified.
+8. **`SHL`/`SAL`/`SHR` — the flag table and the prose disagree inside the same
+   manual.** Table 2-21 prints only `X` under OF and `X` under CF for these two
+   (PDF pp. 88–89), which is what the rows above record. The instruction
+   description says the opposite about three flags: "Shift instructions affect
+   the flags as follows. AF is always undefined following a shift operation.
+   **PF, SF and ZF are updated normally, as in the logical instructions.** CF
+   always contains the value of the last bit shifted out of the destination
+   operand. The content of OF is always undefined following a multibit shift.
+   In a single-bit shift, OF is set if the value of the high-order (sign) bit
+   was changed by the operation; if the sign bit retains its original value, OF
+   is cleared" (PDF p. 62 / printed 2-38) [1]. Read together with `SAR` — whose
+   Table 2-21 row does mark S, Z and P — the prose is the coherent account, and
+   the blank S, Z, P, A cells for `SHL`/`SAL`/`SHR` look like the table's own
+   error. **This section transcribes the table because that is the stated
+   source; the contradiction is recorded here and is unresolved. Do not write a
+   flag test for `SHL`/`SAL`/`SHR` until it is settled.** The rotate prose
+   ("Rotates affect only the carry and overflow flags", same page) does agree
+   with the `ROL`/`ROR`/`RCL`/`RCR` rows, so the contradiction is confined to
+   the two shift instructions.
 
 ---
 
