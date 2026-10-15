@@ -1,9 +1,9 @@
 //! Fetch, decode, execute.
 
-use crate::flags::{AF, CF, DF, Flags, IF, OF, PF, SF, ZF, parity_even};
+use crate::flags::{parity_even, Flags, AF, CF, DF, IF, OF, PF, SF, ZF};
 use crate::memory::Memory;
-use crate::modrm::{Base, DecodeError, Operand, decode_modrm};
-use crate::regs::{Reg8, Reg16, Seg};
+use crate::modrm::{decode_modrm, Base, DecodeError, Operand};
+use crate::regs::{Reg16, Reg8, Seg};
 
 /// A fault the emulated program caused by executing itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,7 +41,11 @@ impl From<DecodeError> for ExecError {
 
 /// `step` budget helper: how many bytes an instruction consumed.
 fn width_mask(bits: u8) -> u16 {
-    if bits == 16 { 0xFFFF } else { 0x00FF }
+    if bits == 16 {
+        0xFFFF
+    } else {
+        0x00FF
+    }
 }
 
 // ---------------------------------------------------------------- fetching
@@ -1005,14 +1009,22 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 }
 
 const fn msb(bits: u8) -> u16 {
-    if bits == 8 { 0x80 } else { 0x8000 }
+    if bits == 8 {
+        0x80
+    } else {
+        0x8000
+    }
 }
 /// Bit 0 is bit 0 at either width.
 const fn lsb(_bits: u8) -> u16 {
     0x0001
 }
 const fn width(bits: u8) -> u16 {
-    if bits == 8 { 0x00FF } else { 0xFFFF }
+    if bits == 8 {
+        0x00FF
+    } else {
+        0xFFFF
+    }
 }
 
 /// `OF` is only architecturally defined after a rotate by one, and after a
@@ -1567,9 +1579,9 @@ impl RegArg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Cpu;
     use crate::flags::{AF, CF, DF, IF, OF, SF, ZF};
     use crate::regs::Registers;
+    use crate::Cpu;
 
     /// Build a CPU with `code` at `1000:0000`, clear of the interrupt
     /// vector table. The IVT is genuinely at `0000:0000` on real hardware, so
@@ -1895,6 +1907,143 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.segment(Seg::Es), 0x6000);
         assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100);
+    }
+
+    /// `8F /0` is `POP r/m16`, the one pop that writes memory.
+    #[test]
+    fn pop_to_memory_takes_the_word_off_the_stack_and_leaves_flags() {
+        // 8F 06 34 12 = POP WORD [1234h]
+        let mut cpu = cpu_at(&[0x8F, 0x06, 0x34, 0x12]);
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0xCAFE);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u16(0x0000, 0x1234), 0xCAFE);
+        assert_eq!(
+            cpu.regs.word(Reg16::Sp),
+            0x0102,
+            "the pop gave two bytes back"
+        );
+        assert_eq!(cpu.regs.ip, 4, "8F /0 with a disp16 is four bytes");
+        let f = cpu.regs.flags;
+        assert!(f.get(CF) && f.get(ZF) && f.get(OF), "POP touches no flag");
+    }
+
+    /// `86 /r` is `XCHG r/m8, r8`, the byte sibling of the word form at `87`.
+    #[test]
+    fn xchg_byte_swaps_a_register_and_a_byte() {
+        // 86 D8 = XCHG AL, BL: reg=011 names BL, rm=000 names AL.
+        let mut cpu = cpu_with(&[0x86, 0xD8]);
+        cpu.regs.set_byte(Reg8::Al, 0x11);
+        cpu.regs.set_byte(Reg8::Bl, 0x22);
+        cpu.regs.flags.set(SF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x22);
+        assert_eq!(cpu.regs.byte(Reg8::Bl), 0x11);
+        assert!(
+            cpu.regs.flags.get(SF) && cpu.regs.flags.get(CF),
+            "XCHG touches no flag"
+        );
+
+        // 86 06 34 12 = XCHG BYTE [1234h], AL
+        let mut cpu = cpu_with(&[0x86, 0x06, 0x34, 0x12]);
+        cpu.regs.set_byte(Reg8::Al, 0x7E);
+        cpu.mem.write_u8(0x0000, 0x1234, 0xA5);
+        cpu.step().unwrap();
+        assert_eq!(cpu.mem.read_u8(0x0000, 0x1234), 0x7E);
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xA5);
+    }
+
+    /// `9E` is `LAHF`: `AH = SF ZF 0 AF 0 PF 1 CF`. No flag moves and AL is
+    /// not touched.
+    #[test]
+    fn lahf_copies_the_status_flags_into_ah() {
+        let mut cpu = cpu_with(&[0x9E]);
+        cpu.regs.set_byte(Reg8::Al, 0x3C);
+        cpu.regs.set_byte(Reg8::Ah, 0xFF);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(AF, true);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.regs.flags.set(DF, true);
+        cpu.step().unwrap();
+        // CF, AF, ZF and the fixed 1: 0101_0011b.
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x53);
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x3C, "LAHF writes AH alone");
+        assert!(
+            cpu.regs.flags.get(OF) && cpu.regs.flags.get(DF),
+            "LAHF moves no flag"
+        );
+    }
+
+    /// `9F` is `SAHF`, the reverse, and the only one of these six that moves
+    /// flags: SF ZF AF PF CF come from AH, OF DF IF TF do not.
+    #[test]
+    fn sahf_restores_the_five_status_flags_from_ah() {
+        let mut cpu = cpu_with(&[0x9F]);
+        cpu.regs.set_byte(Reg8::Ah, 0x45); // bits 0, 2 and 6
+        cpu.regs.flags.set(CF, false);
+        cpu.regs.flags.set(AF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.regs.flags.set(DF, true);
+        cpu.regs.flags.set(IF, false);
+        cpu.step().unwrap();
+        let f = cpu.regs.flags;
+        assert!(
+            f.get(CF) && f.get(PF) && f.get(ZF),
+            "AH set bits 0, 2 and 6"
+        );
+        assert!(!f.get(AF) && !f.get(SF), "AH clears bits 4 and 7");
+        assert!(f.get(OF) && f.get(DF), "SAHF leaves OF and DF alone");
+        assert!(!f.get(IF), "and IF as well");
+    }
+
+    /// `C4 /r` is `LES r16, m`: a four-byte far pointer at the effective
+    /// address, the low word the offset and the high word the segment. No
+    /// flag moves.
+    #[test]
+    fn les_loads_the_far_pointer_and_leaves_flags() {
+        // C4 1E 34 12 = LES CX, [1234h]
+        let mut cpu = cpu_with(&[0xC4, 0x1E, 0x34, 0x12]);
+        cpu.mem.write_u16(0x0000, 0x1234, 0xBEEF);
+        cpu.mem.write_u16(0x0000, 0x1236, 0x9000);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(SF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert_eq!(
+            cpu.regs.word(Reg16::Cx),
+            0xBEEF,
+            "the low word is the offset"
+        );
+        assert_eq!(cpu.regs.segment(Seg::Es), 0x9000);
+        let f = cpu.regs.flags;
+        assert!(f.get(CF) && f.get(SF) && f.get(OF), "LES touches no flag");
+    }
+
+    /// `C5 /r` is `LDS r16, m`: the same far pointer with the segment going
+    /// to DS instead.
+    #[test]
+    fn lds_loads_the_segment_into_ds() {
+        // C5 87 34 12 = LDS AX, [BX+1234h], so the pointer sits at 1334h.
+        let mut cpu = cpu_with(&[0xC5, 0x87, 0x34, 0x12]);
+        cpu.regs.set_word(Reg16::Bx, 0x0100);
+        cpu.mem.write_u16(0x0000, 0x1334, 0x1234);
+        cpu.mem.write_u16(0x0000, 0x1336, 0x4000);
+        cpu.regs.set_segment(Seg::Es, 0x7000);
+        cpu.regs.flags.set(ZF, true);
+        cpu.regs.flags.set(CF, true);
+        cpu.regs.flags.set(OF, true);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x1234);
+        assert_eq!(cpu.regs.segment(Seg::Ds), 0x4000);
+        assert_eq!(cpu.regs.segment(Seg::Es), 0x7000, "LDS must not touch ES");
+        let f = cpu.regs.flags;
+        assert!(f.get(ZF) && f.get(CF) && f.get(OF), "LDS touches no flag");
     }
 
     #[test]
@@ -2278,7 +2427,7 @@ mod tests {
         cpu.regs.set_word(Reg16::Sp, 0x00FC);
         cpu.mem.write_u16(0x2000, 0x00FC, 0x0000); // IP
         cpu.mem.write_u16(0x2000, 0x00FE, 0x0000); // CS
-        // Bit 3 is fixed at zero and bit 12 is not writable on an 8086.
+                                                   // Bit 3 is fixed at zero and bit 12 is not writable on an 8086.
         cpu.mem.write_u16(0x2000, 0x0100, 0x0008 | 0x1000);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.flags.0 & 0x0008, 0, "bit 3 stays zero");
