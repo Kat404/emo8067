@@ -1,0 +1,201 @@
+size	addr	name	space	insns	refs	strings
+1354	10001070	disassemble	ram	5194	807	Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | %s, %s%s0%Xh | Copyright (c) emu8086.com                                                                  | %s%s0%Xh, %s | Copyright (c) emu8086.com                                                                  | %s, %s0%02X%02Xh | Copyright (c) emu8086.com                                                                  | %s, [0%02X%02Xh] | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FADD st0, st%d | Copyright (c) emu8086.com                                                                  | FMUL st0, st%d | Copyright (c) emu8086.com                                                                  | FCOM st0, st%d | Copyright (c) emu8086.com                                                                  | FCOMP st0, st%d | Copyright (c) emu8086.com                                                                  | FSUB st0, st%d | Copyright (c) emu8086.com                                                                  | FSUBR st0, st%d | Copyright (c) emu8086.com                                                                  | FDIV st0, st%d | Copyright (c) emu8086.com                                                                  | FDIVR st0, st%d | Copyright (c) emu8086.com                                                                  | FLD st%d | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FXCH st0, st%d | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FLDL2T | FLDL2E | FLDPI | FLDLG2 | FLDLN2 | F2XM1 | FYL2X | FPTAN | FPATAN | FXTRACT | FPREM1 | FDECSTP | FINCSTP | FPREM | FYL2XP1 | FSQRT | FSINCOS | FRNDINT | FSCALE | Copyright (c) emu8086.com                                                                  | FUCOMPP | Copyright (c) emu8086.com                                                                  | FDISI | FCLEX | FINIT | FSETPM | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FADD st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FMUL st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FSUBR st%d, st0 | Copyright (c) emu8086.com                                                                  | FSUB st%d, st0 | Copyright (c) emu8086.com                                                                  | FDIVR st%d, st0 | Copyright (c) emu8086.com                                                                  | FDIV st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FFREE st%d | Copyright (c) emu8086.com                                                                  | ??? st%d | Copyright (c) emu8086.com                                                                  | FST st%d | Copyright (c) emu8086.com                                                                  | FSTP st%d | Copyright (c) emu8086.com                                                                  | FUCOM st%d | Copyright (c) emu8086.com                                                                  | FUCOMP st%d | Copyright (c) emu8086.com                                                                  | FADDP st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FMULP st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | F??? st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | F??? st%d | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | FSUBRP st%d, st0 | Copyright (c) emu8086.com                                                                  | FSUBP st%d, st0 | Copyright (c) emu8086.com                                                                  | FDIVRP st%d, st0 | Copyright (c) emu8086.com                                                                  | FDIVP st%d, st0 | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | %s0%Xh | Copyright (c) emu8086.com                                                                  | 0%02X%02Xh | Copyright (c) emu8086.com                                                                  | [0%02X%02Xh] | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | %s, %s%s0%Xh | Copyright (c) emu8086.com                                                                  | %s, %s%s0%Xh | Copyright (c) emu8086.com                                                                  | %s%s0%Xh, %s | Copyright (c) emu8086.com                                                                  | %s, %s0%02X%02Xh | Copyright (c) emu8086.com                                                                  | %s, %s0%02X%02Xh | Copyright (c) emu8086.com                                                                  | %s0%02X%02Xh, %s | Copyright (c) emu8086.com                                                                  | %s, [0%02X%02Xh] | Copyright (c) emu8086.com                                                                  | %s, [0%02X%02Xh] | Copyright (c) emu8086.com                                                                  | [0%02X%02Xh], %s | Copyright (c) emu8086.com                                                                  | [0%02X%02Xh], %s | Copyright (c) emu8086.com                                                                  | %s, %s | Copyright (c) emu8086.com                                                                  | %s%s0%Xh | Copyright (c) emu8086.com                                                                  | %s%s0%02X%02Xh | Copyright (c) emu8086.com                                                                  | %s%s0%02X%02Xh:0%02X%02Xh | Copyright (c) emu8086.com                                                                  | %s%s0%04Xh | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | %s%s[0%02X%02Xh] | Copyright (c) emu8086.com                                                                  | %s 0%04Xh | Copyright (c) emu8086.com                                                                  | EXT ??? | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | , 0%Xh | Copyright (c) emu8086.com                                                                  | , 0%02X%02Xh | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                  | Copyright (c) emu8086.com                                                                 
+908	1000463a	FUN_1000463a	ram	2672	577	
+608	1000399b	FUN_1000399b	ram	1909	398	bad expression | (null) | (null) | (null) | (null) | null)
+299	1000517b	___crtLCMapStringA	ram	886	197	
+269	10008b36	___sbh_alloc_block	ram	764	108	
+261	10008382	___sbh_free_block	ram	792	98	
+255	10008857	___sbh_resize_block	ram	735	82	
+231	100072a0	_memcpy	ram	672	110	
+231	10009bc0	_memmove	ram	672	110	
+202	10002c30	FUN_10002c30	ram	632	88	bad syntax
+172	100057fd	FUN_100057fd	ram	510	67	
+171	1000804e	FUN_1000804e	ram	440	103	
+167	10009720	FUN_10009720	ram	461	90	
+156	10005b0e	FUN_10005b0e	ram	364	59	
+150	10009998	_realloc	ram	412	80	
+148	100029e0	FUN_100029e0	ram	577	100	bad operator in stack!
+146	100062c2	FUN_100062c2	ram	421	94	
+145	100068f5	___crtGetStringTypeA	ram	421	85	
+135	100079f8	FUN_100079f8	ram	406	89	
+131	10005d1c	___crtGetEnvironmentStringsA	ram	290	52	
+126	10007866	FUN_10007866	ram	402	63	
+122	100026f0	FUN_100026f0	ram	273	20	
+120	10004410	FUN_10004410	ram	339	56	
+116	10005ff3	FUN_10005ff3	ram	375	65	<program name unknown> | R6009 - not enough space for environment  | Runtime Error!  Program:  | R6009 - not enough space for environment  | Microsoft Visual C++ Runtime Library | R6009 - not enough space for environment  | R6009 - not enough space for environment 
+111	100035a6	FUN_100035a6	ram	382	70	
+109	10006ed0	_strncpy	ram	292	34	
+105	100037f4	__flsbuf	ram	281	36	
+97	100094a1	FUN_100094a1	ram	320	56	Unknown security failure detected! | A security error of unknown cause has been detected which has corrupted the program's internal state.  The program cannot safely continue execution and must now be terminated.  | Buffer overrun detected! | A buffer overrun has been detected which has corrupted the program's internal state.  The program cannot safely continue execution and must now be terminated.  | <program name unknown> | Unknown security failure detected! | Program:  | A security error of unknown cause has been detected which has corrupted the program's internal state.  The program cannot safely continue execution and must now be terminated.  | Microsoft Visual C++ Runtime Library
+95	10006aaf	___free_lc_time	ram	400	45	
+94	10003020	FUN_10003020	ram	271	41	= needs and lvalue | missing an operand | = needs an lvalue
+93	10007b8e	__setmbcp	ram	327	64	
+91	10008751	___sbh_alloc_new_group	ram	262	16	
+90	10008ee8	___crtMessageBoxA	ram	249	51	user32.dll | MessageBoxA | GetActiveWindow | GetLastActivePopup | GetUserObjectInformationA | GetProcessWindowStation
+86	10007f34	FUN_10007f34	ram	209	37	
+85	10006d90	FUN_10006d90	ram	232	28	
+79	10007cfc	__filbuf	ram	225	21	
+79	10007e49	___mbtowc_mt	ram	192	32	
+77	100034bb	FUN_100034bb	ram	201	29	
+76	100041a7	FUN_100041a7	ram	202	32	
+74	10005a47	__setenvp	ram	199	29	
+73	10003724	entry	ram	157	30	
+73	100055de	FUN_100055de	ram	211	44	
+70	10002ed0	FUN_10002ed0	ram	214	35	missing ')'
+69	10006c9e	___free_lconv_mon	ram	217	45	
+66	10004271	FUN_10004271	ram	194	33	
+64	10009364	flsall	ram	182	38	
+63	10005c7a	FUN_10005c7a	ram	162	26	
+63	10006580	___initstdio	ram	169	27	
+60	10002660	FUN_10002660	ram	142	18	
+59	10005742	_calloc	ram	175	35	
+58	10006860	__aulldvrm	ram	149	24	
+57	1000869a	___sbh_alloc_new_region	ram	183	25	
+55	10003170	FUN_10003170	ram	200	34	recursion
+55	100033fa	_atol	ram	136	18	
+54	10007113	FUN_10007113	ram	127	21	
+52	1000a0c1	FUN_1000a0c1	ram	131	20	
+51	100091bb	__lseeki64_lk	ram	131	24	
+51	10009f9a	__commit	ram	177	33	
+50	10004130	FUN_10004130	ram	119	17	
+48	10009066	__free_osfhnd	ram	127	20	
+48	1000923e	__fcloseall	ram	146	26	
+48	1000a060	___ascii_strnicmp	ram	97	14	
+46	100050f0	_strlen	ram	139	16	
+46	10006217	__lseek	ram	160	27	
+46	10006467	__write	ram	160	27	
+46	10007ddd	FID_conflict:_ungetc	ram	108	13	
+46	10009126	FUN_10009126	ram	115	14	
+46	100098ed	__read	ram	160	27	
+45	1000821d	__onexit_lk	ram	128	16	
+43	100061a3	__lseek_lk	ram	116	16	
+42	10005579	FUN_10005579	ram	101	22	
+42	1000a144	__close	ram	144	24	
+41	1000679a	___wctomb_mt	ram	96	17	
+40	10005f31	__heap_term	ram	127	19	
+40	10007000	_memset	ram	96	12	
+40	100092d9	__flush	ram	93	8	
+40	100095f0	___ascii_stricmp	ram	78	5	
+37	1000439f	__getptd	ram	113	19	
+37	1000457b	FUN_1000457b	ram	111	17	
+36	100032b0	FUN_100032b0	ram	88	16	
+35	100056d1	_free	ram	104	22	
+35	10006e80	_strcspn	ram	70	6	
+35	10008ff3	__dosmaperr	ram	115	15	
+34	100066e1	__heap_alloc	ram	111	22	
+34	100070a9	__mtdeletelocks	ram	85	23	
+33	10006c3f	___free_lconv_num	ram	95	21	
+33	100076e0	_strpbrk	ram	64	6	
+33	10007762	__local_unwind2	ram	104	13	
+33	10009b45	__msize	ram	106	22	
+30	100076a0	_strncmp	ram	57	6	
+30	10009efd	__fclose_lk	ram	76	9	
+29	10008e5d	___crtInitCritSecAndSpinCount	ram	103	25	kernel32.dll | InitializeCriticalSectionAndSpinCount
+28	100059fb	__ioterm	ram	76	15	
+27	10007060	__mtinitlocks	ram	73	18	
+27	1000944b	FUN_1000944b	ram	86	19	
+26	10002560	FUN_10002560	ram	84	14	
+26	10005ee0	__heap_init	ram	81	13	
+26	10008005	FUN_10008005	ram	73	15	
+25	10005fb0	__chkstk	ram	61	7	
+23	1000390d	write_char	ram	51	6	
+23	10003964	write_string	ram	55	9	
+22	10003130	FUN_10003130	ram	62	9	bad expression
+22	10009336	__fflush_lk	ram	46	5	
+22	10009f49	_fclose	ram	70	14	
+20	10007192	__lock	ram	49	10	
+19	10003487	_sscanf	ram	52	10	
+19	100045f0	__allmul	ram	52	8	
+19	10006512	__getbuf	ram	68	5	
+19	100071c4	__SEH_prolog	ram	59	12	
+19	100090e5	__get_osfhandle	ram	65	7	
+18	10003308	_isalpha	ram	63	8	
+18	10003347	_isdigit	ram	58	8	
+18	10003381	_isxdigit	ram	63	8	
+18	100033c0	_isspace	ram	58	8	
+18	10005e3e	FUN_10005e3e	ram	61	17	
+18	1000616a	__FF_MSGBANNER	ram	57	9	
+18	10007720	__global_unwind2	ram	32	2	
+18	1000780e	FUN_1000780e	ram	47	4	
+17	1000663d	__lock_file	ram	47	8	
+17	1000668f	__unlock_file	ram	47	8	
+17	1000783d	setSBCS	ram	41	11	
+17	1000830f	___sbh_heap_init	ram	72	11	
+17	1000a1df	__freebuf	ram	43	4	
+16	10001020	FUN_10001020	ram	70	12	
+16	10002870	FUN_10002870	ram	36	5	
+16	10003940	write_multi_char	ram	36	8	
+16	1000675c	__nh_malloc	ram	44	10	
+15	10003240	FUN_10003240	ram	52	6	
+15	10003280	analyse	ram	42	5	
+14	10002810	FUN_10002810	ram	48	9	
+14	10002900	FUN_10002900	ram	53	9	expression too complex
+14	10004333	___updatetlocinfo	ram	50	10	
+14	10008357	___sbh_find_block	ram	43	6	
+13	10002840	FUN_10002840	ram	41	6	
+13	10005537	FUN_10005537	ram	47	12	mscoree.dll | CorExitProcess
+13	10006556	__isatty	ram	42	4	
+13	1000666c	__lock_file2	ram	35	6	
+13	100066be	__unlock_file2	ram	35	6	
+13	10006821	report_failure	ram	41	8	
+13	100082c5	__onexit	ram	50	11	
+13	10008e32	__callnewh	ram	27	4	
+12	100037c1	__amsg_exit	ram	48	10	
+12	10007f09	_mbtowc	ram	43	8	
+11	10001000	tfunc	ram	30	5	Copyright (c)  emu8086.com                        | Copyright (c)  emu8086.com                       
+11	100028c0	FUN_100028c0	ram	50	8	stack overflow
+11	10003584	FUN_10003584	ram	34	6	
+11	10004624	__inc	ram	22	2	
+11	100067fa	_wctomb	ram	39	7	
+11	10009705	FUN_10009705	ram	27	2	
+10	10005ec6	___heap_select	ram	26	4	
+10	100077f6	FUN_100077f6	ram	24	4	
+10	10009199	__unlock_fhandle	ram	34	4	
+9	10002530	FUN_10002530	ram	36	6	
+9	10002640	FUN_10002640	ram	20	4	
+9	10002eb0	yur_init_analyser	ram	28	4	
+9	100071ff	__SEH_epilog	ram	17	1	
+8	100029b0	FUN_100029b0	ram	43	7	
+8	1000436e	FUN_1000436e	ram	30	6	
+8	10007cde	___initmbctable	ram	30	4	
+8	100082fd	_atexit	ram	18	2	
+7	100070fe	FUN_100070fe	ram	21	4	
+7	10009404	FUN_10009404	ram	17	2	
+6	100028a0	s_Last_analyse_ERROR	ram	20	4	
+6	10002970	FUN_10002970	ram	19	3	0123456789abcdefABCDEF
+6	10002990	FUN_10002990	ram	19	3	01234567
+6	100056b1	__exit	ram	17	2	
+6	100056c2	FUN_100056c2	ram	15	1	
+6	10006788	_malloc	ram	18	3	
+5	10006629	___endstdio	ram	20	4	
+5	10008e4d	___crtInitCritSecNoSpinCount@8	ram	16	3	
+4	10004365	FUN_10004365	ram	9	1	
+4	1000438c	FUN_1000438c	ram	19	2	
+4	10004566	FUN_10004566	ram	9	1	
+4	10004572	FUN_10004572	ram	9	1	
+4	10005567	FUN_10005567	ram	9	1	
+4	10005570	FUN_10005570	ram	9	1	
+4	10005724	FUN_10005724	ram	9	1	
+4	100057ec	FUN_100057ec	ram	9	1	
+4	1000629e	FUN_1000629e	ram	8	1	
+4	100064ee	FUN_100064ee	ram	8	1	
+4	10006753	FUN_10006753	ram	9	1	
+4	10006852	__security_check_cookie	ram	14	3	
+4	10007cd5	FUN_10007cd5	ram	9	1	
+4	100092d0	FUN_100092d0	ram	9	1	
+4	10009430	FUN_10009430	ram	9	1	
+4	10009439	__flushall	ram	9	1	
+4	10009442	__fptrap	ram	9	1	
+4	10009974	FUN_10009974	ram	8	1	
+4	10009b00	FUN_10009b00	ram	9	1	
+4	10009bb2	FUN_10009bb2	ram	9	1	
+4	10009f92	FUN_10009f92	ram	8	1	
+4	1000a03a	FUN_1000a03a	ram	8	1	
+4	1000a1bb	FUN_1000a1bb	ram	8	1	
+3	10005fed	FUN_10005fed	ram	6	0	
+3	10006d80	FUN_10006d80	ram	7	2	
+3	10008fe1	FUN_10008fe1	ram	9	1	
+3	10008fea	FUN_10008fea	ram	9	1	
+2	100082f7	FUN_100082f7	ram	6	1	
+1	10003482	_atol	ram	5	1	
+1	1000a2de	KERNEL32.DLL::RtlUnwind	ram	6	2	

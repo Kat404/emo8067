@@ -1,0 +1,13 @@
+emu8086 assembler
+Where to start?
+Click code examples and select Hello, world. A code example with many comments should open. All comments are green and they take up about 90% of all text, so don't be scared by this tiny "Hello Word" code. The compiled executable is only about 100 bytes long, because it uses no interrupts and has only one loop for color highlighting the text. All other code is straight-forward and writes directly to video memory.
+To run this example in the emulator, click emulate (or press F5). The program then attmepts to assemble and save the executable to c:\emu8086\MyBuild. If the assembler succeeds in creating the file, the emulator will also automatically load it into memory.
+You can then click single step (or press F8) to step through the code one instruction at a time, observing changes in registers and the emulator screen. You can also click step back (or press F6) to see what happens when reversing those changes.
+There are many ways to print "Hello,World" in assembly language, and this certainly isn't the shortest way. If you click examples and browse c:\emu8086\examples, you'll find HelloWorld.asm which assembles into only a 30-byte executable. Unlike the previous example which carries out each step by itself, this one is much smaller because it uses a built-in interrupt function of the operating system to write to the display.
+The integrated 8086 assembler can generate console programs that can be executed on any computer that
+runs x86 machine code (Intel/AMD architecture)
+The architecture of the 8086 Intel microprocessor is called "Von Neumann architecture" after
+the mathematician who conceived of the design.
+NOTE: A CPU can interpret the contents of memory as either instructions or data; there's no difference 
+in the individual bytes of memory, only the way in which they're arranged. Because of this, 
+it's even possible for programs to re-write their own instructions, then execute the instructions they've changed.

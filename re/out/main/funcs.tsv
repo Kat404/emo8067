@@ -1,0 +1,1539 @@
+size	addr	name	space	insns	refs	strings
+35010	004eff00	FUN_004eff00	ram	160346	26766	wrong C6 address on doStep() | wrong C7 address on doStep() | wrong EA for [8C] | no such opcode in 8086 instruction set. | 8F / |     -    | no such opcode in 8086 instruction set. | FE / | the emulator is halted. | unknown opcode skipped: | not 8086 instruction - not supported yet.
+9485	0051ff60	FUN_0051ff60	ram	43557	7558	divide error - overflow. | to manually process this error, | change address of INT 0 in interrupt vector table. | overlow | INT 4 can be customized in interrupt vector table. | not graphical mode! | use this code to set graphics mode: | mov ah, 0 | mov al, 13h | int 10h | not graphical mode! | use this code to set graphics mode: | mov ah, 0 | mov al, 13h | int 10h | CX value (string size) is above the allowed limit! | CX is out of memory | INT 10h, AH=13h -  | note: the emulator does not blink. | INT 10h, AX=1003h, BL=01  -  | INT 10h, AX=1003h, BL=0 | h  -  | wrong parameter in BL! | INT 10h, AH=0 | h   -  | is not supported | refer to the list of supported interrupts | INT 13h, AH=0 | h    | - not supported yet. | refer to the list of supported interrupts | INT 15h, AH=0 | h    | - not supported yet. | refer to the list of supported interrupts. | if you need int 21h, put h suffix to 21 | INT 16h, AH=0 | h   -  | - not supported yet. | refer to the list of supported interrupts. | INT 1Ah, AH=0 | h    | - not supported yet. | refer to the list of supported interrupts. | program requested reboot. the emulator halted. | note: you can overwrite INT 19h in interrupt vector table | to create custom reboot function. for more information | refer to custom_interrupt.asm in examples. | program terminated. | PROGRAM HAS RETURNED CONTROL TO THE OPERATING SYSTEM | program terminated. | PROGRAM HAS RETURNED CONTROL TO THE OPERATING SYSTEM | address:  | byte 24h not found after 2000 bytes. | ; correct example of INT 21h/9h: | INT 21h, AH=09h -  | mov dx, offset msg | mov ah, 9 | int 21h | msg db "Hello$" | interrupt error:  | h/3Dh : cannot open file. | interrupt error:  | h :  | program terminated. | PROGRAM HAS RETURNED CONTROL TO THE OPERATING SYSTEM | INT 21h, AH=0 | - not supported yet. | refer to the list of supported interrupts. | this interrupt is not defined yet, it is availabe for custom functions. | you can define this interrupt by modifying interrupt vector table | refer to the list of supported interrupts and global memory table.
+6845	006159f0	FUN_006159f0	ram	31857	5848	MASM_PATH | emu8086.ini | \BIN\ | MASM_PATH is not set in emu8086.ini | .exe | BIN\ | BIN\ | MASM_PATH must be set to MASM folder. | MASM_LINK_PATH | emu8086.ini | LINK.EXE | BINR\LINK.EXE | BINR\ | MASM_INCLUDE_PATH | emu8086.ini | INCLUDE | name  | NAME  | #masm | #MAKE_ | #MAKE_COM# | #MAKE_EXE# | #MAKE_BIN# | #MAKE_BOOT# | PAGE | all binary files (*.exe;*.com;*.bin;*.dll;*.sys;*.obj)|*.exe;*.com;*.bin;*.dll;*.sys;*.obj|exe files (*.exe)|*.exe|com files (*.com)|*.com|bin files (*.bin)|*.com|all Files (*.*)|*.* | cannot use this filename / sharing violation / access denied | .exe | .exe | .exe | .com | .com | .com | .obj | .lst | .symbol | .debug | .log | .binf | .asm | ; [SOURCE]:  | _masm.ok | _masm.bat | _masm | .bat | .map | .lst | .log | .obj | rem    EMU8086 - MASM INCORPORATION  --  |  --  | SET INCLUDE= | inc; | MySource; | cd " | SET INCLUDE= | inc; | MySource; | SET PATH= | SET LIB= | SET INIT= | INIT | SET HELPFILES= | HELP\*.HLP | SET ASMEX= | SAMPLES | SET TMP= | ml.exe /Fl" | " /Fm" | " /Fo" | " /Sa  |  /Fe" | "   > " | cd " | echo    masm-ok    > " | error: cannot start MASM! | assembler aborted | .exe | .exe | .com | .com | no binary output! | there are errors! | .binf |  [A-F,a-f] | segment | "STACK" | 'STACK' | .~asm | ; [SOURCE]:  | Listing is saved:
+5827	0060bf00	FUN_0060bf00	ram	26886	4953	name  | NAME  | #fasm | #MAKE_ | #MAKE_COM# | #MAKE_EXE# | #MAKE_BIN# | #MAKE_BOOT# | format | COFF | COFF | include | win32ax.inc | db 'DEVICE  ' | all binary files (*.exe;*.com;*.bin;*.dll;*.sys;*.obj)|*.exe;*.com;*.bin;*.dll;*.sys;*.obj|exe files (*.exe)|*.exe|com files (*.com)|*.com|bin files (*.bin)|*.com|all Files (*.*)|*.* | cannot use this filename / sharing violation / access denied | .list | .symbol | .debug | .log | .binf | .~asm | ; [SOURCE]:  | _fasm.ok | _fasm.bat | _fasm | .bat | .list | .log | rem    EMU8086 - FASM INCORPORATION  --  |  --  | set include= | fasm\include; | inc; | MySource; | cd " | set include= | fasm\include; | inc; | MySource; | set PATH= | fasm | fasm\fasm.exe " | "  > " | cd " | echo    fasm-ok    > " | error: cannot start fasm! | assembler aborted | no binary output! | there are errors! | .binf | (GLOBAL) | Listing is saved:
+5485	00493fd0	FUN_00493fd0	ram	19230	3550	no code to assemble.... :(  | type something like: HLT  ; at least...   | please wait... | noname | (NOSEG) | masm... | recursive MACRO definition is over  | (NOSEG) | pass #  | IMUL | IDIV | TEST | CALL | RETN | RETF | PUSH | XCHG | SEGMENT | SEGMENT | .RADIX | endm  |  endm | endm |  dup  |  db  |  db  |  dup( |  db  |  db  | .macros | .procedures | not supported. | dup  | dup( | illegal instruction: | or wrong parameters. | overflow! - cannot be evaluated: | (NOSEG) | error 71:  | no size:  | (NOSEG) | (NOSEG) | Assembled in | passes. Time spent: | seconds. | not enough instructions... | should be at least 1 instruction outside macro or before the 'END' directive | creating plain binary file. | startup | startup | code segment | .code | code | directive: org 100h - found! | generally only .COM programs require | location counter to be set to 100h bytes. | continue anyway? | ORG 100h | EXE file not built, aborted - ORG 100h found! | wrong entry point! |  END  | entry point not set! | Generally only .BIN programs (boot sectors) begin | with a 7C00H byte prefix. | Continue anyway? | ORG 7C00H | Line "ORG 7C00H" - found! | EXE file not built, aborted - "ORG 7C00H" found! | is compiled successfully into |  bytes. | ORG 100H | directive: org 100h - not found! | usually a .COM program must set location counter | to 100h bytes. | the incorrect listing may be generated! | continue anyway? | COM file not built, aborted - ORG 100h not found! | Cannot generate a COM file. Remove the stack segment. | executable file is not created! | is assembled successfully into |  bytes. | executable file is not created! | line "org 7c00h" - not found in the begining of the file! | generally a boot sector is loaded | at address 0000:7c00h. | org 7c00h | continue anyway? | boot record file not built, aborted - "org 7c00h" not found! | is assembled successfully into |  bytes. | executable file is not created! | true | LISTING | emu8086.ini | true | there are errors! | fasm...
+4655	0048a0e0	FUN_0048a0e0	ram	20796	3647	.org  | .,:$/\]-'"`~!@#%^&*()_+[><  | COMMENT | MACRO | MACRO | ENDM | PAGE | TITLE | TITLE  | NAME | NAME  | MACRO | MACRO | ENDM | unterminated MACRO definition! (i_err) | SEGMENT | SEGMENT | end: | any code after 'END' directive is ignored. | #MAKE_ | first output type directive | output type is set here again! | #MAKE_COM# | #MAKE_EXE# | #MAKE_BIN# | #MAKE_BOOT# | wrong output type:  | ASSUME | @data | @data | data | @data | no endm | unterminated comment block.
+4077	005e6540	FUN_005e6540	ram	18404	3422	There are no recorded back steps .... | tmp\deleted_bkp_ | .dat | true | FILE_UNDO_NOTE | emu8086.ini | true | note:  | byte-by-byte file write operations cannot be undone, however | all subsequent write operations are reverted when file open is undone. |  to turn off this notification set |  FILE_UNDO_NOTE=false in emu8086.ini | tmp\deleted_bkp_ | .dat | tmp\opened_bkp_ | .dat | cannot re-open the file with the same file number... | undo is not possible. | note:  | screen scroll operations cannot be undone. | it applies both to automatic and manual scroll. | screen cleared. | note:  | memory write operation exceeded  |  bytes. | when interrupt modifies more than  |  bytes | it cannot be undone, it applies to RAM / video memory. | screen cleared.
+3193	004cc150	FUN_004cc150	ram	13817	2673	Flag1 | FIRST_RUN | emu8086 | Flag1 | FIRST_RUN | emu8086 | FIRST_RUN | emu8086 | LNGDATE | FIRST_RUN | emu8086 | true | emu8086.ini | true | default | ASCII_VIEWER | emu8086.ini | default | notepad | true | emu8086.ini | true | true | TRIM_ORIGINAL_SOURCE | emu8086.ini | true | default | RECENT_FILES | emu8086.ini | default | true | emu8086.ini | true | EMUPORT | emu8086.ini | c:\emu8086.hw | HW_INTERRUPT_FILE | emu8086.ini | ASCII_EXTENTIONS | emu8086.ini | false | STRICT_SYNTAX | emu8086.ini | true | true | BEEP | emu8086.ini | true | true | LOCAL_DOCUMENTATION | emu8086.ini | true | documentation\index.html | documentation\ | http://www.emu8086.com/dr/ | http://www.emu8086.com/dr/ | diasm.dll | file not found: |  diasm.dll | MicroAsm.dll | file not found: MicroAsm.dll | [default] | [default] | OutputDir | Dirs | emu8086 | [default] | MyBuild | MySource | MySource | RKsCURRENT_SOURCE_FOLDER | Dirs | emu8086 | examples | RKsCURRENT_SOURCE_FOLDER | Dirs | emu8086 | LNGDATE | FIRST_RUN | emu8086 | win.ini | reg2000 | EXPIRED | EXPIRED | EXPIRED | reg2000 | .html | default | emu8086.ini | default | vdrive\
+3052	0049e660	FUN_0049e660	ram	12345	2209	RecentEditor | Terminal | Terminal | ASM_8086 | ASM_8086 | sampleN | sampleN99
+2882	005be5f0	FUN_005be5f0	ram	8590	1583	
+2806	004c5600	FUN_004c5600	ram	9590	2095	.exe | .exe | executable files (*.exe)|*.exe|all Files (*.*)|*.* | .exe_ | .exe_ | .~asm | save error: | set correct output directory from the "assembler" menu. | EXE HEADER - bytes from 0000 to  |  inclusive. | code | &H4D | &H5A | exe signature (M) | exe signature (Z) | bytes on last page (l.byte) | bytes on last page (h.byte) | 512 byte pages in file (l.byte) | 512 byte pages in file (h.byte) | relocations (l.byte) | relocations (h.byte) | paragraphs in header (l.byte) | paragraphs in header (h.byte) | minimum memory (l.byte) | minimum memory (h.byte) | &HFF | maximum memory (l.byte) | &HFF | maximum memory (h.byte) | SS - stack segment (l.byte) | SS - stack segment (h.byte) | SP - stack pointer (l.byte) | SP - stack pointer (h.byte) | check sum (l.byte) | check sum (h.byte) | IP - instruction pointer (l.byte) | IP - instruction pointer (h.byte) | CS - code segment (l.byte) | CS - code segment (h.byte) | &H1E | relocation table adress (l.byte) | relocation table adress (h.byte) | overlay number (l.byte) | overlay number (h.byte) | signature (l.byte) | signature (h.byte) | relocation table - offset inside segment (l.byte) | relocation table - offset inside segment (h.byte) | relocation table - segment anchor (l.byte) | relocation table - segment anchor (h.byte) |  to 01FF  -   reserved relocation area  (00)  | check sum (l.byte) | check sum (h.byte)
+2751	005c5d70	FUN_005c5d70	ram	9515	2076	=== unsigned === |     below | (CF=1) | not below | (CF=0) |     above | (CF=0 and ZF=0) | not above | (CF=1 or ZF=1) | === signed === |     less | (SF<>OF) | not less | (SF=OF) |     greater | (SF=OF and ZF=0) | not greater | (SF<>OF or ZF=1) |     equal | (ZF=1) | not equal | (ZF=0) | negative | (SF=1) | positive | (SF=0) |    overflow | (OF=1) | no overflow | (OF=0) | parity even | (PF=1) | parity odd  | (PF=0) |     aux carry | (AF=1) | not aux carry | (AF=0) | hw-int disabled | (IF=0) | hw-int enabled  | (IF=1) | forward dir  | (DF=0) | backward dir | (DF=1)
+2640	0054ae60	FUN_0054ae60	ram	12285	1614	
+2260	00578640	FUN_00578640	ram	8531	1758	
+2093	00517d10	FUN_00517d10	ram	7391	1444	.txt | unknown.txt | text files (*.txt)|*.txt|all Files (*.*)|*.* | ; >>>>>>>>>>> disassembled code <<<<<<<<<<<< |  bytes. | .COM_ | .COM | ORG 100h | .EXE_ | .EXE | #MAKE_EXE# | #MAKE_BOOT# | ORG 7C00h | ; ------------- MEMORY at  |  ------------- |  bytes  | ------------- REGISTERS ------------- | AL =  | AH =  | BL =  | BH =  | CL =  | CH =  | DL =  | DH =  | DS =  | ES =  | SI =  | DI =  | BP =  | CS =  | IP =  | SS =  | SP =  | would you like to open it with notepad? | notepad | notepad | the emulator's state is saved to: | open in notepad? | open
+2069	00558b90	FUN_00558b90	ram	8418	1241	
+1774	005f7690	FUN_005f7690	ram	5485	1119	<html> | <head> |        <title> | </title> |        <meta name="description" content=" |        <style> |            a:link {text-decoration: none} |            a:visited {text-decoration: none} |            a:hover {text-decoration: none; color:#ff0000} |        </style> | </head> | <body leftmargin= |   rightmargin= |  topmargin=20 bgcolor= |  text= |  link=blue vlink=blue alink=blue> | <!-- * --> | &nbsp; &nbsp;<center> <font color= | > ;</font> <font size= |  face=" |  </font></center> | <!-- START AUTOMATIC ASM TO HTML EXPORT --> | <pre><font size= |  face=" | <pre><font face=" | &gt; | &lt; | &amp; | </font></pre> | <br>  <br> <center> <font color= | >;</font>  <font face="verdana" size=3><a href="index.html"><u>- index -</u></a></font> </center> <br>  <br><br>   | <center> <font color= | >;</font> <a href="http://www.emu8086.com" target="_blank"><font face=verdana size=1 color= | > - asm2html - </font></a> </center> | <!-- emu8086 version  |     --> | <!-- STOP AUTOMATIC ASM TO HTML EXPORT --> | <!-- *** --> | </body> | </html>
+1764	00486e00	FUN_00486e00	ram	6116	1116	INCLUDE | INCLUDE  | inc\ | .MODEL | tiny | ORG 100H | .DATA | JMP code | data segment | data | .CODE | code: | code segment | code | .STACK | .stack | stack segment |  dup('T') | ends | .exit | mov ax, 4c00h | int 21h | .START | .STARTUP | startup: | MOV DX, data | MOV DS, DX | .8088 | .8086 | .186 | .0186 | ORG 100h must be before .DATA | file not found: | recursive include file?  | recursive include file?  | include file is too long!!! | include file is too long!!!
+1761	00575c60	FUN_00575c60	ram	7706	1434	cannot set the same back and fore color. | defaults set! | select control name from the list | nothing selected
+1675	004b6b80	FUN_004b6b80	ram	6080	1162	FAR  | LABEL | NEAR | dword | dword | NEAR | d16 (simple var) | d16 (simple var) | cannot assemble far call. | refer to  far_call-2.asm  in examples. | wrong parameters: | name | 'name' is a reserved keyword.
+1644	00553030	FUN_00553030	ram	6659	1084	
+1623	004bfd70	FUN_004bfd70	ram	5795	1163	 DB  |  dup | zero prefix must be added to a HEX value, for example: 0Ch | over 8 bits: | cannot evaluate this expression: | comma is missing or wrong syntax:  | comma is missing or wrong syntax:  | wrong size for DUP:  | cannot be evaluated: | over 8 bits: | mismatched or misplaced quotes
+1584	005fb570	FUN_005fb570	ram	5412	1022	MySource | asm2html | note: |      it is recommended to save any unsaved code.  | path to ASM files: | asm2html\ | *.asm |  -- WARNING ! --  |   are to be overwritten ! |  source files pattern:  | no files with this pattern:  | in:  | .html |  from  | index.html | asm2html |       |  files and index.html are saved to:       |        |      click OK to explore. | explore | cannot save index.html
+1571	0059b880	FUN_0059b880	ram	4338	970	AAA AAD AAM AAS ADC ADD AND CALL CBW CLC CLD CLI  | CMC CMP CMPSB CMPSW CWD DAA DAS DEC DIV HLT IDIV  | IMUL IN INC INT INTO IRET JA JAE JB JBE JC JCXZ  | JE JG JGE JL JLE JMP JNA JNAE JNB JNBE JNC JNE JNG  | JNGE JNL JNLE JNO JNP JNS JNZ JO JP JPE JPO JS JZ  | LAHF LDS LEA LES LODSB LODSW LOOP LOOPE LOOPNE  | LOOPNZ LOOPZ MOV MOVSB MOVSW MUL NEG NOP NOT OR OUT POP POPA POPF PUSH PUSHA  | PUSHF RCL RCR REP REPE REPNE REPNZ REPZ RETF RET  | ROL ROR SAHF SAL SAR SBB SCASB SCASW SHL SHR STC STD STI  | STOSB STOSW SUB TEST XCHG XLAT XLATB XOR LOCK  | F2XM1 F4X4 FABS FADD FADDP FBANK FBLD FBSTP FCHS FCLEX FCOM FCOMP FCOMPP FCOS FDECSTP FDISI FDIV FDIVP FDIVR FDIVRP FENI FFREE FIADD FICOM FICOMP FIDIV FIDIVR FILD FIMUL FINCSTP FINIT FIST FISTP FISUB FISUBR FLD FLD1 FLDCW FLDENV FLDL2E FLDL2T FLDLG2 FLDLN2 FLDPI FLDZ FMUL FMULP FNCLEX FNDISI FNENI FNINIT FNOP FNSAVE FNSTCW FNSTENV FNSTSW FPATAN FPREM FPREM1 FPTAN FRNDINT FRSTOR FSAVE FSCALE FSETPM FSIN FSINCOS FSQRT FST FSTCW FSTENV FSTP FSTSW FSUB FSUBP FSUBR FSUBRP FTST FUCOM FUCOMP FUCOMPP FXAM FXCH FXTRACT FYL2X FYL2XP1 |  WAIT FWAIT | PROC | MACRO | SEGMENT | ENDP | ENDM | ENDS | AX BX CX DX AH AL BL BH CH CL DH DL DI SI BP SP  | EAX ECX EDX EBX ESP EBP ESI EDI  | CR0 CR2 CR3 CR4  | DR0 DR1 DR2 DR3 DR6 DR7  | ST0 ST1 ST2 ST3 ST4 ST5 ST6 ST7  | MM0 MM1 MM2 MM3 MM4 MM5 MM6 MM7  | XMM0 XMM1 XMM2 XMM3 XMM4 XMM5 XMM6 XMM7 | BYTE PTR | WORD PTR | OFFSET | INCLUDE | ASM_8086
+1527	0058bd50	FUN_0058bd50	ram	5597	946	
+1495	0057bfa0	FUN_0057bfa0	ram	5373	1134	associations | emu8086 | un-associate  .asm  and  .inc files | associate  .asm  and  .inc files
+1482	004cf940	FUN_004cf940	ram	6316	1223	_emu8086_log.txt | ============================================================================= | EMU8086 INTEGRATED ASSEMBLER EMULATOR  --  |  --  | false | SILENT_ASSEMBLER | emu8086.ini | false | [version] | [total] | [filename] | ============================================================================= | SOURCE:  | ============================================================================= | EMU8086 INTEGRATED ASSEMBLER PROCESSED  |  FILES.   |   --   | <END>
+1474	0057d860	FUN_0057d860	ram	5647	1078	
+1474	0057eee0	FUN_0057eee0	ram	5647	1078	
+1468	005f0a90	FUN_005f0a90	ram	6111	1160	Lang file not set! | Use Set_Lang_File() to set language file first! | [---START FORM---] | [CAPTION] | [---END FORM---] | [END TEXT] | [END TOOLTIP] | [--- START CONTROLS ---] | [CONTROL NAME] | [TEXT] | [END TEXT] | Charset | Font | MultiLine | [END TEXT] | Text | Text | List | [END TEXT] | List | Caption | [TOOLTIP] | ToolTipText | Left | Width | Height
+1463	005fce10	FUN_005fce10	ram	4474	958	<html> | <head> |        <title> | </title> |        <meta name="description" content=" |        <style> |            a:link {text-decoration: none} |            a:visited {text-decoration: none} |            a:hover {text-decoration: none; color:#ff0000} |        </style> | </head> | <body leftmargin= |   rightmargin= |  topmargin=20 bgcolor= |  text= |  link=blue vlink=blue alink=blue> | <!-- * --> | <center>  | &nbsp; &nbsp; <font color= | > ;</font> <h3><font face="verdana">  |  </font></h2> | <!-- START AUTOMATIC INDEX GENERATION --> | <ul><font size= |  face=" | <ul><font face=" | <li>  | <a href=" | " target="_top"> | </a> |        <br><br> |         |        <br><br> | </li> |         |         | </ul></font> | <center> <font color= | >;</font> <a href="http://www.emu8086.com" target="_blank"><font face=verdana size=1 color= | > - asm2html - </font></a> </center> | <!-- emu8086 version  |     --> | <!-- STOP AUTOMATIC INDEX GENERATION --> | </center> | <!-- *** --> | </body> | </html>
+1449	00573f60	FUN_00573f60	ram	6381	1140	
+1448	005d7e00	FUN_005d7e00	ram	5787	1065	no user name. | no registration key. | AX4CT | NCHK | reg2x | NCHKEXP | reg2x | error! | This registration key is expired! | Please update your license by purchasing new registration key. | A747 | the software is successfully registered |                THANK YOU                | wrong registration key. | error!
+1439	004bb3e0	FUN_004bb3e0	ram	5042	1099	insufficient operands for MOV | MOV  | seg  | (NOSEG) | AL,xb | AX,xw | DS,mw | DS,rw | ES,mw | ES,rw | SS,mw | SS,rw | xb,AL | xw,AX | rb,ib | rb,eb | rw,iw | cannot be evaluated: | undefined variable or over 16 bits | first operand must be a register or a memory location | eb,ib | ew,iw | eb,rb | ew,CS | ew,DS | ew,ES | ew,SS | ew,rw | eb,rb | ew,rw | rb,eb | rw,ew | wrong parameters: |  MOV 
+1423	004eeac0	FUN_004eeac0	ram	4980	1099	
+1421	005457c0	FUN_005457c0	ram	7212	1271	the FPU function is not supported yet
+1394	00488650	FUN_00488650	ram	6035	1143	ENDM | unterminated inner MACRO definition!
+1318	004c1bc0	FUN_004c1bc0	ram	4974	971	 DW  |  dup | wrong size for DUP:  | cannot be evaluated:
+1311	005a8e30	FUN_005a8e30	ram	4219	884	.symbol | < THE SYMBOL TABLE >   |   --  emu8086 IDE version:  | < THE SYMBOL TABLE >   |   --  emu8086 assembler version:  | =================================================================================================== | Name | Offset | Size | Type | Segment | =================================================================================================== | =================================================================================================== |   --   | < END > | Symbol table is saved:
+1296	006072b0	FUN_006072b0	ram	4658	936	
+1260	005a0190	FUN_005a0190	ram	4613	858	   error |    error
+1250	005bc3d0	FUN_005bc3d0	ram	5040	934	FFFF | FFFF
+1237	005ed670	FUN_005ed670	ram	3739	642	 000:  |      | null | beep | back | newl | cret
+1212	005ff920	FUN_005ff920	ram	3916	824	out of memory!
+1209	004b5830	FUN_004b5830	ram	4680	883	FAR  | SHORT  | dword | dword | d16 (simple var) | wrong parameters:
+1170	00588260	FUN_00588260	ram	3994	834	.list | EMU8086 GENERATED LISTING. MACHINE CODE <- SOURCE. |  -- emu8086 assembler version:  |   --   | =================================================================================================== | [LINE]     LOC: MACHINE CODE                          SOURCE | =================================================================================================== |      | =================================================================================================== | =================================================================================================== | Listing is saved:
+1161	005c0890	FUN_005c0890	ram	3205	605	
+1154	0059f000	FUN_0059f000	ram	3822	673	BIOS DI |   BX= |   CX= |   DX= |   SP= |   BP= |   SI= |   DI= |   ES= |   SS= |   CS= |   IP=
+1098	004ec340	FUN_004ec340	ram	3681	657	file not found: | this file is too small, |  exe file cannot possibly be less than 32 bytes... | &H4D | &H5A | exe signature not found! | UNINS000.exe | EMU8086.exe | file too big, only first 706,448 bytes are loaded. | emulator: 
+1096	005a3670	FUN_005a3670	ram	3727	717	v:DTA | sorry this command isn't supported yet. select help->check for an update.
+1080	005b47e0	FUN_005b47e0	ram	3711	732	NULL | cannot compute the expression! | NULL | cannot compute the expression! | the value is out of the byte range:
+1035	005e49e0	FUN_005e49e0	ram	3367	671	
+1034	00555de0	FUN_00555de0	ram	4206	846	
+1033	004e9e50	FUN_004e9e50	ram	3532	657	all known files (*.asm, *.exe, *.com, *.bin, *.boot)|*.asm;*.exe;*.exe_;*.com;*.com_;*.bin;*.bin_;*.boot|assembly source files (*.asm)|*.asm|binary executable files (*.com)|*.com;*.com_|executable files (*.exe)|*.exe;*.exe_|binary files (*.bin)|*.bin;*.bin_|old boot sector files (*.boot)|*.boot|all files (*.*)|*.* | RecentEmulator | .EXE | .EXE_ | .COM | .COM_ | .BIN | .BIN_ | FLOPPY_ | .BOOT | .ASM | .EXE | .BIN | .BOOT | .COM | .EXE_ | .BIN_ | .COM_ | .binf | default.binf | can not load in this memory area! | free memory area is between 0050:0000h and 0a000:0000h | file will be loaded at 0100:0000h
+1029	004d4e80	FUN_004d4e80	ram	3411	667	
+1027	005a4b00	FUN_005a4b00	ram	3323	538	error: not valid flag state: 
+1025	004b4330	FUN_004b4330	ram	3668	697	SHORT  | not valid label: | FAR  | conditional jump cannot be FAR: | 0123456789$ | conditional jump is out of range: | allowed values are from -128 to 127. (0-FF) | undeclared label: | label is requred:
+1002	004d8d70	FUN_004d8d70	ram	2678	425	
+987	00499600	FUN_00499600	ram	3409	701	LABEL | PROC | SEGMENT | DUP  | DUP( | PROC |  FAR | NEAR | SEGMENT | SEGMENT | SEGMENT | (ITSELF) | SEGMENT | DUP( | duplicate declaration of:
+986	004abba0	FUN_004abba0	ram	3386	745	{}[]+-*/()^~%<>&| | offset | BYTE | WORD | {}[]+-*/()^~%<>&|
+980	005aa2b0	FUN_005aa2b0	ram	3207	639	_LOC | SEGMENT
+964	005bd840	FUN_005bd840	ram	3384	735	
+954	004e3280	FUN_004e3280	ram	2485	392	
+953	0049b990	FUN_0049b990	ram	3112	570	fasm_ | inc\ | 0_com_template.txt | inc\ | 1_exe_template.txt | inc\ | 2_bin_template.txt | inc\ | 3_boot_template.txt | #fasm# | ; add your code here
+931	005ab000	FUN_005ab000	ram	3132	597	
+920	006135d0	FUN_006135d0	ram	3093	668	LABEL | PROC | SEGMENT | DUP  | DUP( | PROC |  FAR | NEAR | SEGMENT | SEGMENT | SEGMENT | (ITSELF) | SEGMENT | DUP(
+920	0061d9a0	FUN_0061d9a0	ram	3093	668	LABEL | PROC | SEGMENT | DUP  | DUP( | PROC |  FAR | NEAR | SEGMENT | SEGMENT | SEGMENT | (ITSELF) | SEGMENT | DUP(
+916	0057a810	FUN_0057a810	ram	3519	708	
+914	004bdbb0	FUN_004bdbb0	ram	2972	546	8 bit and 16 bit register | 16 bit and 8 bit register | 16 bit register and 8 bit address | 8 bit address and 16 bit register | 8 bit register and 16 bit address (add 'b.' before parameter) | 16 bit address and 8 bit register (add 'b.' before parameter) | second operand is over 8 bits! | second operand is over 8 bits! | cannot use segment register with an immediate value | segment registers cannot go together! | CS cannot be modified directly (use far JMP or CALL) | IP cannot be modified directly (use JMP or CALL) | cannot get value of IP register (use POP after CALL) | wrong use of segment register | first operand cannot be an immediate value | mem to mem | probably it's an undefined var: | probably no zero prefix for hex; or no 'h' suffix; or wrong addressing; or undefined var: | operands do not match: | mem to mem | memory to memory is not allowed for 8086: | use general register to hold intermediate result.
+904	00544c10	FUN_00544c10	ram	2830	464	
+899	005d3a10	FUN_005d3a10	ram	3155	650	welcome... | version  | RecentEditor | www.emu8086.com | CLICK HERE TO BUY THIS SOFTWARE...
+873	004d2220	FUN_004d2220	ram	3718	595	JCXZ | JNAE | JNBE | JNGE | JNLE | LOOP | LOOPE | LOOPNE | LOOPNZ | LOOPZ
+862	0051d5a0	FUN_0051d5a0	ram	2798	417	
+838	004bc7f0	FUN_004bc7f0	ram	2978	589	not found in symbol table: | d16 (simple var) | [BP] + d8 | d16 (simple var) | [BP] + d8
+831	005ccc10	FUN_005ccc10	ram	2784	523	
+826	00561e60	FUN_00561e60	ram	2775	485	
+818	004aa5d0	FUN_004aa5d0	ram	2551	571	[BX + SI] + d8 | [BX + DI] + d8 | [BP + SI] + d8 | [BP + DI] + d8 | [SI] + d8 | [DI] + d8 | [BX] + d8 | [BX + SI] + d16 | [BX + DI] + d16 | [BP + SI] + d16 | [BP + DI] + d16 | [SI] + d16 | [DI] + d16 | [BP] + d16 | [BX] + d16 | [BX + SI] | [BX + DI] | [BP + SI] | [BP + DI] | [SI] | [DI] | [BX] | [BP] + d8 | [BX] cannot go with [BP] - wrong addressing! | [SI] cannot go with [DI] - wrong addressing!
+818	004eadb0	FUN_004eadb0	ram	2615	527	false | START_OUTSIDE_DEVICES_FOLDER | emu8086.ini | true | devices | cannot start this device | because it is outside of the standard devices folder. | copy this file to | or set start_outside_devices_folder=true  in emu8086.ini | #start= | devices\  | cannot start this device. | try to specify the complete file path and extension. | #start=
+812	004e5140	FUN_004e5140	ram	2470	475	emulator.state | file not found:
+810	004c92a0	FUN_004c92a0	ram	2502	545	binary files (*. | )|*. | |all files (*.*)|*.* | .~asm | error saving: | set correct output directory from the "assembler" menu. | .binf
+810	0053c1c0	FUN_0053c1c0	ram	2102	358	
+808	005b21b0	FUN_005b21b0	ram	2674	544	bin file not found: | too many sectors! maximum: 255 | use several bin files. | no drive number | create new drive first! | is it ok to temporary load this file at address 0100:0000h before writing it to virtual floppy? | proceed? | virtual floppy drive write error! | 1 sector is written successfully! | sectors are written successfully!
+794	00593d50	FUN_00593d50	ram	2629	503	
+791	00563d50	FUN_00563d50	ram	2621	449	 chars) |  pixels) |  chars)
+785	005a1490	FUN_005a1490	ram	2852	535	    ^ error |     ^ br error
+774	005417a0	FUN_005417a0	ram	2497	492	
+772	005cbe20	FUN_005cbe20	ram	2681	568	
+771	005caba0	FUN_005caba0	ram	2444	458	
+769	00490440	FUN_00490440	ram	3170	570	Terminal | 39384 | UPDATE_CHECK | emu8086.ini | auto_save_backup.dat | true | STARTUPWIN | emu8086.ini | true
+763	0051c190	FUN_0051c190	ram	2462	360	
+762	004b8d50	FUN_004b8d50	ram	2792	555	first parameter can be AL or AX only. | second operand cannot be AL or AX! | first operand can be AL or AX only! | first operand (port) should be 0..255 or DX.
+762	004b9890	FUN_004b9890	ram	2792	555	second parameter can be AL or AX only. | first operand cannot be AL or AX! | second operand can be AL or AX only! | First operand (port) should be 0..255 or DX.
+761	0049aa50	FUN_0049aa50	ram	2553	494	examples | all known files (*.asm, *.exe, *.com, *.bin, *.boot)|*.asm;*.exe;*.exe_;*.com;*.com_;*.bin;*.bin_;*.boot|assembly source files (*.asm)|*.asm|binary executable files (*.com)|*.com;*.com_|executable files (*.exe)|*.exe;*.exe_|binary files (*.bin)|*.bin;*.bin_|old boot sector files (*.boot)|*.boot|all files (*.*)|*.* | MySource | examples | all known files (*.asm, *.exe, *.com, *.bin, *.boot)|*.asm;*.exe;*.exe_;*.com;*.com_;*.bin;*.bin_;*.boot|assembly source files (*.asm)|*.asm|binary executable files (*.com)|*.com;*.com_|executable files (*.exe)|*.exe;*.exe_|binary files (*.bin)|*.bin;*.bin_|old boot sector files (*.boot)|*.boot|all files (*.*)|*.* | examples | .ASM | .EXE | .BIN | .BOOT | .COM | .EXE_ | .BIN_ | .COM_ | RecentEditor
+761	005f4bd0	FUN_005f4bd0	ram	2685	586	
+759	00597c40	FUN_00597c40	ram	2610	543	decimal | calculator | emu8086 | calculator | emu8086 | calculator | emu8086 | calculator | emu8086 | checkSigned | calculator | emu8086 | optWord | calculator | emu8086 | optByte | calculator | emu8086
+748	0051cbc0	FUN_0051cbc0	ram	2382	367	
+747	0048f290	FUN_0048f290	ram	2585	477	
+735	006064b0	FUN_006064b0	ram	2302	426	DTA ADDRESS:  | PATH:  | DOS PATH:  | ATTRIBUTES:  | h =  | PATTERN: 
+733	004c8760	FUN_004c8760	ram	2395	504	entry point is ignored for .com files. | .com | .com | binary executable files (*.com)|*.com|all files (*.*)|*.* | .com_ | .com_ | .~asm | error saving: | set correct output directory from "assembler" menu.
+733	0051ea80	FUN_0051ea80	ram	2356	364	
+733	005c2940	FUN_005c2940	ram	2301	484	0100 | 0000 |  ; load to segment. |  ; load to offset. |  ;   AL |  ;   AH |  ;   BL |  ;   BH |  ;   CL |  ;   CH |  ;   DL |  ;   DH |  ;   DS |  ;   ES |  ;   SI |  ;   DI |  ;   BP |  ;   CS |  ;   IP |  ;   SS |  ;   SP | MEM=
+730	005c3480	FUN_005c3480	ram	2647	590	LOAD_SEGMENT | LOAD_OFFSET | START
+722	005634d0	FUN_005634d0	ram	1973	318	
+717	0056bec0	FUN_0056bec0	ram	3211	554	unsupported video mode: | set_VIDEO_MODE: 
+716	00577b10	FUN_00577b10	ram	2761	529	
+713	005e0a20	FUN_005e0a20	ram	2596	505	CX value (string size) is over 2000! | DOS OUTPUT REDIRECTION - CX is out of memory | CX value (string size) is over 2000! | DOS OUTPUT REDIRECTION - CX is out of memory
+711	004ba3d0	FUN_004ba3d0	ram	2243	528	not enough operands for | AL,ib | AX,iw | rb,eb | rw,ew | eb,ib | eb,rb | ew,rw | TEST | ew,ib | ew,iw | wrong parameters:
+711	004e46b0	FUN_004e46b0	ram	2122	410	emulator.state | false | emu8086.ini | true | saved to:
+711	0051b820	FUN_0051b820	ram	2270	349	
+700	0054eed0	FUN_0054eed0	ram	2404	490	The emulator can only emulate 16 bit files. | .EXE | .COM | .COM_ | .EXE_ | true | WARN_RUN | emu8086.ini | true | note: running buggy/unchecked executable files outside of the emulator may cause a malfunction. | to prevent the MS-DOS window from closing immediately, | you can have MOV AX,0 / INT 16h as the last instructions | in your assembly program before return to the operating system. | see no-close.asm in examples. | it's possible to turn off this warning in emu8086.ini by setting WARN_RUN=false | are you sure you want to run: | warning! | cannot start: | cannot run this file from the IDE.
+696	0051e120	FUN_0051e120	ram	2246	350	
+693	005ee8e0	FUN_005ee8e0	ram	2564	484	int 33h/AX=0 | h -  | not supported yet... | int 33h/AX=0 | h -  | not supported yet...
+683	004e25e0	FUN_004e25e0	ram	2956	631	
+682	0057b620	FUN_0057b620	ram	2333	489	
+675	0055ea10	FUN_0055ea10	ram	2805	487	
+672	0049db40	FUN_0049db40	ram	2053	431	examples | MySource | MySource | mycode.asm | Assembly (*.asm)|*.asm|All Files (*.*)|*.* | examples | MySource | Assembly (*.asm)|*.asm|All Files (*.*)|*.* | edit:  | RecentEditor
+666	00605280	FUN_00605280	ram	2635	581	
+654	00566130	FUN_00566130	ram	2726	522	
+651	0058e4a0	FUN_0058e4a0	ram	2050	383	
+636	004edec0	FUN_004edec0	ram	2696	519	true | emu8086.ini | true
+635	00540b60	FUN_00540b60	ram	2454	516	
+632	00536290	FUN_00536290	ram	2120	442	custom_memory_map.inf | NO_SYS_INFO | custom memory map is loaded successfully.
+631	005424f0	FUN_005424f0	ram	2048	385	
+631	00542d70	FUN_00542d70	ram	2048	385	
+630	004dec50	FUN_004dec50	ram	2404	367	MACRO name already in use!
+630	005df6b0	FUN_005df6b0	ram	2040	437	vdrive\ | C:\MYBUILD\ | MYBUILD\ | C:\MYBUILD\
+627	004b24c0	FUN_004b24c0	ram	2051	453	not enough operands for | eb,CL | ew,CL | eb,1 | ew,1 | wrong parameters: | only immediate byte or CL can be used as second parameter!
+626	004d4260	FUN_004d4260	ram	2512	421	[BX + SI] | [BX + DI] | [BP + SI] | [BP + DI] | [SI] | [DI] | d16 (simple var) | [BX] | [BX + SI] + d8 | [BX + DI] + d8 | [BP + SI] + d8 | [BP + DI] + d8 | [SI] + d8 | [DI] + d8 | [BP] + d8 | [BX] + d8 | [BX + SI] + d16 | [BX + DI] + d16 | [BP + SI] + d16 | [BP + DI] + d16 | [SI] + d16 | [DI] + d16 | [BP] + d16 | [BX] + d16 | ew=AX | ew=CX | ew=DX | ew=BX | ew=SP | ew=BP | ew=SI | ew=DI | eb=AL | eb=CL | eb=DL | eb=BL | eb=AH | eb=CH | eb=DH | eb=BH
+625	00570850	FUN_00570850	ram	2534	510	OUT OF MEMORY: 
+623	00569d00	FUN_00569d00	ram	1988	312	
+622	004de200	FUN_004de200	ram	2540	493	LOCAL  | LOCAL  | _loc
+622	00615000	FUN_00615000	ram	2329	459	 control register: |  FPU registers:
+614	004bd3d0	FUN_004bd3d0	ram	1922	415	not enough operands for |  LEA | LEA  | MOV  | rw,m | MOV  | MOV  | wrong parameters: |  LEA 
+611	005acca0	FUN_005acca0	ram	2596	493	Options | examples | RKsCURRENT_SOURCE_FOLDER | Dirs | emu8086
+609	00554a80	FUN_00554a80	ram	2447	497	
+609	00555430	FUN_00555430	ram	2447	497	
+608	005fa1e0	FUN_005fa1e0	ram	1887	426	<font color= | </font> | {}[]+-*/()^~%<>&| ,.=#!'":  | <font color= | </font> | <font color= | </font>
+607	00556e80	FUN_00556e80	ram	2440	495	
+607	00557830	FUN_00557830	ram	2440	495	
+607	005581e0	FUN_005581e0	ram	2440	495	
+602	004be7c0	FUN_004be7c0	ram	1901	413	EQU cannot start with a number. | error! |  EQU  |  EQU  | recursive definition is not allowed for EQU: | error! | ,AH,AL,BH,BL,DH,DL,CH,CL,SI,DI,AX,BX,CX,DX,CS,IP,SS,SP,BP,DS,ES, | reserved keyword cannot be redefined: | error!
+590	0056b0c0	FUN_0056b0c0	ram	1855	298	
+587	004b0b40	FUN_004b0b40	ram	2155	411	 cs: |  ds: |  es: |  ss: | .cs: | .ds: | .es: | .ss:
+586	00565270	FUN_00565270	ram	2458	457	ECHO | Bad command or file name
+580	004ed3c0	FUN_004ed3c0	ram	1916	350	file not found: | emulator: 
+578	004d30e0	FUN_004d30e0	ram	2192	398	
+578	004d39a0	FUN_004d39a0	ram	2192	398	
+575	005848a0	FUN_005848a0	ram	2073	440	www.emu8086.com | version  | CLICK HERE TO BUY THIS SOFTWARE...
+575	005a2090	FUN_005a2090	ram	2125	482	
+574	005ca130	FUN_005ca130	ram	2316	437	MyBuild | [default] | OutputDir | Dirs | emu8086 | wrong output directory! | OutputDir | Dirs | emu8086
+571	005948b0	FUN_005948b0	ram	1960	384	Terminal
+567	00614750	FUN_00614750	ram	2011	399	Terminal
+565	005390c0	FUN_005390c0	ram	1681	340	clear break point | set break point | run until | set CS:IP to selected position
+565	005f5f70	FUN_005f5f70	ram	1783	330	source code | source code
+563	004b3ba0	FUN_004b3ba0	ram	1836	409	not enough operands for | XCHG |  XCHG | XCHG  | AX,rw | rw,AX | rb,eb | eb,rb | rw,ew | ew,rw | wrong parameters: |  XCHG 
+561	004a5fa0	FUN_004a5fa0	ram	1601	313	line:  | col:  | sel: 
+558	005d1000	FUN_005d1000	ram	1635	303	_LEFT | WinStates | emu8086 | _TOP | WinStates | emu8086
+549	004b33e0	FUN_004b33e0	ram	1917	388	d16 (simple var) | wrong parameters: |  PUSH 
+548	005d5680	FUN_005d5680	ram	1885	380	Site License | 1 Year Site License
+547	00581290	FUN_00581290	ram	2084	406	
+545	00599240	FUN_00599240	ram	1785	344	
+545	005ad7f0	FUN_005ad7f0	ram	1718	360	Options | Other.dat
+541	005adf80	FUN_005adf80	ram	1775	339	Options | Other.dat
+540	005e5830	FUN_005e5830	ram	1775	326	tmp\deleted_bkp_ | .dat | tmp\deleted_bkp_ | .dat | tmp\opened_bkp_ | .dat
+535	00568390	FUN_00568390	ram	1987	424	
+535	0056fee0	FUN_0056fee0	ram	2188	448	OUT OF MEMORY: 
+534	004bacf0	FUN_004bacf0	ram	1683	376	not enough operands for | dword | word | dword | dword | word | dword | rw,ed | wrong parameters:
+524	00569360	FUN_00569360	ram	1980	426	
+522	0056ea60	FUN_0056ea60	ram	1613	325	
+521	005723d0	FUN_005723d0	ram	1969	380	
+513	0053cac0	FUN_0053cac0	ram	1475	255	*.exe;*.com;*.class;*.jar;*.bat
+512	00493600	FUN_00493600	ram	2050	450	noname.com | noname.com.symbol | noname.com.debug | noname.exe | noname.exe.symbol | noname.exe.debug | noname.bin | noname.bin.symbol | noname.bin.debug | noname.com_ | noname.com_.symbol | noname.com_.debug | noname_.exe | noname.exe_.symbol | noname.exe_.debug | noname.bin_ | noname.bin_.symbol | noname.bin_.debug
+512	00568ba0	FUN_00568ba0	ram	1917	411	
+507	0056e0b0	FUN_0056e0b0	ram	1677	323	cannot set the same back and fore color. | defaults set! | note: video memory must be re-written |  after changing font or diplay size.
+506	004929b0	FUN_004929b0	ram	1987	404	
+506	004d13e0	FUN_004d13e0	ram	1799	343	file not found: | .ASM | .EXE | .BIN | .BOOT | .COM | .COM_ | .BIN_ | .EXE_
+499	004a7ea0	FUN_004a7ea0	ram	1701	341	{}[]+-*/()^~%<>&| | {}[]+-*/()^~%<>&| | offset
+499	004b0130	FUN_004b0130	ram	1609	335	
+498	00564a20	FUN_00564a20	ram	1295	212	
+495	005cff30	FUN_005cff30	ram	1539	263	
+489	00535ad0	FUN_00535ad0	ram	1529	333	INT_VECT | file not found: | BIOS_ROM | file not found:
+489	00585d50	FUN_00585d50	ram	1646	344	Site License | 1 Year Site License
+484	004c1480	FUN_004c1480	ram	1680	373	 DW 
+483	0054a3f0	FUN_0054a3f0	ram	1565	340	http:// | http | true | ASK_OPEN_URL | emu8086.ini | true | no questions asked | would you like to go online? | if your browser won't start automatically, copy & paste the URL to the browser's address bar | online help | file not found: | explorer | open
+482	005aef60	FUN_005aef60	ram	1503	300	Options | Fonts.dat
+480	005cb770	FUN_005cb770	ram	1626	311	Terminal
+480	00602900	FUN_00602900	ram	1503	291	 ...
+479	0051b0e0	FUN_0051b0e0	ram	1643	295	break point encountered at:
+476	004b2d20	FUN_004b2d20	ram	1661	344	d16 (simple var) | wrong parameters: |  POP 
+473	005d6ac0	FUN_005d6ac0	ram	1438	349	
+473	00602f70	FUN_00602f70	ram	1619	316	out of memory!
+470	0053d150	FUN_0053d150	ram	1352	291	.class | \devices | java | open | .jar | \devices | open
+470	00581cc0	FUN_00581cc0	ram	1705	279	
+470	005d1cd0	FUN_005d1cd0	ram	1389	242	_WIDTH | WinStates | emu8086 | WinStates | emu8086
+466	005ae740	FUN_005ae740	ram	1436	287	Options | Fonts.dat
+461	004cb1b0	FUN_004cb1b0	ram	1535	321	the macro expansion exceeds the maximum line length for EQU | recursion is over 100 for EQU definition.
+460	00609080	FUN_00609080	ram	1384	232	
+457	0054fb30	FUN_0054fb30	ram	1278	281	
+455	004df700	FUN_004df700	ram	1667	327	
+454	0052bc40	FUN_0052bc40	ram	1515	315	step delay ms:
+451	0059dff0	FUN_0059dff0	ram	1648	297	
+450	00587270	FUN_00587270	ram	1492	281	
+446	004a4c20	FUN_004a4c20	ram	1261	253	Play Macro 
+445	005d1720	FUN_005d1720	ram	1267	233	_LEFT | WinStates | emu8086 | _TOP | WinStates | emu8086
+442	006042c0	FUN_006042c0	ram	1567	315	
+440	005ce8d0	FUN_005ce8d0	ram	1367	256	
+439	005faf80	FUN_005faf80	ram	1307	310	
+437	005b5f40	FUN_005b5f40	ram	1645	334	
+431	0053f9d0	FUN_0053f9d0	ram	1107	185	
+429	0056cbc0	FUN_0056cbc0	ram	1384	221	
+429	005c5750	FUN_005c5750	ram	1145	186	
+429	005fe9a0	FUN_005fe9a0	ram	1246	231	
+426	0054de90	FUN_0054de90	ram	1342	259	emu8086 | emu8086 | .com_ | HKCR | emu8086 | emu8086 | .exe_ | HKCR | emu8086 | emu8086 | .bin_ | HKCR | PerceivedType | .asm | HKCR | PersistentHandler | .asm | HKCR | PerceivedType | .inc | HKCR | PersistentHandler | .inc | HKCR | emu8086 | emu8086 | .inc | HKCR | emu8086 | emu8086 | .asm | HKCR | assembly source code | assembly source code | emu8086 | HKCR | .exe,0 | emu8086\DefaultIcon | HKCR | .exe  | emu8086\shell\open\command | HKCR
+425	004b1470	FUN_004b1470	ram	1311	263	CMPSB | CMPSW | INTO | IRET | LAHF | LODSB | LODSW | MOVSB | MOVSW | POPF | PUSHF | SAHF | SCASB | SCASW | STOSB | STOSW | XLAT | XLATB | PUSHA | POPA
+425	004b8390	FUN_004b8390	ram	1394	284	RETN | RETF | RETF | RETF | wrong parameters:
+424	004addf0	FUN_004addf0	ram	1373	298	empty parameter!## | empty parameter!## | no such parameter: 
+422	00499040	FUN_00499040	ram	1381	275	_location_counter_ | END 
+422	00593040	FUN_00593040	ram	1490	313	
+422	005a7530	FUN_005a7530	ram	1307	262	
+421	00573200	FUN_00573200	ram	1462	289	
+421	00590820	FUN_00590820	ram	1485	311	
+419	004b19b0	FUN_004b19b0	ram	1285	303	not enough operands for | wrong parameters: | should be a register or a memory location.
+419	0056d230	FUN_0056d230	ram	1352	219	
+419	005a6ea0	FUN_005a6ea0	ram	1383	300	not enough parameters |     error:  | second operand is over 8 bits! | use ow |     error: 
+416	004a1a40	FUN_004a1a40	ram	1248	202	
+416	005da160	FUN_005da160	ram	1403	290	UserName | emu8086 | RegKey | emu8086 | LicCount | emu8086 | NCHK | reg2x | AX4CT | NCHKEXP | reg2x | NCHKEXP | reg2x | NCHKEXP | reg2x | emu8086.com | username | reg.ini | emu8086.com | regkey | reg.ini | reg.ini
+415	00562a40	FUN_00562a40	ram	1437	302	
+411	00591250	FUN_00591250	ram	1457	306	
+411	00591c50	FUN_00591c50	ram	1457	306	
+410	00587930	FUN_00587930	ram	1435	315	
+409	00612e30	FUN_00612e30	ram	1362	280	error: | flat assembler
+404	0058f680	FUN_0058f680	ram	1234	224	
+404	0058ff50	FUN_0058ff50	ram	1234	224	
+402	005bbba0	FUN_005bbba0	ram	1357	281	
+401	0059d9b0	FUN_0059d9b0	ram	1265	246	default | DEBUG_LOG_FONT_FACE | emu8086.ini | default | default | DEBUG_LOG_FONT_SIZE | emu8086.ini | default | HEIGHT TEST. lazy dog jumps over the red fox qwertyuiop[asdfghjkll;'\zxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM
+399	004ebaa0	FUN_004ebaa0	ram	1363	278	START
+398	00583fe0	FUN_00583fe0	ram	1090	170	
+396	00580560	FUN_00580560	ram	1350	230	
+393	004b1f00	FUN_004b1f00	ram	1205	286	not enough operands for | wrong parameters:
+393	00560620	FUN_00560620	ram	1649	316	
+391	00572bc0	FUN_00572bc0	ram	1543	289	
+391	00599ca0	FUN_00599ca0	ram	1387	318	
+389	005389a0	FUN_005389a0	ram	1088	184	cannot find FLOPPY_0 file!
+389	005e33f0	FUN_005e33f0	ram	1344	261	
+383	00567300	FUN_00567300	ram	1598	300	
+382	004a4020	FUN_004a4020	ram	1154	243	
+379	005b6690	FUN_005b6690	ram	1213	214	
+377	0059e780	FUN_0059e780	ram	1115	200	
+377	005c15e0	FUN_005c15e0	ram	1054	169	
+377	0061e5f0	FUN_0061e5f0	ram	1256	254	: error | : error
+375	005daaf0	FUN_005daaf0	ram	1589	321	QW10PASDFGHJKLZXCVBNMERTYU | Z9RTASDF01823ASJFSD1234346GFHPLMASDR613412QWERX | JKASERKKN837C3FRTQZX
+373	005371d0	FUN_005371d0	ram	1632	389	
+370	004a33a0	FUN_004a33a0	ram	1326	287	open | samples | save | compile | emulate | calculator | convertor | options | help | about
+364	004e1020	FUN_004e1020	ram	1322	282	
+363	00548960	FUN_00548960	ram	1047	182	
+362	005a4620	FUN_005a4620	ram	1070	243	
+361	004e8370	FUN_004e8370	ram	1422	284	enter command line parameters, or click cancel to reset. | set command line parameters | reload: | reload? | "   ?
+360	005835a0	FUN_005835a0	ram	1183	207	PROGRAM HAS RETURNED CONTROL TO THE OPERATING SYSTEM | the emulator is halted. | break point encountered at:
+359	005f8fd0	FUN_005f8fd0	ram	1108	220	.html | MySource | mycode.html | HTML files (*.html;*.htm)|*.html;*.htm|All Files (*.*)|*.* | html
+358	005f4660	FUN_005f4660	ram	1199	250	
+357	005ddf80	FUN_005ddf80	ram	1134	251	file does not exist:  | OPEN_VIRTUAL_FILE: unsupported value in AL | set AL=2 (read/write/shared) or refer to int 21h/4Dh reference
+355	004b5280	FUN_004b5280	ram	933	104	
+349	0052c590	FUN_0052c590	ram	1168	246	
+348	004dd640	FUN_004dd640	ram	1175	233	unterminated string:
+343	0052b020	FUN_0052b020	ram	975	159	32765
+341	005e3d10	FUN_005e3d10	ram	1060	240	
+338	005ce110	FUN_005ce110	ram	1020	206	
+336	005d7360	FUN_005d7360	ram	997	240	
+335	004ca680	FUN_004ca680	ram	1027	223	_BKP | true | ALWAYS_BACKUP | emu8086.ini | false | overwrite? | Would you like to overwrite this file:  |   and save a backup as:  | To turn off automatic backup set ALWAYS_BACKUP=false in emu8086.ini
+335	005cfae0	FUN_005cfae0	ram	955	161	0050:0000  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00    ................   | 0000:0000
+334	00543ef0	FUN_00543ef0	ram	1069	204	
+334	00586980	FUN_00586980	ram	1203	208	
+334	0059cc50	FUN_0059cc50	ram	1081	225	.log | emu8086.log | Log files (*.log)|*.log|All Files (*.*)|*.*
+332	004a9860	FUN_004a9860	ram	1042	242	
+331	0052b800	FUN_0052b800	ram	943	151	32765
+331	005c9a00	FUN_005c9a00	ram	1112	233	MyBuild
+330	00543a40	FUN_00543a40	ram	1053	200	
+329	004a8630	FUN_004a8630	ram	1122	236	0123456789HOBD | 0123456789ABCDEF | 01234567
+329	0060ba20	FUN_0060ba20	ram	1088	243	#fasm | use16 | use32 | ; fasm example | format  | ; LIFE - fasm | ; requires FPU | include  | include 'win32ax.inc' | win32ax.inc | #masm
+328	004db690	FUN_004db690	ram	1280	210	
+325	005858e0	FUN_005858e0	ram	1058	215	
+324	004d5c20	FUN_004d5c20	ram	977	203	auto_save_backup.dat | Count
+324	004d7770	FUN_004d7770	ram	1172	235	ERROR: 
+323	005ac420	FUN_005ac420	ram	1149	266	
+323	005faa10	FUN_005faa10	ram	1160	220	%PROC%MACRO%SEGMENT% | %AX%BX%CX%DX%AH%AL%BL%BH%CH%CL%DH%DL%DI%SI%BP%SP%%EAX%ECX%EDX%EBX%ESP%EBP%ESI%EDI%CR0%CR2%CR3%CR4%DR0%DR1%DR2%DR3%DR6%DR7%ST0%ST1%ST2%ST3%ST4%ST5%ST6%ST7%MM0%MM1%MM2%MM3%MM4%MM5%MM6%MM7%XMM0%XMM1%XMM2%XMM3%XMM4%XMM5%XMM6%XMM7% | %DS%ES%SS%CS%%FS%GS | %ORG%DB%DW%DD%DT%DQ%EQU%END%BYTE%PTR%WORD%PTR%B.%W.%OFFSET%INCLUDE%
+321	0055e510	FUN_0055e510	ram	1235	264	
+320	00537ca0	FUN_00537ca0	ram	1097	227	
+320	005a5960	FUN_005a5960	ram	1072	225	   error
+319	00596370	FUN_00596370	ram	1091	207	FLOPPY_
+318	005f6720	FUN_005f6720	ram	1210	206	
+312	004a5ac0	FUN_004a5ac0	ram	1008	207	examples\ | _sample.asm | traffic_lights.asm | palindrome.asm | LED_display_test.asm | stepper_motor.asm | simple_io.asm | examples\
+311	00561820	FUN_00561820	ram	1321	285	
+311	005dd420	FUN_005dd420	ram	961	206	
+310	004af010	FUN_004af010	ram	1057	213	
+310	005a6210	FUN_005a6210	ram	1009	236	   error
+308	005b4220	FUN_005b4220	ram	820	130	
+308	00608970	FUN_00608970	ram	911	139	
+306	005d7780	FUN_005d7780	ram	854	194	http\shell\open\command | open
+306	0060a910	FUN_0060a910	ram	1045	180	
+305	005b02e0	FUN_005b02e0	ram	1119	199	Options | Keywords.dat
+304	004e1b40	FUN_004e1b40	ram	1262	240	
+303	004cad10	FUN_004cad10	ram	1071	245	      -    |       -    |       -   
+303	004da3b0	FUN_004da3b0	ram	953	173	
+303	005b2de0	FUN_005b2de0	ram	899	151	
+301	00595640	FUN_00595640	ram	961	197	
+300	00531be0	FUN_00531be0	ram	1035	214	
+300	00533cb0	FUN_00533cb0	ram	1035	214	
+300	00595e00	FUN_00595e00	ram	1011	194	FLOPPY_
+300	005ceed0	FUN_005ceed0	ram	1035	214	
+300	005f5a70	FUN_005f5a70	ram	1035	214	
+298	004ad2a0	FUN_004ad2a0	ram	888	198	 ptr | byte  | byte  | word  | word  | dword  | dword  |  dw.
+296	004e93a0	FUN_004e93a0	ram	950	205	only 4 floppy drives are allowed! | cannot create new virtual floppy drive. | floppy drive: | created. |  FLOPPY_
+296	005afdc0	FUN_005afdc0	ram	1084	189	Options | Keywords.dat
+295	005d05e0	FUN_005d05e0	ram	879	158	
+294	00598750	FUN_00598750	ram	921	194	decimal | calculator | emu8086 | calculator | emu8086 | calculator | emu8086 | calculator | emu8086 | checkSigned | calculator | emu8086 | optWord | calculator | emu8086 | optByte | calculator | emu8086
+293	004ad9f0	FUN_004ad9f0	ram	946	214	{}[]+-*/()^~%<>&| ,.=#!'":  | offset
+293	0055d750	FUN_0055d750	ram	1157	245	
+293	0055e060	FUN_0055e060	ram	1157	245	
+293	0058ee60	FUN_0058ee60	ram	992	205	
+293	0058f270	FUN_0058f270	ram	992	205	
+290	005f0300	FUN_005f0300	ram	931	161	
+288	004c4280	FUN_004c4280	ram	889	214	(NOSEG) | (NOSEG) | SEGMENT | SEGMENT | (ITSELF)
+288	0058ace0	FUN_0058ace0	ram	931	172	
+287	005ded70	FUN_005ded70	ram	1026	217	file seek: wrong parameter in AL: 0 | allowed values for AL = 0 - start. 1 - current. 2 - end.
+286	004da830	FUN_004da830	ram	803	138	
+286	00565c60	FUN_00565c60	ram	926	192	
+286	005c44c0	FUN_005c44c0	ram	861	156	template | user | emu8086 | use_fasm | user | emu8086
+284	004c4a20	FUN_004c4a20	ram	997	206	ENDS | mismatched:
+283	005491a0	FUN_005491a0	ram	973	255	0000 | 0001 | 0010 | 0011 | 0100 | 0101 | 0110 | 0111 | 1000 | 1001 | 1010 | 1011 | 1100 | 1101 | 1110 | 1111
+283	00550b40	FUN_00550b40	ram	1014	202	01010000b | wrong parameter for INT 17h | , AH= | 01010000b
+282	0058dd40	FUN_0058dd40	ram	940	180	Terminal
+282	0059d5b0	FUN_0059d5b0	ram	940	180	Terminal
+282	005a3160	FUN_005a3160	ram	847	147	
+282	005efe60	FUN_005efe60	ram	923	188	 hardware interrupt: 
+279	0051a580	FUN_0051a580	ram	1123	221	overwrite any previous boot sector of: | overwrite? |  FLOPPY_ | virtual boot sector write error!
+278	0054e920	FUN_0054e920	ram	878	192	no file is loaded. start debug.exe without parameters? | debug | open
+276	004b8950	FUN_004b8950	ram	957	194	wrong parameters: |  INT 
+276	004e7d10	FUN_004e7d10	ram	983	214	FLOPPY_
+275	005abf90	FUN_005abf90	ram	962	232	NULL
+274	0055d2f0	FUN_0055d2f0	ram	1076	229	
+274	0055dc00	FUN_0055dc00	ram	1076	229	
+272	005a6730	FUN_005a6730	ram	803	192	max L: 400 (1024 bytes) | all bytes are equal
+271	00600ee0	FUN_00600ee0	ram	839	167	
+271	006012c0	FUN_006012c0	ram	839	167	
+269	005dc410	FUN_005dc410	ram	980	199	string has no 0 in the end!
+268	006016a0	FUN_006016a0	ram	802	147	
+268	00603770	FUN_00603770	ram	802	147	
+266	004919e0	FUN_004919e0	ram	827	184	
+266	004c7db0	FUN_004c7db0	ram	864	191	STACK | NO STACK!
+266	0060b560	FUN_0060b560	ram	936	196	
+263	004d6cf0	FUN_004d6cf0	ram	789	158	_location_counter__ | offset calculation error
+263	00538430	FUN_00538430	ram	1193	222	
+263	0053e480	FUN_0053e480	ram	811	167	cmd.exe | open | command | open
+263	0055c3f0	FUN_0055c3f0	ram	956	206	
+263	0055cb70	FUN_0055cb70	ram	956	206	
+263	005a7af0	FUN_005a7af0	ram	866	164	File | emu8086 | File1 | emu8086 | File | emu8086 | File | emu8086 | File1 | emu8086
+261	00596ed0	FUN_00596ed0	ram	782	186	{}[]+-*/()^~%<>&| | {}[]+-*/()^~%<>&| | 1234567890
+261	005e4220	FUN_005e4220	ram	827	175	true | emu8086.ini | true | default | emu8086.ini | default | default | emu8086.ini | default
+261	005ff2f0	FUN_005ff2f0	ram	772	180	
+260	0053d7f0	FUN_0053d7f0	ram	880	195	
+260	005c8590	FUN_005c8590	ram	992	205	default | emu8086.ini | default | default | emu8086.ini | default
+259	005cf410	FUN_005cf410	ram	768	140	out of memory
+257	0056f660	FUN_0056f660	ram	865	142	
+255	0053f5d0	FUN_0053f5d0	ram	704	120	
+253	004869e0	FUN_004869e0	ram	851	191	
+253	004a2c40	FUN_004a2c40	ram	939	191	
+253	00547ec0	FUN_00547ec0	ram	885	158	CRITICAL ERROR 2: 
+253	0058a090	FUN_0058a090	ram	877	181	cannot make such changes here. | close the emulator, then edit and re-assemble.
+253	005a7ee0	FUN_005a7ee0	ram	827	148	File | emu8086 | Caption | Visible
+252	005afa50	FUN_005afa50	ram	838	140	
+252	005e2e50	FUN_005e2e50	ram	821	157	
+251	005d0c60	FUN_005d0c60	ram	738	151	_LEFT | WinStates | emu8086 | _TOP | WinStates | emu8086 | _WIDTH | WinStates | emu8086 | WinStates | emu8086
+248	004ab830	FUN_004ab830	ram	799	182	h, 0
+248	005cd8e0	FUN_005cd8e0	ram	769	158	
+248	00605e40	FUN_00605e40	ram	883	180	
+247	004e6aa0	FUN_004e6aa0	ram	760	158	
+247	004e73d0	FUN_004e73d0	ram	760	158	
+246	004e5d30	FUN_004e5d30	ram	796	180	.list | open | .lst | open
+246	00586410	FUN_00586410	ram	793	133	
+245	0059d160	FUN_0059d160	ram	897	179	
+245	005b3d70	FUN_005b3d70	ram	819	177	default | VAR_FONT_SIZE | emu8086.ini | default | default | VAR_FONT_FACE | emu8086.ini | default
+245	005c4150	FUN_005c4150	ram	735	138	use_fasm | user | emu8086 | use_fasm | user | emu8086 | template | user | emu8086
+244	004e2140	FUN_004e2140	ram	913	182	
+244	005892b0	FUN_005892b0	ram	808	171	.debug | .debug | _.debug | _.debug | .debug
+243	004dae00	FUN_004dae00	ram	793	180	.list | open | .lst | open
+243	00566c20	FUN_00566c20	ram	838	148	
+243	005cf7a0	FUN_005cf7a0	ram	685	110	
+243	005dd8d0	FUN_005dd8d0	ram	815	169	
+242	005d4870	FUN_005d4870	ram	776	157	
+241	00582b70	FUN_00582b70	ram	906	180	
+239	004dc0a0	FUN_004dc0a0	ram	935	202	
+238	00560210	FUN_00560210	ram	986	189	
+237	00534a10	FUN_00534a10	ram	843	181	
+237	00535130	FUN_00535130	ram	843	181	
+237	0059ec90	FUN_0059ec90	ram	677	122	
+236	004a8dc0	FUN_004a8dc0	ram	785	169	{}[]+-*/()^~%<>&| ,.=#!'":  | {}[]+-*/()^~%<>&| ,.=#!'": 
+236	004aea30	FUN_004aea30	ram	824	169	
+236	004c3290	FUN_004c3290	ram	796	168	 cs: |  ds: |  es: |  ss: | .cs: | .ds: | .es: | .ss:
+236	005da770	FUN_005da770	ram	829	182	
+234	004dddb0	FUN_004dddb0	ram	837	180	
+234	005c2320	FUN_005c2320	ram	671	115	
+233	004c2f90	FUN_004c2f90	ram	720	160	
+233	005f29f0	FUN_005f29f0	ram	674	119	
+233	00604990	FUN_00604990	ram	772	177	{}[]+-*/()^~%<>&| ,.=#!'":  | ax,dx,cx,ip,sp,al,ah,bl,bh,cl,ch,dl,dh | ax,dx,cx,ip,sp,al,ah,bl,bh,cl,ch,dl,dh
+231	0058a950	FUN_0058a950	ram	713	129	
+230	005827b0	FUN_005827b0	ram	869	173	
+230	00604d40	FUN_00604d40	ram	740	160	
+228	0055c7e0	FUN_0055c7e0	ram	855	180	
+228	0055cf60	FUN_0055cf60	ram	855	180	
+228	005ef560	FUN_005ef560	ram	704	120	
+227	004ad6e0	FUN_004ad6e0	ram	712	157	
+226	004ca360	FUN_004ca360	ram	699	149	; [SOURCE]: 
+226	005b3a30	FUN_005b3a30	ram	752	145	Terminal
+226	005df2d0	FUN_005df2d0	ram	730	155	move is allowed between directories | on same logical drive only. | target filename already exists:
+226	005fe660	FUN_005fe660	ram	752	145	Terminal
+225	004dce10	FUN_004dce10	ram	758	163	
+223	004af980	FUN_004af980	ram	694	170	{}[]+-*/()^~%<>&| ,.=#!'": 
+221	004c3660	FUN_004c3660	ram	723	153	
+221	005307c0	FUN_005307c0	ram	774	164	
+221	005335d0	FUN_005335d0	ram	774	164	
+221	005a2e50	FUN_005a2e50	ram	626	99	
+221	005dce30	FUN_005dce30	ram	707	170	directory already exists:
+219	00602370	FUN_00602370	ram	696	147	
+216	004c8470	FUN_004c8470	ram	688	148	no entry point.
+216	004e1610	FUN_004e1610	ram	785	173	
+216	0051ac40	FUN_0051ac40	ram	916	170	program terminated. reload:
+216	005f2fd0	FUN_005f2fd0	ram	647	126	
+215	004d7c50	FUN_004d7c50	ram	649	129	
+211	005435f0	FUN_005435f0	ram	691	107	
+211	0058b310	FUN_0058b310	ram	685	129	Terminal
+211	00597580	FUN_00597580	ram	704	142	
+211	005ff010	FUN_005ff010	ram	677	143	
+210	004e0d20	FUN_004e0d20	ram	629	100	
+209	004b0830	FUN_004b0830	ram	612	145	
+208	005b0cf0	FUN_005b0cf0	ram	626	143	Options | \macro | .dat
+207	004a3100	FUN_004a3100	ram	597	100	
+207	004e8d00	FUN_004e8d00	ram	663	137	
+207	00517500	FUN_00517500	ram	784	166	
+207	00589a30	FUN_00589a30	ram	841	170	; [SOURCE]:  | ; [SOURCE]: 
+207	005e25e0	FUN_005e25e0	ram	665	142	
+206	00492290	FUN_00492290	ram	810	151	Flag_DP | FIRST_PRINT | emu8086 | Print Warning | Please note:  |  Direct print may not be correct on some printers. It is recommended to export to HTML and use browser to print. |  This warning appears once only. Click OK to print directly anyway. | Flag_DP | FIRST_PRINT | emu8086
+206	004c81b0	FUN_004c81b0	ram	636	137	STACK
+206	00567000	FUN_00567000	ram	710	147	
+205	004d8a10	FUN_004d8a10	ram	664	146	
+204	0053a5a0	FUN_0053a5a0	ram	701	102	
+204	005b0990	FUN_005b0990	ram	617	144	Options | \macro | .dat
+202	0052d9f0	FUN_0052d9f0	ram	706	150	
+202	0052e090	FUN_0052e090	ram	706	150	
+202	0052e6a0	FUN_0052e6a0	ram	706	150	
+202	0052ed40	FUN_0052ed40	ram	706	150	
+202	0052f3e0	FUN_0052f3e0	ram	707	150	
+202	0052fa80	FUN_0052fa80	ram	706	150	
+202	00530120	FUN_00530120	ram	706	150	
+202	00530ea0	FUN_00530ea0	ram	706	150	
+202	00531540	FUN_00531540	ram	707	150	
+202	005321f0	FUN_005321f0	ram	706	150	
+202	00532890	FUN_00532890	ram	707	150	
+202	00532f30	FUN_00532f30	ram	707	150	
+202	00534370	FUN_00534370	ram	707	150	
+202	00567d10	FUN_00567d10	ram	677	123	
+202	005b5850	FUN_005b5850	ram	723	150	
+202	005eafd0	FUN_005eafd0	ram	661	90	
+202	00603b10	FUN_00603b10	ram	679	141	
+200	005b1620	FUN_005b1620	ram	626	139	Options | \LoadFlag.dat | Options | Load options from hdd flag file.
+200	005ed250	FUN_005ed250	ram	696	138	Terminal
+199	00572100	FUN_00572100	ram	642	140	
+199	005a6af0	FUN_005a6af0	ram	668	144	
+199	005b3220	FUN_005b3220	ram	577	116	Size:  |  bytes. Sectors: 
+198	004bfa50	FUN_004bfa50	ram	632	143	
+198	004c9e40	FUN_004c9e40	ram	667	145	{}[]+-*/()^~%<>&| ,.=#!'": 
+198	006099c0	FUN_006099c0	ram	635	145	get file time failed.
+197	004a3900	FUN_004a3900	ram	615	125	saveas | sampleN
+197	004dc830	FUN_004dc830	ram	571	123	cmd.exe | open | command | open
+197	005a87f0	FUN_005a87f0	ram	633	118	
+196	004ae740	FUN_004ae740	ram	675	142	true | FIX_SMALL_FONTS | emu8086.ini | true
+195	004e7920	FUN_004e7920	ram	604	124	
+195	005ce5c0	FUN_005ce5c0	ram	606	110	
+194	004a6bf0	FUN_004a6bf0	ram	600	131	0123456789 | 0123456789
+194	00573c50	FUN_00573c50	ram	711	149	associations | emu8086 | un-associate  .asm  and  .inc files | associations | emu8086 | .inc | HKCR | .asm | HKCR | associate  .asm  and  .inc files | associations | emu8086
+194	005f56c0	FUN_005f56c0	ram	624	127	
+192	005c9720	FUN_005c9720	ram	669	140	[default] | [default] | OutputDir | Dirs | emu8086 | [default]
+191	0052d090	FUN_0052d090	ram	697	138	
+191	005631c0	FUN_005631c0	ram	595	106	
+191	00607000	FUN_00607000	ram	544	80	
+190	004d6750	FUN_004d6750	ram	569	109	
+190	004d6a20	FUN_004d6a20	ram	569	109	
+190	005e4630	FUN_005e4630	ram	756	159	tmp\deleted_bkp_ | .dat | tmp\opened_bkp_ | .dat
+188	00567940	FUN_00567940	ram	629	122	
+188	005c4f70	FUN_005c4f70	ram	633	131	
+187	004ae3c0	FUN_004ae3c0	ram	670	149	
+187	004dfdd0	FUN_004dfdd0	ram	575	122	
+187	00552230	FUN_00552230	ram	668	143	
+187	005527c0	FUN_005527c0	ram	668	143	
+187	005ef8a0	FUN_005ef8a0	ram	624	107	
+186	004dd3d0	FUN_004dd3d0	ram	569	111	
+186	005a5eb0	FUN_005a5eb0	ram	577	138	
+186	005f2380	FUN_005f2380	ram	655	140	
+186	00612b40	FUN_00612b40	ram	692	159	unrecoverable error!
+185	004c4630	FUN_004c4630	ram	563	136	STACK | STACK | NONE
+185	00519b90	FUN_00519b90	ram	596	129	
+185	00551f70	FUN_00551f70	ram	660	141	
+185	00552500	FUN_00552500	ram	660	141	
+185	005e1e70	FUN_005e1e70	ram	607	138	virtual printer does not respond. | start c:\emu8086\devices\Printer.exe
+184	0054abc0	FUN_0054abc0	ram	620	111	
+184	005b5bf0	FUN_005b5bf0	ram	633	127	
+183	004a8b60	FUN_004a8b60	ram	552	120	OFFSET 
+183	004ab5d0	FUN_004ab5d0	ram	542	131	
+183	005af610	FUN_005af610	ram	559	107	
+182	0051a270	FUN_0051a270	ram	595	97	
+182	0055fc00	FUN_0055fc00	ram	667	111	
+180	004ab370	FUN_004ab370	ram	542	132	
+180	005b1ec0	FUN_005b1ec0	ram	561	114	supported files (*.bin, *.boot)|*.bin;*.bin_;*.boot|binary files (*.bin)|*.bin;*.bin_|boot sector files (*.boot)|*.boot|all files (*.*)|*.*
+179	004ab110	FUN_004ab110	ram	556	107	cannot convert to 16 bit value: 
+178	00489e40	FUN_00489e40	ram	608	119	COMMENT | COMMENT
+178	005ecb30	FUN_005ecb30	ram	514	104	http://www.emu8086.com/update/
+176	005b1330	FUN_005b1330	ram	548	123	Options | \hotkeys.dat
+176	005d6190	FUN_005d6190	ram	523	116	www.emu8086.com | mailto: | www.emu8086.com | open | http:// | www.emu8086.com
+175	00598fb0	FUN_00598fb0	ram	582	119	
+175	005d6890	FUN_005d6890	ram	504	128	
+175	005e0370	FUN_005e0370	ram	601	120	too many opened files. reset the emulator!
+174	0053b380	FUN_0053b380	ram	508	113	OUT  | , AX | not supported! | refer to "I/O ports" in documentation.
+174	0055f870	FUN_0055f870	ram	705	116	
+174	00589710	FUN_00589710	ram	589	121	.~asm | .~asm | _.~asm
+173	005379d0	FUN_005379d0	ram	551	128	
+173	00600c10	FUN_00600c10	ram	568	132	
+172	004c4010	FUN_004c4010	ram	546	130	ENDP | mismatched:
+172	005b1050	FUN_005b1050	ram	539	124	Options | \hotkeys.dat
+172	005efb90	FUN_005efb90	ram	582	111	
+171	004d71c0	FUN_004d71c0	ram	685	137	
+171	005495b0	FUN_005495b0	ram	581	151	
+170	004bf320	FUN_004bf320	ram	667	129	
+170	005db920	FUN_005db920	ram	480	92	Your free evaluation period has expired | Your free evaluation period has expired!!
+169	00582f50	FUN_00582f50	ram	587	134	
+169	005c8300	FUN_005c8300	ram	455	76	
+169	005f6c30	FUN_005f6c30	ram	583	121	
+168	004c3c60	FUN_004c3c60	ram	528	131	PROC |  FAR | NEAR
+167	0053de90	FUN_0053de90	ram	591	123	
+166	0056a590	FUN_0056a590	ram	594	124	
+166	0056bab0	FUN_0056bab0	ram	538	89	
+165	0055b790	FUN_0055b790	ram	645	129	
+165	005d70a0	FUN_005d70a0	ram	666	140	HKCU | HKLM | HKDD | HKCC | HKCR
+165	005ddc60	FUN_005ddc60	ram	527	118	
+164	0058b840	FUN_0058b840	ram	592	122	
+164	005e29a0	FUN_005e29a0	ram	501	109	
+163	0056fa90	FUN_0056fa90	ram	502	83	
+163	005d25e0	FUN_005d25e0	ram	515	118	EmuPort.io
+162	004cb810	FUN_004cb810	ram	455	103	
+162	004d9d80	FUN_004d9d80	ram	616	107	
+162	004da020	FUN_004da020	ram	616	107	
+162	0058a470	FUN_0058a470	ram	481	112	cannot make these changes on runtime. | close the emulator, then edit and recompile.
+160	0049b5d0	FUN_0049b5d0	ram	516	94	edit:
+159	004a4830	FUN_004a4830	ram	515	119	not found! | cannot not find:  | no such line!
+159	004d4c60	FUN_004d4c60	ram	479	100	
+159	005340f0	FUN_005340f0	ram	563	114	17000
+158	0055ff60	FUN_0055ff60	ram	536	98	
+158	005bae80	FUN_005bae80	ram	538	113	
+158	005bb0e0	FUN_005bb0e0	ram	538	113	
+157	004ddb40	FUN_004ddb40	ram	577	127	
+156	004aedd0	FUN_004aedd0	ram	493	109	
+156	00582580	FUN_00582580	ram	489	113	
+156	0059b670	FUN_0059b670	ram	455	103	
+155	004d1c90	FUN_004d1c90	ram	506	109	
+155	0056b880	FUN_0056b880	ram	557	111	
+155	005952f0	FUN_005952f0	ram	426	72	
+155	005a8c30	FUN_005a8c30	ram	485	92	SEGMENT
+155	005cc8e0	FUN_005cc8e0	ram	448	75	
+154	004a6940	FUN_004a6940	ram	458	96	[LONG-LINE][ | [LONG-LINE][
+154	005abd20	FUN_005abd20	ram	467	108	NOT SUPPORTED YET
+154	005c48b0	FUN_005c48b0	ram	423	77	
+154	005d5e30	FUN_005d5e30	ram	423	77	
+153	004bf7d0	FUN_004bf7d0	ram	472	110	
+152	005c8be0	FUN_005c8be0	ram	524	95	
+152	005d2300	FUN_005d2300	ram	525	121	EmuPort.io
+151	0053b100	FUN_0053b100	ram	460	105	OUT  | , AL | port not available in 8086! | refer to i/o ports in emu8086 documentation
+151	005e16c0	FUN_005e16c0	ram	458	114	
+151	005ec4b0	FUN_005ec4b0	ram	461	87	
+151	005f6eb0	FUN_005f6eb0	ram	438	90	notepad | notepad
+151	00609cd0	FUN_00609cd0	ram	521	116	set file time failed.
+150	004a9120	FUN_004a9120	ram	457	91	offset 
+150	005f27c0	FUN_005f27c0	ram	504	104	
+149	004cbf00	FUN_004cbf00	ram	588	98	WinStates | WinStates | emu8086 | CustColors | CustColors | emu8086 | Dirs | Dirs | emu8086 | calculator | calculator | emu8086
+149	0051fc20	FUN_0051fc20	ram	632	114	
+148	00536c10	FUN_00536c10	ram	450	100	file not found:
+148	00560f70	FUN_00560f70	ram	467	77	
+148	00603e70	FUN_00603e70	ram	543	101	
+147	0053b630	FUN_0053b630	ram	539	69	
+147	0058bac0	FUN_0058bac0	ram	453	70	
+147	00598b70	FUN_00598b70	ram	400	67	
+146	004a7460	FUN_004a7460	ram	457	102	auto_save_backup.dat
+146	004afd40	FUN_004afd40	ram	455	109	
+146	00538e70	FUN_00538e70	ram	435	85	FLOPPY_
+146	0053ac10	FUN_0053ac10	ram	445	103	refer to i/o ports in emu8086 documentation | IN AL,  | port not available in 8086!
+146	0053ae90	FUN_0053ae90	ram	448	99	IN AX,  | port not available in 8086! | refer to i/o ports in emu8086 documentation
+146	005c4d00	FUN_005c4d00	ram	422	73	
+145	004c5410	FUN_004c5410	ram	444	98	
+145	004cba10	FUN_004cba10	ram	500	118	 LABEL 
+145	004ec0c0	FUN_004ec0c0	ram	480	98	
+145	00547670	FUN_00547670	ram	504	70	
+144	0049a3b0	FUN_0049a3b0	ram	386	57	
+144	004db370	FUN_004db370	ram	483	103	.list | .lst | .symbol
+144	005dff60	FUN_005dff60	ram	483	92	
+144	0060b0b0	FUN_0060b0b0	ram	480	87	
+143	004a3c30	FUN_004a3c30	ram	389	75	
+143	004a9670	FUN_004a9670	ram	444	99	
+143	0052ca60	FUN_0052ca60	ram	436	90	RecentEmulator
+143	0058fd30	FUN_0058fd30	ram	476	97	
+143	00590600	FUN_00590600	ram	476	97	
+143	00591030	FUN_00591030	ram	476	97	
+143	00591a30	FUN_00591a30	ram	476	97	
+143	00592440	FUN_00592440	ram	476	97	
+143	00592930	FUN_00592930	ram	476	97	
+143	00592e20	FUN_00592e20	ram	476	97	
+143	00593850	FUN_00593850	ram	476	97	
+141	0051f450	FUN_0051f450	ram	427	50	
+141	0058b610	FUN_0058b610	ram	492	107	
+141	005b1970	FUN_005b1970	ram	443	98	Options | \LoadFlag.dat | NOT_FOUND | NOT_FOUND | RKsCURRENT_SOURCE_FOLDER | Dirs | emu8086 | NOT_FOUND
+141	005d09e0	FUN_005d09e0	ram	415	97	
+141	005d2dd0	FUN_005d2dd0	ram	512	104	register.html
+140	00571770	FUN_00571770	ram	483	98	
+140	00589de0	FUN_00589de0	ram	400	55	
+139	004a26c0	FUN_004a26c0	ram	394	69	
+139	004d62c0	FUN_004d62c0	ram	449	99	
+139	0059a720	FUN_0059a720	ram	464	93	
+139	005eb8f0	FUN_005eb8f0	ram	398	97	
+138	005fe220	FUN_005fe220	ram	486	86	
+137	004d1ef0	FUN_004d1ef0	ram	407	79	CustColors | emu8086
+137	004e60a0	FUN_004e60a0	ram	448	98	.symbol | open
+137	004e6de0	FUN_004e6de0	ram	440	85	
+137	00539e80	FUN_00539e80	ram	496	101	
+137	00583c20	FUN_00583c20	ram	439	76	
+137	00597870	FUN_00597870	ram	468	96	
+137	005ac970	FUN_005ac970	ram	553	114	Options | RKsCURRENT_SOURCE_FOLDER | dirs | emu8086
+137	005aedc0	FUN_005aedc0	ram	376	86	
+137	00608760	FUN_00608760	ram	472	98	
+137	00614220	FUN_00614220	ram	517	117	
+136	004a66b0	FUN_004a66b0	ram	433	83	cannot assemble, this code contains too many lines over 1020 chars. |  [LONG-LINE][
+136	004db160	FUN_004db160	ram	448	98	.symbol | open
+136	004e6850	FUN_004e6850	ram	454	91	
+136	005449f0	FUN_005449f0	ram	403	73	
+136	0060a160	FUN_0060a160	ram	446	100	
+135	004e9aa0	FUN_004e9aa0	ram	450	93	
+135	005b3850	FUN_005b3850	ram	469	83	
+134	0052ae10	FUN_0052ae10	ram	386	78	emulator.state
+134	005853b0	FUN_005853b0	ram	380	83	mailto: | info@emu8086.com | open
+134	005f8dd0	FUN_005f8dd0	ram	434	94	explore
+133	0049d5d0	FUN_0049d5d0	ram	434	91	
+133	004a9300	FUN_004a9300	ram	409	81	
+133	004aa310	FUN_004aa310	ram	406	79	
+133	005445c0	FUN_005445c0	ram	403	73	
+133	0055bf00	FUN_0055bf00	ram	457	81	
+133	0056a810	FUN_0056a810	ram	457	81	
+133	0058b140	FUN_0058b140	ram	457	81	
+133	0058e2d0	FUN_0058e2d0	ram	457	81	
+133	00597a70	FUN_00597a70	ram	457	81	
+133	005b6f60	FUN_005b6f60	ram	457	81	
+133	005c1aa0	FUN_005c1aa0	ram	453	92	
+133	005cdd80	FUN_005cdd80	ram	457	81	
+133	005ecf90	FUN_005ecf90	ram	457	81	
+133	00606260	FUN_00606260	ram	419	96	
+133	00614580	FUN_00614580	ram	457	81	
+132	0056d880	FUN_0056d880	ram	491	97	
+132	005db5c0	FUN_005db5c0	ram	475	93	
+131	00490070	FUN_00490070	ram	462	99	
+131	005973c0	FUN_005973c0	ram	391	85	
+131	005af870	FUN_005af870	ram	428	85	
+130	004e64a0	FUN_004e64a0	ram	385	79	.lst | .list | .symbol
+130	00595bf0	FUN_00595bf0	ram	449	105	FLOPPY_
+130	005f9690	FUN_005f9690	ram	418	89	open
+129	0049a610	FUN_0049a610	ram	481	102	save changes to file ? | save changes?
+129	004d7580	FUN_004d7580	ram	449	91	
+129	00549b20	FUN_00549b20	ram	407	96	
+129	00549d00	FUN_00549d00	ram	407	96	
+129	00549ee0	FUN_00549ee0	ram	407	96	
+128	005d3560	FUN_005d3560	ram	474	84	
+127	005a82b0	FUN_005a82b0	ram	402	94	....
+127	005db190	FUN_005db190	ram	501	104	
+127	005dca30	FUN_005dca30	ram	470	87	
+127	005f4490	FUN_005f4490	ram	421	83	
+126	004a1830	FUN_004a1830	ram	457	88	
+126	004e7180	FUN_004e7180	ram	405	80	
+126	00536e70	FUN_00536e70	ram	554	113	
+126	0056da70	FUN_0056da70	ram	461	91	
+125	004a51e0	FUN_004a51e0	ram	357	84	
+125	004d80b0	FUN_004d80b0	ram	424	89	there are errors.
+125	005f94b0	FUN_005f94b0	ram	401	85	explorer | open
+124	004aca10	FUN_004aca10	ram	413	81	
+124	004dac20	FUN_004dac20	ram	400	88	explore
+124	004e4120	FUN_004e4120	ram	414	89	.list | .symbol
+124	0056f220	FUN_0056f220	ram	372	78	flush keyboard buffer? | clear keyboard buffer
+124	005aa050	FUN_005aa050	ram	394	93	.symbol | .symbol | _.symbol
+124	005c8ff0	FUN_005c8ff0	ram	333	61	
+123	004ca170	FUN_004ca170	ram	429	81	
+123	004e0550	FUN_004e0550	ram	445	74	
+123	004e0820	FUN_004e0820	ram	445	74	
+123	005447e0	FUN_005447e0	ram	387	73	
+123	005823c0	FUN_005823c0	ram	405	85	
+122	0053a250	FUN_0053a250	ram	416	85	
+121	004a94b0	FUN_004a94b0	ram	382	81	
+121	0052deb0	FUN_0052deb0	ram	422	85	
+121	0052e4c0	FUN_0052e4c0	ram	422	85	
+121	0052eb60	FUN_0052eb60	ram	422	85	
+121	0052f200	FUN_0052f200	ram	422	85	
+121	0052f8a0	FUN_0052f8a0	ram	422	85	
+121	0052ff40	FUN_0052ff40	ram	422	85	
+121	005305e0	FUN_005305e0	ram	422	85	
+121	00530cc0	FUN_00530cc0	ram	422	85	
+121	00531360	FUN_00531360	ram	422	85	
+121	00531a00	FUN_00531a00	ram	422	85	
+121	005326b0	FUN_005326b0	ram	422	85	
+121	00532d50	FUN_00532d50	ram	422	85	
+121	005333f0	FUN_005333f0	ram	422	85	
+121	00533ad0	FUN_00533ad0	ram	422	85	
+121	00534830	FUN_00534830	ram	422	85	
+121	00534f50	FUN_00534f50	ram	422	85	
+121	00535790	FUN_00535790	ram	422	85	
+121	00550070	FUN_00550070	ram	398	91	
+121	0056e800	FUN_0056e800	ram	399	81	ForeColor | Font | Font | ForeColor
+121	005739f0	FUN_005739f0	ram	399	81	ForeColor | Font | Font | ForeColor
+121	005846b0	FUN_005846b0	ram	443	90	register.html
+121	005b6c60	FUN_005b6c60	ram	422	85	
+121	005b7610	FUN_005b7610	ram	422	85	
+121	005b7960	FUN_005b7960	ram	422	85	
+121	005b7cb0	FUN_005b7cb0	ram	422	85	
+121	005b81c0	FUN_005b81c0	ram	422	85	
+121	005b86d0	FUN_005b86d0	ram	422	85	
+121	005b9030	FUN_005b9030	ram	422	85	
+121	005b9520	FUN_005b9520	ram	422	85	
+121	005b9a30	FUN_005b9a30	ram	422	85	
+121	005b9f20	FUN_005b9f20	ram	422	85	
+121	005ba430	FUN_005ba430	ram	422	85	
+121	005ba920	FUN_005ba920	ram	422	85	
+121	005baca0	FUN_005baca0	ram	422	85	
+121	005bb340	FUN_005bb340	ram	422	85	
+121	005bb690	FUN_005bb690	ram	422	85	
+121	005c1e20	FUN_005c1e20	ram	422	85	
+121	005f42b0	FUN_005f42b0	ram	422	85	
+121	005f9880	FUN_005f9880	ram	422	85	
+121	005f9a60	FUN_005f9a60	ram	422	85	
+121	005f9c40	FUN_005f9c40	ram	422	85	
+121	005f9e20	FUN_005f9e20	ram	422	85	
+121	005fa000	FUN_005fa000	ram	422	85	
+120	005443b0	FUN_005443b0	ram	387	73	
+120	0055ae50	FUN_0055ae50	ram	533	99	
+120	0055b0a0	FUN_0055b0a0	ram	533	99	
+120	0055b2f0	FUN_0055b2f0	ram	533	99	
+120	0055b540	FUN_0055b540	ram	533	99	
+119	00586830	FUN_00586830	ram	336	41	
+119	00597220	FUN_00597220	ram	350	77	
+119	00601a40	FUN_00601a40	ram	408	92	
+118	004c5290	FUN_004c5290	ram	335	60	 db: |  db  |  db: |  dw: |  db  |  dw: |  dd: |  db  |  dd:
+118	004d8560	FUN_004d8560	ram	346	55	
+118	004dbec0	FUN_004dbec0	ram	423	71	
+118	004dc480	FUN_004dc480	ram	423	71	
+118	004e00d0	FUN_004e00d0	ram	423	71	
+118	005510a0	FUN_005510a0	ram	399	75	
+118	00552e70	FUN_00552e70	ram	437	89	
+118	00571480	FUN_00571480	ram	457	94	
+118	0059a270	FUN_0059a270	ram	416	91	
+118	005d3290	FUN_005d3290	ram	423	71	
+118	005f71f0	FUN_005f71f0	ram	423	71	
+118	005f74b0	FUN_005f74b0	ram	423	71	
+118	005fe440	FUN_005fe440	ram	388	77	
+117	00548640	FUN_00548640	ram	432	97	
+117	0060a3c0	FUN_0060a3c0	ram	448	89	set file time failed
+116	00552cc0	FUN_00552cc0	ram	428	88	
+116	0057d690	FUN_0057d690	ram	411	80	
+116	005de530	FUN_005de530	ram	417	84	
+115	004d6580	FUN_004d6580	ram	418	80	STATUS: 
+115	0054a230	FUN_0054a230	ram	366	90	
+115	00598dd0	FUN_00598dd0	ram	421	93	
+115	005e2300	FUN_005e2300	ram	364	74	
+114	00587020	FUN_00587020	ram	371	69	
+113	00588020	FUN_00588020	ram	372	76	.debug
+113	0058a710	FUN_0058a710	ram	365	59	
+113	00599aa0	FUN_00599aa0	ram	435	90	
+113	005ec730	FUN_005ec730	ram	314	54	
+112	004a7020	FUN_004a7020	ram	411	90	
+112	0051aa60	FUN_0051aa60	ram	333	70	
+112	00532020	FUN_00532020	ram	409	77	17000
+112	005dbce0	FUN_005dbce0	ram	395	85	abcdefghijklmnopqrstvuwxvz
+111	004b56b0	FUN_004b56b0	ram	343	81	
+111	00550240	FUN_00550240	ram	367	75	
+111	005a2920	FUN_005a2920	ram	419	78	
+111	005d6710	FUN_005d6710	ram	337	86	
+111	0060ae30	FUN_0060ae30	ram	373	69	
+110	004aff50	FUN_004aff50	ram	345	79	
+110	00575a20	FUN_00575a20	ram	375	73	it's required to restart emu8086...
+110	005a8670	FUN_005a8670	ram	346	72	
+110	005c26f0	FUN_005c26f0	ram	577	117	
+109	0056ac70	FUN_0056ac70	ram	362	68	
+109	005d9f90	FUN_005d9f90	ram	297	71	username= | regkey= | reg.ini
+108	004a7980	FUN_004a7980	ram	357	85	
+108	004e98c0	FUN_004e98c0	ram	403	94	debug.exe: 
+108	0052cca0	FUN_0052cca0	ram	466	76	
+108	00583400	FUN_00583400	ram	355	74	
+108	005de930	FUN_005de930	ram	331	70	
+107	004d9af0	FUN_004d9af0	ram	365	73	
+107	0055acd0	FUN_0055acd0	ram	329	61	
+107	00585740	FUN_00585740	ram	361	72	
+107	00593b90	FUN_00593b90	ram	310	48	
+107	005d6470	FUN_005d6470	ram	361	72	
+107	005dbf50	FUN_005dbf50	ram	332	75	abcdefghijklmnopqrstvuwxvz
+107	00609f60	FUN_00609f60	ram	360	85	
+106	004a4aa0	FUN_004a4aa0	ram	321	50	
+106	004cbce0	FUN_004cbce0	ram	316	69	 equ  |  equ 
+106	004dc660	FUN_004dc660	ram	401	94	debug.exe: 
+106	0051fa20	FUN_0051fa20	ram	350	58	
+106	0054e620	FUN_0054e620	ram	300	69	
+106	00585130	FUN_00585130	ram	358	72	
+106	005d46d0	FUN_005d46d0	ram	358	72	
+105	0049e4e0	FUN_0049e4e0	ram	379	69	
+105	0053e300	FUN_0053e300	ram	379	69	
+105	00551230	FUN_00551230	ram	359	67	
+105	00551b50	FUN_00551b50	ram	359	67	
+105	00563020	FUN_00563020	ram	416	74	
+104	004d20b0	FUN_004d20b0	ram	327	73	CustColors | emu8086
+104	004d8870	FUN_004d8870	ram	366	77	
+104	005415c0	FUN_005415c0	ram	333	60	
+104	00548f50	FUN_00548f50	ram	362	78	
+104	005c9230	FUN_005c9230	ram	265	43	
+103	0048fd20	FUN_0048fd20	ram	363	67	
+103	00492730	FUN_00492730	ram	363	67	
+103	00517ba0	FUN_00517ba0	ram	357	71	
+103	0052dd00	FUN_0052dd00	ram	385	85	
+103	0052e9b0	FUN_0052e9b0	ram	385	85	
+103	0052f050	FUN_0052f050	ram	385	85	
+103	0052f6f0	FUN_0052f6f0	ram	385	85	
+103	0052fd90	FUN_0052fd90	ram	385	85	
+103	00530430	FUN_00530430	ram	385	85	
+103	00530b10	FUN_00530b10	ram	385	85	
+103	005311b0	FUN_005311b0	ram	385	85	
+103	00531850	FUN_00531850	ram	385	85	
+103	00532500	FUN_00532500	ram	385	85	
+103	00532ba0	FUN_00532ba0	ram	385	85	
+103	00533240	FUN_00533240	ram	385	85	
+103	00533920	FUN_00533920	ram	385	85	
+103	00534680	FUN_00534680	ram	385	85	
+103	00534da0	FUN_00534da0	ram	385	85	
+103	005355e0	FUN_005355e0	ram	385	85	
+103	00547cc0	FUN_00547cc0	ram	322	75	
+103	00551620	FUN_00551620	ram	355	66	
+103	00551e00	FUN_00551e00	ram	355	66	
+103	0055c0d0	FUN_0055c0d0	ram	399	77	
+103	0055c260	FUN_0055c260	ram	399	77	
+103	005e14e0	FUN_005e14e0	ram	420	94	wrong file handle... auxiliary device is not supported yet.
+102	004e02b0	FUN_004e02b0	ram	364	66	
+102	004e1950	FUN_004e1950	ram	298	47	
+102	00569b60	FUN_00569b60	ram	405	77	
+102	005eb460	FUN_005eb460	ram	346	63	
+101	004a9d30	FUN_004a9d30	ram	286	67	
+101	0052d380	FUN_0052d380	ram	350	70	
+101	0056fd10	FUN_0056fd10	ram	384	81	
+101	005ebca0	FUN_005ebca0	ram	348	56	
+101	005ecdd0	FUN_005ecdd0	ram	298	58	
+101	006026d0	FUN_006026d0	ram	353	80	JMP 0FFFF | JMP 0
+100	0053a900	FUN_0053a900	ram	356	65	
+100	005650f0	FUN_005650f0	ram	334	67	
+100	00590e40	FUN_00590e40	ram	305	55	
+100	00593660	FUN_00593660	ram	305	55	
+100	005d4f70	FUN_005d4f70	ram	340	67	
+100	005e0880	FUN_005e0880	ram	340	73	input redirection is not supported yet! |  INT 21h/9h should be used instead. refer to interrupt reference.
+100	005fe080	FUN_005fe080	ram	364	68	&amp; | &gt; | &lt; |  &nbsp;  |     
+99	00549840	FUN_00549840	ram	302	69	
+99	005499b0	FUN_005499b0	ram	302	69	
+99	00560cd0	FUN_00560cd0	ram	358	63	
+99	00586f10	FUN_00586f10	ram	272	37	
+98	00592250	FUN_00592250	ram	302	59	
+97	004c3af0	FUN_004c3af0	ram	316	78	PROC
+97	004c3ea0	FUN_004c3ea0	ram	316	78	ENDP
+97	004c48b0	FUN_004c48b0	ram	316	78	ENDS
+97	0051f850	FUN_0051f850	ram	307	53	
+97	005509a0	FUN_005509a0	ram	364	74	
+97	00596a20	FUN_00596a20	ram	387	81	
+97	005f2d30	FUN_005f2d30	ram	283	45	
+97	006050c0	FUN_006050c0	ram	373	81	
+96	00517a00	FUN_00517a00	ram	370	65	
+96	00571280	FUN_00571280	ram	307	64	
+96	005b1d70	FUN_005b1d70	ram	335	66	
+95	005b8bc0	FUN_005b8bc0	ram	276	51	
+94	004a57f0	FUN_004a57f0	ram	279	48	
+94	004e66b0	FUN_004e66b0	ram	278	56	
+94	005507e0	FUN_005507e0	ram	363	82	
+94	00581b30	FUN_00581b30	ram	337	74	
+94	005ebeb0	FUN_005ebeb0	ram	322	56	
+93	00547910	FUN_00547910	ram	323	72	
+93	005b7130	FUN_005b7130	ram	293	56	
+92	005513a0	FUN_005513a0	ram	314	56	
+92	005514e0	FUN_005514e0	ram	314	56	
+92	00551cc0	FUN_00551cc0	ram	314	56	
+92	00586750	FUN_00586750	ram	224	26	
+92	0058d450	FUN_0058d450	ram	294	58	
+92	005a8540	FUN_005a8540	ram	285	51	
+92	005ec070	FUN_005ec070	ram	306	56	
+91	004c4e60	FUN_004c4e60	ram	287	70	
+91	00552a90	FUN_00552a90	ram	354	71	
+91	00591850	FUN_00591850	ram	280	54	
+91	00592750	FUN_00592750	ram	280	54	
+91	00592c40	FUN_00592c40	ram	280	54	
+91	005c9370	FUN_005c9370	ram	305	61	
+91	005dc150	FUN_005dc150	ram	281	64	abcdefghijklmnopqrstvuwxvz
+91	005dd1a0	FUN_005dd1a0	ram	315	78	
+90	004bf650	FUN_004bf650	ram	326	79	NULL | BEEP | BACK | NEWL | CRET
+90	0051f690	FUN_0051f690	ram	294	54	
+90	00551790	FUN_00551790	ram	310	55	
+90	005518d0	FUN_005518d0	ram	310	55	
+90	00551a10	FUN_00551a10	ram	310	55	
+90	005950c0	FUN_005950c0	ram	331	70	
+90	005d54a0	FUN_005d54a0	ram	289	52	
+90	005de770	FUN_005de770	ram	290	58	
+90	00600940	FUN_00600940	ram	290	53	
+89	004a54c0	FUN_004a54c0	ram	354	72	
+89	0052cf30	FUN_0052cf30	ram	308	60	
+89	005a2af0	FUN_005a2af0	ram	312	60	
+89	005b74a0	FUN_005b74a0	ram	303	62	
+89	005b77f0	FUN_005b77f0	ram	303	62	
+89	005b7b40	FUN_005b7b40	ram	303	62	
+89	005b8050	FUN_005b8050	ram	303	62	
+89	005b8560	FUN_005b8560	ram	303	62	
+89	005b8a50	FUN_005b8a50	ram	303	62	
+89	005b8ec0	FUN_005b8ec0	ram	303	62	
+89	005b93b0	FUN_005b93b0	ram	303	62	
+89	005b98c0	FUN_005b98c0	ram	303	62	
+89	005b9db0	FUN_005b9db0	ram	303	62	
+89	005ba2c0	FUN_005ba2c0	ram	303	62	
+89	005ba7b0	FUN_005ba7b0	ram	303	62	
+89	005bb520	FUN_005bb520	ram	303	62	
+89	005bba30	FUN_005bba30	ram	303	62	
+88	0049cbf0	FUN_0049cbf0	ram	266	42	
+88	004af590	FUN_004af590	ram	257	53	
+88	004d9990	FUN_004d9990	ram	298	59	
+88	0058e140	FUN_0058e140	ram	353	65	
+88	0061ed30	FUN_0061ed30	ram	276	61	
+88	0061ee90	FUN_0061ee90	ram	276	61	
+87	004c39d0	FUN_004c39d0	ram	250	57	LABEL
+87	005c55f0	FUN_005c55f0	ram	303	59	
+87	00604140	FUN_00604140	ram	339	70	0123456789abcdef
+86	004afc60	FUN_004afc60	ram	224	34	REPE | REPZ | REPNE | REPNZ
+86	004d6040	FUN_004d6040	ram	270	61	
+86	00519f80	FUN_00519f80	ram	262	48	
+86	0053fff0	FUN_0053fff0	ram	272	54	
+86	0055ba20	FUN_0055ba20	ram	324	62	
+86	0055f540	FUN_0055f540	ram	292	53	
+86	0057d530	FUN_0057d530	ram	296	61	
+86	005e6190	FUN_005e6190	ram	302	51	
+86	005ee780	FUN_005ee780	ram	339	56	
+85	004a9e90	FUN_004a9e90	ram	324	73	
+85	00542200	FUN_00542200	ram	230	47	
+85	00596d90	FUN_00596d90	ram	278	59	
+85	0059caf0	FUN_0059caf0	ram	296	58	
+84	0054e7b0	FUN_0054e7b0	ram	263	63	
+84	005b7e90	FUN_005b7e90	ram	250	49	
+84	005b83a0	FUN_005b83a0	ram	250	49	
+84	005bb870	FUN_005bb870	ram	250	49	
+84	005c2000	FUN_005c2000	ram	250	49	
+84	005d52d0	FUN_005d52d0	ram	273	48	
+83	004af6d0	FUN_004af6d0	ram	272	61	
+83	004c5030	FUN_004c5030	ram	259	59	
+83	0054ed90	FUN_0054ed90	ram	263	59	
+83	005613b0	FUN_005613b0	ram	293	57	
+83	005a8b30	FUN_005a8b30	ram	239	41	
+83	005c1cb0	FUN_005c1cb0	ram	294	58	
+83	00613420	FUN_00613420	ram	255	55	
+83	0061eb80	FUN_0061eb80	ram	255	55	
+82	00548350	FUN_00548350	ram	318	63	
+82	0055f670	FUN_0055f670	ram	278	55	
+82	005737f0	FUN_005737f0	ram	278	55	
+82	0058d5c0	FUN_0058d5c0	ram	278	55	
+82	00593a70	FUN_00593a70	ram	278	55	
+82	00595ad0	FUN_00595ad0	ram	278	55	
+82	0059aae0	FUN_0059aae0	ram	278	55	
+82	005b6e40	FUN_005b6e40	ram	278	55	
+82	005b8d00	FUN_005b8d00	ram	247	53	
+82	005b9700	FUN_005b9700	ram	247	53	
+82	005ba100	FUN_005ba100	ram	247	53	
+82	005c8df0	FUN_005c8df0	ram	278	55	
+82	005c9eb0	FUN_005c9eb0	ram	291	59	
+82	005cb650	FUN_005cb650	ram	278	55	
+82	005d2a70	FUN_005d2a70	ram	318	63	
+82	005eb370	FUN_005eb370	ram	240	31	
+82	00609800	FUN_00609800	ram	275	58	
+81	004aa1f0	FUN_004aa1f0	ram	245	52	
+81	004acf10	FUN_004acf10	ram	229	39	
+81	0053e110	FUN_0053e110	ram	289	57	
+81	005eb290	FUN_005eb290	ram	224	27	
+80	004d6190	FUN_004d6190	ram	248	55	
+80	004e0a10	FUN_004e0a10	ram	317	62	
+80	0052d5a0	FUN_0052d5a0	ram	259	48	
+80	0052d730	FUN_0052d730	ram	259	48	
+80	00560e40	FUN_00560e40	ram	302	59	
+80	00561200	FUN_00561200	ram	240	40	
+80	0059ac00	FUN_0059ac00	ram	244	37	
+80	0059b450	FUN_0059b450	ram	283	54	
+80	005e6370	FUN_005e6370	ram	275	47	
+79	0053a420	FUN_0053a420	ram	331	59	
+79	005484d0	FUN_005484d0	ram	294	63	
+79	00548830	FUN_00548830	ram	243	54	
+79	0056f550	FUN_0056f550	ram	267	48	
+79	005e0210	FUN_005e0210	ram	298	58	
+79	005e2c20	FUN_005e2c20	ram	288	61	
+78	0041a018	entry	ram	194	18	
+78	005a2d20	FUN_005a2d20	ram	239	50	debug.html
+77	00538240	FUN_00538240	ram	354	18	
+77	00550680	FUN_00550680	ram	299	54	
+77	0058d840	FUN_0058d840	ram	225	39	
+77	005e2170	FUN_005e2170	ram	256	53	
+77	006021d0	FUN_006021d0	ram	279	50	
+76	004912c0	FUN_004912c0	ram	266	52	
+76	004915b0	FUN_004915b0	ram	266	52	
+76	0049c7e0	FUN_0049c7e0	ram	266	52	
+76	004a3f10	FUN_004a3f10	ram	266	52	
+76	004a53a0	FUN_004a53a0	ram	240	62	Shift |  + Ctrl | Ctrl |  + Alt
+76	004a7310	FUN_004a7310	ram	243	46	
+76	004d70d0	FUN_004d70d0	ram	239	44	
+76	004d8290	FUN_004d8290	ram	239	44	
+76	004d8380	FUN_004d8380	ram	239	44	
+76	004d8470	FUN_004d8470	ram	239	44	
+76	004d9c90	FUN_004d9c90	ram	239	44	
+76	004da2c0	FUN_004da2c0	ram	239	44	
+76	004db5a0	FUN_004db5a0	ram	239	44	
+76	004dd2e0	FUN_004dd2e0	ram	239	44	
+76	004e0c10	FUN_004e0c10	ram	266	52	
+76	004e3df0	FUN_004e3df0	ram	266	52	
+76	004e3f00	FUN_004e3f00	ram	266	52	
+76	004e4010	FUN_004e4010	ram	266	52	
+76	004e4300	FUN_004e4300	ram	266	52	
+76	004e62b0	FUN_004e62b0	ram	266	52	
+76	004e8140	FUN_004e8140	ram	266	52	
+76	004e8b00	FUN_004e8b00	ram	266	52	
+76	004e9050	FUN_004e9050	ram	266	52	
+76	0052c480	FUN_0052c480	ram	266	52	
+76	0053ab00	FUN_0053ab00	ram	266	52	
+76	0053dd80	FUN_0053dd80	ram	266	52	
+76	0055bdf0	FUN_0055bdf0	ram	267	46	
+76	00571ee0	FUN_00571ee0	ram	266	52	
+76	00571ff0	FUN_00571ff0	ram	267	46	
+76	005c4060	FUN_005c4060	ram	239	44	
+76	005c4b20	FUN_005c4b20	ram	239	44	
+76	005c4c10	FUN_005c4c10	ram	239	44	
+76	005c94d0	FUN_005c94d0	ram	275	58	
+76	005c9610	FUN_005c9610	ram	266	45	
+76	005d3010	FUN_005d3010	ram	239	44	
+76	005d3470	FUN_005d3470	ram	239	44	
+76	005d3770	FUN_005d3770	ram	239	44	
+76	005d4bb0	FUN_005d4bb0	ram	239	44	
+76	005d4ca0	FUN_005d4ca0	ram	239	44	
+76	005d4d90	FUN_005d4d90	ram	239	44	
+76	005d4e80	FUN_005d4e80	ram	239	44	
+76	005d50f0	FUN_005d50f0	ram	239	44	
+76	005d51e0	FUN_005d51e0	ram	239	44	
+76	005d60a0	FUN_005d60a0	ram	239	44	
+76	005fccd0	FUN_005fccd0	ram	266	48	
+75	004a7b10	FUN_004a7b10	ram	235	58	
+75	005b88b0	FUN_005b88b0	ram	225	48	
+75	005b9210	FUN_005b9210	ram	225	48	
+75	005b9c10	FUN_005b9c10	ram	225	48	
+75	005ba610	FUN_005ba610	ram	225	48	
+75	005bab00	FUN_005bab00	ram	225	48	
+75	005e0690	FUN_005e0690	ram	271	52	
+75	005e3a10	FUN_005e3a10	ram	301	67	
+75	00601de0	FUN_00601de0	ram	238	51	
+74	00542370	FUN_00542370	ram	235	50	
+74	00547a90	FUN_00547a90	ram	228	51	
+74	0056dc40	FUN_0056dc40	ram	274	51	
+74	00583ea0	FUN_00583ea0	ram	261	55	
+74	005b5740	FUN_005b5740	ram	223	40	
+74	005c54b0	FUN_005c54b0	ram	261	55	
+74	0061eff0	FUN_0061eff0	ram	221	54	
+73	0049c8f0	FUN_0049c8f0	ram	258	56	
+73	004e7c20	FUN_004e7c20	ram	225	29	
+73	005615f0	FUN_005615f0	ram	259	56	to enable hotkeys for the screen | set SCREEN_HOTKEYS=true in emu8086.ini
+73	005ca000	FUN_005ca000	ram	258	56	
+73	005e3b70	FUN_005e3b70	ram	234	49	MYBUILD\
+72	005681e0	FUN_005681e0	ram	242	42	
+72	0058fc30	FUN_0058fc30	ram	248	43	
+72	00590500	FUN_00590500	ram	248	43	
+72	005d2960	FUN_005d2960	ram	261	49	
+72	005ff6b0	FUN_005ff6b0	ram	226	53	
+71	004aa4d0	FUN_004aa4d0	ram	223	39	
+71	004c5170	FUN_004c5170	ram	221	51	
+71	00535970	FUN_00535970	ram	211	43	
+71	0055bc10	FUN_0055bc10	ram	260	50	
+71	00566020	FUN_00566020	ram	264	50	
+71	0056df80	FUN_0056df80	ram	289	53	
+71	005cf310	FUN_005cf310	ram	246	43	
+70	00490350	FUN_00490350	ram	235	42	
+70	004913d0	FUN_004913d0	ram	235	42	
+70	004914c0	FUN_004914c0	ram	235	42	
+70	004917e0	FUN_004917e0	ram	235	42	
+70	00491dc0	FUN_00491dc0	ram	235	42	
+70	00491eb0	FUN_00491eb0	ram	235	42	
+70	004dbd30	FUN_004dbd30	ram	213	34	
+70	004e8c10	FUN_004e8c10	ram	235	42	
+70	0052e3a0	FUN_0052e3a0	ram	233	43	
+70	005399f0	FUN_005399f0	ram	214	43	
+70	00592660	FUN_00592660	ram	235	42	
+70	00592b50	FUN_00592b50	ram	235	42	
+70	005ed160	FUN_005ed160	ram	239	41	
+69	004d8780	FUN_004d8780	ram	233	41	
+69	005178e0	FUN_005178e0	ram	241	46	
+69	005c53c0	FUN_005c53c0	ram	233	41	
+68	004a7c20	FUN_004a7c20	ram	218	46	_location_counter_
+68	004e0420	FUN_004e0420	ram	252	49	
+68	004e9270	FUN_004e9270	ram	252	49	
+68	0052b480	FUN_0052b480	ram	223	40	
+68	0052b640	FUN_0052b640	ram	223	40	
+68	00561740	FUN_00561740	ram	223	40	
+68	005b3580	FUN_005b3580	ram	251	57	
+67	004e7020	FUN_004e7020	ram	214	41	
+67	0052c370	FUN_0052c370	ram	225	44	
+67	005832c0	FUN_005832c0	ram	264	56	
+67	0060b450	FUN_0060b450	ram	266	46	STOP: ============ TERMINATED BY STOP BUTTON ! ======= 
+66	0049a930	FUN_0049a930	ram	236	47	
+66	004bf0e0	FUN_004bf0e0	ram	212	51	
+66	005deb80	FUN_005deb80	ram	237	55	
+66	005e5740	FUN_005e5740	ram	213	35	
+66	00601ca0	FUN_00601ca0	ram	212	51	
+66	00605d00	FUN_00605d00	ram	212	51	
+65	004edc50	FUN_004edc50	ram	185	36	
+65	0054e440	FUN_0054e440	ram	226	50	
+65	005845d0	FUN_005845d0	ram	217	38	
+65	0059aea0	FUN_0059aea0	ram	247	48	
+65	005c3f80	FUN_005c3f80	ram	217	38	
+65	005d98f0	FUN_005d98f0	ram	253	46	
+65	005db4e0	FUN_005db4e0	ram	217	38	
+65	005ec220	FUN_005ec220	ram	217	38	
+65	005eca50	FUN_005eca50	ram	217	38	
+65	005f73d0	FUN_005f73d0	ram	217	38	
+65	00600b00	FUN_00600b00	ram	244	51	
+65	00609710	FUN_00609710	ram	230	38	
+65	0060b940	FUN_0060b940	ram	217	38	
+64	004911e0	FUN_004911e0	ram	215	38	
+64	004918d0	FUN_004918d0	ram	227	39	
+64	00492070	FUN_00492070	ram	227	39	
+64	00492180	FUN_00492180	ram	227	39	
+64	00492620	FUN_00492620	ram	227	39	
+64	004928a0	FUN_004928a0	ram	227	39	
+64	0049cae0	FUN_0049cae0	ram	227	39	
+64	0049ced0	FUN_0049ced0	ram	227	39	
+64	0049cfe0	FUN_0049cfe0	ram	227	39	
+64	0049d0f0	FUN_0049d0f0	ram	215	38	
+64	0049d1d0	FUN_0049d1d0	ram	227	39	
+64	0049d2e0	FUN_0049d2e0	ram	227	39	
+64	0049d3f0	FUN_0049d3f0	ram	227	39	
+64	0049d7d0	FUN_0049d7d0	ram	227	39	
+64	004a2910	FUN_004a2910	ram	227	39	
+64	004a2a20	FUN_004a2a20	ram	227	39	
+64	004a2b30	FUN_004a2b30	ram	227	39	
+64	004af4a0	FUN_004af4a0	ram	193	42	
+64	004d7fa0	FUN_004d7fa0	ram	223	42	
+64	004dbc10	FUN_004dbc10	ram	229	42	
+64	004e0740	FUN_004e0740	ram	215	38	
+64	004e4410	FUN_004e4410	ram	215	38	
+64	004e44f0	FUN_004e44f0	ram	215	38	
+64	004e45d0	FUN_004e45d0	ram	215	38	
+64	004e63c0	FUN_004e63c0	ram	215	38	
+64	004e7710	FUN_004e7710	ram	215	38	
+64	0051a110	FUN_0051a110	ram	215	38	
+64	0052b560	FUN_0052b560	ram	215	38	
+64	0052b720	FUN_0052b720	ram	215	38	
+64	0052c290	FUN_0052c290	ram	215	38	
+64	0053a170	FUN_0053a170	ram	215	38	
+64	0053b9a0	FUN_0053b9a0	ram	215	38	
+64	0053ba80	FUN_0053ba80	ram	215	38	
+64	0053bb60	FUN_0053bb60	ram	215	38	
+64	0053bc40	FUN_0053bc40	ram	215	38	
+64	0053bd20	FUN_0053bd20	ram	215	38	
+64	0058db60	FUN_0058db60	ram	227	39	
+64	00596930	FUN_00596930	ram	240	49	
+64	005b4620	FUN_005b4620	ram	215	38	
+64	005c25f0	FUN_005c25f0	ram	249	61	00000 | 7C00 | 0000 | 0000 | 0000 | 0000 | 0000 | 0000 | 7C00 | 0000 | 0000
+64	005cdf50	FUN_005cdf50	ram	215	38	
+64	005ce030	FUN_005ce030	ram	215	38	
+64	005d3100	FUN_005d3100	ram	208	37	
+64	005d9dd0	FUN_005d9dd0	ram	257	52	UserName | emu8086 | RegKey | emu8086 | LicCount | emu8086
+64	005e1d10	FUN_005e1d10	ram	209	41	
+64	0061f0f0	FUN_0061f0f0	ram	208	51	
+63	004a7730	FUN_004a7730	ram	188	32	
+63	004a7810	FUN_004a7810	ram	188	32	
+63	004ab020	FUN_004ab020	ram	180	39	
+63	004ad0c0	FUN_004ad0c0	ram	204	46	WORD  | WORD[
+63	004ad1b0	FUN_004ad1b0	ram	204	46	BYTE  | BYTE[
+63	004e9cb0	FUN_004e9cb0	ram	220	42	
+63	00561d80	FUN_00561d80	ram	211	37	
+63	005e1940	FUN_005e1940	ram	190	44	
+62	004916c0	FUN_004916c0	ram	225	47	http://www.emu8086.com/update/
+62	004aa020	FUN_004aa020	ram	240	50	
+62	004e8250	FUN_004e8250	ram	225	47	http://www.emu8086.com/update/
+62	00539b50	FUN_00539b50	ram	185	34	
+62	0058dc70	FUN_0058dc70	ram	200	35	
+62	005ec930	FUN_005ec930	ram	225	47	http://www.emu8086.com/update/
+61	004a46b0	FUN_004a46b0	ram	186	33	
+61	004acda0	FUN_004acda0	ram	213	40	
+61	004bef80	FUN_004bef80	ram	201	45	
+61	0056af40	FUN_0056af40	ram	189	38	
+61	00571680	FUN_00571680	ram	234	48	
+61	00585620	FUN_00585620	ram	223	47	http:// | www.emu8086.com
+61	0058d9e0	FUN_0058d9e0	ram	186	33	
+61	005d9af0	FUN_005d9af0	ram	188	34	
+61	005f0910	FUN_005f0910	ram	194	38	Alignment | Alignment
+60	0048fe90	FUN_0048fe90	ram	200	33	
+60	00491fa0	FUN_00491fa0	ram	200	33	
+60	004932c0	FUN_004932c0	ram	200	33	
+60	00493390	FUN_00493390	ram	200	33	
+60	00493460	FUN_00493460	ram	200	33	
+60	00493530	FUN_00493530	ram	200	33	
+60	0049d500	FUN_0049d500	ram	201	35	
+60	004a1ff0	FUN_004a1ff0	ram	221	44	
+60	004a59f0	FUN_004a59f0	ram	201	35	
+60	004dd1e0	FUN_004dd1e0	ram	211	40	
+60	00568110	FUN_00568110	ram	202	34	
+60	0056f470	FUN_0056f470	ram	213	36	
+60	0059a440	FUN_0059a440	ram	228	47	
+60	0059a550	FUN_0059a550	ram	228	47	
+60	005e1ba0	FUN_005e1ba0	ram	210	43	
+59	0053bf80	FUN_0053bf80	ram	186	36	
+59	0056abb0	FUN_0056abb0	ram	192	33	
+59	0059a920	FUN_0059a920	ram	214	37	
+59	0059aa00	FUN_0059aa00	ram	211	37	
+59	005d6610	FUN_005d6610	ram	170	34	
+59	005d7b30	FUN_005d7b30	ram	186	44	register.html
+59	005db7a0	FUN_005db7a0	ram	186	44	register.html
+59	005ec300	FUN_005ec300	ram	209	41	
+58	0048ff60	FUN_0048ff60	ram	210	44	index.html
+58	00490280	FUN_00490280	ram	197	34	
+58	0049a860	FUN_0049a860	ram	197	34	
+58	0049cdc0	FUN_0049cdc0	ram	210	44	index.html
+58	004e9160	FUN_004e9160	ram	210	44	index.html
+58	00517430	FUN_00517430	ram	197	34	
+58	00519eb0	FUN_00519eb0	ram	197	34	
+58	0053a0a0	FUN_0053a0a0	ram	197	34	
+58	00583b20	FUN_00583b20	ram	178	32	
+58	005caad0	FUN_005caad0	ram	197	34	
+58	005d3860	FUN_005d3860	ram	210	44	start.html
+58	005d3970	FUN_005d3970	ram	157	24	
+58	005db3d0	FUN_005db3d0	ram	210	44	register.html
+58	005dbbd0	FUN_005dbbd0	ram	210	44	http://www.emu8086.com
+58	005e1a20	FUN_005e1a20	ram	188	37	
+57	004b5630	FUN_004b5630	ram	128	18	
+57	00539ca0	FUN_00539ca0	ram	179	33	
+57	0056aaf0	FUN_0056aaf0	ram	187	32	
+57	005c5250	FUN_005c5250	ram	172	32	
+57	005d2cc0	FUN_005d2cc0	ram	227	39	
+57	0060a630	FUN_0060a630	ram	211	37	
+57	0060a7a0	FUN_0060a7a0	ram	211	37	
+56	00493f00	FUN_00493f00	ram	198	31	
+56	0049d8e0	FUN_0049d8e0	ram	181	29	
+56	0049da80	FUN_0049da80	ram	181	29	
+56	0053be00	FUN_0053be00	ram	173	39	
+56	00552c00	FUN_00552c00	ram	185	31	
+56	0055bb70	FUN_0055bb70	ram	160	22	
+56	005648a0	FUN_005648a0	ram	182	31	
+56	00564960	FUN_00564960	ram	182	31	
+56	005f26d0	FUN_005f26d0	ram	177	41	stop_on_condition.html
+55	004a7dd0	FUN_004a7dd0	ram	171	38	_location_counter_
+55	004bf220	FUN_004bf220	ram	172	39	
+55	004e77f0	FUN_004e77f0	ram	165	38	
+55	0059ad00	FUN_0059ad00	ram	208	38	
+55	0059add0	FUN_0059add0	ram	208	38	
+55	005b1cc0	FUN_005b1cc0	ram	176	29	
+55	005cdcb0	FUN_005cdcb0	ram	203	34	
+54	0049a560	FUN_0049a560	ram	165	25	
+54	0049ca20	FUN_0049ca20	ram	180	29	
+54	004a2600	FUN_004a2600	ram	180	29	
+54	004acc90	FUN_004acc90	ram	174	33	
+54	004dcce0	FUN_004dcce0	ram	161	30	
+54	0053e930	FUN_0053e930	ram	190	37	
+54	0054a0c0	FUN_0054a0c0	ram	196	34	
+54	005d2bf0	FUN_005d2bf0	ram	196	34	
+53	004e8990	FUN_004e8990	ram	174	33	
+53	0053dc10	FUN_0053dc10	ram	174	33	
+53	00550440	FUN_00550440	ram	141	26	
+53	0056dd60	FUN_0056dd60	ram	185	31	
+53	0059b090	FUN_0059b090	ram	183	39	
+53	005d28a0	FUN_005d28a0	ram	189	34	
+52	004aa130	FUN_004aa130	ram	158	37	
+52	004b2400	FUN_004b2400	ram	160	31	
+52	004dcbf0	FUN_004dcbf0	ram	188	37	
+52	00547c50	FUN_00547c50	ram	112	13	
+52	0059a660	FUN_0059a660	ram	181	31	
+52	005d9740	FUN_005d9740	ram	158	27	
+52	005e6010	FUN_005e6010	ram	195	33	
+52	005f5eb0	FUN_005f5eb0	ram	179	29	
+51	004a44f0	FUN_004a44f0	ram	178	32	
+51	004a45d0	FUN_004a45d0	ram	178	32	
+51	004a6ef0	FUN_004a6ef0	ram	164	31	
+51	004de150	FUN_004de150	ram	174	26	
+51	0053ea20	FUN_0053ea20	ram	175	27	
+51	0053ead0	FUN_0053ead0	ram	175	27	
+51	0053f920	FUN_0053f920	ram	170	27	
+51	005401d0	FUN_005401d0	ram	180	28	
+51	00540290	FUN_00540290	ram	180	28	
+51	00540350	FUN_00540350	ram	180	28	
+51	00540410	FUN_00540410	ram	180	28	
+51	0055bd40	FUN_0055bd40	ram	170	27	
+51	0056a9e0	FUN_0056a9e0	ram	177	31	
+51	0059b300	FUN_0059b300	ram	177	38	
+51	005c21c0	FUN_005c21c0	ram	170	27	
+51	005c2270	FUN_005c2270	ram	170	27	
+51	005c9170	FUN_005c9170	ram	142	23	
+51	005e3290	FUN_005e3290	ram	192	35	
+51	005ec400	FUN_005ec400	ram	170	27	
+51	005f4150	FUN_005f4150	ram	170	27	
+51	005f4200	FUN_005f4200	ram	170	27	
+50	004a21e0	FUN_004a21e0	ram	150	30	
+50	004a2340	FUN_004a2340	ram	150	30	
+50	004a24a0	FUN_004a24a0	ram	150	30	
+50	0052d8c0	FUN_0052d8c0	ram	159	32	
+50	0056ded0	FUN_0056ded0	ram	170	26	
+50	0058d6e0	FUN_0058d6e0	ram	150	30	
+50	005a2c30	FUN_005a2c30	ram	189	36	
+50	005b1c20	FUN_005b1c20	ram	160	24	
+50	005b37b0	FUN_005b37b0	ram	160	25	
+50	005d9c70	FUN_005d9c70	ram	159	28	
+50	005f0830	FUN_005f0830	ram	155	32	Charset | Font
+50	005f2ee0	FUN_005f2ee0	ram	189	36	
+50	005f7100	FUN_005f7100	ram	189	36	
+49	0049d9a0	FUN_0049d9a0	ram	175	33	
+49	004af8b0	FUN_004af8b0	ram	151	32	    
+49	005354c0	FUN_005354c0	ram	145	32	
+49	0056ade0	FUN_0056ade0	ram	150	31	
+49	0056bcd0	FUN_0056bcd0	ram	166	26	
+49	00596bb0	FUN_00596bb0	ram	174	28	
+49	005d9810	FUN_005d9810	ram	177	35	
+49	005ff800	FUN_005ff800	ram	149	32	
+49	00608d80	FUN_00608d80	ram	185	30	
+49	00608e40	FUN_00608e40	ram	185	30	
+49	00608f00	FUN_00608f00	ram	185	30	
+49	00608fc0	FUN_00608fc0	ram	185	30	
+48	004d98b0	FUN_004d98b0	ram	173	34	
+48	004df650	FUN_004df650	ram	167	26	
+48	004e3d10	FUN_004e3d10	ram	173	34	
+48	004edda0	FUN_004edda0	ram	142	27	
+48	00539940	FUN_00539940	ram	164	26	
+48	0055f790	FUN_0055f790	ram	173	34	
+48	00561510	FUN_00561510	ram	173	34	
+48	00573910	FUN_00573910	ram	173	34	
+48	005844f0	FUN_005844f0	ram	173	34	
+48	0058d370	FUN_0058d370	ram	173	34	
+48	0058ed80	FUN_0058ed80	ram	173	34	
+48	00595560	FUN_00595560	ram	173	34	
+48	005b0810	FUN_005b0810	ram	182	34	
+48	005b08d0	FUN_005b08d0	ram	182	34	
+48	005b4700	FUN_005b4700	ram	173	34	
+48	005b73c0	FUN_005b73c0	ram	173	34	
+48	005c5c90	FUN_005c5c90	ram	173	34	
+48	005c8f10	FUN_005c8f10	ram	173	34	
+48	005cd800	FUN_005cd800	ram	173	34	
+48	005fef30	FUN_005fef30	ram	173	34	
+48	00614450	FUN_00614450	ram	178	35	
+47	00539de0	FUN_00539de0	ram	156	24	
+47	005852d0	FUN_005852d0	ram	180	38	http://www.emu8086.com/dr/donation.html
+47	00595240	FUN_00595240	ram	164	26	
+47	00596c60	FUN_00596c60	ram	152	35	
+47	0059df40	FUN_0059df40	ram	164	26	
+47	005b4170	FUN_005b4170	ram	164	26	
+47	005b7310	FUN_005b7310	ram	164	26	
+47	005c8b30	FUN_005c8b30	ram	164	26	
+47	005ccb60	FUN_005ccb60	ram	164	26	
+47	005d7cb0	FUN_005d7cb0	ram	145	26	
+47	005ed550	FUN_005ed550	ram	146	25	
+47	005ee5c0	FUN_005ee5c0	ram	164	26	
+47	00606e90	FUN_00606e90	ram	135	18	
+46	0040e886	FUN_0040e886	ram	125	3	
+46	004a7270	FUN_004a7270	ram	158	25	
+46	0056bd80	FUN_0056bd80	ram	154	25	
+46	0056be20	FUN_0056be20	ram	154	25	
+46	0056f190	FUN_0056f190	ram	133	18	
+46	005707b0	FUN_005707b0	ram	157	28	
+46	005f0750	FUN_005f0750	ram	159	37	Caption
+45	004a7d20	FUN_004a7d20	ram	147	31	
+45	004ead10	FUN_004ead10	ram	152	23	
+45	004eea20	FUN_004eea20	ram	152	23	
+45	0053c120	FUN_0053c120	ram	152	23	
+45	00589f70	FUN_00589f70	ram	139	33	
+45	005a3550	FUN_005a3550	ram	141	30	
+44	004a76d0	FUN_004a76d0	ram	96	12	
+44	004a7920	FUN_004a7920	ram	96	12	
+44	004cac60	FUN_004cac60	ram	143	27	noname
+44	00550560	FUN_00550560	ram	150	34	
+43	004a5750	FUN_004a5750	ram	129	21	
+43	005f0a00	FUN_005f0a00	ram	132	21	RightToLeft
+42	0053ef00	FUN_0053ef00	ram	121	17	
+42	0053f300	FUN_0053f300	ram	121	17	
+42	0053fec0	FUN_0053fec0	ram	139	30	
+42	00571960	FUN_00571960	ram	122	20	
+42	00571a10	FUN_00571a10	ram	122	20	
+42	00571ac0	FUN_00571ac0	ram	122	20	
+42	00571b70	FUN_00571b70	ram	122	20	
+42	00571c20	FUN_00571c20	ram	122	20	
+42	00571cd0	FUN_00571cd0	ram	122	20	
+42	00571d80	FUN_00571d80	ram	122	20	
+42	00571e30	FUN_00571e30	ram	122	20	
+42	005831e0	FUN_005831e0	ram	160	32	
+42	005bc130	FUN_005bc130	ram	165	32	
+42	005bc210	FUN_005bc210	ram	165	32	
+42	005bc2f0	FUN_005bc2f0	ram	165	32	
+42	005e3350	FUN_005e3350	ram	148	23	
+41	0051a1f0	FUN_0051a1f0	ram	119	16	
+41	0052ad90	FUN_0052ad90	ram	119	16	
+41	005f8d10	FUN_005f8d10	ram	128	25	
+40	005eb650	FUN_005eb650	ram	144	22	
+40	005eb7e0	FUN_005eb7e0	ram	124	25	
+39	00548e40	FUN_00548e40	ram	127	28	
+39	006020b0	FUN_006020b0	ram	139	29	
+38	0053eb80	FUN_0053eb80	ram	106	16	
+38	0053ebf0	FUN_0053ebf0	ram	106	16	
+38	0053ec60	FUN_0053ec60	ram	106	16	
+38	0053ecd0	FUN_0053ecd0	ram	106	16	
+38	0053ed40	FUN_0053ed40	ram	106	16	
+38	0053edb0	FUN_0053edb0	ram	106	16	
+38	0053ee20	FUN_0053ee20	ram	106	16	
+38	0053ee90	FUN_0053ee90	ram	106	16	
+38	0053ef80	FUN_0053ef80	ram	109	16	
+38	0053eff0	FUN_0053eff0	ram	109	16	
+38	0053f0d0	FUN_0053f0d0	ram	109	16	
+38	0053f140	FUN_0053f140	ram	109	16	
+38	0053f1b0	FUN_0053f1b0	ram	109	16	
+38	0053f220	FUN_0053f220	ram	109	16	
+38	0053f380	FUN_0053f380	ram	109	16	
+38	0053f3f0	FUN_0053f3f0	ram	109	16	
+38	0053f460	FUN_0053f460	ram	109	16	
+38	0053f4d0	FUN_0053f4d0	ram	111	21	
+38	0054a190	FUN_0054a190	ram	121	25	
+38	00551010	FUN_00551010	ram	138	23	
+38	0060b3a0	FUN_0060b3a0	ram	172	25	
+38	00614f90	FUN_00614f90	ram	105	15	
+37	00539840	FUN_00539840	ram	117	21	
+36	00543930	FUN_00543930	ram	124	21	
+36	005eb6e0	FUN_005eb6e0	ram	116	26	
+36	005ee670	FUN_005ee670	ram	126	27	
+35	004a3e80	FUN_004a3e80	ram	107	19	
+35	005ebb20	FUN_005ebb20	ram	110	24	
+35	005f5970	FUN_005f5970	ram	127	18	
+35	005f59f0	FUN_005f59f0	ram	127	18	
+35	00601f90	FUN_00601f90	ram	123	26	
+34	0053f060	FUN_0053f060	ram	101	13	
+34	0053f290	FUN_0053f290	ram	101	13	
+34	005404d0	FUN_005404d0	ram	101	13	
+34	00540540	FUN_00540540	ram	101	13	
+34	005405b0	FUN_005405b0	ram	101	13	
+34	00540620	FUN_00540620	ram	101	13	
+34	00540690	FUN_00540690	ram	101	13	
+34	00540700	FUN_00540700	ram	101	13	
+34	00540770	FUN_00540770	ram	101	13	
+34	005407e0	FUN_005407e0	ram	99	13	
+34	00540850	FUN_00540850	ram	99	13	
+34	005408c0	FUN_005408c0	ram	99	13	
+34	00540930	FUN_00540930	ram	99	13	
+34	005409a0	FUN_005409a0	ram	99	13	
+34	00540a10	FUN_00540a10	ram	99	13	
+34	00540a80	FUN_00540a80	ram	99	13	
+34	00540af0	FUN_00540af0	ram	99	13	
+34	00547870	FUN_00547870	ram	120	28	
+34	0059b1f0	FUN_0059b1f0	ram	109	23	
+32	0056de20	FUN_0056de20	ram	99	19	
+32	005dc310	FUN_005dc310	ram	121	18	
+32	005dc390	FUN_005dc390	ram	119	19	
+32	005ebc20	FUN_005ebc20	ram	122	19	
+32	00603670	FUN_00603670	ram	107	24	
+31	0059afa0	FUN_0059afa0	ram	102	22	
+26	005e24f0	FUN_005e24f0	ram	90	18	
+25	004ad070	FUN_004ad070	ram	68	10	
+25	00606f20	FUN_00606f20	ram	80	17	
+15	004a78f0	FUN_004a78f0	ram	38	4	
+15	004acd70	FUN_004acd70	ram	40	1	
+12	004ad030	FUN_004ad030	ram	32	5	
+11	005b3770	FUN_005b3770	ram	43	4	
+10	004a9100	FUN_004a9100	ram	26	2	
+10	004ad050	FUN_004ad050	ram	32	5	
+8	00438778	FUN_00438778	ram	25	5	
+8	00438aec	FUN_00438aec	ram	25	5	
+8	00438b38	FUN_00438b38	ram	25	5	
+8	00438b84	FUN_00438b84	ram	25	5	
+8	00438bd8	FUN_00438bd8	ram	25	5	
+8	00438c28	FUN_00438c28	ram	25	5	
+8	00438c80	FUN_00438c80	ram	25	5	
+8	004390a4	FUN_004390a4	ram	25	5	
+8	0043b1a4	FUN_0043b1a4	ram	25	5	
+8	0043b1ec	FUN_0043b1ec	ram	25	5	
+8	0043b220	FUN_0043b220	ram	25	5	
+8	0043b268	FUN_0043b268	ram	25	5	
+8	0043b2b0	FUN_0043b2b0	ram	25	5	
+8	0043b2f8	FUN_0043b2f8	ram	25	5	
+8	0043b340	FUN_0043b340	ram	25	5	
+8	0043b388	FUN_0043b388	ram	25	5	
+8	0043b3ec	FUN_0043b3ec	ram	25	5	
+8	0043b434	FUN_0043b434	ram	25	5	
+8	0043b490	FUN_0043b490	ram	25	5	
+8	0043cbc8	FUN_0043cbc8	ram	25	5	
+8	0043cc0c	FUN_0043cc0c	ram	25	5	
+8	0043ccb4	FUN_0043ccb4	ram	25	5	
+8	0043cd00	FUN_0043cd00	ram	25	5	
+8	0043cd44	FUN_0043cd44	ram	25	5	
+8	0043cd9c	FUN_0043cd9c	ram	25	5	
+8	0043cde8	FUN_0043cde8	ram	25	5	
+8	0043ce40	FUN_0043ce40	ram	25	5	
+8	0043ce74	FUN_0043ce74	ram	25	5	
+8	0043e8e0	FUN_0043e8e0	ram	25	5	
+8	0043e914	FUN_0043e914	ram	25	5	
+8	00442da8	FUN_00442da8	ram	25	5	
+8	00443568	FUN_00443568	ram	25	5	
+8	004436a0	FUN_004436a0	ram	25	5	
+8	004436f0	FUN_004436f0	ram	25	5	
+8	00443738	FUN_00443738	ram	25	5	
+8	00443780	FUN_00443780	ram	25	5	
+8	004437cc	FUN_004437cc	ram	25	5	
+8	00443814	FUN_00443814	ram	25	5	
+8	00443858	FUN_00443858	ram	25	5	
+8	00443910	FUN_00443910	ram	25	5	
+8	00443964	FUN_00443964	ram	25	5	
+8	004439b4	FUN_004439b4	ram	25	5	
+8	00443d2c	FUN_00443d2c	ram	25	5	
+8	00447f08	FUN_00447f08	ram	25	5	
+8	004496e4	FUN_004496e4	ram	25	5	
+8	004523e8	FUN_004523e8	ram	25	5	
+8	00452474	FUN_00452474	ram	25	5	
+8	004524c8	FUN_004524c8	ram	25	5	
+8	00452518	FUN_00452518	ram	25	5	
+8	00452568	FUN_00452568	ram	25	5	
+8	004525ac	FUN_004525ac	ram	25	5	
+8	004525f0	FUN_004525f0	ram	25	5	
+5	004adde0	FUN_004adde0	ram	15	1	
+5	005a8500	FUN_005a8500	ram	27	5	
+5	005a8520	FUN_005a8520	ram	27	5	
+5	005b1c00	FUN_005b1c00	ram	24	4	
+4	005e0860	FUN_005e0860	ram	15	2	
+3	00600930	FUN_00600930	ram	13	2	
+3	00601c90	FUN_00601c90	ram	11	2	
+2	005b37a0	FUN_005b37a0	ram	11	1	
+2	005e0870	FUN_005e0870	ram	6	1	
+1	004199b0	MSVBVM60.DLL::__vbaChkstk	ram	6	2	
+1	004199bc	MSVBVM60.DLL::__vbaFPException	ram	6	2	
+1	004199c8	MSVBVM60.DLL::adj_fdiv_m32	ram	6	2	
+1	004199d4	MSVBVM60.DLL::adj_fdiv_m64	ram	6	2	
+1	004199e6	MSVBVM60.DLL::adj_fdivr_m32	ram	6	2	
+1	004199f2	MSVBVM60.DLL::adj_fdivr_m64	ram	6	2	
+1	00419a40	MSVBVM60.DLL::DllFunctionCall	ram	6	2	
+1	0041a010	MSVBVM60.DLL::Ordinal_100	ram	6	2	

@@ -1,0 +1,18 @@
+documentation for emu8086
+documentation for emu8086 - assembler and microprocessor emulator
+ Where to start?
+ Assembly Language Tutorials
+ Working with The Editor
+ How to Compile The Code
+ Working with The Emulator
+ Complete 8086 Instruction Set 
+ Short List of Supported Interrupt Functions 
+ Global Memory Table
+ Custom Memory Map
+ Masm / Tasm compatibility
+ I/O ports and Hardware Interrupts
+ emu8086 official website (online) 
+ The Licence Agreement and Terms of Use
+ Frequently Asked Questions (online) 
+ the reference and tutorials were once checked and partly re-written by Daniel B. Sedory (aka The Starman).
+ to visit The Starman's Realm click here.

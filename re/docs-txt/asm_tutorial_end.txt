@@ -1,0 +1,7 @@
+8086 Assembler Tutorial for Beginners (Part 13)
+Congratulations! You made it through all tutorials!
+Now you should be ready for:
+ Complete 8086 instruction set
+frequently asked questions
+Check for an update.
+ <<< Previous Part <<<

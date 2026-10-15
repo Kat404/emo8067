@@ -1,0 +1,16 @@
+# Build
+/target/
+**/*.rs.bk
+
+# RE artifacts — large, regenerable, and derived from a proprietary binary
+/re/ghidra-project/
+/re/out/*/decomp/
+/re/extracted/
+/re/out/*.log
+
+# Keep the small, human-readable RE deliverables
+!/re/FINDINGS.md
+
+# Runtime
+*.bak
+/crates/core/.scratch

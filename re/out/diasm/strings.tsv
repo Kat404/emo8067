@@ -1,0 +1,286 @@
+addr	len	value	xrefcount	xref-addrs
+1000b0f8	7	[BX] + 	2	1000d1f4 1000d274
+1000b100	7	[BP] + 	2	1000d1f0 1000d270
+1000b108	7	[DI] + 	2	1000d1ec 1000d26c
+1000b110	7	[SI] + 	2	1000d1e8 1000d268
+1000b118	12	[BP + DI] + 	2	1000d1e4 1000d264
+1000b128	12	[BP + SI] + 	2	1000d1e0 1000d260
+1000b138	12	[BX + DI] + 	2	1000d1dc 1000d25c
+1000b148	12	[BX + SI] + 	2	1000d1d8 1000d258
+1000b158	5	[BX] 	2	1000d1d4 1000d254
+1000b160	5	[BP] 	2	1000d1d0 1000d250
+1000b168	5	[DI] 	2	1000d1cc 1000d24c
+1000b170	5	[SI] 	2	1000d1c8 1000d248
+1000b178	10	[BP + DI] 	2	1000d1c4 1000d244
+1000b184	10	[BP + SI] 	2	1000d1c0 1000d240
+1000b190	10	[BX + DI] 	2	1000d1bc 1000d23c
+1000b19c	10	[BX + SI] 	2	1000d1b8 1000d238
+1000b1c0	9	[BP + DI]	2	1000d1a4 1000d224
+1000b1cc	9	[BP + SI]	2	1000d1a0 1000d220
+1000b1d8	9	[BX + DI]	2	1000d19c 1000d21c
+1000b1e4	9	[BX + SI]	2	1000d198 1000d218
+1000b240	49	Copyright (c)  emu8086.com                       	2	10001010 1000100b
+1000b280	12	, 0%02X%02Xh	1	100023e8
+1000b290	6	, 0%Xh	1	100023af
+1000b298	7	EXT ???	1	10002318
+1000b2a0	9	%s 0%04Xh	1	10002304
+1000b2ec	16	%s%s[0%02X%02Xh]	1	100021f2
+1000b300	10	%s%s0%04Xh	1	1000215f
+1000b30c	25	%s%s0%02X%02Xh:0%02X%02Xh	1	1000210b
+1000b328	14	%s%s0%02X%02Xh	1	100020b3
+1000b338	8	%s%s0%Xh	1	10002073
+1000b344	6	%s, %s	1	1000200b
+1000b34c	16	[0%02X%02Xh], %s	2	10001f77 10001f98
+1000b360	16	%s0%02X%02Xh, %s	1	10001ee6
+1000b374	12	[0%02X%02Xh]	1	10001ccd
+1000b384	10	0%02X%02Xh	1	10001c97
+1000b390	6	%s0%Xh	1	10001c65
+1000b3c0	15	FDIVP st%d, st0	1	10001a99
+1000b3d0	16	FDIVRP st%d, st0	1	10001a7c
+1000b3e4	15	FSUBP st%d, st0	1	10001a5b
+1000b3f4	16	FSUBRP st%d, st0	1	10001a3a
+1000b408	9	F??? st%d	1	10001a0d
+1000b41c	14	F??? st%d, st0	1	100019ab
+1000b42c	15	FMULP st%d, st0	1	1000197e
+1000b43c	15	FADDP st%d, st0	1	10001951
+1000b44c	11	FUCOMP st%d	1	100018f7
+1000b458	10	FUCOM st%d	1	100018d6
+1000b464	9	FSTP st%d	1	100018b5
+1000b470	8	FST st%d	1	10001894
+1000b47c	8	??? st%d	1	10001873
+1000b488	10	FFREE st%d	1	10001852
+1000b494	14	FDIV st%d, st0	1	1000180c
+1000b4a4	15	FDIVR st%d, st0	1	100017ef
+1000b4b4	14	FSUB st%d, st0	1	100017ce
+1000b4c4	15	FSUBR st%d, st0	1	100017ad
+1000b4d4	14	FMUL st%d, st0	1	10001754
+1000b4e4	14	FADD st%d, st0	1	10001727
+1000b514	6	FSETPM	1	10001652
+1000b51c	5	FINIT	1	1000164a
+1000b524	5	FCLEX	1	10001642
+1000b52c	5	FDISI	1	1000163a
+1000b53c	7	FUCOMPP	1	100015ec
+1000b554	6	FSCALE	1	10001591
+1000b55c	7	FRNDINT	1	10001586
+1000b564	7	FSINCOS	1	1000157b
+1000b56c	5	FSQRT	1	10001570
+1000b574	7	FYL2XP1	1	10001565
+1000b57c	5	FPREM	1	1000155a
+1000b584	7	FINCSTP	1	1000154f
+1000b58c	7	FDECSTP	1	10001544
+1000b594	6	FPREM1	1	1000153c
+1000b59c	7	FXTRACT	1	10001534
+1000b5a4	6	FPATAN	1	1000152c
+1000b5ac	5	FPTAN	1	10001524
+1000b5b4	5	FYL2X	1	1000151c
+1000b5bc	5	F2XM1	1	10001514
+1000b5cc	6	FLDLN2	1	10001504
+1000b5d4	6	FLDLG2	1	100014fc
+1000b5dc	5	FLDPI	1	100014f4
+1000b5e4	6	FLDL2E	1	100014ec
+1000b5ec	6	FLDL2T	1	100014e4
+1000b624	14	FXCH st0, st%d	1	10001450
+1000b634	8	FLD st%d	1	10001423
+1000b640	15	FDIVR st0, st%d	1	100013e3
+1000b650	14	FDIV st0, st%d	1	100013c6
+1000b660	15	FSUBR st0, st%d	1	100013a5
+1000b670	14	FSUB st0, st%d	1	10001384
+1000b680	15	FCOMP st0, st%d	1	10001363
+1000b690	14	FCOM st0, st%d	1	10001342
+1000b6a0	14	FMUL st0, st%d	1	10001321
+1000b6b0	14	FADD st0, st%d	1	10001300
+1000b6c0	16	%s, [0%02X%02Xh]	3	10001f33 10001f52 1000127f
+1000b6d4	16	%s, %s0%02X%02Xh	3	10001e73 10001ea2 1000122a
+1000b6e8	12	%s%s0%Xh, %s	2	10001e12 100011e3
+1000b6f8	12	%s, %s%s0%Xh	3	10001db3 10001dda 100011af
+1000b730	14	stack overflow	1	100028cc
+1000b740	22	expression too complex	1	10002929
+1000b758	22	0123456789abcdefABCDEF	1	10002974
+1000b770	8	01234567	1	10002994
+1000b77c	22	bad operator in stack!	1	10002be5
+1000b794	10	bad syntax	1	10002e81
+1000b7a8	11	missing ')'	1	10002f30
+1000b7b4	17	= needs an lvalue	1	100030f6
+1000b7c8	18	missing an operand	1	100030b4
+1000b7dc	18	= needs and lvalue	1	10003079
+1000b7f0	14	bad expression	2	10003139 100039ee
+1000b800	9	recursion	1	10003181
+1000b86e	5	null)	1	1000408a
+1000b87c	6	(null)	5	10003e84 10003e8d 10003d66 10003d69 1001349c
+1000ba64	14	CorExitProcess	1	10005546
+1000ba74	11	mscoree.dll	1	10005537
+1000babc	14	runtime error 	0	
+1000bad0	13	TLOSS error\n	0	
+1000bae0	12	SING error\n	0	
+1000baf0	14	DOMAIN error\n	0	
+1000bb00	36	R6028\n- unable to initialize heap\n	0	
+1000bb28	52	R6027\n- not enough space for lowio initialization\n	0	
+1000bb60	52	R6026\n- not enough space for stdio initialization\n	0	
+1000bb98	37	R6025\n- pure virtual function call\n	0	
+1000bbc0	52	R6024\n- not enough space for _onexit/atexit table\n	0	
+1000bbf8	40	R6019\n- unable to open console device\n	0	
+1000bc24	32	R6018\n- unexpected heap error\n	0	
+1000bc48	44	R6017\n- unexpected multithread lock error\n	0	
+1000bc78	43	R6016\n- not enough space for thread data\n	0	
+1000bca8	149	\nThis application has requested the Runtime to terminate it in an unusual way.\nPlease contact the application's support team for more information.\n	0	
+1000bd40	43	R6009\n- not enough space for environment\n	5	100060d1 1000610e 1000613a 10006143 10013684
+1000bd6c	41	R6008\n- not enough space for arguments\n	0	
+1000bd98	36	R6002\n- floating point not loaded\n	0	
+1000bdc0	36	Microsoft Visual C++ Runtime Library	2	100095d5 1000611f
+1000bdec	25	Runtime Error!\n\nProgram: 	1	100060f1
+1000be0c	22	<program name unknown>	2	10009529 1000607c
+1000c284	8	HH:mm:ss	1	10013a60
+1000c290	19	dddd, MMMM dd, yyyy	1	10013a5c
+1000c2a4	8	MM/dd/yy	1	10013a58
+1000c2b8	8	December	1	10013a4c
+1000c2c4	8	November	1	10013a48
+1000c2d0	7	October	1	10013a44
+1000c2d8	9	September	1	10013a40
+1000c2e4	6	August	1	10013a3c
+1000c2fc	5	April	1	10013a2c
+1000c304	5	March	1	10013a28
+1000c30c	8	February	1	10013a24
+1000c318	7	January	1	10013a20
+1000c350	8	Saturday	1	100139ec
+1000c35c	6	Friday	1	100139e8
+1000c364	8	Thursday	1	100139e4
+1000c370	9	Wednesday	1	100139e0
+1000c37c	7	Tuesday	1	100139dc
+1000c384	6	Monday	1	100139d8
+1000c38c	6	Sunday	1	100139d4
+1000c3dc	37	InitializeCriticalSectionAndSpinCount	1	10008e8a
+1000c404	12	kernel32.dll	1	10008e7b
+1000c424	23	GetProcessWindowStation	1	10008f5b
+1000c43c	25	GetUserObjectInformationA	1	10008f4a
+1000c458	18	GetLastActivePopup	1	10008f2f
+1000c46c	15	GetActiveWindow	1	10008f27
+1000c47c	11	MessageBoxA	1	10008f16
+1000c488	10	user32.dll	1	10008efb
+1000c4c0	9	Program: 	1	100095ae
+1000c4d0	159	A buffer overrun has been detected which has corrupted the program's\ninternal state.  The program cannot safely continue execution and must\nnow be terminated.\n	1	10009503
+1000c570	24	Buffer overrun detected!	1	100094fe
+1000c590	176	A security error of unknown cause has been detected which has\ncorrupted the program's internal state.  The program cannot safely\ncontinue execution and must now be terminated.\n	2	100094f0 100095c7
+1000c644	34	Unknown security failure detected!	2	1000959b 100094eb
+1000c674	21	SunMonTueWedThuFriSat	0	
+1000c68c	36	JanFebMarAprMayJunJulAugSepOctNovDec	0	
+1000c842	18	GetCurrentThreadId	0	
+1000c858	11	TlsSetValue	0	
+1000c866	15	GetCommandLineA	0	
+1000c878	13	GetVersionExA	0	
+1000c888	7	TlsFree	0	
+1000c892	12	SetLastError	0	
+1000c8a2	11	TlsGetValue	0	
+1000c8b0	12	GetLastError	0	
+1000c8c0	8	TlsAlloc	0	
+1000c8cc	12	LCMapStringA	0	
+1000c8dc	19	WideCharToMultiByte	0	
+1000c8f2	19	MultiByteToWideChar	0	
+1000c908	12	LCMapStringW	0	
+1000c918	11	ExitProcess	0	
+1000c926	14	GetProcAddress	0	
+1000c938	16	GetModuleHandleA	0	
+1000c94c	16	TerminateProcess	0	
+1000c960	17	GetCurrentProcess	0	
+1000c974	8	HeapFree	0	
+1000c980	9	HeapAlloc	0	
+1000c98c	14	SetHandleCount	0	
+1000c99e	12	GetStdHandle	0	
+1000c9ae	11	GetFileType	0	
+1000c9bc	15	GetStartupInfoA	0	
+1000c9ce	21	DeleteCriticalSection	0	
+1000c9e6	18	GetModuleFileNameA	0	
+1000c9fc	23	FreeEnvironmentStringsA	0	
+1000ca16	21	GetEnvironmentStrings	0	
+1000ca2e	23	FreeEnvironmentStringsW	0	
+1000ca48	22	GetEnvironmentStringsW	0	
+1000ca62	11	HeapDestroy	0	
+1000ca70	10	HeapCreate	0	
+1000ca7e	11	VirtualFree	0	
+1000ca8c	9	WriteFile	0	
+1000ca98	14	SetFilePointer	0	
+1000caaa	20	EnterCriticalSection	0	
+1000cac2	20	LeaveCriticalSection	0	
+1000cada	14	GetStringTypeA	0	
+1000caec	14	GetStringTypeW	0	
+1000cafe	9	GetCPInfo	0	
+1000cb0a	14	GetLocaleInfoA	0	
+1000cb1c	9	RtlUnwind	0	
+1000cb28	6	GetACP	0	
+1000cb32	8	GetOEMCP	0	
+1000cb3e	14	VirtualProtect	0	
+1000cb50	12	VirtualAlloc	0	
+1000cb60	13	GetSystemInfo	0	
+1000cb70	12	VirtualQuery	0	
+1000cb80	11	HeapReAlloc	0	
+1000cb8e	25	InitializeCriticalSection	0	
+1000cbaa	12	LoadLibraryA	0	
+1000cbba	12	SetStdHandle	0	
+1000cbca	23	QueryPerformanceCounter	0	
+1000cbe4	12	GetTickCount	0	
+1000cbf4	19	GetCurrentProcessId	0	
+1000cc0a	23	GetSystemTimeAsFileTime	0	
+1000cc24	8	ReadFile	0	
+1000cc30	8	HeapSize	0	
+1000cc3c	16	FlushFileBuffers	0	
+1000cc50	11	CloseHandle	0	
+1000cc5c	12	KERNEL32.dll	0	
+1000ccca	9	diasm.dll	1	1000cc7c
+1000ccd4	7	analyse	1	1000ccac
+1000ccdc	11	disassemble	1	1000ccb0
+1000cce8	20	s_Last_analyse_ERROR	1	1000ccb4
+1000ccfd	5	tfunc	1	1000ccb8
+1000cd03	17	yur_init_analyser	1	1000ccbc
+1000d040	90	Copyright (c) emu8086.com                                                                 	126	10002370 10002443 1000249b 10001149 100012f2 1000142d 1000145a 1000147d 10001492 100014a5 100015f8 10001686 100016a7 100016c8 100016ed 10001731 1000175e 10001775 10001788 1000179f 10001844 1000195b 10001988 100019b5 100019dd 10001a06 10001a2c 10001acd 10001af6 10001b84 10001c34 10001d43 10002309 10002335 1000235e 100023ed 10002401 10002431 1000243e 10002458 10002490 100021f7 100021b6 1000218d 10002164 10002110 100020b8 10002078 10001cfb 10001d10 10001d35 10001db8 10001ddf 10001e17 100011e8 10001e78 10001ea7 10001eeb 10001f38 10001f57 10001f7c 10001f9d 10002010 10001d2e 10001102 10001116 1000113b 100011b4 1000122f 10001284 10001134 10001305 10001326 10001347 10001368 10001389 100013aa 100013cb 100013e8 10001b39 10001b50 10001b7c 10001bf2 10001c06 10001c2d 10001c6a 10001c9c 10001cd2 10001c26 10001b6e 10001428 10001455 1000172c 10001759 100017b2 100017d3 100017f4 10001811 10001857 10001878 10001899 100018ba 100018db 100018fc 10001a12 10001956 10001983 100019b0 10001a3f 10001a60 10001a81 10001a9e 10002481 10002423 100023b4 10002357 1000231d 1000110c 100015b6 1000165e 10001b43 10001bfc 10001d05 1000232e 100023fa 1000244e
+1000db2b	6	EXT OP	0	
+1000f93a	5	PUSHA	0	
+10011fd2	5	ENTER	0	
+10012031	5	LEAVE	0	
+100125c2	6	FADD d	0	
+100125e0	7	FCOMP d	0	
+10012649	8	FLDENV d	0	
+1001265d	8	FSTENV d	0	
+10012680	7	FIADD d	0	
+1001268a	7	FIMUL d	0	
+10012694	7	FICOM d	0	
+1001269e	8	FICOMP d	0	
+100126b2	8	FISUBR d	0	
+100126df	6	FILD d	0	
+100126f3	6	FIST d	0	
+100127c5	8	FRSTOR s	0	
+100127d9	7	FSAVE s	0	
+10012806	6	FIMUL 	0	
+10012810	6	FICOM 	0	
+1001281a	7	FICOMP 	0	
+10012824	6	FISUB 	0	
+1001286f	5	FIST 	0	
+100128ba	6	LOOPNE	0	
+10012919	5	LOOPE	0	
+1001344f	5	CALL 	0	
+10013459	6	CALL d	0	
+100160c2	14	StringFileInfo	0	
+100160e6	8	040904b0	0	
+100160fe	8	Comments	0	
+10016110	11	emu8086.com	0	
+1001612e	11	CompanyName	0	
+10016148	7	emu8086	0	
+1001615e	15	FileDescription	0	
+10016180	21	di module for emu8086	0	
+100161b2	11	FileVersion	0	
+100161cc	10	1, 0, 1, 5	0	
+100161ea	12	InternalName	0	
+10016204	5	diasm	0	
+10016216	14	LegalCopyright	0	
+10016234	25	Copyright (c) emu8086.com	0	
+1001626e	15	LegalTrademarks	0	
+10016290	7	emu8086	0	
+100162a6	16	OriginalFilename	0	
+100162c8	9	diasm.dll	0	
+100162e2	11	ProductName	0	
+100162fc	21	di module for emu8086	0	
+1001632e	14	ProductVersion	0	
+1001634c	10	1, 0, 1, 5	0	
+1001636a	11	VarFileInfo	0	
+1001638a	11	Translation	0	
+ffdff1ac	0		0	
+ffdffc00	0		0	
+ffdfff50	36	00000000-0000-0000-0000-000000000000	0	

@@ -1,0 +1,31 @@
+Custom Memory Map
+Custom Memory Map
+You can define your own memory map (different from IBM-PC).
+It is required to create this file: c:\emu8086\custom_memory_map.inf
+then you can use the following format to add settings into that configuration file:
+address - filename
+...
+for example:
+0000:0000 - System.bin
+F000:0000 - Rom.bin
+12AC - Data.dat
+ | 
+Address can be both physical (without ":") or logical, value must be in
+hexadecimal form. Emulator will look for
+the file name after the "-" and load it into the memory at the specified address.
+Emulator will not update System information area (memory from 00400h to 00500h)
+if your configuration file has "NO_SYS_INFO" directive (on a separate line).
+for example:
+NO_SYS_INFO
+0000:0000 - System.bin
+F000:0000 - Rom.bin
+12AC - Data.dat
+ | 
+emulator will allow you to load ".bin" files to any memory address
+(be careful not to load them over your custom system/data area).
+Warning! standard interrupts will not work when you change the memory map,
+unless you provide your own replacement for them.
+To disable changes just delete or rename "custom_memory_map.inf" file,
+and restart emu8086.
+See also:
+Global Memory Table

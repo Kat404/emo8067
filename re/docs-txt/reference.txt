@@ -1,0 +1,11 @@
+reference for emu8086
+emu8086 reference
+ Source code editor
+ Compiling assembly code
+ Using the emulator
+ Complete 8086 instruction set
+ List of supported interrupts
+ Global memory table
+ Custom memory map
+ MASM / TASM compatibility
+ I/O ports

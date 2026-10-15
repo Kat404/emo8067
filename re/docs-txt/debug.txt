@@ -1,0 +1,57 @@
+debug
+ Extended Debug For The Emulator
+ c - compare several bytes (arrays). For example:
+org 100h
+jmp a
+v1 db 1,4,3,4,5,6,7
+v2 db 1,5,3,0,5,6,7
+a:
+mov ax, v1
+mov al, v2
+mov dx, v1
+mov dl, v2
+ret
+ To compare v1 and v2 type the following:
+ c v1 L 7 v2
+ L denotes the size of the array. If L parameter is not specified this command compares 8 bytes by default. For example to compare 8 bytes at offsets CS:100 and CS:233 type the following:
+ c 100 233
+ It is also possible to use registers as parameters, for example:
+ c SI L 20h DI
+ The command outputs only those addresses with values that are different. 
+ Equal bytes are not printed out.
+ i - input and display byte from a specified port. For example:
+ i 123
+ To input a word value use iw command.
+ o - output byte to a specified port. For example:
+ o 123 55
+ To output a word value use ow command. For example:
+ ow 123 5512
+ d - dump 128 bytes at specified address. For example:
+ d ds:3 
+ d ds:[bx] 
+ d ds:[bx+si] 
+ d bx + 5
+ d 10 
+ If no segment is specified CS is used by default. Square brackets are optional.
+ Subsequent use of d command without parameters shows next block of the memory.
+ L parameter can be used to specify the number of bytes to dump. For example:
+ There must be spaces around L to distingush from variable offset, for example:
+ d lion L 10
+ The above command dumps 16 bytes at offset of a variable called lion.
+ If requred to denote variable L, declared as L db 5, brackets must be used. For example:
+ d [L]
+ d [L] L 1
+ t - single step.
+ p - step over (procedure or interrupt).
+ r - show all registers and current instruction at CS:IP.
+ rf - view/set flags.
+ r [register name] - view/set register value.
+ Note: All output values are in hex. All input parameters must be in hex. The h suffix is not required.
+ The debug commands and output may not be compatible with the original Microsoft debug because of the enhanced features. The original debug cannot process commands such as: 
+ d bx+si
+ iw 100
+ ow 100 1234
+ ...
+ More commands are to be added in the nearest future.
+ Microsoft ® is a registered trademark of Microsoft Corporation.
+ Frequently asked questions

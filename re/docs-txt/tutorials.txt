@@ -1,0 +1,16 @@
+assembler tutorials
+tutorials
+8086 assembler tutorials
+ numbering systems
+ part 1: what is assembly language?
+ part 2: memory access
+ part 3: variables
+ part 4: interrupts
+ part 5: library of common functions - emu8086.inc
+ part 6: arithmetic and logic instructions
+ part 7: program flow control
+ part 8: procedures
+ part 9: the stack
+ part 10: macros
+ part 11: making your own operating system
+ part 12: controlling external devices (robot, stepper-motor...)

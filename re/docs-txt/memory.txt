@@ -1,0 +1,137 @@
+global memory table
+Global Memory Table
+8086 CPU can access up to 1 MB of random access memory (RAM).
+This is more than enough for any kind of computations (if used wisely).
+memory table of the emulator (and typical ibm pc memory table):
+ physical address of memory area in HEX
+ | 
+ short description
+ | 
+ 00000 - 00400
+ | 
+ Interrupt vectors. The emulator loads this file: c:\emu8086\INT_VECT at the physical address 000000.
+ | 
+ 00400 - 00500
+ | 
+ System information area. We use a trick to set some parameters by loading a tiny last part (21 bytes) of INT_VECT in that
+ area (the size of that file is 1,045 or 415h bytes, so when loaded it takes memory from 00000 to 00415h).
+ this memory block is updated by the emulator when configuration changes, see system information area table.
+ | 
+ 00500 - A0000
+ | 
+ A free memory area. A block of 654,080 bytes. Here you can load your programs.
+ | 
+ A0000 - B1000
+ | 
+ Video memory for vga, monochrome, and other adapters.
+ It is used by video mode 13h of INT 10h.
+ | 
+ B1000 - B8000
+ | 
+ Reserved.
+ Not used by the emulator.
+ | 
+ B8000 - C0000
+ | 
+ 32 kb video memory for color graphics adapter (cga).
+ The emulator uses this memory area to keep 8 pages of video
+ memory. The emulator screen can be resized, so less memory
+ is required for each page, although the emulator always uses 1000h (4096 bytes)
+ for each page (see INT 10h / AH=05h in
+ the list of supported interrupts).
+ | 
+ C0000 - F4000
+ | 
+ Reserved.
+ | 
+ F4000 - 10FFEF
+ | 
+ ROM BIOS and extensions. the emulator loads BIOS_ROM file at the physical address 0F4000h.
+ addresses of interrupt table points to this memory area to make emulation of the interrupt functions.
+ | 
+interrupt vector table (memory from 00000h to 00400h)
+INT number address in address of
+in hex interrupt vector BIOS sub-program
+00 00x4 = 00 F400:0170 - CPU-generated,
+ divide error.
+04 04x4 = 10 F400:0180 - CPU-generated,
+ INTO detected
+ overflow.
+10 10x4 = 40 F400:0190 - video functions.
+11 11x4 = 44 F400:01D0 - get BIOS
+ equipment list.
+12 12x4 = 48 F400:01A0 - get memory size.
+13 13x4 = 4C F400:01B0 - disk functions.
+15 15x4 = 54 F400:01E0 - BIOS functions.
+16 16x4 = 58 F400:01C0 - keyboard functions.
+17 17x4 = 5C F400:0400 - printer.
+19 19x4 = 64 FFFF:0000 - reboot.
+1A 1Ax4 = 68 F400:0160 - time functions.
+1E 1Ex4 = 78 F400:AFC7 - vector of diskette
+ controller parameters.
+20 20x4 = 80 F400:0150 - DOS function:
+ terminate program.
+21 21x4 = 84 F400:0200 - DOS functions.
+33 33x4 = CC F400:0300 - mouse functions.
+all the others ??x4 = ?? F400:0100 - default interrupt stub.
+A call to BIOS sub-system is
+ disassembled as BIOS DI (Basic Input/Output System - Do Interrupt). To encode this 4 byte instruction, FFFF opcode prefix is used. for example: FFFFCD10 is used to make the
+ emulator to execute interrupt number 10h.
+ At address F400:0100 there is this machine code FFFFCDFF (it is decoded as INT 0FFh,
+ it is used to generate a default error message, unless you make your own interrupt replacement for missing functions).
+ | 
+System information area (memory from 00400h to 00500h)
+address (hex) | size | description | 
+0040h:0010 | WORD | 
+BIOS equipment list.
+bit fields for BIOS-detected installed hardware:
+bit(s) Description
+ 15-14 number of parallel devices.
+ 13 reserved.
+ 12 game port installed.
+ 11-9 number of serial devices.
+ 8 reserved.
+ 7-6 number of floppy disk drives (minus 1):
+ 00 single floppy disk;
+ 01 two floppy disks;
+ 10 three floppy disks;
+ 11 four floppy disks.
+ 5-4 initial video mode:
+ 00 EGA,VGA,PGA, or other with on-board video BIOS;
+ 01 40x25 CGA color.
+ 10 80x25 CGA color (emulator default).
+ 11 80x25 mono text.
+ 3 reserved.
+ 2 PS/2 mouse is installed.
+ 1 math coprocessor installed.
+ 0 set when booted from floppy.
+ | 
+0040h:0013 | WORD | 
+ kilobytes of contiguous memory starting
+ at absolute address 00000h.
+ this word is also returned in AX by INT 12h.
+ this value is set to: 0280h (640KB).
+ | 
+0040h:004A | WORD | 
+number of columns on screen.
+ default value: 0032h (50 columns).
+ | 
+0040h:004E | WORD | 
+current video page start address in video memory (after 0B800:0000).
+ default value: 0000h.
+ | 
+0040h:0050 | 8 WORDs | 
+contains row and column position for the cursors on each of eight
+ video pages.
+ default value: 0000h (for all 8 WORDs).
+ | 
+0040h:0062 | BYTE | 
+current video page number.
+ default value: 00h (first page).
+ | 
+0040h:0084 | BYTE | 
+rows on screen minus one.
+ default value: 13h (19+1=20 columns).
+ | 
+see also:
+custom memory map

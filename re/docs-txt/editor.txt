@@ -1,0 +1,105 @@
+Editor
+Source Code Editor
+Using the Mouse
+Editor supports the following mouse actions:
+Mouse Action | Result | 
+L-Button click over text | Changes the caret position
+R-Button click | Displays the right click menu
+L-Button down over selection, and drag | Moves text
+Ctrl + L-Button down over selection, and drag | Copies text
+L-Button click over left margin | Selects line
+L-Button click over left margin, and drag | Selects multiple lines
+Alt + L-Button down, and drag | Select columns of text
+L-Button double click over text | Select word under cursor
+Spin IntelliMouse mouse wheel | Scroll the window vertically
+Single click IntelliMouse mouse wheel | Select the word under the cursor
+Double click IntelliMouse mouse wheel | Select the line under the cursor
+Click and drag splitter bar | Split the window into multiple views or adjust the current splitter position
+Double click splitter bar | Split the window in half into multiple views or unsplit the window if already split
+Editor Hot Keys:
+Command Keystroke
+=======================================================================
+Toggle Bookmark Control + F2
+Next Bookmark F2
+Prev Bookmark Shift + F2
+Copy Control + C, Control + Insert
+Cut Control + X, Shift + Delete, Control + Alt + W
+Cut Line Control + Y
+Cut Sentence Control + Alt + K
+Paste Control + V, Shift + Insert
+Undo Control + Z, Alt + Backspace
+Document End Control + End
+Document End Extend Control + Shift + End
+Document Start Control + Home
+Document Start Extend Control + Shift + Home
+Find Control + F, Alt + F3
+Find Next F3
+Find Next Word Control + F3
+Find Prev Shift + F3
+Find Prev Word Control + Shift + F3
+Find and Replace Control + H, Control + Alt + F3
+Go To Line Control + G
+Go To Match Brace Control + ]
+Select All Control + A
+Select Line Control + Alt + F8
+Select Swap Anchor Control + Shift + X
+Insert New Line Above Control + Shift + N
+Indent Selection Tab
+Outdent Selection Shift + Tab
+Tabify Selection Control + Shift + T
+Untabify Selection Control + Shift + Space
+Lowercase Selection Control + L
+Uppercase Selection Control + U, Control + Shift + U
+Left Word Control + Left
+Right Word Control + Right
+Left Sentence Control + Alt + Left
+Right Sentence Control + Alt + Right
+Toggle Overtype Insert
+Display Whitespace Control + Alt + T
+Scroll Window Up Control + Down
+Scroll Window Down Control + Up
+Scroll Window Left Control + PageUp
+Scroll Window Right Control + PageDown
+Delete Word To End Control + Delete
+Delete Word To Start Control + Backspace
+Extend Char Left Shift + Left
+Extend Char Right Shift + Right
+Extend Left Word Control + Shift + Left
+Extend Right Word Control + Shift + Right
+Extend to Line Start Shift + Home
+Extend to Line End Shift + End
+Extend Line Up Shift + Up
+Extend Line Down Shift + Down
+Extend Page Up Shift + PgUp
+Extend Page Down Shift + Next
+Comment Block Ctrl + Q
+Uncomment Block Ctrl + W
+regular expression syntax rules for search and replace
+wildcards:
+ ? (for any character),
+ + (for one or more ot something),
+ * (for zero or more of something).
+sets of characters:
+ characters enclosed in square brackets
+ will be treated as an option set.
+ character ranges may be specified
+ with a - (e.g. [a-c]).
+logical OR:
+ subexpressions may be ORed together
+ with the | pipe symbol.
+rarenthesized subexpressions:
+ a regular expression may be enclosed
+ within parentheses and will be treated as a unit.
+escape characters:
+ sequences such as:
+ \t - tab
+ etc.
+ will be substituted for an equivalent
+ single character. \\ represents the backslash.
+ If there are problems with the source editor
+ you may need to manually copy "cmax20.ocx"
+ from program's folder into Windows\System or Windows\System32
+ replacing any existing version of
+ that file (restart may be required before
+ system allows to replace existing file).
+Portions Copyright 1997-2005 Barry Allyn. All rights reserved.

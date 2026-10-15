@@ -1,0 +1,13 @@
+[package]
+name = "emu8086-core"
+description = "Clean-room Intel 8086/8088 emulator core. No dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

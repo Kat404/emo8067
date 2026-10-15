@@ -1,0 +1,28 @@
+stop on condition
+ stop on condition
+ this feature is accessible from debug -> stop on condition menu of the emulator.
+ stop on condition works only when its window is open.
+ expression can be decimal, binary or hexadecimal, for example:
+ 5
+ 101b
+ 34h
+ h suffix must be added to any a hexadecimal values in the expression, for example:
+ 12h
+ boolean logic and mathematical operators can be used, for example:
+ 1234h + 1
+ 0FFh - 101b
+ 5 << 2 
+~ not (inverts all bits).
+* multiply.
+/ divide.
+% modulus.
++ sum.
+- subtract (and unary -).
+<< shift left.
+>> shift right.
+& bitwise AND.
+^ bitwise XOR.
+| bitwise OR.
+ | 
+ offset and segment values (for memory byte / word) are always in hex. no suffix is requred.
+ frequently asked questions

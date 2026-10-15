@@ -1,0 +1,7 @@
+help menu for emu8086
+  | 
+ Documentation Index | 
+ Licence | 
+ Tutorials | 
+ 8086 Instruction Set | 
+ Interrupts |

@@ -1,0 +1,4483 @@
+addr	len	value	xrefcount	xref-addrs
+00400240	12	MSVBVM60.DLL	0	
+0041b5ea	68	b*\AD:\yur74\emu8086\emu8086v400src\emu8086_v408_vb_code\emu8086.vbp	0	
+00422df3	18	CodeMaxCtl.CodeMax	0	
+00422e06	7	CodeMax	0	
+00422fa0	7	Enabled	0	
+00422fa8	11	BorderStyle	0	
+00423009	19	MSComctlLib.Toolbar	0	
+0042301d	7	Toolbar	0	
+004231d5	21	MSComctlLib.StatusBar	0	
+004231eb	9	StatusBar	0	
+0042331d	21	MSComctlLib.ImageList	0	
+00423333	9	ImageList	0	
+004234b8	7	Enabled	0	
+00423515	18	MSComctlLib.Slider	0	
+00423528	6	Slider	0	
+004370c0	7	frmMain	0	
+004370c8	7	Module1	0	
+004370d8	7	Module2	0	
+004370e0	13	mInstructions	0	
+004370f0	11	mDefinition	0	
+004370fc	17	mBuild_Executable	0	
+00437110	10	mCompMacro	0	
+0043711c	6	mStart	0	
+00437124	7	frmInfo	0	
+0043712c	15	StringTokenizer	0	
+0043713c	8	frmMacro	0	
+00437148	12	frmEmulation	0	
+00437158	5	other	0	
+00437164	9	frmScreen	0	
+00437174	8	frmFLAGS	0	
+00437180	10	frmOptions	0	
+00437194	8	frm_mBox	0	
+004371a0	8	frmAbout	0	
+004371ac	13	mCodeSelector	0	
+004371bc	11	frmOrigCode	0	
+004371c8	16	frmBaseConvertor	0	
+004371dc	8	frmStack	0	
+004371f8	9	mAnalyser	0	
+00437204	12	frmEvaluator	0	
+00437214	5	mMath	0	
+0043721c	7	mString	0	
+00437224	7	mEditor	0	
+0043722c	11	frmDebugLog	0	
+00437238	12	mRecentFiles	0	
+00437248	13	mSYMBOL_TABLE	0	
+00437258	8	mOptions	0	
+00437264	20	mSegment_Names_Table	0	
+00437284	19	frmWriteBinToFloppy	0	
+00437298	7	mOutput	0	
+004372a0	7	frmVars	0	
+004372a8	17	frmExtendedViewer	0	
+004372bc	9	mTrapping	0	
+004372d0	17	frmChooseTemplate	0	
+004372e4	15	frmEditVariable	0	
+004372f4	15	frmFlagAnalyzer	0	
+00437304	12	mFORMS_STATE	0	
+00437314	17	frm16Color_DIALOG	0	
+00437328	15	frmSetOutputDir	0	
+00437338	9	frmMemory	0	
+00437344	9	mWinState	0	
+00437354	10	frmStartUp	0	
+00437360	11	BugFixerMod	0	
+0043736c	6	UPDATE	0	
+00437374	8	Registry	0	
+00437380	12	modLaunchURL	0	
+00437390	11	frmRegister	0	
+0043739c	13	mRegistration	0	
+004373ac	20	frmSORRY_2_INTERRUPT	0	
+004373c4	9	mDOS_FILE	0	
+004373d0	9	inimodule	0	
+004373dc	9	mStepBack	0	
+004373e8	18	frmEvaluatorHelper	0	
+004373fc	9	frmUpdate	0	
+00437408	14	frmASCII_CHARS	0	
+00437418	6	mMOUSE	0	
+00437420	19	mINT_VECT_ROMWRITER	0	
+00437434	23	frmScreen_ASCII_CHARMAP	0	
+0043744c	7	mHW_INT	0	
+0043745c	18	frmStopOnCondition	0	
+00437470	13	frmExportHTML	0	
+00437480	20	frmSymbolTableViewer	0	
+00437498	11	mMemoryList	0	
+004374a4	16	mDisassemblyList	0	
+004374b8	11	frmDOS_FILE	0	
+004374c4	17	mFileDateTime_API	0	
+004374d8	18	mDOS_MEMORY_BLOCKS	0	
+004374ec	22	frmAssemble_ALL_IN_DIR	0	
+00437504	14	frmBatchStatus	0	
+00437530	14	getWindowsPath	0	
+0043754c	18	_location_counter_	3	004a7c86 004a7e27 004992fd
+00437578	12	; [SOURCE]: 	6	0061863b 0061bcf6 00589bd6 00589c11 0060e106 004ca538
+00437598	7	emu8086	78	005b1abd 005acb7b 005a7bea 005a7db5 005a7df9 005a7ca1 005a7d19 00597e2a 00597f6a 005980b0 005981fc 00598348 0059848b 005985d7 00573cfd 00573e06 00573efd 005d0da8 005d0e15 005d0e88 005d0efb 005d1dfe 005d202c 005ad674 005d9e3b 005d9e5d 005d9e92 004d1ff0 005a7ff5 0054df17 0054df4d 0054df80 0054e018 0054e04b 0054e08e 004cbfd4 004cc048 004cc0bc 004cc130 0057d2ff 005d11a6 005d1475 004d2195 004cc208 004cc266 004cc848 004cc9ac 004cdf82 004ce661 004ceb14 005c4226 005c43bf 005c4249 005da1db 005da249 005da2b1 004ce80e 005ca3c2 005ca964 00492346 004924eb 005c4603 005c4762 00598806 00598880 005988f4 00598968 005989dc 00598a50 00598ac0 005d1810 005d1a2c 005c9811 0054df00 0054df39 0054df6c 0054e004 0054e037
+004375ac	5	reg2x	6	005d8977 005d89f2 005da330 005da3ef 005da47a 005da4c0
+004375bc	14	emulator.state	3	0052aeef 004e526f 004e47dc
+004375e0	17	{}[]+-*/()^~%<>&|	6	004abcfb 004ac61d 00596fd3 005970b0 004a8146 004a816b
+00437628	12	RecentEditor	4	0049b2a9 0049e2c2 0049ed1e 005d4399
+00437648	14	RecentEmulator	2	004ea0d4 0052cb5d
+0043766c	7	Options	15	005b1a50 005acacc 005b0a95 005b0df5 005ace4b 005afecf 005af04f 005ae066 005b1146 005b03cc 005b1426 005b16fd 005b17f0 005ae853 005ad900
+00437680	9	Fonts.dat	2	005af073 005ae877
+00437698	9	Other.dat	2	005ae08a 005ad924
+004376b0	12	Keywords.dat	2	005afef3 005b03f0
+004376d0	10	EmuPort.io	2	005d2475 005d2744
+004376f4	5	39384	1	0049074f
+00437704	28	PROGRAM HAS RETURNED CONTROL	0	
+00437750	23	TO THE OPERATING SYSTEM	0	
+00437784	23	the emulator is halted.	2	005165fc 005836f9
+004377b8	19	program terminated.	3	005258ab 00525ab5 00529ff9
+004377e4	30	http://www.emu8086.com/update/	4	005ec9a8 005ecbdc 004e82c8 00491738
+00437828	13	register.html	5	00584735 005d2e55 005d7b92 005db448 005db802
+00437848	26	http://www.emu8086.com/dr/	2	004cd333 004cd34c
+00437880	13	mnuAsciiCodes	0	
+00437890	7	mnuFile	0	
+0043789c	315	all known files (*.asm, *.exe, *.com, *.bin, *.boot)|*.asm;*.exe;*.exe_;*.com;*.com_;*.bin;*.bin_;*.boot|assembly source files (*.asm)|*.asm|binary executable files (*.com)|*.com;*.com_|executable files (*.exe)|*.exe;*.exe_|binary files (*.bin)|*.bin;*.bin_|old boot sector files (*.boot)|*.boot|all files (*.*)|*.*	3	0049ac72 0049af0d 004ea06a
+00437b18	15	www.emu8086.com	6	00584973 005d4415 005d6206 005d62c5 005d633b 0058569d
+00437b3c	16	info@emu8086.com	1	005854b6
+00437b64	8	_msg.dat	0	
+00437b7c	12	_default.dat	0	
+00437b9c	9	_lang.dat	0	
+00437bb4	12	_ignored.dat	0	
+00437c3c	7	cmdSave	0	
+00437c54	49	C:\Programme\Microsoft Visual Studio\VB98\VB6.OLB	1	00437c98
+00437ccc	17	mnuCheckForUpdate	0	
+00437cf0	18	Timer_DelayCommand	0	
+00437d04	7	mnuSave	0	
+00437d0c	15	mnuDelimeter541	0	
+00437d1c	18	mnuTabifySelection	0	
+00437d30	20	mnuRepeatNextCommand	0	
+00437d54	9	mnuIndent	0	
+00437d60	12	mnuDelim5432	0	
+00437d70	20	mnuCompileAndEmulate	0	
+00437d88	15	mnuLastBookmark	0	
+00437d98	12	mnuEvaluator	0	
+00437da8	11	popEmulator	0	
+00437db4	15	mnuDelimeter642	0	
+00437dc4	15	mnuDelimeter643	0	
+00437dd4	10	cmdCompile	0	
+00437de0	15	mnuPrevBookmark	0	
+00437df0	15	mnuDelimeter623	0	
+00437e00	17	mnuToggleBookmark	0	
+00437e1c	14	mnuBINTemplate	0	
+00437e2c	11	mnuGotoLine	0	
+00437e38	16	mnuFirstBookmark	0	
+00437e64	15	mnuDelimeter135	0	
+00437e74	22	cmdCompile_and_Emulate	0	
+00437e8c	16	mnuDelim00011122	0	
+00437ea0	13	mnuDelimeter2	0	
+00437eb0	21	mnuLowercaseSelection	0	
+00437ec8	21	mnuUppercaseSelection	0	
+00437eec	15	mnuCommentBlock	0	
+00437efc	9	mnuSaveAs	0	
+00437f08	11	mnuFindText	0	
+00437f14	12	mnuBookmarks	0	
+00437f24	14	mnuDelimter112	0	
+00437f34	7	mnuMath	0	
+00437f3c	14	mnuCOMTemplate	0	
+00437f4c	17	mnuDelimeter61234	0	
+00437f60	12	mnuDelim1345	0	
+00437f70	8	mnuAbout	0	
+00437f7c	13	mnuCalculator	0	
+00437f8c	14	mnuDelim000111	0	
+00437f9c	10	mnuReplace	0	
+00437fa8	10	mnuCompile	0	
+00437fbc	20	mnuNewKeystrokeMacro	0	
+00437fd4	16	mnuDelimeter6178	0	
+00438000	15	mnuDelimeter512	0	
+00438010	22	mnuCompileAndEmulate_2	0	
+00438040	10	lst_Source	0	
+0043804c	16	mnuDelimeter5896	0	
+00438068	8	mnuMacro	0	
+00438074	17	mnuDelimeter78123	0	
+00438090	13	mnuHelpTopics	0	
+004380a0	10	popCompile	0	
+004380ac	10	mnuOutdent	0	
+004380b8	14	mnuEXETemplate	0	
+004380c8	15	mnuDelimeter834	0	
+004380d8	11	mnuAdvanced	0	
+004380e4	15	mnuDelimeter613	0	
+00438104	8	Toolbar1	0	
+00438120	32	C:\WINDOWS\system32\Mscomctl.oca	1	00438160
+00438144	11	MSComctlLib	1	00438164
+00438178	15	mnuBOOTTemplate	0	
+00438190	20	mnuClearAllBookmarks	0	
+004381a8	15	mnuExportToHTML	0	
+004381b8	11	mnuEmulator	0	
+004381c4	15	mnuSetOutPutDir	0	
+004381d4	11	mnuFindNext	0	
+004381f0	13	mnuSample_ARR	0	
+00438208	12	mnuSelectAll	0	
+00438218	8	cmdAbout	0	
+00438234	15	mnuNextBookmark	0	
+00438244	16	mnuCleanTemplate	0	
+00438266	12	glStatusBar1	0	
+00438274	15	lst_Precompiled	0	
+00438284	20	mnuDisplayWhitespace	0	
+0043829c	15	Timer_ResizeBug	0	
+004382ac	10	cmdEmulate	0	
+004382c0	7	mnuRedo	0	
+004382d0	7	mnuCopy	0	
+004382d8	8	mnuPaste	0	
+004382f4	12	frameLoading	0	
+00438304	18	mnuShowLineNumbers	0	
+00438318	9	mnuRecent	0	
+00438324	10	mnuSamples	0	
+00438340	17	Combo_output_type	0	
+00438354	7	mnuEdit	0	
+0043835c	17	lst_Segment_Sizes	0	
+0043837f	9	,txtInput	0	
+00438399	33	ueoC:\WINDOWS\system32\cmax20.oca	0	
+004383bc	10	CodeMaxCtl	1	004383dc
+004383f0	12	mnuPlayMacro	0	
+00438400	20	lst_Relocation_Table	0	
+00438418	7	mnuLoad	0	
+00438420	7	cmdLoad	0	
+00438428	16	mnuDelimeter7123	0	
+0043843c	8	mnuPrint	0	
+00438448	10	cmdOptions	0	
+00438454	17	mnuUncommentBlock	0	
+00438468	20	mnuUntabifySelection	0	
+00438480	9	mnuDelim1	0	
+0043849c	16	mnuDelimeter0002	0	
+004384b0	19	cmdNew_Click_PUBLIC	0	
+004384c4	23	CompileTheSource_PUBLIC	0	
+004384dc	15	build_EQU_Table	0	
+004384ec	25	build_primary_SymbolTable	0	
+00438508	20	cmdLoad_Click_PUBLIC	0	
+00438520	14	openSourceFile	0	
+00438530	17	create_NEW_source	0	
+00438544	33	mnuRecent_CLICK_from_NICE_STARTUP	0	
+00438568	14	get_spent_time	0	
+00438578	29	mnuSample_CLICK_from_Emulator	0	
+00438598	18	is_source_modified	0	
+0043862c	8	lblTitle	0	
+00438638	11	mnu_nothing	0	
+00438644	13	mnuOtherFiles	0	
+00438654	12	cmdTutorials	0	
+00438664	10	cmdSamples	0	
+00438678	9	cmdRecent	0	
+00438684	16	lbl_URL_OR_EMAIL	0	
+004386b0	14	lblDescription	0	
+004386c0	12	lblLicNumber	0	
+004386d0	11	lblUserName	0	
+004386ec	7	picIcon	0	
+004386f4	10	lblVersion	0	
+00438700	14	cmdEnterRegKey	0	
+00438710	15	fraRegisteredTo	0	
+00438720	18	show_Registered_To	0	
+00438744	9	diasm.dll	2	00438760 0043e8c8
+00438754	11	disassemble	0	
+00438798	21	frmMain_OLEDragDrop: 	0	
+00438a64	7	INCLUDE	3	0059c7a0 0061646d 00486ff2
+00438a78	8	INCLUDE 	1	0048702d
+00438abc	8	kernel32	17	00438ad4 00438b20 00438b6c 0043b478 0043cd2c 00442d90 00443550 004438f8 0044394c 0044399c 004523d0 0045245c 004524b0 00452500 00452550 00452594 004525d8
+00438b0c	17	GetShortPathNameA	0	
+00438b58	19	GetSystemDirectoryA	0	
+00438ba4	6	user32	5	00438bc0 00438c10 0043908c 00443d14 00447ef0
+00438bb0	14	MapVirtualKeyA	0	
+00438bf4	11	addErr_MASM	1	00436284
+00438c04	11	GetKeyState	0	
+00438c48	11	shell32.dll	1	00438c68
+00438c58	13	ShellExecuteA	0	
+00438d30	4	inc\	5	0049bf68 0049be40 0049bd18 0049bbba 0048726e
+00438d40	15	file not found:	10	0048819c 004cd6a9 004d16d2 004e52eb 004ec44e 004ed47d 00535c4a 00535e97 00536c98 0054a82d
+00438dcf	12	.mnuCopyLine	0	
+00438ddc	16	mnuDelimeter0001	0	
+00438df0	10	mnuExplore	0	
+00438dfc	10	mnuCopyAll	0	
+00438e08	16	mnuCommandPrompt	0	
+00438e1c	12	mnuCopyPopup	0	
+00438e2c	13	lstErr_BUFFER	0	
+00438e3c	14	lstERROR_CAUSE	0	
+00438e4c	6	lstErr	0	
+00438e54	17	picProgressHolder	0	
+00438e68	16	cmdBrowseMyBuild	0	
+00438e7c	14	timerAnimation	0	
+00438e8c	11	cmdExternal	0	
+00438e98	14	mnuExternalRun	0	
+00438ea8	11	mnuDebugEXE	0	
+00438eb4	14	mnuShowListing	0	
+00438ec4	14	lblPASS_NUMBER	0	
+00438ed4	18	mnuShowSymbolTable	0	
+00438ef8	10	txtCURRENT	0	
+00438f0c	11	mnuExternal	0	
+00438f18	9	lstStatus	0	
+00438f24	8	cmdClose	0	
+00438f30	9	addStatus	1	0043627c
+00438f3c	11	addErr_FASM	1	00436280
+00438f48	6	addErr	1	00436288
+00438f50	25	clearErrorBuffer_and_Text	1	00436294
+00438f6c	15	showErrorBuffer	1	00436298
+00438f7c	22	click_on_error_message	1	0043629c
+00438f94	25	show_precompile_animation	1	004362a0
+00438fb0	25	stop_precompile_animation	1	004362a4
+00438fcc	22	show_FULL_progress_bar	1	00436304
+00438fe4	23	show_EMPTY_progress_bar	1	00436308
+00438ffc	14	updatePROGRESS	1	0043630c
+0043900c	21	set_current_text_fast	1	00436328
+00439024	21	set_current_text_cool	1	0043632c
+0043903c	28	set_forcus_from_current_text	1	00436330
+0043907c	12	SendMessageA	0	
+00439108	24	recursive include file? 	2	00488269 004882ed
+00439148	6	.MODEL	1	004874c6
+0043915c	4	tiny	1	004874e2
+0043916c	8	ORG 100H	2	00487515 00497b01
+00439184	5	.DATA	1	00487582
+00439194	8	JMP code	1	004875ba
+004391ac	12	data segment	1	0048761e
+004391cc	4	data	2	0048ec3e 0048765d
+004391f4	5	.CODE	1	0048768d
+00439204	5	code:	1	004876c5
+00439214	12	code segment	2	004876fb 00496fce
+00439234	4	code	3	004c618e 0048773a 0049708f
+00439244	6	.STACK	1	00487763
+00439258	40	tiny model has no stack! ignoring line: 	0	
+004392b0	6	.stack	1	004877e3
+004392c4	13	stack segment	1	0048796d
+004392f0	9	 dup('T')	1	00487a0f
+00439308	4	ends	1	00487ac5
+00439318	5	.exit	1	00487b45
+00439328	13	mov ax, 4c00h	1	00487c18
+00439348	7	int 21h	2	00487ca7 00526b8c
+0043935c	8	.STARTUP	1	00487ce3
+00439374	6	.START	1	00487ccc
+00439388	8	startup:	1	00487dbc
+004393a0	12	MOV DX, data	1	00487e4a
+004393c0	10	MOV DS, DX	1	00487ecd
+004393dc	5	.8086	1	00487f44
+004393ec	5	.8088	1	00487f2b
+004393fc	4	.186	1	00487f69
+0043940c	5	.0186	1	00487f86
+00439434	29	ORG 100h must be before .DATA	1	004880e7
+00439478	27	include file is too long!!!	2	004884d8 0048855b
+00439504	6	Label1	0	
+0043950c	13	lstParameters	0	
+0043951c	9	lstMacros	0	
+00439528	10	lstCurrent	0	
+00439544	18	lstMacro_Locations	0	
+00439558	14	lstMacro_Names	0	
+00439568	10	resetMacro	1	00436338
+00439574	15	get_MACRO_index	1	0043633c
+00439584	18	prepare_MACRO_CODE	1	00436340
+00439598	14	Add_MACRO_Name	0	
+004395e8	4	ENDM	4	0059c0b1 0048aeb0 0048cab9 00489229
+004395f8	11	#MAKE_BOOT#	4	00616d91 00518183 0060ca6a 0048e436
+00439618	36	unterminated inner MACRO definition!	1	00489490
+00439668	7	COMMENT	3	00489ef5 0048aa4b 00489e9b
+004396bc	5	.org 	1	0048a60e
+004396cc	27	.,:$/\]-'"`~!@#%^&*()_+[>< 	1	0048a741
+00439714	5	MACRO	5	0059c00d 0048ac78 0048ac8f 0048b6f1 0048bba1
+00439724	4	PAGE	2	00616fca 0048aedf
+00439734	5	TITLE	1	0048afd6
+00439744	6	TITLE 	1	0048b01e
+00439758	4	NAME	1	0048b170
+00439768	5	NAME 	3	00616a7e 0060c730 0048b1b8
+00439798	10	#MAKE_BIN#	3	00616d41 0060ca1a 0048e35a
+004397bc	38	unterminated MACRO definition! (i_err)	1	0048cd41
+00439810	7	SEGMENT	24	0059c036 0061ddb1 0061e2b8 0061e2cb 0061e31a 0049589e 00495904 0048d620 0048d637 004c43cc 005aac41 006139e1 00613ee8 00613efb 00613f4a 00499a7a 00499ebf 00499ed2 00499f2b 0049a06c 004c44b1 005a8d9e 0061402f 0061e3ff
+00439830	4	end:	1	0048d7d6
+00439848	42	any code after 'END' directive is ignored.	1	0048dde4
+004398ac	6	#MAKE_	3	0048defe 0060c8e4 00616c0b
+004398c0	27	first output type directive	1	0048dfd3
+004398fc	30	output type is set here again!	1	0048e0ab
+00439940	10	#MAKE_COM#	3	00616c9b 0060c974 0048e1a0
+0043996c	10	#MAKE_EXE#	4	00616cee 00518169 0060c9c7 0048e27d
+004399e4	19	wrong output type: 	1	0048e57a
+00439a10	6	ASSUME	1	0048e7da
+00439a24	5	@data	3	0048eb17 0048ec43 0048eab5
+00439a40	7	no endm	1	0048eeb0
+00439a54	27	unterminated comment block.	1	0048eff2
+00439acb	8	pmnuFind	0	
+00439ad4	8	mnuPopUp	0	
+00439ae0	16	cmaxActualSource	0	
+00439af4	8	DoShowMe	2	00436898 00436980
+00439b00	24	PREPARE_cmaxActualSource	0	
+00439b1c	17	setDefaultCaption	0	
+00439b30	8	lblASCII	0	
+00439b78	15	urJcmdRegister	0	
+00439b88	13	txtCopyright3	0	
+00439b98	13	lblCopyright1	0	
+00439ba8	9	lblRegNow	0	
+00439bb4	13	picCopyrights	0	
+00439bd4	13	lblCopyright2	0	
+00439bfc	10	index.html	4	005fc6bc 0048ffd8 0049ce38 004e91d8
+00439c40	26	disassembled string size: 	0	
+00439c8c	8	Terminal	12	00594e77 005b3b3f 0058de4f 005ed342 0058b403 00490533 0059d6bf 005fe76f 0049f98b 0049f9c2 00614d59 005cb87f
+00439ca4	11	FONT FIXED!	0	
+00439cd0	8	opt16bit	0	
+00439ce0	11	emu8086.ini	37	004cfb60 00615c91 00616299 00616413 0059dad7 0059dc12 005b3ecf 005b3fd0 004eaf42 004ee643 0054f14e 0049857b 004cc9eb 004cca7f 004ccb1f 004ccbb2 004ccc56 004ccd18 004ccdb9 004cce0e 004cce63 004cceb8 004ccf59 004ccffa 004cf371 005e42a1 005e436b 005e4471 0054a54d 0049078a 00490d85 005e8c4b 005c86f8 005c883e 004ca848 004e4835 004ae8ec
+00439cfc	12	UPDATE_CHECK	1	00490774
+00439d64	17	cmdCheckForUpdate	0	
+00439d78	8	cmdLater	0	
+00439d84	7	lblInfo	0	
+00439d8c	13	txtURL_MANUAL	0	
+00439dac	20	auto_save_backup.dat	3	004d5d7d 00490b67 004a752e
+00439ddc	10	STARTUPWIN	1	00490d6f
+00439df8	4	true	32	004eaf70 004ee665 0054f17c 004985a9 004cca1e 004ccb54 004ccbe5 004ccd2e 004ccece 004ccf6f 004cd010 005e4318 0054a56f 00490da7 005e8c79 004e485d 004ae91f 00490d61 0049855f 004ae8c8 004ca826 004cc9c7 004ccafb 004ccb8e 004cccf4 004ccf35 004ccfd6 004ee61f 0054a531 0054f12c 005e427f 005e8c27
+00439e08	12	kernel32.dll	0	
+00439e1c	20	GetWindowsDirectoryA	0	
+00439e6c	21	GetVolumeInformationA	0	
+00439ee0	27	Error on frmMain_Activate: 	0	
+00439f60	10	draw_ascii	0	
+00439fb8	11	txtHEX_8bit	0	
+00439fc4	12	txtDecSigned	0	
+00439fd4	14	txtDecUnsigned	0	
+0043a00c	12	lblSignedInt	0	
+0043a02c	10	txtASCII_L	0	
+0043a038	10	txtASCII_H	0	
+0043a044	12	txtHEX_16bit	0	
+0043a054	15	Update_from_Hex	0	
+0043a074	23	mnuCommentBlock_Click: 	0	
+0043a0a8	11	FIRST_PRINT	2	00492341 004924e6
+0043a0c4	7	Flag_DP	2	0049233c 004924e1
+0043a0e0	13	Please note: 	1	004923d1
+0043a100	112	 Direct print may not be correct on some printers. It is recommended to export to HTML and use browser to print.	1	00492404
+0043a1f8	67	 This warning appears once only. Click OK to print directly anyway.	1	00492449
+0043a284	13	Print Warning	1	004923b1
+0043a2e8	7	txtPath	0	
+0043a2f0	9	cmdCancel	0	
+0043a2fc	12	cmdChooseDir	0	
+0043a31c	13	chkUseDefault	0	
+0043a330	19	mnuUncommentBlock: 	0	
+0043a398	13	picPleaseWait	0	
+0043a3ac	20	mnuLoadPreviousState	0	
+0043a3c4	8	mnuDrive	0	
+0043a3d0	15	mnuDelimeter634	0	
+0043a3e0	8	mnuDebug	0	
+0043a3ec	12	mnuDelim6123	0	
+0043a3fc	16	mnuDelimeter3321	0	
+0043a410	12	mnuVariables	0	
+0043a420	18	mnuDelimeters61234	0	
+0043a434	19	mnuSaveCurrentState	0	
+0043a448	13	mnuMemory_AUX	0	
+0043a458	23	mnuExternalMemoryViewer	0	
+0043a470	16	mnuDelimeter7134	0	
+0043a484	8	mnuASCII	0	
+0043a490	13	lblPleaseWait	0	
+0043a4a0	24	mnuCommandLineParameters	0	
+0043a4bc	13	mnuUserScreen	0	
+0043a4cc	8	mnuStack	0	
+0043a4d8	23	mnuExtendedRegisterView	0	
+0043a4f0	17	mnuVirtualDevices	0	
+0043a504	17	mnuDelimeter00211	0	
+0043a518	15	mnuDelimeter123	0	
+0043a530	18	mnuMakeEmptyFloppy	0	
+0043a558	24	mnuResetEmulator_and_RAM	0	
+0043a574	10	txtDisAddr	0	
+0043a580	17	mnuDelimeter00002	0	
+0043a594	7	mnuStop	0	
+0043a59c	17	mnuDelimeter00001	0	
+0043a5b0	15	mnuActualSource	0	
+0043a5c0	16	mnuDelimeter7843	0	
+0043a5d4	12	cmdStopInput	0	
+0043a5e4	24	mnuSelect_lines_at_CS_IP	0	
+0043a600	17	mnuDelimeter61123	0	
+0043a61c	11	mnuDebugLog	0	
+0043a628	11	mnuMS_DEBUG	0	
+0043a634	23	txtIntegratedMemoryAddr	0	
+0043a65c	9	scrollDis	0	
+0043a668	12	mnuDelimeter	0	
+0043a678	9	cmdReload	0	
+0043a68c	18	mnuStopOnCondition	0	
+0043a6a0	15	mnuDelimeter734	0	
+0043a6b0	16	mnuDelimeter3123	0	
+0043a6c4	10	mnuOptions	0	
+0043a6e0	24	mnuAUX_stop_on_condition	0	
+0043a70b	16	wsliderSTEPDELAY	0	
+0043a71c	11	mnuStepOver	0	
+0043a728	11	chkAutoStep	0	
+0043a734	16	mnuDelimeter1001	0	
+0043a748	9	mnuReLoad	0	
+0043a754	23	mnuWriteBinFileToFloppy	0	
+0043a76c	13	mnuDelimeter1	0	
+0043a77c	17	mnuDelimeters7750	0	
+0043a790	17	mnuDelimeters7771	0	
+0043a7a4	16	mnuDelimter71345	0	
+0043a7b8	10	mnuAlu_AUX	0	
+0043a7c4	16	mnuDelimeter1000	0	
+0043a7d8	9	scrollMem	0	
+0043a7e4	15	mnuFlagAnalyzer	0	
+0043a7fc	19	mnuDelimeter4235432	0	
+0043a810	13	mnuSingleStep	0	
+0043a820	16	mnuDelimeter6126	0	
+0043a834	8	mnuFlags	0	
+0043a840	14	mnuDELIMITER_0	0	
+0043a850	16	mnuDelimeter5312	0	
+0043a864	16	mnuDelimeter8981	0	
+0043a878	17	mnuBootFromFloppy	0	
+0043a88c	15	mnuDelimeter824	0	
+0043a8a4	21	mnuBoot_from_FLOPPY_X	0	
+0043a8bc	27	mnuWriteBootRecord_FLOPPY_X	0	
+0043a8d8	16	mnuDelimete37723	0	
+0043a8ec	18	mnuWriteBootRecord	0	
+0043a900	13	mnuDelimter51	0	
+0043a910	18	lblWaitingForInput	0	
+0043a924	18	mnu_Set_BreakPoint	0	
+0043a938	17	mnuExternalDevice	0	
+0043a94c	17	mnuShowBreakPoint	0	
+0043a960	19	mnuRunUntilSelected	0	
+0043a974	25	mnu_set_CS_IP_to_selected	0	
+0043a990	20	mnu_Clear_BreakPoint	0	
+0043a9a8	17	mnuSingleStepBack	0	
+0043a9bc	7	cmdBack	0	
+0043a9c4	10	picLOADING	0	
+0043a9d0	14	cmdStopLoading	0	
+0043a9e0	10	picDisList	0	
+0043a9ec	10	picMemList	0	
+0043a9f8	15	lblHW_INTERRUPT	0	
+0043aa34	7	popLoad	0	
+0043aa6c	7	cmdStep	0	
+0043aaa4	9	timerStep	0	
+0043aab0	13	timerINT15_86	0	
+0043aac0	18	picWaitingForInput	0	
+0043aad4	12	fraRegisters	0	
+0043aae4	23	timer_CLOSE_frmDebugLog	0	
+0043ab0c	8	cmdFlags	0	
+0043ab18	19	cmdShowActualSource	0	
+0043ab3c	8	cmdReset	0	
+0043ab48	10	picDragger	0	
+0043ab54	8	cmdStack	0	
+0043ab60	11	lblStepTime	0	
+0043ab6c	14	mnuListing_AUX	0	
+0043ab7c	13	mnuSymbol_AUX	0	
+0043ab8c	19	timerStartTurboMode	0	
+0043aba0	22	ON_EMULATOR_HIDE_PART1	0	
+0043abb8	22	ON_EMULATOR_HIDE_PART2	0	
+0043abd0	51	select_disassembled_line_according_to_selected_byte	0	
+0043ac04	17	loadFILEtoEMULATE	0	
+0043ac18	51	check_if_external_device_needs_to_be_started_PUBLIC	0	
+0043ac4c	20	loadBinaryExecutable	0	
+0043ac64	11	to16bit_UNS	0	
+0043ac70	21	show_Registers_PUBLIC	0	
+0043ac88	37	mnuResetEmulator_and_RAM_Click_PUBLIC	0	
+0043acb0	37	mnuSelect_lines_at_CS_IP_Click_PUBLIC	0	
+0043acd8	24	mnuStepOver_Click_PUBLIC	0	
+0043acf4	16	store_BYTE_at_EA	1	004364b8
+0043ad08	26	store_FOLLOWING_BYTE_at_EA	1	004364bc
+0043ad24	16	store_WORD_at_EA	1	004364c0
+0043ad38	6	get_AL	1	004366f4
+0043ad40	6	get_AH	1	004366f8
+0043ad48	26	store_FOLLOWING_WORD_at_EA	1	004364c4
+0043ad64	14	get_BYTE_at_EA	1	004364c8
+0043ad74	14	get_WORD_at_EA	1	004364cc
+0043ad84	17	get_BYTE_RegValue	1	004364d4
+0043ad98	19	store_BYTE_RegValue	1	004364d8
+0043adac	17	get_WORD_RegValue	1	004364dc
+0043adc0	19	store_WORD_RegValue	1	004364e0
+0043add4	29	sliderSTEPDELAY_Change_public	0	
+0043adf4	12	stopAutoStep	0	
+0043ae04	11	setMEMVALUE	0	
+0043ae10	26	load_BININFO_all_registers	0	
+0043ae2c	16	stackPUSH_PUBLIC	0	
+0043ae40	26	mnuSingleStep_Click_PUBLIC	0	
+0043ae5c	14	do_INT_21h_23h	0	
+0043ae6c	14	process_HotKey	0	
+0043ae7c	9	IS_HotKey	0	
+0043ae88	14	get_Step_Delay	1	004366b4
+0043ae98	14	set_Step_Delay	1	004366b8
+0043aea8	32	Reset_registers_highlight_PUBLIC	1	004366bc
+0043aed8	6	get_AX	1	004366ec
+0043aee0	6	get_CX	1	004366f0
+0043aee8	6	get_BL	1	004366fc
+0043aef0	6	get_BH	1	00436700
+0043aef8	6	get_CL	1	00436704
+0043af00	6	get_CH	1	00436708
+0043af08	6	get_DL	1	0043670c
+0043af10	6	get_DH	1	00436710
+0043af18	6	get_DX	1	00436714
+0043af20	6	get_DS	1	00436718
+0043af28	6	get_IP	1	0043671c
+0043af30	6	set_IP	1	00436720
+0043af38	6	get_CS	1	00436724
+0043af40	6	get_ES	1	00436728
+0043af48	6	get_SS	1	0043672c
+0043af50	6	get_SP	1	00436730
+0043af58	6	set_CS	1	00436734
+0043af60	6	get_BX	1	00436738
+0043af68	6	get_BP	1	0043673c
+0043af70	6	get_SI	1	00436740
+0043af78	6	get_DI	1	00436744
+0043af80	24	get_SEGMENT_DISPLACEMENT	0	
+0043af9c	6	set_AX	1	00436760
+0043afa4	6	set_BX	1	00436764
+0043afac	6	set_CX	1	00436768
+0043afb4	6	set_DX	1	0043676c
+0043afbc	6	set_SS	1	00436770
+0043afc4	6	set_SP	1	00436774
+0043afcc	6	set_BP	1	00436778
+0043afd4	6	set_SI	1	0043677c
+0043afdc	6	set_DI	1	00436780
+0043afe4	6	set_ES	1	00436784
+0043afec	6	set_DS	1	00436788
+0043aff4	6	set_AL	1	0043678c
+0043affc	6	set_AH	1	00436790
+0043b004	6	set_BL	1	00436794
+0043b00c	6	set_BH	1	00436798
+0043b014	6	set_CL	1	0043679c
+0043b01c	6	set_CH	1	004367a0
+0043b024	6	set_DL	1	004367a4
+0043b02c	6	set_DH	1	004367a8
+0043b038	15	MicroAsm_D8_TAB	0	
+0043b048	26	Reset_Before_Load_Anything	1	004367ac
+0043b064	14	Set_After_Load	1	004367b0
+0043b074	20	do_instruction_D8_DF	0	
+0043b08c	12	INIT_FPU_PUB	1	004367f4
+0043b114	10	noname.com	1	0049370d
+0043b16c	12	MICROASM.DLL	10	0043b18c 0043b1d4 0043b208 0043b250 0043b298 0043b2e0 0043b328 0043b370 0043b3d4 0043b41c
+0043b180	10	MicroAsm_T	0	
+0043b1c4	14	MicroAsm_FINIT	0	
+0043b240	15	MicroAsm_D9_TAB	0	
+0043b288	15	MicroAsm_DA_TAB	0	
+0043b2d0	15	MicroAsm_DB_TAB	0	
+0043b318	15	MicroAsm_DC_TAB	0	
+0043b360	15	MicroAsm_DD_TAB	0	
+0043b3a8	15	MicroAsm_DE_TAB	0	
+0043b3bc	10	noname.bin	1	0049395f
+0043b40c	15	MicroAsm_DF_TAB	0	
+0043b46c	9	CopyFileA	0	
+0043b4e4	17	noname.com.symbol	1	00493770
+0043b50c	16	noname.com.debug	1	004937d3
+0043b534	10	noname.exe	1	00493836
+0043b550	17	noname.exe.symbol	1	00493899
+0043b578	16	noname.exe.debug	1	004938fc
+0043b5a4	17	noname.bin.symbol	1	004939c2
+0043b5cc	16	noname.bin.debug	1	00493a25
+0043b5f4	11	noname.com_	1	00493a88
+0043b610	18	noname.com_.symbol	1	00493aeb
+0043b63c	17	noname.com_.debug	1	00493b4e
+0043b664	11	noname_.exe	1	00493bb1
+0043b680	18	noname.exe_.symbol	1	00493c14
+0043b6ac	17	noname.exe_.debug	1	00493c77
+0043b6d4	11	noname.bin_	1	00493cda
+0043b6f0	18	noname.bin_.symbol	1	00493d3d
+0043b71c	17	noname.bin_.debug	1	00493da0
+0043b744	21	delete_noname_files: 	0	
+0043b774	27	no code to assemble.... :( 	1	00494247
+0043b7b0	41	type something like: HLT  ; at least...  	1	00494261
+0043b828	14	please wait...	1	004947cb
+0043b84c	6	noname	2	004cacb0 00494827
+0043b860	7	(NOSEG)	8	004965bf 004c42b7 004bb844 00494856 00494ab7 00496492 004965e3 004c4303
+0043b874	7	fasm...	1	00498b65
+0043b888	7	masm...	1	004948c3
+0043b8d4	35	recursive MACRO definition is over 	1	004949f8
+0043b9e8	7	pass # 	1	00494e16
+0043ba98	4	IMUL	1	00495566
+0043baa8	4	IDIV	1	0049557f
+0043bb0c	4	TEST	2	0049561d 004baa31
+0043bb70	4	CALL	1	004956b5
+0043bb8c	4	RETN	2	004956c8 004b855a
+0043bb9c	4	RETF	4	004956f4 004b862b 004b8695 004b85b8
+0043bbac	4	PUSH	1	0049570d
+0043bbc8	4	XCHG	2	00495733 004b3e6c
+0043bbe4	6	.RADIX	1	00495ac0
+0043bbf8	10	error 71: 	1	004964ee
+0043bc14	5	endm 	1	00495ae9
+0043bc24	5	 endm	1	00495af9
+0043bc34	4	endm	1	00495b07
+0043bc44	7	.macros	1	00495fbe
+0043bc64	11	.procedures	1	00495fda
+0043bc8c	14	not supported.	1	00496016
+0043bcb0	5	 dup 	1	00495bc8
+0043bcc0	4	 db 	7	00495be1 00495c08 00495c45 00495c74 004c5302 004c534d 004c537e
+0043bcdc	5	 dup(	1	00495c2e
+0043bcec	4	dup 	1	004960dd
+0043bcfc	4	dup(	1	004960ed
+0043bd0c	9	no size: 	1	00496542
+0043bd24	20	illegal instruction:	1	00496132
+0043bd54	20	or wrong parameters.	1	0049614f
+0043bd84	32	overflow! - cannot be evaluated:	1	004962e0
+0043bdcc	13	no ENDP for: 	0	
+0043bdf8	13	no ENDS for: 	0	
+0043be18	12	Assembled in	1	00496663
+0043be38	19	passes. Time spent:	1	00496673
+0043be64	8	seconds.	1	0049667d
+0043be7c	26	not enough instructions...	1	004968e7
+0043beb8	76	should be at least 1 instruction outside macro or before the 'END' directive	1	00496991
+0043bf58	27	creating plain binary file.	1	00496c51
+0043bf94	21	#make_com#  detected.	1	00496de2
+0043bfc4	21	#make_exe#  detected.	1	00496e0e
+0043bff8	21	#make_bin#  detected.	1	00496e3a
+0043c028	27	#make_boot# detected (.bin)	1	00496e84
+0043c064	7	startup	2	00496f6b 00496f7a
+0043c078	5	.code	1	0049702a
+0043c088	18	wrong entry point!	1	0049743c
+0043c0b4	5	 END 	1	00497485
+0043c0c4	20	entry point not set!	1	00497648
+0043c0f4	28	directive: org 100h - found!	1	00497147
+0043c134	36	generally only .COM programs require	1	00497164
+0043c184	16	Continue anyway?	1	004976fe
+0043c1ac	9	ORG 7C00H	1	00497743
+0043c1c4	41	location counter to be set to 100h bytes.	1	00497181
+0043c21c	16	continue anyway?	3	00497bbc 00498250 004971a4
+0043c244	8	ORG 100h	2	005180e0 004971e9
+0043c25c	45	EXE file not built, aborted - ORG 100h found!	1	004973d8
+0043c2bc	25	Line "ORG 7C00H" - found!	1	004977a1
+0043c2f4	49	Generally only .BIN programs (boot sectors) begin	1	004976c4
+0043c35c	25	with a 7C00H byte prefix.	1	004976e1
+0043c3a4	48	EXE file not built, aborted - "ORG 7C00H" found!	1	00497909
+0043c418	29	is compiled successfully into	1	00497969
+0043c458	7	 bytes.	5	0051803d 00497a07 004984a1 00497fad 005ea4b5
+0043c46c	31	executable file is not created!	3	00497dd6 00498050 004984f1
+0043c4b0	32	directive: org 100h - not found!	1	00497b27
+0043c4f8	48	usually a .COM program must set location counter	1	00497b3b
+0043c560	14	to 100h bytes.	1	00497b59
+0043c584	39	the incorrect listing may be generated!	1	00497b86
+0043c5d8	49	COM file not built, aborted - ORG 100h not found!	1	00497c94
+0043c640	30	is assembled successfully into	2	00497f0f 00498404
+0043c684	53	Cannot generate a COM file. Remove the stack segment.	1	00497d3e
+0043c700	14	access denied.	0	
+0043c724	17	assembler error: 	0	
+0043c760	57	line "org 7c00h" - not found in the begining of the file!	1	0049810e
+0043c7d8	33	generally a boot sector is loaded	1	0049812b
+0043c820	22	at address 0000:7c00h.	1	00498148
+0043c854	9	org 7c00h	1	0049818d
+0043c86c	60	boot record file not built, aborted - "org 7c00h" not found!	1	00498347
+0043c8ec	7	LISTING	1	00498569
+0043c900	17	there are errors!	3	00498a31 006105fd 0061ab72
+0043c93c	4	END 	1	004994b2
+0043c970	5	LABEL	5	004b6e49 004998b9 004c3a75 006137f4 0061dbc4
+0043c9a4	4	PROC	9	0059bfec 0061dd8f 0061e1a9 004c3bd4 004c3d4d 006139bf 00613dd9 00499a58 00499d7d
+0043c9b4	4	DUP 	3	0061ddd5 00613a05 00499a9c
+0043c9c4	4	DUP(	6	0061ddf5 0061e494 00613a25 006140c4 00499abe 0049a113
+0043c9e0	4	 FAR	4	00499e1f 004c3dd1 00613e65 0061e235
+0043c9fc	4	NEAR	6	004b6e5c 004b789b 00499e55 004c3e00 00613e96 0061e266
+0043ca34	8	(ITSELF)	4	0049a058 004c457e 00614025 0061e3f5
+0043ca58	25	duplicate declaration of:	1	0049a21f
+0043ca90	22	save changes to file ?	1	0049a66b
+0043cac4	13	save changes?	1	0049a68d
+0043cae8	8	examples	7	0049abe2 0049afb0 0049aed1 0049dc78 0049dfb6 005ad632 004ce7cc
+0043cb8c	12	comdlg32.dll	2	0043cbb0 0043cc9c
+0043cba0	12	ChooseColorA	0	
+0043cbe8	11	ChooseFontA	0	
+0043cc2c	14	SHGetFileInfoA	0	
+0043cc74	16	GetSaveFileNameA	0	
+0043cc8c	13	RtlMoveMemory	0	
+0043ccd4	16	GetOpenFileNameA	0	
+0043cd20	8	lstrcatA	0	
+0043cd64	7	shell32	3	0043cd84 0043cdd0 004496cc
+0043cd70	17	SHBrowseForFolder	0	
+0043cdbc	19	SHGetPathFromIDList	0	
+0043ce08	9	ole32.dll	1	0043ce28
+0043ce18	13	CoTaskMemFree	0	
+0043cefc	8	MySource	8	0049adf3 0049dd4b 0049de62 0049e089 005f9255 004ce4a4 004ce61f 005fb78c
+0043cf14	44	(unchanged/examples) sCURRENT_SOURCE_FOLDER:	0	
+0043cf74	4	.ASM	3	0049b0d8 004ea48c 004d177b
+0043cf84	4	.EXE	6	0049b0f4 00518145 004ea553 0054f0ab 004d1803 004ea21f
+0043cf94	4	.BIN	4	0049b10a 004ea56d 004d1819 004ea395
+0043cfa4	5	.BOOT	4	0049b120 004ea587 004d182f 004ea41d
+0043cfb4	4	.COM	6	0049b136 005180bc 004ea5a1 0054f0c8 004d1845 004ea2a1
+0043cfc4	5	.EXE_	6	0049b14c 00518128 004ea5bb 0054f110 004d1887 004ea229
+0043cfd4	5	.BIN_	4	0049b162 004ea5d5 004d1871 004ea39f
+0043cfe4	5	.COM_	6	0049b178 0051809f 004ea5ef 0054f0f0 004d185b 004ea2ab
+0043d000	16	make_all_decimal	0	
+0043d014	8	txtTitle	0	
+0043d024	33	Load Canceled, or no file name...	0	
+0043d06c	5	edit:	1	0049b742
+0043d07c	5	fasm_	1	0049bb0b
+0043d08c	18	0_com_template.txt	1	0049bbdd
+0043d0b8	18	1_exe_template.txt	1	0049bd3b
+0043d0e4	18	2_bin_template.txt	1	0049be63
+0043d110	19	3_boot_template.txt	1	0049bf8b
+0043d13c	6	#fasm#	1	0049c019
+0043d18c	10	chkUseFASM	0	
+0043d1a8	15	option_template	0	
+0043d1b8	13	frameSignType	0	
+0043d1d4	39	wrong parameter for create_NEW_source: 	0	
+0043d228	20	; add your code here	1	0049c22c
+0043d258	24	Error loading template: 	0	
+0043d290	31	please re-install the software.	0	
+0043d310	11	checkSigned	0	
+0043d31c	7	optWord	0	
+0043d324	7	optByte	0	
+0043d32c	12	txtEvaluator	0	
+0043d33c	14	timerEvaluator	0	
+0043d34c	10	optDecimal	0	
+0043d358	6	optHex	0	
+0043d360	6	optOct	0	
+0043d368	8	cmdClear	0	
+0043d374	15	frameResultType	0	
+0043d39c	20	EmnuGotoLine_Click: 	0	
+0043d3dc	10	mycode.asm	1	0049deb5
+0043d3f8	42	Assembly (*.asm)|*.asm|All Files (*.*)|*.*	2	0049defd 0049e152
+0043d460	6	edit: 	1	0049e268
+0043d474	14	Save canceled.	0	
+0043d498	13	error saving:	2	004c8e55 004c99c2
+0043d4f4	14	chkConvertTabs	0	
+0043d504	10	txtTabSize	0	
+0043d510	10	picDefault	0	
+0043d51c	27	chkKeywordCaseNormalization	0	
+0043d538	23	comboLineNumberingStyle	0	
+0043d550	10	frameOther	0	
+0043d55c	9	frameTabs	0	
+0043d568	18	cmdResetToDefaults	0	
+0043d57c	10	lblTabSize	0	
+0043d588	12	comboObjects	0	
+0043d598	19	chkShowLineToolTips	0	
+0043d5ac	14	lblKeywordItem	0	
+0043d5bc	16	frameLineNumbers	0	
+0043d5d0	13	frameKeywords	0	
+0043d5e0	10	cmdSetFont	0	
+0043d5ec	10	lblObjects	0	
+0043d5f8	23	txtStartLineNumberingAt	0	
+0043d610	19	picGeneralBackColor	0	
+0043d624	21	comboKeywordFontStyle	0	
+0043d63c	16	comboKeywordItem	0	
+0043d650	15	lblKeyForeColor	0	
+0043d660	19	picKeywordForeColor	0	
+0043d674	15	lblKeyBackColor	0	
+0043d684	25	picKeywordBackgroundColor	0	
+0043d6a0	15	lblKeyFontStyle	0	
+0043d6b0	12	cmdAssociate	0	
+0043d6c0	21	chkConfineCaretToText	0	
+0043d6dc	19	comboAutoIndentMode	0	
+0043d780	8	ASM_8086	3	0059c8f1 004a089c 004a08d3
+0043d798	7	sampleN	2	004a3a49 004a0cde
+0043d7dc	9	sampleN99	1	004a1016
+0043d7f4	14	frmMain_Load: 	0	
+0043d818	32	Error on frmMain Form_resize(): 	0	
+0043d860	10	calculator	17	00597e25 00597f65 005980ab 005981f7 00598343 00598486 005985d2 004cc0dc 004cc127 004a36d6 00598801 0059887b 005988ef 00598963 005989d7 00598a4b 00598abb
+0043d878	9	cmdBrowse	0	
+0043d888	21	frmMain.Form_Unload: 	0	
+0043d8b8	14	Error on cut: 	0	
+0043d8dc	15	Error on copy: 	0	
+0043d900	16	Error on paste: 	0	
+0043d928	26	mnuShowLineNumbers_Click: 	0	
+0043d984	32	frmMain_StatusBar1_OLEDragDrop: 	0	
+0043d9e8	4	open	21	004dc969 004dca17 0054ec00 004e5e79 004e5fd5 0051993f 004daf49 004db0a2 004e61e9 0053d46a 0053d5f2 004db2a9 005d62e3 0054a98c 004a34e2 005854d4 0053e69b 0053e749 005f95df 005f97c1 005d7a4d
+0043d9f8	7	samples	1	004a3544
+0043da0c	4	save	1	004a35b0
+0043da1c	7	compile	1	004a3612
+0043da30	7	emulate	1	004a3674
+0043da44	9	convertor	1	004a3738
+0043da5c	7	options	1	004a379a
+0043da70	4	help	1	004a37fc
+0043da80	5	about	1	004a385b
+0043daa0	6	saveas	1	004a39a8
+0043dab4	26	Toolbar1_ButtonMenuClick: 	0	
+0043daf0	22	Toolbar1_OLEDragDrop: 	0	
+0043db24	29	Error on mnuSelectAll_Click: 	0	
+0043db64	17	cannot not find: 	1	004a4933
+0043db8c	10	not found!	1	004a4920
+0043dba8	13	no such line!	1	004a49a7
+0043dbc8	21	txtInput_CmdFailure: 	0	
+0043dbf4	8	lstIndex	0	
+0043dc04	11	Play Macro 	1	004a4f94
+0043dc34	16	mnuMacro_Click: 	0	
+0043dc68	5	Shift	1	004a53ee
+0043dc78	7	 + Ctrl	1	004a540f
+0043dc8c	4	Ctrl	1	004a5427
+0043dc9c	6	 + Alt	1	004a5448
+0043dcbc	16	get_spent_time: 	0	
+0043dce4	20	Timer_DelayCommand: 	0	
+0043dd14	9	examples\	2	004a5bd3 004a5cfc
+0043dd2c	11	_sample.asm	1	004a5c07
+0043dd48	18	traffic_lights.asm	1	004a5c4f
+0043dd74	14	palindrome.asm	1	004a5c56
+0043dd94	18	chkDefaultFontSize	0	
+0043dda8	12	lblFileSaved	0	
+0043ddbc	20	LED_display_test.asm	1	004a5c5d
+0043ddec	17	stepper_motor.asm	1	004a5c64
+0043de14	13	simple_io.asm	1	004a5c6b
+0043de34	15	mnuSample_ARR: 	0	
+0043de88	6	line: 	1	004a6181
+0043debc	5	col: 	1	004a62b0
+0043decc	5	sel: 	1	004a6482
+0043dedc	20	txtInput_SelChange: 	0	
+0043df26	11	k)txtMargin	0	
+0043df34	14	txtDescription	0	
+0043df44	11	txtFontName	0	
+0043df50	11	txtFontSize	0	
+0043df5c	8	FileList	0	
+0043df6c	67	cannot assemble, this code contains too many lines over 1020 chars.	1	004a6748
+0043dff8	13	 [LONG-LINE][	1	004a67f5
+0043e020	31	Err!  create_dup_replacer_for: 	0	
+0043e064	12	[LONG-LINE][	2	004a69a4 004a6a69
+0043e084	35	Err! check_long_dup_expand_if_any: 	0	
+0043e0d0	10	0123456789	2	004a6cba 004a6d90
+0043e0ec	21	cut_out_line_number: 	0	
+0043e138	16	mnuOpenInNotepad	0	
+0043e14c	16	chkFilenameOnTop	0	
+0043e160	9	cmdExport	0	
+0043e16c	16	lblBatchProgress	0	
+0043e180	20	chkAddExportedByNote	0	
+0043e198	9	lblMargin	0	
+0043e1a4	19	mnuExportSingleFile	0	
+0043e1b8	12	mnuExportAll	0	
+0043e1c8	11	lblFontsize	0	
+0043e1d4	11	lblFontname	0	
+0043e1e0	17	mnuDelimeter00004	0	
+0043e1f4	17	mnuDelimeter00000	0	
+0043e210	7	mnuOpen	0	
+0043e218	17	to_HTML_FONT_SIZE	0	
+0043e22c	17	make_HTML_COLORED	1	00437038
+0043e240	18	getcolor_for_token	1	0043703c
+0043e254	9	GetRevRGB	1	00437040
+0043e260	17	add_to_index_list	1	00437048
+0043e274	10	save_index	1	0043704c
+0043e280	7	legHTML	1	00437050
+0043e2a4	23	mnuExportToHTML_Click: 	0	
+0043e2f0	17	anti_crash_save: 	0	
+0043e32c	18	__vbaVarVargNofree	0	
+0043e340	11	__vbaVarSub	0	
+0043e34c	12	__vbaVarCopy	0	
+0043e35c	15	__vbaEraseNoPop	0	
+0043e36c	8	__vbaNew	0	
+0043e37c	5	word 	2	004ad389 004ad3a5
+0043e388	12	__vbaBoolVar	0	
+0043e3b0	17	__vbaObjSetAddref	0	
+0043e3d0	5	byte 	2	004ad327 004ad343
+0043e3dc	10	__vbaStrR4	0	
+0043e3e8	12	__vbaStrLike	0	
+0043e404	10	__vbaStrI4	0	
+0043e410	11	__vbaLbound	0	
+0043e420	4	 ptr	1	004ad308
+0043e444	11	__vbaVarDup	0	
+0043e450	16	__vbaAryDestruct	0	
+0043e464	11	__vbaUbound	0	
+0043e470	11	__vbaAryVar	0	
+0043e47c	12	__vbaAryCopy	0	
+0043e48c	11	__vbaResume	0	
+0043e49c	15	[BX + SI] + d16	2	004d4601 004aabdc
+0043e4c4	11	__vbaLenVar	0	
+0043e4d0	13	__vbaVarTstGt	0	
+0043e4f8	10	__vbaCyVar	0	
+0043e508	10	evalExpr: 	0	
+0043e524	12	__vbaFpCmpCy	0	
+0043e534	15	__vbaCastObjVar	0	
+0043e544	12	__vbaCastObj	0	
+0043e554	24	__vbaGenerateBoundsError	0	
+0043e570	18	__vbaRedimPreserve	0	
+0043e584	15	__vbaLateIdCall	0	
+0043e594	13	__vbaVarCmpNe	0	
+0043e5a8	5	BYTE[	1	004ad251
+0043e5b4	13	__vbaVarCmpEq	0	
+0043e5c4	10	__vbaVarOr	0	
+0043e5dc	13	__vbaInStrVar	0	
+0043e5ec	17	__vbaLateIdCallLd	0	
+0043e600	12	__vbaVarMove	0	
+0043e610	11	__vbaVarAnd	0	
+0043e61c	16	__vbaBoolVarNull	0	
+0043e630	10	__vbaStrI2	0	
+0043e63c	15	__vbaStrCompVar	0	
+0043e64c	10	__vbaErase	0	
+0043e658	16	__vbaFreeObjList	0	
+0043e670	14	__vbaStrVarVal	0	
+0043e680	18	__vbaErrorOverflow	0	
+0043e694	11	__vbaVarCat	0	
+0043e6a0	11	__vbaStrCmp	0	
+0043e6ac	10	__vbaInStr	0	
+0043e6bc	5	BYTE 	1	004ad220
+0043e6c8	13	__vbaVarTstEq	0	
+0043e6e4	13	__vbaLateIdSt	0	
+0043e6f4	14	__vbaFileClose	0	
+0043e704	17	__vbaLineInputStr	0	
+0043e728	13	__vbaFileOpen	0	
+0043e738	11	__vbaStrCat	0	
+0043e744	13	__vbaVarTstNe	0	
+0043e754	12	__vbaFreeVar	0	
+0043e764	12	__vbaLenBstr	0	
+0043e784	12	__vbaStrComp	0	
+0043e794	16	__vbaFreeVarList	0	
+0043e7a8	12	__vbaStrCopy	0	
+0043e7b8	15	__vbaStrVarMove	0	
+0043e7cc	17	yur_init_analyser	0	
+0043e7e0	13	__vbaExitProc	0	
+0043e7f0	16	__vbaFreeStrList	0	
+0043e804	11	__vbaObjSet	0	
+0043e810	12	__vbaFreeStr	0	
+0043e820	12	__vbaStrMove	0	
+0043e830	9	__vbaNew2	0	
+0043e840	12	__vbaFreeObj	0	
+0043e850	20	__vbaHresultCheckObj	0	
+0043e874	12	__vbaOnError	0	
+0043e8c0	7	analyse	0	
+0043e96c	6	offset	3	004adc38 004abd5f 004a8341
+0043e988	14	is_immediate: 	0	
+0043e9ac	16	0123456789ABCDEF	1	004a89a4
+0043e9d4	8	01234567	1	004a89b0
+0043ea00	14	0123456789HOBD	1	004a87e4
+0043ea24	11	is_number: 	0	
+0043ea40	7	OFFSET 	1	004a8bcd
+0043ea5c	27	{}[]+-*/()^~%<>&| ,.=#!'": 	7	004afa9a 004a8e32 004a8e74 005fa51a 004adba3 004c9ea6 00604a09
+0043ea98	7	offset 	1	004a923a
+0043eab8	41	wrong parameter calling get_var_segment: 	0	
+0043eb10	40	wrong parameter calling get_var_offset: 	0	
+0043eba8	32	[warning] independent_eval fix: 	0	
+0043ebf0	22	err independent_eval: 	0	
+0043ec30	9	[DI] + d8	2	004d4586 004aaa00
+0043ec48	9	[BP] + d8	4	004d45af 004bcdfd 004bd142 004aae86
+0043ec60	9	[BX] + d8	2	004d45d8 004aaa1d
+0043ec78	52	getTableEA_byte() called with empty parameter! line:	0	
+0043ece8	38	Wrong sTab param in getTabIndex call: 	0	
+0043ed3c	38	Wrong sRow param in getRowIndex call: 	0	
+0043eda8	14	[BX + SI] + d8	2	004d44b9 004aa8cc
+0043edcc	14	[BX + DI] + d8	2	004d44e2 004aa94b
+0043edf0	14	[BP + SI] + d8	2	004d450b 004aa9cb
+0043ee14	14	[BP + DI] + d8	2	004d452c 004aa9e0
+0043ee38	9	[SI] + d8	2	004d455d 004aa9f0
+0043ee50	15	[BX + DI] + d16	2	004d462a 004aabf3
+0043ee74	15	[BP + SI] + d16	2	004d4653 004aac07
+0043ee98	15	[BP + DI] + d16	2	004d467c 004aac1b
+0043eebc	10	[SI] + d16	2	004d469d 004aac2a
+0043eed8	10	[DI] + d16	2	004d46ce 004aac39
+0043eef4	10	[BP] + d16	2	004d46f7 004aac48
+0043ef10	10	[BX] + d16	2	004d4720 004aac5b
+0043ef2c	9	[BX + SI]	2	004d4376 004aae20
+0043ef44	9	[BX + DI]	2	004d439e 004aae34
+0043ef5c	9	[BP + SI]	2	004d43c7 004aae45
+0043ef74	9	[BP + DI]	2	004d43ef 004aae56
+0043ef8c	4	[SI]	2	004d4418 004aae62
+0043ef9c	4	[DI]	2	004d4441 004aae6e
+0043efac	4	[BX]	2	004d4493 004aae7a
+0043f000	44	[BX] cannot go with [BP] - wrong addressing!	1	004aaed9
+0043f060	44	[SI] cannot go with [DI] - wrong addressing!	1	004aaf61
+0043f0c0	32	cannot convert to 16 bit value: 	1	004ab2d3
+0043f108	30	Wrong parameter in sum_str(): 	0	
+0043f14c	4	h, 0	1	004ab9d0
+0043f178	13	wrong radix: 	0	
+0043f198	4	BYTE	1	004ac26d
+0043f1a8	4	WORD	1	004ac283
+0043f1cc	21	Error on bin_to_long(	0	
+0043f208	42	: Wrong param calling to_unsigned_byte(): 	0	
+0043f264	44	#400b22-org-8000# to_signed_int() corrected 	0	
+0043f2d8	33	critical error on to_signed_int: 	0	
+0043f320	49	Wrong param calling to_signed_long_from_currency(	0	
+0043f388	5	WORD 	1	004ad130
+0043f398	5	WORD[	1	004ad161
+0043f3a8	6	dword 	2	004ad3b2 004ad3ce
+0043f3d4	4	 dw.	1	004ad43f
+0043f41c	18	empty parameter!##	2	004adf04 004adf73
+0043f448	19	no such parameter: 	1	004ae1d8
+0043f474	43	get_parameter_from_SYMBOL_TABLE: not found>	0	
+0043f4d0	33	get_parameter_from_SYMBOL_TABLE: 	0	
+0043f524	25	ERROR on make_normal_hex(	0	
+0043f578	10	__vbaCySub	0	
+0043f590	10	__vbaCyAdd	0	
+0043f59c	12	__vbaPowerR8	0	
+0043f5dc	14	__vbaAryUnlock	0	
+0043f5ec	12	__vbaAryLock	0	
+0043f5fc	15	__vbaVarLikeVar	0	
+0043f60c	15	__vbaVarForNext	0	
+0043f628	15	__vbaVarForInit	0	
+0043f678	11	lst_opNames	0	
+0043f684	12	lst_Opcodes1	0	
+0043f694	12	lblLaunching	0	
+0043f6a4	13	lst_EA_TCONST	0	
+0043f6c4	15	FIX_SMALL_FONTS	1	004ae8d6
+0043f6f0	11	is_around: 	0	
+0043f70c	4	    	4	004af8ec 005fe1ae 00588c47 005eddb6
+0043f734	4	REPE	1	004afc8a
+0043f744	4	REPZ	1	004afc9f
+0043f754	5	REPNE	1	004afcc3
+0043f764	5	REPNZ	1	004afce7
+0043f810	4	 cs:	2	004b0d60 004c345f
+0043f820	4	 ds:	2	004b0d83 004c3488
+0043f830	4	 es:	2	004b0eec 004c34b1
+0043f840	4	 ss:	2	004b1053 004c34da
+0043f850	4	.cs:	2	004b11bc 004c3503
+0043f860	4	.ds:	2	004b11dc 004c352c
+0043f870	4	.es:	2	004b11fc 004c3555
+0043f880	4	.ss:	2	004b121c 004c357e
+0043f910	5	CMPSB	1	004b1653
+0043f920	5	CMPSW	1	004b166c
+0043f960	4	INTO	1	004b16e9
+0043f970	4	IRET	1	004b1702
+0043f980	4	LAHF	1	004b171b
+0043f990	5	LODSB	1	004b1734
+0043f9a0	5	LODSW	1	004b174d
+0043f9b0	5	MOVSB	1	004b1766
+0043f9c0	5	MOVSW	1	004b177f
+0043f9d0	4	POPF	1	004b1798
+0043f9e0	5	PUSHF	1	004b17b1
+0043f9f0	4	SAHF	1	004b17ca
+0043fa00	5	SCASB	1	004b17e3
+0043fa10	5	SCASW	1	004b17fc
+0043fa44	5	STOSB	1	004b1860
+0043fa58	5	STOSW	1	004b1876
+0043fa68	5	XLATB	1	004b189d
+0043fa78	4	XLAT	1	004b188c
+0043fa88	5	PUSHA	1	004b18bb
+0043fa98	4	POPA	1	004b18d1
+0043fac4	23	not enough operands for	7	004b1af9 004b2049 004b276c 004b3e35 004ba685 004bafa5 004bd652
+0043fb10	17	wrong parameters:	14	004b41dd 004b1cd8 004b2262 004b2a2a 004b325b 004b3a16 004b6901 004b812e 004b8728 004b8bd3 004bab19 004bb20f 004bc645 004bda1c
+0043fb38	42	should be a register or a memory location.	1	004b1dbd
+0043fbac	5	eb,CL	1	004b28c3
+0043fbbc	5	ew,CL	1	004b28fb
+0043fbcc	4	eb,1	1	004b295f
+0043fbdc	4	ew,1	1	004b297d
+0043fc08	58	only immediate byte or CL can be used as second parameter!	1	004b2bb7
+0043fc84	16	d16 (simple var)	8	004b63d2 004b78cb 004b7b85 004b2f99 004d446a 004b3675 004bcc0b 004bcf33
+0043fcac	5	 POP 	1	004b32a3
+0043fce0	6	 PUSH 	1	004b3a5e
+0043fcf4	5	 XCHG	1	004b3e88
+0043fd04	5	XCHG 	1	004b3f09
+0043fd20	5	AX,rw	1	004b3fc0
+0043fd30	5	rw,AX	1	004b4018
+0043fd40	5	rb,eb	4	004b406b 004ba8be 004bbdc3 004bc5a0
+0043fd50	5	eb,rb	4	004b40c5 004ba9ad 004bc51a 004bc464
+0043fd60	5	rw,ew	3	004b40fb 004ba913 004bc5e2
+0043fd70	5	ew,rw	4	004b4152 004ba9fa 004bc55d 004bc4ed
+0043fd80	6	 XCHG 	1	004b41e2
+0043fd94	17	label is requred:	1	004b5052
+0043fdbc	16	not valid label:	1	004b472a
+0043fde4	6	SHORT 	2	004b5c68 004b4654
+0043fdf8	4	FAR 	3	004b5b49 004b6d33 004b4838
+0043fe08	31	conditional jump cannot be FAR:	1	004b4881
+0043fe4c	11	0123456789$	1	004b4a40
+0043fe74	33	conditional jump is out of range:	1	004b4d84
+0043febc	43	allowed values are from -128 to 127. (0-FF)	1	004b4e45
+0043ff18	17	undeclared label:	1	004b4f39
+0043ff40	17	compile_JCC_LOOP(	0	
+0043ff88	5	dword	8	004b608d 004b60ad 004b7515 004b753a 004bb128 004bb143 004bb165 004bb184
+0043ff98	12	compile_JMP(	0	
+0043ffb8	25	cannot assemble far call.	1	004b7df9
+0043fff0	38	refer to  far_call-2.asm  in examples.	1	004b7e8c
+00440044	44	probably an error, assembling immidiate jmp!	2	0043bbd8 0043c998
+004400d0	4	name	1	004b81fb
+004400e0	29	'name' is a reserved keyword.	1	004b8211
+0044013c	5	 INT 	1	004b8c1b
+00440164	37	first parameter can be AL or AX only.	1	004b92cb
+004401b4	34	second operand cannot be AL or AX!	1	004b9480
+00440200	35	first operand can be AL or AX only!	1	004b95f1
+0044024c	44	first operand (port) should be 0..255 or DX.	1	004b96f1
+004402ac	38	second parameter can be AL or AX only.	1	004b9e0b
+00440300	5	AL,xb	1	004bb93a
+00440310	5	AX,xw	1	004bb99e
+00440320	33	first operand cannot be AL or AX!	1	004b9fc0
+00440368	36	second operand can be AL or AX only!	1	004ba131
+004403b8	44	First operand (port) should be 0..255 or DX.	1	004ba231
+00440418	5	AL,ib	1	004ba817
+00440428	5	AX,iw	1	004ba86c
+00440438	5	eb,ib	2	004ba962 004bc3dd
+00440448	5	ew,ib	1	004baa52
+00440458	5	ew,iw	2	004baaa5 004bc41c
+00440468	5	rw,ed	1	004bb1a6
+00440478	4	word	2	004bb13e 004bb17f
+00440488	29	insufficient operands for MOV	1	004bb6cf
+004404c8	4	MOV 	4	004bd774 004bd8f2 004bd9c8 004bb77e
+004404d8	4	seg 	1	004bb788
+004404ec	5	DS,mw	1	004bb9fb
+004404fc	5	DS,rw	1	004bbae4
+0044050c	5	ES,mw	1	004bbb20
+0044051c	5	ES,rw	1	004bbb76
+0044052c	5	SS,mw	1	004bbb9d
+0044053c	5	SS,rw	1	004bbbc4
+0044054c	5	xb,AL	1	004bbc1d
+0044055c	5	xw,AX	1	004bbc81
+0044056c	5	rb,ib	1	004bbd7a
+0044057c	5	rw,iw	1	004bbea7
+0044058c	20	cannot be evaluated:	3	004bbedf 004c114d 004c2da1
+004405bc	34	undefined variable or over 16 bits	1	004bc00f
+00440608	5	ew,CS	1	004bc472
+00440618	5	ew,DS	1	004bc47d
+00440628	5	ew,ES	1	004bc498
+00440638	5	ew,SS	1	004bc4be
+00440678	4	 LEA	1	004bd6a8
+00440694	53	first operand must be a register or a memory location	1	004bc331
+00440704	5	 MOV 	1	004bc689
+00440828	26	not found in symbol table:	1	004bc901
+0044086c	4	LEA 	1	004bd723
+0044087c	4	rw,m	1	004bd81d
+0044088c	5	 LEA 	1	004bda64
+0044089c	25	8 bit and 16 bit register	1	004bdc8b
+004408d4	25	16 bit and 8 bit register	1	004bdcba
+0044090c	33	16 bit register and 8 bit address	1	004bdce9
+00440954	33	8 bit address and 16 bit register	1	004bdd18
+0044099c	61	8 bit register and 16 bit address (add 'b.' before parameter)	1	004bdd47
+00440a40	61	16 bit address and 8 bit register (add 'b.' before parameter)	1	004bdd76
+00440ac0	30	second operand is over 8 bits!	3	004bdd9f 004bddd4 005a733a
+00440b04	51	cannot use segment register with an immediate value	1	004bde26
+00440b70	37	segment registers cannot go together!	1	004bde62
+00440bc0	42	first operand cannot be an immediate value	1	004be000
+00440c28	52	CS cannot be modified directly (use far JMP or CALL)	1	004bdeda
+00440ca4	48	IP cannot be modified directly (use JMP or CALL)	1	004bdf4c
+00440d0c	52	cannot get value of IP register (use POP after CALL)	1	004bdfb2
+00440d7c	29	wrong use of segment register	1	004bdfe2
+00440dbc	10	mem to mem	2	004be5bc 004be0bf
+00440dd8	4	CRET	1	004bf716
+00440e04	31	probably it's an undefined var:	1	004be146
+00440e58	89	probably no zero prefix for hex; or no 'h' suffix; or wrong addressing; or undefined var:	1	004be36c
+00440f10	22	operands do not match:	1	004be469
+00440f44	41	memory to memory is not allowed for 8086:	1	004be5cf
+00440f9c	5	 EQU 	2	004bea0d 004bea21
+00440fac	4	BACK	1	004bf6c2
+00440fc8	4	NEWL	1	004bf6fa
+00440fdc	49	use general register to hold intermediate result.	1	004be6a4
+00441058	16	__vbaMidStmtBstr	0	
+0044106c	18	__vbaAryConstruct2	0	
+00441084	31	EQU cannot start with a number.	1	004be921
+004410c8	6	error!	5	004be9cd 004bebd9 004bed5f 005d8ad3 005d93bd
+004410e0	44	recursive definition is not allowed for EQU:	1	004beb00
+00441140	64	,AH,AL,BH,BL,DH,DL,CH,CL,SI,DI,AX,BX,CX,DX,CS,IP,SS,SP,BP,DS,ES,	1	004bec74
+004411c8	37	reserved keyword cannot be redefined:	1	004bec86
+00441218	22	get_min_but_not_zero: 	0	
+0044124c	9	byteHEX: 	0	
+00441270	9	byteDEC: 	0	
+00441294	4	NULL	4	005b4f5e 005b53e1 004bf68a 005ac326
+004412a4	4	BEEP	2	004bf6a6 004ccf43
+004412b8	36	convert_ASCII_STRING_TO_HEX_STRING: 	0	
+00441308	54	convert_ASCII_STRING_TO_unsigned_decimal_byte_STRING: 	0	
+0044137c	52	convert_ASCII_STRING_TO_single_integer_word_STRING: 	0	
+004413ec	4	 DB 	1	004c0053
+0044141c	34	comma is missing or wrong syntax: 	2	004c1088 004c1016
+00441468	4	 dup	2	004c20c3 004c0500
+00441478	7	notepad	5	0051972d 00519766 005f6f73 005f6ffb 004ccacd
+0044148c	20	wrong size for DUP: 	2	004c2d46 004c10f3
+004414c4	12	over 8 bits:	2	004c0e67 004c1219
+004414e4	58	zero prefix must be added to a HEX value, for example: 0Ch	1	004c0dc4
+00441560	32	cannot evaluate this expression:	1	004c0f36
+004415a8	30	mismatched or misplaced quotes	1	004c1317
+004415f8	4	 DW 	2	004c1eaf 004c1a75
+00441608	21	error on process_DD: 	0	
+00441644	4	&HFF	2	004c6832 004c6892
+00441654	44	unterminated string. in process_byte_str(): 	0	
+004416ec	4	ENDP	3	0059c092 004c3f84 004c40d7
+004416fc	11	mismatched:	2	004c4165 004c4d2d
+00441718	5	STACK	4	004c7f47 004c8330 004c4734 004c47a2
+00441728	4	NONE	1	004c4835
+00441738	4	ENDS	3	0059c0da 004c4994 004c4b26
+00441748	21	err1 set_ENTRY_POINT:	0	
+00441778	4	 db:	2	004c52ef 004c5307
+00441788	4	 dw:	2	004c5336 004c5352
+00441798	4	 dd:	2	004c5367 004c5383
+004417a8	11	vcannot be!	0	
+004417c0	17	__vbaVarIndexLoad	0	
+004417d4	18	__vbaStrErrVarCopy	0	
+004417e8	14	__vbaRefVarAry	0	
+004417f8	11	__vbaStrUI1	0	
+00441808	5	.exe_	3	0054df5d 004c5c05 004c5c6a
+00441818	4	.exe	8	00615f4a 00617f0c 00617f5b 00617fc3 0061a77f 0061a7ca 004c593f 004c598b
+00441828	50	executable files (*.exe)|*.exe|all Files (*.*)|*.*	1	004c5ab6
+004418a0	5	.~asm	7	0061b9bc 0060dd84 004c9994 004c5cd3 004c8e27 0058977d 005897b2
+004418b0	11	save error:	1	004c5d0e
+004418cc	55	set correct output directory from the "assembler" menu.	2	004c5d18 004c99d2
+00441954	32	EXE HEADER - bytes from 0000 to 	1	004c5f9b
+0044199c	11	 inclusive.	1	004c5fc2
+004419b8	4	&H4D	2	004ec5ce 004c61cb
+004419c8	4	&H5A	2	004ec5df 004c61fa
+004419d8	17	exe signature (M)	1	004c6229
+00441a00	17	exe signature (Z)	1	004c626e
+00441a28	27	bytes on last page (l.byte)	1	004c62da
+00441a64	27	bytes on last page (h.byte)	1	004c6332
+00441aa4	31	512 byte pages in file (l.byte)	1	004c6417
+00441ae8	31	512 byte pages in file (h.byte)	1	004c64fc
+00441b2c	20	relocations (l.byte)	1	004c65d8
+00441b5c	20	relocations (h.byte)	1	004c66b4
+00441b8c	29	paragraphs in header (l.byte)	1	004c670e
+00441bcc	29	paragraphs in header (h.byte)	1	004c6765
+00441c0c	23	minimum memory (l.byte)	1	004c67b3
+00441c40	23	minimum memory (h.byte)	1	004c6801
+00441c80	23	maximum memory (l.byte)	1	004c6861
+00441cb4	23	maximum memory (h.byte)	1	004c68c1
+00441ce8	27	SS - stack segment (l.byte)	1	004c69a6
+00441d24	27	SS - stack segment (h.byte)	1	004c6a8b
+00441d60	27	SP - stack pointer (l.byte)	1	004c6b70
+00441d9c	27	SP - stack pointer (h.byte)	1	004c6c55
+00441dd8	18	check sum (l.byte)	2	004c6c86 004c7a04
+00441e04	18	check sum (h.byte)	2	004c6cc8 004c7ae1
+00441e54	33	IP - instruction pointer (l.byte)	1	004c6dbe
+00441e9c	33	IP - instruction pointer (h.byte)	1	004c6ea3
+00441ee4	26	CS - code segment (l.byte)	1	004c6f88
+00441f20	26	CS - code segment (h.byte)	1	004c706d
+00441f5c	4	&H1E	1	004c709e
+00441f6c	32	relocation table adress (l.byte)	1	004c70cd
+00441fb4	32	relocation table adress (h.byte)	1	004c7124
+00441ffc	23	overlay number (l.byte)	1	004c717b
+00442034	23	overlay number (h.byte)	1	004c71d2
+00442068	18	signature (l.byte)	1	004c722c
+00442094	18	signature (h.byte)	1	004c7283
+004420c0	49	relocation table - offset inside segment (l.byte)	1	004c75b0
+00442128	49	relocation table - offset inside segment (h.byte)	1	004c7663
+00442190	42	relocation table - segment anchor (l.byte)	1	004c7796
+004421ec	13	ALWAYS_BACKUP	1	004ca836
+0044220c	42	relocation table - segment anchor (h.byte)	1	004c7849
+00442268	45	 to 01FF  -   reserved relocation area  (00) 	1	004c7904
+004422c8	16	exe build error:	0	
+004422f0	9	NO STACK!	1	004c8097
+00442308	8	err st: 	0	
+00442320	15	no entry point.	1	004c8658
+00442344	38	entry point is ignored for .com files.	1	004c884d
+00442398	5	.com_	3	0054df2a 004c8d69 004c8dc5
+004423a8	4	.com	7	00618002 00618051 006180b9 0061a7f6 0061a841 004c8ad2 004c8b23
+004423b8	4	_BKP	1	004ca7fb
+004423c8	5	false	6	004cfb76 004ca85a 004cce94 004cfb3a 004e4813 004eaf1e
+004423d8	57	binary executable files (*.com)|*.com|all files (*.*)|*.*	1	004c8c1c
+0044245c	51	set correct output directory from "assembler" menu.	1	004c8e65
+004424c8	16	com build error:	0	
+004424f0	16	binary files (*.	1	004c96ed
+00442518	4	)|*.	1	004c9702
+00442528	20	|all files (*.*)|*.*	1	004c971e
+00442558	5	.binf	6	00618247 0061adbf 004ea635 0060dd3b 00610844 004c9b1b
+00442568	16	bin build error:	0	
+00442590	13	contsegname: 	0	
+004425b0	34	ALWAYS_BACKUP=false! OVERWRITING: 	0	
+004425fc	39	Would you like to overwrite this file: 	1	004ca8ea
+00442650	24	  and save a backup as: 	1	004ca91d
+00442694	67	To turn off automatic backup set ALWAYS_BACKUP=false in emu8086.ini	1	004ca994
+00442720	10	overwrite?	2	004ca892 0051a614
+0044273c	14	BACKUP SAVED: 	0	
+00442760	5	 equ 	2	004cbda9 004cbdf6
+00442770	7	default	22	0059db1a 0059dc55 005b3f12 005b4013 004ccab2 004ccc89 004cf3c7 005e43c9 005e44cf 005c8760 005c88a6 004cca5b 004ccc32 004cf34d 0059dab5 0059dbf0 005b3eab 005b3fac 005c86d4 005c881a 005e434f 005e4455
+00442784	37	a valid output directory must be set.	0	
+004427d4	10	      -   	3	004caea7 004cafd7 004cb0c9
+0044280c	27	wrong data in txt_EQU.Text!	0	
+00442848	41	recursion is over 100 for EQU definition.	1	004cb6c6
+004428a0	28	err_replace_LABEL_WHATEVER: 	0	
+004428e8	59	the macro expansion exceeds the maximum line length for EQU	1	004cb610
+00442984	16	wrong dup size: 	0	
+004429ac	18	- must be 1..32767	0	
+004429d8	17	DUP syntax error!	0	
+00442a00	24	unterminated string/dup:	0	
+00442a38	17	unterminated DUP!	0	
+00442a60	7	 LABEL 	1	004cba8d
+00442a74	33	doesn't look like LABEL directive	0	
+00442ac0	32	ERROR on replace_EQUAL_with_EQU(	0	
+00442bd4	9	WinStates	12	005d0da3 005d0e10 005d0e83 005d0ef6 005d1df9 005d2027 004cbf80 004cbfcb 005d11a1 005d1470 005d180b 005d1a27
+00442bec	10	CustColors	4	004d1feb 004cbff4 004cc03f 004d2190
+00442c08	4	Dirs	10	005b1ab8 005ad66f 004cc068 004cc0b3 004cdf7d 004ce65c 004ce809 005ca3bd 005ca95f 005c980c
+00442c18	9	FIRST_RUN	5	004cc203 004cc261 004cc843 004cc9a7 004ceb0f
+00442c30	5	Flag1	2	004cc1fe 004cc25c
+00442c54	7	LNGDATE	2	004cc9a2 004ceb0a
+00442c68	12	ASCII_VIEWER	1	004cca69
+00442c88	20	TRIM_ORIGINAL_SOURCE	1	004ccb9c
+00442cb8	12	RECENT_FILES	1	004ccc40
+00442cd8	38	RECENT_FILES = (value too big!) max=20	0	
+00442d6c	7	EMUPORT	1	004ccda3
+00442d80	12	GetTempPathA	0	
+00442de4	17	HW_INTERRUPT_FILE	1	004ccdf8
+00442e0c	13	c:\emu8086.hw	1	004ccdea
+00442e4c	16	ASCII_EXTENTIONS	1	004cce4d
+00442e74	13	STRICT_SYNTAX	1	004ccea2
+00442e94	19	LOCAL_DOCUMENTATION	1	004ccfe4
+00442ec0	24	documentation\index.html	1	004cd17b
+00442ef8	14	documentation\	1	004cd2f6
+00442f1c	9	diasm.dll	1	004cd5f5
+00442f34	10	 diasm.dll	1	004cd6cc
+00442f50	12	MicroAsm.dll	1	004cd88e
+00442f70	28	file not found: MicroAsm.dll	1	004cd94a
+00443023	16	etimer_Flash_HID	0	
+00443034	9	picSCREEN	0	
+00443040	10	timerInput	0	
+0044304c	15	lblHotKeyNotice	0	
+0044305c	23	lblHardwareIntsDisabled	0	
+00443074	13	cmdChangeFont	0	
+00443084	17	lblKeyboardBuffer	0	
+00443098	16	txtCommandPrompt	0	
+004430ac	22	lblKeyboardBufferASCII	0	
+004430c4	15	picHotKeyNotice	0	
+004430d4	14	cmdClearScreen	0	
+004430e4	21	timerHideHotKeyNotice	0	
+004430fc	13	add_to_SCREEN	1	004368e4
+0044310c	25	add_to_SCREEN_with_attrib	1	004368e8
+00443128	29	set_current_video_page_number	1	004368ec
+00443148	29	get_current_video_page_number	1	004368f0
+00443168	12	clear_SCREEN	1	004368f4
+00443178	11	clearScreen	0	
+00443184	19	Form_KeyDown_PUBLIC	0	
+00443198	20	setDefaultCursorType	0	
+004431bc	13	setSCREEN_W_H	0	
+004431cc	14	VMEM_TO_SCREEN	1	00436948
+004431dc	19	updateScreen_at_loc	1	0043694c
+004431f0	18	updatePIXEL_at_loc	1	00436950
+00443204	16	scroll_screen_UP	1	00436954
+00443218	16	scroll_WINDOW_UP	1	00436958
+0044322c	18	scroll_WINDOW_DOWN	1	0043695c
+00443240	11	inputString	1	00436968
+0044324c	9	inputChar	1	0043696c
+00443258	16	inputChar_NOECHO	1	00436970
+0044326c	14	stopTimerInput	1	0043697c
+0044327c	12	setCursorPos	1	00436984
+0044328c	16	getCursorPos_COL	1	00436988
+004432a0	16	getCursorPos_ROW	1	0043698c
+004432b4	28	get_ASCII_CODE_at_CurrentPos	1	00436994
+004432d4	24	get_ATTRIB_at_CurrentPos	1	00436998
+004432f0	35	setChar_and_Attribute_at_CurrentPos	1	0043699c
+00443314	24	advance_current_position	1	004369a0
+00443330	19	show_if_not_visible	1	004369a4
+00443344	13	setCursorSize	1	004369a8
+00443354	19	getCursor_StartLine	1	004369ac
+00443368	20	getcursor_BottomLine	1	004369b0
+00443380	14	set_VIDEO_MODE	1	004369b4
+00443390	16	resize_screen_to	1	004369b8
+004433a4	23	resize_screen_to_pixels	1	004369bc
+004433bc	28	set_DEFAULT_ATTRIB_backcolor	1	004369c0
+004433dc	28	set_DEFAULT_ATTRIB_forecolor	1	004369c4
+004433fc	28	get_DEFAULT_ATTRIB_backcolor	1	004369c8
+0044341c	28	get_DEFAULT_ATTRIB_forecolor	1	004369cc
+0044343c	18	get_DEFAULT_ATTRIB	1	004369d0
+00443450	18	set_DEFAULT_ATTRIB	1	004369d4
+00443464	15	show_uKB_BUFFER	0	
+00443474	15	Flush_KB_Buffer	0	
+00443484	18	show_mouse_pointer	1	004369f8
+00443498	18	hide_mouse_pointer	1	004369fc
+004434ac	11	INT_10h_0Fh	1	00436a00
+004434d0	9	OutputDir	4	004cdf78 005ca3b8 005ca95a 005c9807
+004434e8	9	[default]	7	004cdf35 004cdf6c 004cdfa3 005ca3b3 005c97d6 005c97fe 005c9828
+00443500	7	MyBuild	3	005c9cd9 004ce0df 005ca378
+0044351c	24	RKsCURRENT_SOURCE_FOLDER	5	005b1ab3 005acb71 005ad66a 004ce657 004ce804
+00443588	7	win.ini	1	004ced8e
+0044359c	7	reg2000	2	004cee3a 004ceeee
+004435d0	12	advapi32.dll	7	00443688 004436d8 00443720 00443768 004437b4 004437fc 00443840
+004435e4	13	RegEnumValueA	0	
+0044362c	16	RegQueryInfoKeyA	0	
+00443678	15	RegDeleteValueA	0	
+004436c0	13	RegDeleteKeyA	0	
+00443710	13	RegOpenKeyExA	0	
+00443758	15	RegCreateKeyExA	0	
+004437a0	16	RegQueryValueExA	0	
+004437ec	14	RegSetValueExA	0	
+00443834	11	RegCloseKey	0	
+00443878	25	GetPrivateProfileSectionA	0	
+004438dc	24	GetPrivateProfileStringA	0	
+00443930	26	WritePrivateProfileStringA	0	
+00443984	21	GetPrivateProfileIntA	0	
+004439d4	7	EXPIRED	3	004cee53 004ceea1 004ceed8
+004439e8	5	.html	3	005f91a3 004cf2e8 005fc343
+00443a14	42	EMU8086 INTEGRATED ASSEMBLER EMULATOR  -- 	1	004cfa5b
+00443b38	7	vdrive\	2	004cf534 005df821
+00443b4c	24	Error on mStart.Main(): 	0	
+00443b84	16	_emu8086_log.txt	1	004cf9df
+00443bac	77	=============================================================================	3	004cfa25 004d0cee 004d0f2a
+00443c4c	4	 -- 	3	004cfa79 00618ae3 0060e49c
+00443c60	16	SILENT_ASSEMBLER	1	004cfb48
+00443cc4	7	cmdStop	0	
+00443ccc	8	Command1	0	
+00443cd8	9	lblStatus	0	
+00443cfc	21	SystemParametersInfoA	0	
+00443d92	10	fqfileBox1	0	
+00443dc0	9	[version]	1	004d0acd
+00443dd8	7	[total]	1	004d0b8c
+00443e00	10	[filename]	1	004d0bf0
+00443e1c	8	SOURCE: 	1	004d0d24
+00443e34	39	EMU8086 INTEGRATED ASSEMBLER PROCESSED 	1	004d1015
+00443e88	9	 FILES.  	1	004d1046
+00443ea0	6	  --  	3	004d1065 005a9c85 005886c5
+00443eb4	5	<END>	2	004d1149 004d12a4
+00443ec4	16	CRITICAL ERROR: 	1	004d1263
+00443eec	18	PROCESS_CMD_Line: 	0	
+00443f80	4	JCXZ	1	004d2428
+00443fb0	4	JNAE	1	004d2544
+00443fcc	4	JNBE	1	004d2596
+00444000	4	JNGE	1	004d263a
+0044401c	4	JNLE	1	004d268c
+004440a4	4	LOOP	1	004d284f
+004440b4	5	LOOPE	1	004d2878
+004440c4	6	LOOPNE	1	004d28a1
+004440d8	6	LOOPNZ	1	004d28ca
+004440ec	5	LOOPZ	1	004d28f3
+004442ac	5	ew=AX	1	004d4749
+004442bc	5	ew=CX	1	004d4772
+004442cc	5	ew=DX	1	004d479b
+004442dc	5	ew=BX	1	004d47c4
+004442ec	5	ew=SP	1	004d47ed
+004442fc	5	ew=BP	1	004d480e
+0044430c	5	ew=SI	1	004d483f
+0044431c	5	ew=DI	1	004d4868
+0044432c	5	eb=AL	1	004d48c8
+0044433c	5	eb=CL	1	004d48f4
+0044434c	5	eb=DL	1	004d4925
+0044435c	5	eb=BL	1	004d493d
+0044436c	5	eb=AH	1	004d496e
+0044437c	5	eb=CH	1	004d4997
+0044438c	5	eb=DH	1	004d49c0
+0044439c	5	eb=BH	1	004d49e4
+00444484	5	Count	1	004d5e39
+00444494	13	END_PROGRAM: 	0	
+004444b4	26	 ERROR! extract_extension(	0	
+004444f0	35	 ERROR! extract_extension_no_UCASE(	0	
+00444548	25	Error on append_to_file: 	0	
+00444580	25	clean_and_write_to_file: 	0	
+004445b8	33	ERROR! read_first_line_from_file(	0	
+004445fc	18	__vbaLateMemCallLd	0	
+00444614	16	cmdClose_Click: 	0	
+00444638	10	__vbaRedim	0	
+00444650	14	__vbaPrintFile	0	
+00444660	8	__vbaEnd	0	
+0044466c	19	__vbaSetSystemError	0	
+00444684	7	ERROR: 	1	004d7b93
+00444698	13	__vbaI4ErrVar	0	
+004446ac	8	addErr: 	0	
+004446d0	8	STATUS: 	1	004d66d4
+004446e8	26	duplicated error message: 	0	
+00444724	14	addErr_FASM : 	0	
+00444748	14	addErr_MASM : 	0	
+0044476c	19	_location_counter__	1	004d6d61
+00444798	24	offset calculation error	1	004d6e05
+004447d0	35	Error on click_on_error_message(): 	0	
+0044481c	17	there are errors.	1	004d81f9
+00444854	24	frmInfo_ACTIVEATE! Err: 	0	
+0044488c	27	frmInfo Form_OLEDragDrop : 	0	
+004448c8	16	frmInfo_Resize: 	0	
+00444900	18	mnuCopyAll_Click: 	0	
+0044492c	19	mnuCopyLine_Click: 	0	
+00444958	7	explore	3	004dad57 005f8f29 005fc8b8
+0044496c	5	.list	8	004e5da9 004dae79 0060dc37 0060e3c8 004e41b6 0058832f 004db405 004e654f
+0044497c	4	.lst	6	00618137 00618973 004e5efc 004dafca 004db43a 004e652a
+00444988	8	fraFlags	0	
+0044499c	7	.symbol	10	00618176 005a8f4d 0060dc73 005aa0b7 005aa0ec 004e6119 004db1d9 004e4248 004db4dd 004e65cd
+004449b0	16	updatePROGRESS: 	0	
+004449e8	11	debug.exe: 	2	004e9995 004dc733
+00444a04	7	cmd.exe	2	004dc8c3 0053e5f3
+00444a24	7	command	2	004dca0b 0053e73d
+00444a38	16	command prompt: 	0	
+00444a60	23	set_current_text_fast: 	0	
+00444a94	23	set_current_text_cool: 	0	
+00444ac4	17	__vbaStrToUnicode	0	
+00444ad8	14	__vbaStrToAnsi	0	
+00444ae8	10	cmdAnalize	0	
+00444af8	34	Unterminated string in nextToken: 	0	
+00444b44	20	unterminated string:	1	004dd9e4
+00444b74	6	LOCAL 	2	004de4f6 004de3b6
+00444b88	4	_loc	1	004dea87
+00444ba4	26	MACRO name already in use!	1	004df46d
+00444bf8	26	frmEmulation_OLEDragDrop: 	0	
+00444c80	19	getFLAGS_REGISTER16	1	00436a34
+00444c94	18	getFLAGS_REGISTER8	1	00436a38
+00444ca8	17	setFLAGS_REGISTER	1	00436a3c
+00444d28	8	lstStack	0	
+00444d34	12	setStackView	0	
+00444d74	17	ERR:## stop all: 	0	
+00444d9c	23	frmEmulation.DoShowMe: 	0	
+00444e0a	12	GPtxtMessage	0	
+00444e28	26	frmEmulation_QueryUnload: 	0	
+00444e64	24	ON_EMULATOR_HIDE_PART1: 	0	
+00444ee2	12	P&fAdd_WORDS	0	
+00444ef0	9	add_WORDS	1	004367fc
+00444efc	8	or_WORDS	1	00436800
+00444f08	9	and_WORDS	1	00436804
+00444f14	9	add_BYTES	1	00436808
+00444f20	9	xor_BYTES	1	0043680c
+00444f2c	8	or_BYTES	1	00436810
+00444f38	9	and_BYTES	1	00436814
+00444f44	9	sub_WORDS	1	00436818
+00444f50	9	xor_WORDS	1	0043681c
+00444f5c	9	sub_BYTES	1	00436820
+00444f68	8	inc_WORD	1	00436824
+00444f74	8	inc_BYTE	1	00436828
+00444f80	8	dec_WORD	1	0043682c
+00444f8c	8	dec_BYTE	1	00436830
+00444f98	12	GET_C_SIGNED	1	00436838
+00444fa8	8	GET_C_lb	1	0043683c
+00444fb4	8	GET_C_hb	1	00436840
+00444fc0	14	MAKE_add_WORDS	1	00436844
+00444fd0	14	MAKE_add_BYTES	0	
+00444fe0	14	MAKE_sub_WORDS	1	00436864
+00444ff0	14	MAKE_sub_BYTES	1	00436868
+00445000	6	LOAD_A	1	0043686c
+00445008	9	LOAD_A_lb	1	00436870
+00445014	9	LOAD_A_hb	1	00436874
+00445020	9	LOAD_B_lb	1	00436878
+0044502c	6	LOAD_B	1	0043687c
+00445034	11	shiftL_WORD	1	00436880
+00445040	11	move_C_to_A	1	00436884
+0044504c	17	move_C_lb_to_A_lb	1	00436888
+00445060	16	NOT_A_lb_to_C_lb	1	0043689c
+00445074	10	NOT_A_to_C	1	004368a0
+00445080	8	SHL_BYTE	1	004368a4
+0044508c	8	SHR_BYTE	1	004368a8
+00445098	8	SHL_WORD	1	004368ac
+004450a4	8	SHR_WORD	1	004368b0
+004450b0	15	returnALU_STATE	1	004368d8
+004450c0	12	setALU_STATE	1	004368dc
+004450d0	15	set_parity_flag	1	004368e0
+004450e0	27	set_register_for_RN_command	1	00436c38
+004450fc	8	clearLog	0	
+00445108	20	show_current_command	0	
+00445120	17	get_compare_bytes	1	00436c78
+00445134	12	do_I_command	1	00436c7c
+00445144	12	do_O_command	1	00436c80
+00445224	13	showFPU_STATE	0	
+0044527f	13	ucomboConcole	0	
+00445298	13	cmdSaveToFile	0	
+004452a8	26	remove_last_entry_from_log	1	00436c2c
+004452c4	12	do_R_Command	1	00436c30
+004452d4	28	do_R_Command_with_parameters	1	00436c34
+00445344	10	txtResults	0	
+00445350	12	AnalyzeFlags	0	
+004453a0	8	listVars	0	
+004453ac	7	cmdEdit	0	
+004453b4	11	txtElements	0	
+004453c0	14	comboNumSystem	0	
+004453d0	9	comboSize	0	
+004453dc	21	show_value_properties	0	
+00445440	12	txtMemOffset	0	
+00445450	12	txtDEC_L_UNS	0	
+00445478	8	txtOCT_H	0	
+00445484	8	txtOCT_L	0	
+00445490	17	comboRegisterName	0	
+004454a4	17	lblMem_semicolumn	0	
+004454f8	16	txtDEC_16bit_SGN	0	
+0044551c	16	txtDEC_16bit_UNS	0	
+00445530	12	txtDEC_H_SGN	0	
+00445540	12	txtDEC_H_UNS	0	
+00445564	13	txtMemSegment	0	
+00445574	12	txtDEC_L_SGN	0	
+00445584	12	showRegister	1	00436db4
+00445594	24	showRegister_if_selected	1	00436db8
+004455b0	11	update_info	1	00436dbc
+00445608	9	lstMemory	0	
+00445614	8	optTable	0	
+00445620	10	picMemView	0	
+0044562c	14	lblCurrentAddr	0	
+0044563c	7	optList	0	
+00445644	13	cmdShowMemory	0	
+00445654	12	txtMicroEdit	0	
+00445664	13	txtMemoryAddr	0	
+00445674	24	EMITATE_ShowMemory_Click	0	
+00445690	20	Update_List_or_Table	0	
+004456a8	17	set_list_or_table	0	
+004456bc	32	set_table_size_according_to_font	0	
+004456e0	13	show_blue_box	0	
+00445744	12	lblCondition	0	
+00445754	18	lblConditionIsTrue	0	
+00445768	14	timerRemoveRed	0	
+00445778	14	comboCondition	0	
+00445788	13	txtExpression	0	
+00445798	10	lblOperand	0	
+004457a4	8	lblValue	0	
+004457b0	14	checkCondition	0	
+004457c0	16	temp_fix_4_flags	0	
+00445828	10	cmdGetInfo	0	
+00445834	7	txtInfo	0	
+00445854	34	set_PATH_AND_GET_FIRST_FILE_TO_DTA	0	
+00445878	24	do_INT_21_4E_4F_StepBack	0	
+00445894	20	get_NEXT_FILE_TO_DTA	0	
+004458dc	24	ON_EMULATOR_HIDE_PART2: 	0	
+00445914	30	error on frmEmulation_Resize: 	0	
+00445958	5	IP = 	1	00519445
+004459a0	9	saved to:	1	004e4e2c
+004459b8	28	err   #400-emu-state# save: 	0	
+00445a14	14	CONTROL_BYTES:	0	
+00445a40	12	STATE LOADED	0	
+00445a60	29	err   #400-emu-state# load:  	0	
+00445aa0	15	mnuView_Click: 	0	
+00445af8	5	"   ?	1	004e87d1
+00445b08	7	reload?	1	004e86d4
+00445b1c	29	Error: picDisList_MouseDown: 	0	
+00445b9c	30	Error on lstMemory_MouseDown: 	0	
+00445c14	7	FLOPPY_	6	00595d28 004e7f37 00538f63 00595eec 00596462 004ea413
+00445c28	56	enter command line parameters, or click cancel to reset.	1	004e83e2
+00445ca0	27	set command line parameters	1	004e8404
+00445cdc	7	reload:	1	004e8687
+00445cf0	19	mnuDebugLog_Click: 	0	
+00445d30	33	only 4 floppy drives are allowed!	1	004e945e
+00445db0	39	cannot create new virtual floppy drive.	1	004e95a8
+00445e04	13	floppy drive:	1	004e961c
+00445e24	8	 FLOPPY_	2	004e964d 0051a695
+00445e3c	8	created.	1	004e962c
+00445e54	31	error making new floppy drive: 	0	
+00445e98	17	mnuReLoad_Click: 	0	
+00445ec0	12	default.binf	1	004ea6f9
+00445ee0	33	can not load in this memory area!	1	004ea7fb
+00445f28	54	free memory area is between 0050:0000h and 0a000:0000h	1	004ea805
+00445f9c	33	file will be loaded at 0100:0000h	1	004ea80f
+00445ff0	19	loadFiletoEmULATE: 	0	
+0044601c	28	START_OUTSIDE_DEVICES_FOLDER	1	004eaf2c
+0044605c	7	devices	1	004eb09a
+00446070	7	#start=	2	004eb6b4 004eb454
+00446084	5	CS = 	1	00519364
+00446098	24	cannot start this device	1	004eb3a8
+004460d0	53	because it is outside of the standard devices folder.	1	004eb3b8
+00446140	17	copy this file to	1	004eb3c2
+00446168	9	devices\ 	1	004eb52d
+00446180	56	or set start_outside_devices_folder=true  in emu8086.ini	1	004eb443
+004461f8	25	cannot start this device.	1	004eb698
+00446250	5	DI = 	1	005191a0
+00446260	5	BP = 	1	00519282
+00446274	52	try to specify the complete file path and extension.	1	004eb6a6
+004462e4	46	check_if_external_device_needs_to_be_started: 	0	
+00446348	5	START	2	004ebe5d 005c3e5b
+00446358	24	device directive found: 	0	
+00446390	51	ERR: get_device_name_from_orig_source_code_if_any: 	0	
+00446418	23	this file is too small,	1	004ec510
+0044644c	50	 exe file cannot possibly be less than 32 bytes...	1	004ec52e
+004464b8	24	exe signature not found!	1	004ec67b
+004464f0	11	EMU8086.exe	1	004ecbd4
+0044650c	12	UNINS000.exe	1	004ecba7
+0044652c	50	file too big, only first 706,448 bytes are loaded.	1	004ecc8f
+00446598	10	emulator: 	2	004ed0b9 004eda5f
+004465b4	22	executable load error:	0	
+00446684	28	wrong C6 address on doStep()	1	004f06f6
+004466c4	28	wrong C7 address on doStep()	1	004f0e48
+00446704	17	wrong EA for [8C]	1	004f1482
+0044672c	4	8F /	1	00500d1f
+0044673c	8	    -   	1	00500d52
+00446754	39	no such opcode in 8086 instruction set.	2	00500d0e 005060e5
+004467a8	4	FE /	1	005060f6
+004467b8	14	LOCK-OPCODE:F0	0	
+004467dc	5	SI = 	1	005190bf
+004467ec	23	unknown opcode skipped:	1	00516e85
+00446820	41	not 8086 instruction - not supported yet.	1	00516e96
+00446878	22	error on single step: 	1	00517180
+004468ac	32	mnuResetEmulator_and_RAM_Click: 	0	
+004468f4	4	.txt	1	00517e2a
+00446904	11	unknown.txt	1	00517ee5
+00446920	44	text files (*.txt)|*.txt|all Files (*.*)|*.*	1	00517f39
+0044698c	5	DH = 	1	00518def
+0044699c	5	DS = 	1	00518efb
+004469ac	5	ES = 	1	00518fdd
+004469c0	44	; >>>>>>>>>>> disassembled code <<<<<<<<<<<<	1	00517fec
+00446a2c	9	ORG 7C00h	1	005181a1
+00446a44	26	; ------------- MEMORY at 	1	005183de
+00446a80	14	 -------------	1	00518596
+00446aa4	7	 bytes 	1	00518639
+00446ab8	37	------------- REGISTERS -------------	1	00518799
+00446b08	5	AL = 	1	005187c3
+00446b18	5	AH = 	1	005188a5
+00446b28	5	BL = 	1	00518987
+00446b38	5	BH = 	1	00518a68
+00446b48	5	CL = 	1	00518b4a
+00446b58	5	CH = 	1	00518c2c
+00446b68	5	DL = 	1	00518d0d
+00446b78	5	SS = 	1	00519527
+00446b88	5	SP = 	1	00519609
+00446b98	39	would you like to open it with notepad?	1	005196fd
+00446bec	33	the emulator's state is saved to:	1	0051978f
+00446c34	16	open in notepad?	1	005197cb
+00446c5c	7	error: 	2	00612763 0061d581
+00446ca8	19	mnuStepOver_Click: 	0	
+00446cd4	38	overwrite any previous boot sector of:	1	0051a5f2
+00446d44	32	virtual boot sector write error!	1	0051a962
+00446dac	27	program terminated. reload:	1	0051ad0e
+00446e47	13	U6mn]Command2	0	
+00446e58	8	Command3	0	
+00446e64	13	lblemu8086com	0	
+00446e7c	19	lblSorryToInterrupt	0	
+00446ea0	27	break point encountered at:	2	0051b30a 0058388e
+00446ef8	30	error on PROCESS_SINGLE_STEP: 	0	
+00446f3c	31	ERROR CALLING store_BYTE_at_EA(	0	
+00446f80	38	   address is out of available memory!	0	
+00446ff4	41	ERROR CALLING store_FOLLOWING_BYTE_at_EA(	0	
+0044706c	31	ERROR CALLING store_WORD_at_EA(	0	
+004470d0	41	ERROR CALLING store_FOLLOWING_WORD_at_EA(	0	
+00447148	29	ERROR CALLING get_BYTE_at_EA(	0	
+00447188	29	ERROR CALLING get_word_at_ea(	0	
+004471c8	50	sSEGMENT_REPLACEMENT_NAME contains invalid value: 	0	
+00447250	37	wrong parameter in get_BYTE_RegValue(	0	
+004472b0	39	wrong parameter in store_BYTE_RegValue(	0	
+00447324	37	wrong parameter in get_WORD_RegValue(	0	
+004473ac	24	divide error - overflow.	1	00520028
+004473e4	31	to manually process this error,	1	00520039
+00447428	22	todo: INT 10h, AH=011h	0	
+0044745c	13	INT 10h, AH=0	1	005238fa
+0044747c	50	change address of INT 0 in interrupt vector table.	1	0052004a
+004474e8	7	overlow	1	005202e0
+004474fc	50	INT 4 can be customized in interrupt vector table.	1	00520329
+00447568	19	not graphical mode!	2	0052226f 005226d9
+00447594	35	use this code to set graphics mode:	2	00522280 005226ea
+004475e0	9	mov ah, 0	2	00522310 0052277a
+004475f8	11	mov al, 13h	2	00522344 005227ae
+00447614	7	int 10h	2	00522378 005227e2
+00447628	16	is not supported	1	0052394f
+00447650	50	CX value (string size) is above the allowed limit!	1	00522f84
+004476bc	18	INT 10h, AH=13h - 	1	00523113
+004476e8	19	CX is out of memory	1	00523102
+00447714	28	INT 10h, AX=1003h, BL=01  - 	1	0052360f
+00447754	34	note: the emulator does not blink.	1	005235fe
+004477a0	23	INT 10h, AX=1003h, BL=0	1	00523720
+004477d4	5	h  - 	1	00523760
+004477e4	22	wrong parameter in BL!	1	00523774
+00447818	6	h   - 	2	0052393b 00524c1f
+0044782c	41	refer to the list of supported interrupts	2	00523990 00523f2f
+00447884	13	INT 13h, AH=0	1	00523e99
+004478a4	4	h   	3	00523eda 00524635 0052532f
+004478b4	20	- not supported yet.	5	00523eee 00524649 00524c33 00525343 0052a329
+004478e4	13	INT 15h, AH=0	1	005245f4
+00447904	42	refer to the list of supported interrupts.	4	0052468a 00524c74 00525384 0052a36a
+00447960	39	if you need int 21h, put h suffix to 21	1	005246df
+004479b4	13	INT 16h, AH=0	1	00524bdf
+004479d4	13	INT 1Ah, AH=0	1	005252ee
+00447a04	46	program requested reboot. the emulator halted.	1	0052558e
+00447a68	57	note: you can overwrite INT 19h in interrupt vector table	1	0052559f
+00447ae0	54	to create custom reboot function. for more information	1	005255b0
+00447b54	42	refer to custom_interrupt.asm in examples.	1	005255c1
+00447bcc	13	ERR:## sas : 	0	
+00447bec	53	PROGRAM HAS RETURNED CONTROL\nTO THE OPERATING SYSTEM	4	00525933 00525b3d 0052a081 005836e9
+00447c5c	18	INT 21h, AH=09h - 	1	005269e9
+00447c88	9	address: 	1	00526981
+00447ca0	36	byte 24h not found after 2000 bytes.	1	005269c7
+00447cf0	32	; correct example of INT 21h/9h:	1	005269d8
+00447d38	18	mov dx, offset msg	1	00526b24
+00447d64	9	mov ah, 9	1	00526b58
+00447d88	15	msg db "Hello$"	1	00526bf4
+00447dac	5	17000	2	0053215e 005342c8
+00447dbc	35	wrong AL value for INT 21h/AH=0Ch: 	0	
+00447e14	18	WRONG DRIVE NUMBER	0	
+00447e40	17	interrupt error: 	3	00528a61 00529c1c 0052aa35
+00447e68	25	h/3Dh : cannot open file.	1	00528a9c
+00447ea0	4	h : 	2	00529c57 0052aa70
+00447eb0	13	INT 21h, AH=0	1	0052a2d4
+00447edc	16	GetSystemMetrics	0	
+00447f48	14	step delay ms:	1	0052c047
+00447f78	71	this interrupt is not defined yet, it is availabe for custom functions.	1	0052a5ae
+0044800c	65	you can define this interrupt by modifying interrupt vector table	1	0052a5d9
+00448094	66	refer to the list of supported interrupts and global memory table.	1	0052a604
+0044813c	5	32765	2	0052bb3c 0052b364
+00448178	8	INT_VECT	1	00535c0a
+00448190	8	BIOS_ROM	1	00535e53
+004481a8	22	emulator setup error: 	0	
+004481dc	21	custom_memory_map.inf	1	005363a8
+0044820c	11	NO_SYS_INFO	1	0053696d
+00448228	41	custom memory map is loaded successfully.	1	00536a1b
+00448280	55	Error LOAD_CUSTOM_MEMORY_MAP:  & LCase(err.Description)	0	
+00448338	37	Error on load_BININFO_segment_offset(	0	
+00448388	36	Error on load_BININFO_all_registers(	0	
+004483d8	22	get_address_from_str: 	0	
+0044840c	41	wrong sMEMSET in .binf - address missing 	0	
+00448464	38	wrong record for MEM=... in .binf file	0	
+00448518	26	cannot find FLOPPY_0 file!	1	00538a09
+00448554	49	error on updateMemory_at_410_and_floppy_menus(): 	0	
+004485dc	17	clear break point	1	0053925c
+0044861c	15	set break point	1	0053941b
+00448640	9	run until	1	00539553
+00448658	30	set CS:IP to selected position	1	00539611
+0044869c	25	error on mnuDebug_Click: 	0	
+00448708	16	comboDriveNumber	0	
+0044871c	11	comboSector	0	
+00448728	9	comboHead	0	
+00448734	13	comboCylinder	0	
+00448744	16	txtPathToBinFile	0	
+00448758	20	lblSectorsInBootFile	0	
+00448770	8	cmdWrite	0	
+0044877c	10	cmdGetFile	0	
+00448798	29	not supported INT 21h/33h AL=	0	
+004487d8	16	process_HotKey: 	0	
+00448800	10	IS_HotKey 	0	
+0044881c	7	IN AL, 	1	0053acdd
+00448830	27	port not available in 8086!	3	0053ad18 0053afa4 0053b227
+00448878	19	do_instruction_C0: 	0	
+004488a4	43	refer to i/o ports in emu8086 documentation	3	0053afc2 0053b245 0053accf
+00448900	7	IN AX, 	1	0053af69
+00448914	4	OUT 	2	0053b1dd 0053b47d
+00448924	4	, AL	1	0053b209
+00448950	4	, AX	1	0053b4a9
+00448960	14	not supported!	1	0053b4c7
+00448984	38	refer to "I/O ports" in documentation.	1	0053b4e5
+004489f4	21	step_BACK_to_prefix: 	0	
+00448a24	16	get_Step_Delay: 	0	
+00448a4c	16	set_Step_Delay: 	0	
+00448a74	27	Reset_registers_highlight: 	0	
+00448ab0	31	*.exe;*.com;*.class;*.jar;*.bat	1	0053cb40
+00448b08	19	Set_VDevices_Menu: 	0	
+00448b4c	6	.class	1	0053d31c
+00448b60	4	java	1	0053d45e
+00448b70	8	\devices	2	0053d433 0053d5bb
+00448b88	4	.jar	1	0053d4cf
+00448b98	16	ERR? set_DX_AX: 	0	
+00448bc0	14	cmdLog_Click: 	0	
+00448be4	16	cmdReset_Click: 	0	
+00448c34	20	picDragger_MouseUp: 	0	
+00448c80	31	timer_CLOSE_frmDebugLog_Timer: 	0	
+00448cc4	19	reset before load: 	0	
+00448cf0	21	err: Set_After_Load: 	0	
+00448d20	39	ERROR CALLING get_EA_loc_and_size_BYTE(	0	
+00448dcc	17	weird.... C0 tab6	0	
+00448df0	10	__vbaCyFix	0	
+00448e00	17	weird.... C1 tab6	0	
+00448e28	19	do_instruction_C1: 	0	
+00448e54	20	do_instruction_C8 : 	0	
+00448e84	20	do_instruction_C9 : 	0	
+00448eb4	20	do_instruction_69 : 	0	
+00448ee4	20	do_instruction_6B : 	0	
+00448f14	20	do_instruction_6C : 	0	
+00448f44	20	do_instruction_6D : 	0	
+00448f74	20	do_instruction_6E : 	0	
+00448fa4	20	do_instruction_6F : 	0	
+00449050	37	the FPU function is not supported yet	1	005472f2
+004490a0	11	FPU ERROR: 	1	005474de
+004490bc	23	do_instruction_D8_DF : 	0	
+00449104	10	__vbaCyMul	0	
+00449138	14	__vbaCopyBytes	0	
+00449154	9	__vbaGet4	0	
+00449160	9	__vbaGet3	0	
+00449170	17	ExtractFileName: 	0	
+00449198	18	err CutExtension: 	0	
+004491c4	18	CRITICAL ERROR 2: 	1	005481e5
+004491f0	19	Error on mbox me, (	0	
+0044922c	21	AddHorizontalScroll: 	0	
+0044925c	19	error on myMKDIR : 	0	
+00449288	29	error (expected?) on myChDir(	0	
+004492c8	4	0000	10	00549228 005c266f 005c267b 005c2687 005c2693 005c269f 005c26ab 005c26c3 005c26cf 005c2b52
+004492d8	4	0001	1	00549259
+004492e8	4	0010	1	0054928a
+004492f8	4	0011	1	005492bb
+00449308	4	0100	2	005492ec 005c2b0b
+00449318	4	0101	1	0054931d
+00449328	4	0110	1	0054934e
+00449338	4	0111	1	0054937f
+00449350	4	1000	1	005493b0
+00449368	4	1001	1	005493e1
+00449378	4	1010	1	00549412
+00449388	4	1011	1	00549443
+00449398	4	1100	1	00549474
+004493a8	4	1101	1	005494a5
+004493b8	4	1110	1	005494d6
+004493d0	4	1111	1	00549507
+004493e0	7	optByte	2	005985cd 00598ab6
+004493f4	28	wrong argument in HEX_2_BIN(	0	
+00449490	28	wrong argument in OCT_2_BIN(	0	
+004494d0	23	wrong param for myAsc: 	0	
+00449504	26	empty param sent to myAsc!	0	
+00449540	7	http://	3	005d6336 0054a494 00585698
+00449554	4	http	1	0054a4a4
+00449564	12	ASK_OPEN_URL	1	0054a53b
+00449584	18	no questions asked	1	0054a5e9
+004495b4	28	would you like to go online?	1	0054a5f8
+004495f4	92	if your browser won't start automatically, copy & paste the URL to the browser's address bar	1	0054a612
+004496b4	11	online help	1	0054a62c
+00449704	8	explorer	2	0054a980 005f95cf
+0044971c	42	cannot start the HTML viewer or browser...	0	
+00449778	7	optWord	2	00598481 00598a46
+0044978c	30	wrong index for getDOS_COLOR: 	0	
+004497d0	4	HKCR	15	00573e27 00573e42 0054df2f 0054df62 0054df95 0054dfbe 0054dfd2 0054dfe6 0054dffa 0054e02d 0054e060 0054e093 0054e1cf 0054e372 005d7216
+004497e0	4	.asm	5	006182a7 00573e38 0054dfb9 0054dfcd 0054e05b
+004497f0	4	.inc	4	00573e1d 0054dfe1 0054dff5 0054e028
+00449800	29	Assembly Language Source Code	0	
+00449840	19	emu8086\DefaultIcon	1	0054e1ca
+0044986c	6	.exe,0	1	0054e198
+00449880	26	emu8086\shell\open\command	1	0054e36d
+004498bc	5	.exe 	1	0054e2ff
+004498cc	5	.bin_	1	0054df90
+004498dc	13	PerceivedType	2	0054dfb4 0054dfdc
+004498fc	17	PersistentHandler	2	0054dfc8 0054dff0
+00449924	20	assembly source code	2	0054e07e 0054e06a
+00449958	26	error #327xo-av-protect-3#	0	
+004499ac	27	ERROR on get_reminder_only(	0	
+004499e8	23	ERR Replace_NO_IN_STR: 	0	
+00449a1c	17	 -- not replaced!	0	
+00449a44	57	err on InStr_NOT_INSTR, it seems we have no CR in the end	0	
+00449abc	23	ERR: InStr_NOT_IN_STR: 	0	
+00449af0	54	no file is loaded. start debug.exe without parameters?	1	0054e9b4
+00449b64	5	debug	1	0054ebf4
+00449b74	43	The emulator can only emulate 16 bit files.	1	0054f060
+00449bd0	8	WARN_RUN	1	0054f13c
+00449be8	95	note: running buggy/unchecked executable files outside of the emulator may cause a malfunction.	1	0054f1e2
+00449ca8	13	__vbaVarCmpGe	0	
+00449cc8	54	to prevent the MS-DOS window from closing immediately,	1	0054f1ff
+00449d3c	56	you can have MOV AX,0 / INT 16h as the last instructions	1	0054f21c
+00449db4	63	in your assembly program before return to the operating system.	1	0054f239
+00449e38	29	see no-close.asm in examples.	1	0054f256
+00449e78	79	it's possible to turn off this warning in emu8086.ini by setting WARN_RUN=false	1	0054f273
+00449f1c	29	are you sure you want to run:	1	0054f296
+00449f5c	8	warning!	1	0054f2cc
+00449f74	13	cannot start:	1	0054f713
+00449f94	34	cannot run this file from the IDE.	1	0054f7ab
+00449fe0	20	external run error: 	0	
+0044a030	11	waiting....	0	
+0044a050	50	timer protection  - will not wait over 10 seconds!	0	
+0044a0d0	9	wait_ms: 	0	
+0044a0e8	19	get_PHYSICAL_ADDR: 	0	
+0044a114	10	free mem: 	0	
+0044a13c	9	01010000b	2	00550c9f 00550eda
+0044a154	27	wrong parameter for INT 17h	1	00550d2d
+0044a190	5	, AH=	1	00550d52
+0044a1a0	12	do_INT_17H: 	0	
+0044a1c0	19	err on myFileCopy: 	0	
+0044a1e8	13	__vbaVarCmpLt	0	
+0044a1f8	11	__vbaVarAdd	0	
+0044a204	15	__vbaStrVarCopy	0	
+0044a220	23	Error returnALU_STATE: 	0	
+0044a254	21	err returnALU_STATE: 	0	
+0044a284	20	Error setALU_STATE: 	0	
+0044a2b4	18	err setALU_STATE: 	0	
+0044a2e0	17	set_parity_flag: 	0	
+0044a304	13	__vbaPrintObj	0	
+0044a328	10	__vbaFPInt	0	
+0044a338	26	stoped adding to screen...	0	
+0044a374	75	error, get_current_video_page_number() cannot calculate current page number	0	
+0044a410	14	clear_SCREEN: 	0	
+0044a434	22	cmdClearScreen_Click: 	0	
+0044a474	32	to enable hotkeys for the screen	1	00561662
+0044a4bc	38	set SCREEN_HOTKEYS=true in emu8086.ini	1	0056167e
+0044a518	41	#400b4-mini# #10: OBOSOLETE iINPUT_TYPE: 	0	
+0044a570	19	frmScreen.KeyDown: 	0	
+0044a59c	23	frmScreen_QueryUnload: 	0	
+0044a5d0	31	Error on frmDOS Form_Resize(): 	0	
+0044a61c	7	 chars)	2	0056435d 005646b4
+0044a630	8	 pixels)	1	005643de
+0044a650	26	Error on setSCREEN_W_H(): 	0	
+0044a68c	27	err timer_Flash_HID_Timer: 	0	
+0044a6c8	4	ECHO	1	005659a9
+0044a6d4	14	__vbaLateMemSt	0	
+0044a6e8	24	Bad command or file name	1	00565ad8
+0044a720	71	#327u-print_in_13h_mode.asm# - updating complete screen in graphix mode	0	
+0044a7b4	21	updateScreen_at_loc: 	0	
+0044a7e4	26	Error on scroll_WINDOW_UP(	0	
+0044a820	28	Error on scroll_WINDOW_DOWN(	0	
+0044a860	37	Error on setChar_and_Attrib_value(): 	0	
+0044a8c0	18	timerInput ERROR: 	0	
+0044a8ec	31	Error page number setCursorPos(	0	
+0044a930	41	Error on get_ASCII_CODE_at_CurrentPos(): 	0	
+0044a988	37	Error on get_ATTRIB_at_CurrentPos(): 	0	
+0044aa11	16	]5opic_chars_8x8	0	
+0044aa2c	25	draw_char_to_video_memory	0	
+0044aa84	42	err. setChar_and_Attribute_at_CurrentPos: 	0	
+0044aae0	16	set_VIDEO_MODE: 	1	0056ca1f
+0044ab08	23	unsupported video mode:	1	0056ca11
+0044ab3c	18	resize_screen_to: 	0	
+0044ab68	25	resize_screen_to_pixels: 	0	
+0044aba0	40	cannot set the same back and fore color.	2	0056e3b7 0057721e
+0044abf8	13	defaults set!	3	0056e3dd 00577240 00580db5
+0044ac18	31	 err: lblKeyboardBuffer_Click: 	0	
+0044ac5c	37	note: video memory must be re-written	1	0056e6aa
+0044acac	36	 after changing font or diplay size.	1	0056e6c4
+0044acfc	17	err change font: 	0	
+0044ad20	9	ForeColor	4	0056e861 0056e942 00573a51 00573b32
+0044ad34	4	Font	6	0056e892 0056e91c 005f0876 00573a82 00573b0c 005f18c6
+0044ad44	21	Error on set_font(): 	0	
+0044ad80	22	err: show_uKB_BUFFER: 	0	
+0044adb4	22	flush keyboard buffer?	1	0056f28a
+0044ade8	21	clear keyboard buffer	1	0056f2b0
+0044ae24	16	__vbaLateMemStAd	0	
+0044ae44	12	__vbaCyMulI2	0	
+0044ae6c	12	__vbaR8IntI2	0	
+0044ae80	27	OUT OF MEMORY! mWRITE_BYTE(	0	
+0044aebc	15	OUT OF MEMORY: 	2	00570a6f 00570060
+0044aee0	27	OUT OF MEMORY! mWRITE_WORD(	0	
+0044af1c	26	OUT OF MEMORY! mREAD_BYTE(	0	
+0044af58	21	Error on mREAD_BYTE: 	0	
+0044af88	26	OUT OF MEMORY! mREAD_WORD(	0	
+0044afc4	12	associations	4	00573cf8 00573e01 00573ef8 0057d2fa
+0044aff0	35	un-associate  .asm  and  .inc files	2	00573d63 0057d365
+0044b03c	32	associate  .asm  and  .inc files	2	00573e70 0057d40b
+0044b084	23	settings saving error: 	1	0057584a
+0044b0b8	35	it's required to restart emu8086...	1	00575adb
+0044b104	26	cmdResetToDefaults_Click: 	0	
+0044b140	33	select control name from the list	1	00577958
+0044b188	16	nothing selected	1	0057797a
+0044b1c0	29	wrong text in comboObjects!!!	0	
+0044b23b	9	nlblCOLOR	0	
+0044b248	16	lblSelectedColor	0	
+0044b25c	11	lblSelected	0	
+0044b26c	40	cannot set the same fore and back color!	1	00580d8f
+0044b2c4	28	background color set error: 	0	
+0044b30c	17	__vbaVerifyVarObj	0	
+0044b320	15	__vbaLateIdStAd	0	
+0044b334	11	checkSigned	2	0059833e 005989d2
+0044b390	14	__vbaStrFixstr	0	
+0044b3a0	12	__vbaVar2Vec	0	
+0044b3b0	12	__vbaAryMove	0	
+0044b3c0	16	__vbaRecDestruct	0	
+0044b3d4	20	__vbaRecDestructAnsi	0	
+0044b3ec	17	__vbaRecAnsiToUni	0	
+0044b400	17	__vbaRecUniToAnsi	0	
+0044b430	24	frm_Box_ACTIVEATE: err: 	0	
+0044b468	18	frm_mBox_KeyDown: 	0	
+0044b4a4	32	Error on frm_mbox me, _resize-> 	0	
+0044b53c	9	txtRegKey	0	
+0044b548	11	txtUserName	0	
+0044b558	8	version 	2	00584c62 005d3dc1
+0044b570	34	CLICK HERE TO BUY THIS SOFTWARE...	2	00585015 005d4602
+0044b5bc	39	http://www.emu8086.com/dr/donation.html	1	00585331
+0044b610	7	mailto:	2	005d62c0 005854b1
+0044b624	10	lblemail: 	0	
+0044b640	12	Site License	2	00585e6c 005d579c
+0044b660	19	1 Year Site License	2	00585f21 005d5851
+0044b68c	21	cannot expand_Lines: 	0	
+0044b6c8	36	Error on selectNextLineToBeExecuted(	0	
+0044b718	19	get_Starting_Line: 	0	
+0044b744	28	NOT FOUND ON SELECTED LINE: 	0	
+0044b784	14	 SEARCHING....	0	
+0044b7a8	18	FOUND! wrong line:	0	
+0044b7d4	22	, right (better) line:	0	
+0044b808	16	selectErrorLine(	0	
+0044b830	27	get_formated_machine_code: 	0	
+0044b86c	6	.debug	6	006181b5 0060dcaf 0058807a 0058932c 00589361 00589474
+0044b880	27	Error on SaveDebugInfoFile(	0	
+0044b8bc	50	EMU8086 GENERATED LISTING. MACHINE CODE <- SOURCE.	1	005883a4
+0044b928	31	 -- emu8086 assembler version: 	1	0058858b
+0044b984	23	Error on loadDebugInfo(	0	
+0044b9b8	6	_.~asm	1	005897bd
+0044b9cc	23	Error on load_lstInput(	0	
+0044ba00	99	===================================================================================================	7	005887ca 0058880a 00588fd9 0058905e 005a9544 005a9783 005a9c44
+0044bacc	60	[LINE]     LOC: MACHINE CODE                          SOURCE	1	005887ea
+0044bb4c	17	Listing is saved:	3	00589116 00611d85 0061cbc6
+0044bb74	7	_.debug	2	0058936c 00589399
+0044bb88	15	No debug file: 	0	
+0044bbac	15	, or no source.	0	
+0044bbdc	21	unexpected error 5112	0	
+0044bc0c	17	codesel free mem:	0	
+0044bc34	30	cannot make such changes here.	1	0058a2fc
+0044bc78	46	close the emulator, then edit and re-assemble.	1	0058a30a
+0044bcdc	37	cannot make these changes on runtime.	1	0058a568
+0044bd2c	44	close the emulator, then edit and recompile.	1	0058a578
+0044bdb0	28	cmaxActualSource_MouseDown: 	0	
+0044bdf0	26	cmaxActualSource_MouseUp: 	0	
+0044be2c	28	cmaxActualSource_SelChange: 	0	
+0044be6c	32	Error on resize of frmOrigCode: 	0	
+0044beb4	19	Error on copy all: 	0	
+0044bee0	15	mnuFind_Click: 	0	
+0044bf04	23	Error Update_from_Hex: 	0	
+0044bf48	28	Error on txtASCII_H_Change: 	0	
+0044bf8c	28	Error on txtASCII_L_Change: 	0	
+0044bfcc	13	Error on kp: 	0	
+0044bfec	19	frmStack.DoShowMe: 	0	
+0044c034	25	Error on setStackView(): 	0	
+0044c06c	26	Error on frmStack.Resize: 	0	
+0044c0a8	27	Error lstStack_DblClick(): 	0	
+0044c100	25	Error on read_sectors(): 	0	
+0044c138	10	1234567890	1	00597143
+0044c154	46	Error on read_sectors(): No such drive number!	0	
+0044c1b8	26	Error on write_sectors(): 	0	
+0044c1f4	47	Error on write_sectors(): No such drive number!	0	
+0044c254	14	__vbaPutOwner4	0	
+0044c264	14	__vbaGetOwner4	0	
+0044c278	16	ANALYSIS ERROR: 	0	
+0044c2ac	7	decimal	2	00597e20 005987fc
+0044c2c4	12	calculator: 	0	
+0044c2e4	31	frmEvaluator.Form_QueryUnload: 	0	
+0044c328	32	Error on frmEvaluator_Resize(): 	0	
+0044c3ab	10	TtxtHelper	0	
+0044c3bc	7	Error: 	0	
+0044c3d4	12	__vbaStrBool	0	
+0044c3e4	12	__vbaBoolStr	0	
+0044c3f8	14	    ^ br error	1	005a1f07
+0044c420	27	math_get_low_byte_of_word: 	0	
+0044c45c	28	math_get_high_byte_of_word: 	0	
+0044c49c	33	math_get_low_word_of_doubleword: 	0	
+0044c4e4	34	math_get_high_word_of_doubleword: 	0	
+0044c530	15	generateRandom(	0	
+0044c584	49	AAA AAD AAM AAS ADC ADD AND CALL CBW CLC CLD CLI 	1	0059b9e4
+0044c5ec	49	CMC CMP CMPSB CMPSW CWD DAA DAS DEC DIV HLT IDIV 	1	0059b9e9
+0044c654	48	IMUL IN INC INT INTO IRET JA JAE JB JBE JC JCXZ 	1	0059ba04
+0044c6bc	51	JE JG JGE JL JLE JMP JNA JNAE JNB JNBE JNC JNE JNG 	1	0059ba13
+0044c728	24	DR0 DR1 DR2 DR3 DR6 DR7 	1	0059c233
+0044c760	50	JNGE JNL JNLE JNO JNP JNS JNZ JO JP JPE JPO JS JZ 	1	0059ba22
+0044c7cc	47	LAHF LDS LEA LES LODSB LODSW LOOP LOOPE LOOPNE 	1	0059ba31
+0044c830	77	LOOPNZ LOOPZ MOV MOVSB MOVSW MUL NEG NOP NOT OR OUT POP POPA POPF PUSH PUSHA 	1	0059ba40
+0044c8d0	49	PUSHF RCL RCR REP REPE REPNE REPNZ REPZ RETF RET 	1	0059ba4f
+0044c938	7	"   > "	1	00619b7d
+0044c94c	57	ROL ROR SAHF SAL SAR SBB SCASB SCASW SHL SHR STC STD STI 	1	0059ba5e
+0044c9c4	46	STOSB STOSW SUB TEST XCHG XLAT XLATB XOR LOCK 	1	0059ba6d
+0044ca28	11	 WAIT FWAIT	1	0059ba8b
+0044ca44	48	AX BX CX DX AH AL BL BH CH CL DH DL DI SI BP SP 	1	0059c210
+0044caac	32	EAX ECX EDX EBX ESP EBP ESI EDI 	1	0059c215
+0044caf4	16	CR0 CR2 CR3 CR4 	1	0059c224
+0044cb1c	6	(DF=1)	1	005c8147
+0044cb30	530	F2XM1 F4X4 FABS FADD FADDP FBANK FBLD FBSTP FCHS FCLEX FCOM FCOMP FCOMPP FCOS FDECSTP FDISI FDIV FDIVP FDIVR FDIVRP FENI FFREE FIADD FICOM FICOMP FIDIV FIDIVR FILD FIMUL FINCSTP FINIT FIST FISTP FISUB FISUBR FLD FLD1 FLDCW FLDENV FLDL2E FLDL2T FLDLG2 FLDLN2 FLDPI FLDZ FMUL FMULP FNCLEX FNDISI FNENI FNINIT FNOP FNSAVE FNSTCW FNSTENV FNSTSW FPATAN FPREM FPREM1 FPTAN FRNDINT FRSTOR FSAVE FSCALE FSETPM FSIN FSINCOS FSQRT FST FSTCW FSTENV FSTP FSTSW FSUB FSUBP FSUBR FSUBRP FTST FUCOM FUCOMP FUCOMPP FXAM FXCH FXTRACT FYL2X FYL2XP1	1	0059ba7c
+0044cf5c	32	ST0 ST1 ST2 ST3 ST4 ST5 ST6 ST7 	1	0059c242
+0044cfa4	32	MM0 MM1 MM2 MM3 MM4 MM5 MM6 MM7 	1	0059c251
+0044cfec	39	XMM0 XMM1 XMM2 XMM3 XMM4 XMM5 XMM6 XMM7	1	0059c260
+0044d070	8	BYTE PTR	1	0059c6a6
+0044d088	8	WORD PTR	1	0059c6d8
+0044d0a0	6	OFFSET	1	0059c76e
+0044d0b4	15	registercutom: 	0	
+0044d0d8	4	.log	5	006181f4 006189b7 0059ce1e 0060dceb 0060e3e9
+0044d0e8	11	emu8086.log	1	0059cee5
+0044d104	11	    ^ error	1	005a1676
+0044d124	43	Log files (*.log)|*.log|All Files (*.*)|*.*	1	0059cf29
+0044d18c	18	Error saving log: 	0	
+0044d1b8	22	frmDebugLog.DoShowMe: 	0	
+0044d1ec	19	DEBUG_LOG_FONT_FACE	1	0059dac5
+0044d218	19	DEBUG_LOG_FONT_SIZE	1	0059dc00
+0044d244	5	  DX=	1	0059faaa
+0044d254	5	  SP=	1	0059fad8
+0044d264	5	  BP=	1	0059fafe
+0044d274	5	  SI=	1	0059fb24
+0044d284	5	  DI=	1	0059fb4a
+0044d2a0	5	  ES=	1	0059fba8
+0044d2b0	5	  SS=	1	0059fbce
+0044d2c0	5	  CS=	1	0059fbf4
+0044d2d0	5	  IP=	1	0059fc1a
+0044d2e4	102	HEIGHT TEST. lazy dog jumps over the red fox qwertyuiop[asdfghjkll;'\zxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM	1	0059dd8b
+0044d3b8	15	frmDebug_Load: 	0	
+0044d3dc	29	Error on frmDebugLog_Resize: 	0	
+0044d428	12	add_to_log: 	0	
+0044d448	28	remove_last_entry_from_log: 	0	
+0044d488	7	BIOS DI	1	0059f466
+0044d49c	5	  BX=	1	0059fa54
+0044d4ac	5	  CX=	1	0059fa7f
+0044d4c0	24	Error on make_make_log: 	0	
+0044d4f8	8	   error	4	005a11bd 005a1256 005a5bad 005a6526
+0044d60c	36	err: do_R_Command_with_parameters:  	0	
+0044d660	26	brrr... cannot be #327xa: 	0	
+0044d69c	33	err: set_register_for_RN_command:	0	
+0044d7a4	10	debug.html	1	005a2d79
+0044d7c0	13	cmdHelp_Click	0	
+0044d7e0	17	makeSmallerPath: 	0	
+0044d80c	38	TODO: should show a drop down list....	0	
+0044d860	22	comboConcole_KeyDown: 	0	
+0044d894	23	comboConcole_KeyPress: 	0	
+0044d8c8	22	show_current_command: 	0	
+0044d944	5	v:DTA	1	005a43cc
+0044d954	32	read_value_from_debug_style_ea: 	0	
+0044d9a4	4	....	1	005a83ee
+0044d9b0	17	__vbaVarLateMemSt	0	
+0044d9c8	73	sorry this command isn't supported yet. select help->check for an update.	1	005a448d
+0044da60	10	 ^ error: 	0	
+0044da7c	30	get_OPERATING_ADDRESS_IF_ANY: 	0	
+0044dac0	116	brr.... something wrong only fixed CS:/DS:/ES:/SS: is allowed as a valid prefix for read_value_from_debug_style_ea()	0	
+0044dbb0	47	probably flags were deleted from the command...	0	
+0044dcb0	29	error: not valid flag state: 	1	005a5852
+0044dcf0	26	set_flags_for_RF_command: 	0	
+0044dd44	11	    error: 	2	005a70b0 005a7356
+0044dd64	23	max L: 400 (1024 bytes)	1	005a67bd
+0044dd98	19	all bytes are equal	1	005a6a07
+0044ddcc	21	not enough parameters	1	005a70a2
+0044ddfc	6	use ow	1	005a7348
+0044de10	27	from window to command line	0	
+0044de4c	17	txtLog_KeyPress: 	0	
+0044de74	4	File	4	005a7bc2 005a7d80 005a7ce4 005a7fc5
+0044de84	5	File1	2	005a7dee 005a7c96
+0044de94	15	Recent_Add_New(	0	
+0044ded0	7	Caption	3	005f1e88 005a80ab 005f0790
+0044dee0	7	Visible	1	005a8115
+0044defc	18	Recent_Set_Menus: 	0	
+0044df28	21	symbol_Tables_EQUAL: 	0	
+0044df58	22	< THE SYMBOL TABLE >  	2	005a9172 005a941e
+0044df8c	27	  --  emu8086 IDE version: 	1	005a9192
+0044dfc8	33	  --  emu8086 assembler version: 	1	005a943e
+0044e010	4	Name	1	005a9578
+0044e020	6	Offset	1	005a9596
+0044e034	4	Size	1	005a95b4
+0044e044	4	Type	1	005a95d2
+0044e054	7	Segment	1	005a95f3
+0044e068	7	< END >	1	005a9d6a
+0044e07c	22	Symbol table is saved:	1	005a9dd8
+0044e0b0	35	Error on save_SYMBOL_TABLE_to_FILE(	0	
+0044e0fc	8	_.symbol	1	005aa0f7
+0044e114	28	load_SYMBOL_TABLE_from_FILE(	0	
+0044e160	4	_LOC	1	005aa88a
+0044e170	26	add_to_vST_if_VAR_or_SEG: 	0	
+0044e1ac	21	unsupported var type!	0	
+0044e1dc	19	update_VAR_WINDOW: 	0	
+0044e208	17	NOT SUPPORTED YET	1	005abd8f
+0044e230	40	READ_format_to_NumSystem: unknown base: 	0	
+0044e288	27	READ_format_to_NumSystem : 	0	
+0044e2c4	40	format_to_NumSystem_byte: unknown base: 	0	
+0044e31c	27	format_to_NumSystem_byte : 	0	
+0044e358	40	format_to_NumSystem_word: unknown base: 	0	
+0044e3b0	27	format_to_NumSystem_word : 	0	
+0044e3e8	11	__vbaVarNot	0	
+0044e3f8	4	dirs	1	005acb76
+0044e408	14	save_Options: 	0	
+0044e430	27	Options not loaded! (RESET)	0	
+0044e46c	14	load_Options: 	0	
+0044e4dc	20	save_OTHER_options: 	0	
+0044e50c	11	not found: 	0	
+0044e528	37	 - has wrong size (previous version?)	0	
+0044e578	20	load_OTHER_options: 	0	
+0044e5c4	19	save_FONT_options: 	0	
+0044e5ec	15	__vbaLsetFixstr	0	
+0044e600	19	load_FONT_options: 	0	
+0044e62c	38	save_KEYWORD_COLOR_AND_STYLE_options: 	0	
+0044e680	38	load_KEYWORD_COLOR_AND_STYLE_options: 	0	
+0044e6d4	6	\macro	2	005b0aaa 005b0e0a
+0044e6e8	4	.dat	10	005e5e07 005e5c10 005e5aa3 005b0ad7 005b0e37 005e9b1a 005e941c 005e8762 005e47ff 005e48a1
+0044e714	12	SaveMacros: 	0	
+0044e734	11	LoadMacro: 	0	
+0044e750	12	\hotkeys.dat	2	005b115b 005b143b
+0044e770	13	SaveHotKeys: 	0	
+0044e790	13	LoadHotKeys: 	0	
+0044e7b0	13	\LoadFlag.dat	2	005b1a65 005b1712
+0044e7d0	32	Load options from hdd flag file.	1	005b183d
+0044e818	23	set_LOAD_OPTIONS_FLAG: 	0	
+0044e84c	9	NOT_FOUND	3	005b1aaa 005b1ad0 005b1a93
+0044e864	23	get_LOAD_OPTIONS_FLAG: 	0	
+0044e894	14	__vbaGetOwner3	0	
+0044e8a4	14	__vbaPutOwner3	0	
+0044e8c4	139	supported files (*.bin, *.boot)|*.bin;*.bin_;*.boot|binary files (*.bin)|*.bin;*.bin_|boot sector files (*.boot)|*.boot|all files (*.*)|*.*	1	005b201a
+0044e9e0	18	cmdGetFile_Click: 	0	
+0044ea0c	19	bin file not found:	1	005b22ee
+0044ea38	30	too many sectors! maximum: 255	1	005b23ab
+0044ea7c	22	use several bin files.	1	005b23bb
+0044eab0	15	no drive number	1	005b24ec
+0044ead4	23	create new drive first!	1	005b2542
+0044eb08	95	is it ok to temporary load this file at address 0100:0000h before writing it to virtual floppy?	1	005b2633
+0044ebcc	8	proceed?	1	005b2651
+0044ebe4	33	virtual floppy drive write error!	1	005b2a42
+0044ec2c	13	VAR_FONT_SIZE	1	005b3eb9
+0044ec4c	33	1 sector is written successfully!	1	005b2aa7
+0044ec94	33	sectors are written successfully!	1	005b2b05
+0044ecdc	38	error writing to virtual floppy drive!	0	
+0044ed30	26	frmWriteBinToFloppy_Load: 	0	
+0044ed6c	6	Size: 	1	005b336f
+0044ed80	17	 bytes. Sectors: 	1	005b339a
+0044eda8	25	txtPathToBinFile_Change: 	0	
+0044ede0	21	get_size_in_sectors: 	0	
+0044ee10	6	(OF=1)	1	005c75a7
+0044ee28	13	VAR_FONT_FACE	1	005b3fba
+0044ee48	14	frmVars.LOAD: 	0	
+0044ee6c	25	Error on frmVars_Resize: 	0	
+0044eee0	8	txtValue	0	
+0044eeec	8	setValue	0	
+0044ef0c	30	cannot compute the expression!	2	005b4ff8 005b54fd
+0044ef50	35	the value is out of the byte range:	1	005b5578
+0044ef9c	31	get_RegValue: wrong iRegIndex: 	0	
+0044efe0	46	listVars_DblClick: cannot edit var with size: 	0	
+0044f044	19	listVars_DblClick: 	0	
+0044f094	35	comboSize_Click: Unknown size index	0	
+0044f0e0	39	show_value_properties: unknown var size	0	
+0044f134	23	show_value_properties: 	0	
+0044f168	24	frmExtendedViewer_Load: 	0	
+0044f1a0	4	FFFF	2	005bd2ff 005bd449
+0044f1b0	31	set_RegValue: wrong iRegIndex: 	0	
+0044f1f4	30	update_VALUES: unknown source.	0	
+0044f238	15	update_VALUES: 	0	
+0044f25c	13	show_Values: 	0	
+0044f27c	29	showRegister: wrong regname: 	0	
+0044f2d0	29	should not produce any errors	0	
+0044f310	5	00000	1	005c25f7
+0044f320	4	7C00	2	005c2603 005c26b7
+0044f330	19	 ; load to segment.	1	005c2c7e
+0044f35c	14	(CF=1 or ZF=1)	1	005c648f
+0044f384	18	 ; load to offset.	1	005c2cb9
+0044f3b0	7	 ;   AL	1	005c2ce8
+0044f3c4	7	 ;   AH	1	005c2d16
+0044f3d8	7	 ;   BL	1	005c2d45
+0044f3ec	7	 ;   BH	1	005c2d74
+0044f400	7	 ;   CL	1	005c2da2
+0044f414	7	 ;   CH	1	005c2dd1
+0044f428	7	 ;   DL	1	005c2e03
+0044f43c	7	 ;   DH	1	005c2e3a
+0044f450	7	 ;   DS	1	005c2e72
+0044f464	7	 ;   ES	1	005c2eaa
+0044f478	7	 ;   SI	1	005c2ee1
+0044f48c	7	 ;   DI	1	005c2f19
+0044f4a0	7	 ;   BP	1	005c2f51
+0044f4b4	7	 ;   CS	1	005c2f88
+0044f4c8	7	 ;   IP	1	005c2fc0
+0044f4dc	7	 ;   SS	1	005c2ff8
+0044f4f0	7	 ;   SP	1	005c302f
+0044f504	4	MEM=	1	005c3065
+0044f514	11	   overflow	1	005c756d
+0044f534	29	write_BINF_file_if_directed: 	0	
+0044f574	29	 '=' not found in directive: 	0	
+0044f5b4	12	LOAD_SEGMENT	1	005c384a
+0044f5d4	11	LOAD_OFFSET	1	005c3885
+0044f5f0	26	wrong assembler directive:	0	
+0044f62c	24	PROCESS_BINF_DIRECTIVE: 	0	
+0044f664	4	user	5	005c4221 005c43ba 005c4244 005c45fe 005c475d
+0044f674	8	use_fasm	3	005c421c 005c423f 005c4758
+0044f68c	8	template	2	005c43b5 005c45f9
+0044f6a4	13	cmdOK_Click: 	0	
+0044f6c4	16	choosetemplate: 	0	
+0044f6ec	9	not above	1	005c6455
+0044f704	24	frmStartUp_OLEDragDrop: 	0	
+0044f73c	26	frmEditVariable.setValue: 	0	
+0044f778	36	frmEditVariable: txtValue.SetFocus: 	0	
+0044f7c8	33	Error on frmEditVariable_Resize: 	0	
+0044f810	16	=== unsigned ===	1	005c5ecf
+0044f838	9	    below	1	005c6062
+0044f850	6	(CF=1)	1	005c609c
+0044f864	9	not below	1	005c60d2
+0044f87c	6	(CF=0)	1	005c610c
+0044f890	9	    above	1	005c63e5
+0044f8a8	15	(CF=0 and ZF=0)	1	005c641f
+0044f8cc	14	=== signed ===	1	005c6688
+0044f8f0	8	    less	1	005c68c6
+0044f908	8	(SF<>OF)	1	005c6900
+0044f920	8	not less	1	005c6936
+0044f938	7	(SF=OF)	1	005c6970
+0044f94c	11	    greater	1	005c6cee
+0044f968	16	(SF=OF and ZF=0)	1	005c6d28
+0044f990	11	not greater	1	005c6d5e
+0044f9ac	16	(SF<>OF or ZF=1)	1	005c6d98
+0044f9d4	9	    equal	1	005c6fd5
+0044f9ec	6	(ZF=1)	1	005c700f
+0044fa00	9	not equal	1	005c7045
+0044fa18	6	(ZF=0)	1	005c707f
+0044fa2c	8	negative	1	005c72a1
+0044fa44	6	(SF=1)	1	005c72db
+0044fa58	8	positive	1	005c7311
+0044fa70	6	(SF=0)	1	005c734b
+0044fa88	11	no overflow	1	005c75dd
+0044faa4	6	(OF=0)	1	005c7617
+0044fab8	11	parity even	1	005c7839
+0044fad4	6	(PF=1)	1	005c7873
+0044fae8	11	parity odd 	1	005c78a9
+0044fb04	6	(PF=0)	1	005c78e3
+0044fb18	13	    aux carry	1	005c7b05
+0044fb38	6	(AF=1)	1	005c7b3f
+0044fb4c	13	not aux carry	1	005c7b75
+0044fb6c	6	(AF=0)	1	005c7baf
+0044fb80	15	hw-int disabled	1	005c7dd1
+0044fba4	6	(IF=0)	1	005c7e0b
+0044fbb8	15	hw-int enabled 	1	005c7e41
+0044fbdc	6	(IF=1)	1	005c7e7b
+0044fbf0	12	forward dir 	1	005c809d
+0044fc10	6	(DF=0)	1	005c80d7
+0044fc24	12	backward dir	1	005c810d
+0044fc44	24	frmFlagAnalyzer_Resize: 	0	
+0044fd04	45	POSSIBLE emu8086.ini ERROR! frmFlagAnalyzer: 	1	005c898f
+0044fd64	23	wrong output directory!	1	005ca78b
+0044fda4	30	Error on cmdShowMemory_Click: 	0	
+0044fde8	15	WRITE_IO_BYTE: 	0	
+0044fe0c	6	" /Sa 	1	00619aca
+0044fe20	32	Error on frmMemory.Update_list: 	0	
+0044fe78	27	error on resize frmMemory: 	0	
+0044feb4	28	Error lstMemory_DblClick(): 	0	
+0044ff38	13	out of memory	1	005cf52c
+0044ff6c	8	setlist:	0	
+0044ff80	10	__vbaR4Str	0	
+0044ff90	14	READ_IO_BYTE: 	0	
+0044ffb8	80	0050:0000  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00    ................  	1	005cfb56
+00450060	9	0000:0000	1	005cfcf8
+00450078	26	err picMemView_MouseDown: 	0	
+004500b4	16	show_blue_box : 	0	
+004500f0	5	_LEFT	3	005d0d90 005d118e 005d17f8
+00450100	4	_TOP	3	005d0dfd 005d145d 005d1a14
+00450110	6	_WIDTH	2	005d0e70 005d1de0
+00450138	17	SaveWindowState: 	0	
+00450160	16	GetWindowState: 	0	
+0045018c	39	wrong param calling make_signed_int(): 	0	
+004501e0	25	frmStartUp.cmdNew_Click: 	0	
+00450218	10	start.html	1	005d38d8
+00450234	10	welcome...	1	005d3ac6
+00450250	21	error mnuOtherFiles: 	0	
+00450280	17	error mnuRecent: 	0	
+004502a8	18	lbl_URL_OR_EMAIL: 	0	
+004502d4	14	checkMod_INT: 	0	
+00450308	19	 -- legal overflow.	0	
+00450354	45	Unable to delete registry key. --- fDeleteKey	0	
+004503b4	62	Unable to delete registry or .ini file value. --- fDeleteValue	0	
+00450438	65	Unable to enumerate registry or .ini file values. ---- fEnumValue	0	
+004504c0	53	Unable to read .ini file value. ------- fReadIniFuzzy	0	
+00450530	66	Unable to read registry or .ini file value. ----------- fReadValue	0	
+004505bc	4	HKCU	1	005d7135
+004505cc	4	HKLM	1	005d7162
+004505e8	4	HKDD	1	005d71bc
+004505f8	4	HKCC	1	005d71e9
+00450608	66	Unable to decode registry key or find .ini file. --------- fTopKey	0	
+004506a0	67	Unable to write registry or .ini file value. ---------- fWriteValue	0	
+00450728	16	__vbaVargVarMove	0	
+0045073c	16	__vbaVargVarCopy	0	
+00450760	7	include	1	0060ce0c
+00450774	23	http\shell\open\command	1	005d77e7
+004507a8	14	cmdHow_Click: 	0	
+004507cc	16	cmdLater_Click: 	0	
+004507f4	13	no user name.	1	005d81df
+00450814	20	no registration key.	1	005d8443
+00450844	5	AX4CT	2	005d88f1 005da386
+00450860	4	NCHK	2	005d896d 005da326
+00450870	7	NCHKEXP	4	005d89e8 005da3e5 005da470 005da4b6
+00450884	33	This registration key is expired!	1	005d8b31
+004508cc	20	txtRegKey_KeyPress: 	0	
+0045090c	62	Please update your license by purchasing new registration key.	1	005d8b4d
+00450990	4	A747	1	005d8c3d
+004509a0	39	the software is successfully registered	1	005d8e9b
+004509f4	39	               THANK YOU               	1	005d92e5
+00450a48	23	wrong registration key.	1	005d939b
+00450a7c	19	cmdRegister_Click: 	0	
+00450aa8	20	registration error: 	1	005d958b
+00450ae4	22	txtUserName_KeyPress: 	0	
+00450b18	8	UserName	2	005d9e31 005da1d1
+00450b30	6	RegKey	2	005d9e53 005da23f
+00450b44	8	LicCount	2	005d9e88 005da2a7
+00450b5c	36	error saving the registration info: 	0	
+00450bac	7	reg.ini	4	005da073 005da5d5 005da619 005da657
+00450bc0	9	username=	1	005d9fe4
+00450bd8	7	regkey=	1	005da014
+00450bf8	22	error saving reg.ini: 	0	
+00450c2c	8	username	1	005da5c3
+00450c44	11	emu8086.com	2	005da5b3 005da5fd
+00450c60	6	regkey	1	005da607
+00450c74	20	error validate reg: 	0	
+00450ce0	26	QW10PASDFGHJKLZXCVBNMERTYU	1	005dab6c
+00450d1c	47	Z9RTASDF01823ASJFSD1234346GFHPLMASDR613412QWERX	1	005dab81
+00450d80	20	JKASERKKN837C3FRTQZX	1	005dab96
+00450db0	12	GetWinDir - 	0	
+00450dd0	16	Command3_Click: 	0	
+00450e04	39	Your free evaluation period has expired	1	005dbaa4
+00450e58	14	FILE_UNDO_NOTE	1	005e8c35
+00450e80	41	Your free evaluation period has expired!!	1	005dbae1
+00450ed8	21	frmUREGISTERED_LOAD: 	0	
+00450f08	22	http://www.emu8086.com	1	005dbc48
+00450f3c	26	abcdefghijklmnopqrstvuwxvz	3	005dbe00 005dbfb4 005dc1c7
+00450f78	19	 get_drive_index - 	0	
+00450fb0	26	get_drive_letter_DEF0_A1: 	0	
+00450fec	38	get_drive_letter_A0: wrong byteIndex: 	0	
+00451040	6	note: 	3	005ea24d 005ea459 005e8cea
+00451054	21	get_drive_letter_A0: 	0	
+00451084	27	string has no 0 in the end!	1	005dc654
+004510c0	19	error read_ASCIIZ: 	0	
+004510ec	20	error write_ASCIIZ: 	0	
+0045111c	15	 -- wrong path!	0	
+00451140	25	directory already exists:	1	005dcecf
+00451178	19	DIRECTORY CREATED: 	0	
+004511a4	29	CREATE_VIRTUAL_SUBDIRECTORY: 	0	
+004511e4	29	CHDIR: back dir in file path!	0	
+00451224	36	ERROR! CREATE_VIRTUAL_SUBDIRECTORY: 	0	
+00451284	41	REMOVE_VIRTUAL_SUBDIRECTORY: no file name	0	
+004512dc	20	file does not exist:	0	
+0045130c	19	DIRECTORY REMOVED: 	0	
+00451338	36	ERROR! REMOVE_VIRTUAL_SUBDIRECTORY: 	0	
+00451388	15	 -- NOT exists!	0	
+004513f0	34	too many back dirs, or single .. :	0	
+0045144c	14	ALL REPLACED: 	0	
+00451470	27	DEF VIRTUAL DIR for drive: 	0	
+004514ac	16	 is SET to ROOT!	0	
+004514d4	9	 is SET: 	0	
+004514ec	36	ERROR! CHANGE_VIRTUAL_SUBDIRECTORY: 	0	
+0045153c	7	drive: 	0	
+00451550	33	ERROR! GET_VIRTUAL_SUBDIRECTORY: 	0	
+00451598	21	DELETE_VIRTUAL_FILE: 	0	
+004515c8	72	1brr... probably we won't be able to step back out of create new file...	0	
+00451660	72	2brr... probably we won't be able to step back out of create new file...	0	
+004516f8	21	CREATE_VIRTUAL_FILE: 	0	
+00451728	32	OPEN_VIRTUAL_FILE: no file name!	0	
+00451770	21	file does not exist: 	1	005de060
+004517b0	42	OPEN_VIRTUAL_FILE: unsupported value in AL	1	005de25a
+0045180c	62	set AL=2 (read/write/shared) or refer to int 21h/4Dh reference	1	005de274
+00451890	19	OPEN_VIRTUAL_FILE: 	0	
+004518bc	11	FILE NAME: 	0	
+004518d8	24	Err CLOSE_VIRTUAL_FILE: 	0	
+00451910	19	READ_VIRTUAL_FILE: 	0	
+0045193c	20	WRITE_VIRTUAL_FILE: 	0	
+0045198c	35	file seek: wrong parameter in AL: 0	1	005defb1
+004519d8	56	allowed values for AL = 0 - start. 1 - current. 2 - end.	1	005df005
+00451a50	27	ERR:   SEEK_VIRTUAL_FILE:  	0	
+00451a8c	35	move is allowed between directories	1	005df3c9
+00451ad8	27	on same logical drive only.	1	005df3e9
+00451b14	31	target filename already exists:	1	005df485
+00451b58	9	renamed: 	0	
+00451b70	25	ERR: RENAME_VIRTUAL_FILE:	0	
+00451ba8	11	C:\MYBUILD\	2	005dfd44 005dfa06
+00451bc4	8	MYBUILD\	2	005dfa85 005e3c2c
+00451bdc	22	back dir in file path!	0	
+00451c10	40	too many back dirs, or single back dir: 	0	
+00451c74	21	UNEXPECTED ERROR MVP!	0	
+00451ca4	25	make_virtual_drive_path: 	0	
+00451cdc	27	cut_off_dir_with_two_dots: 	0	
+00451d18	17	set_DTA_Address: 	0	
+00451d40	42	too many opened files. reset the emulator!	1	005e04d7
+00451d9c	50	too many opened files! file handle not recorded...	0	
+00451e08	28	RECORD_VIRTUAL_FILE_HANDLE: 	0	
+00451e48	25	CLOSE_ALL_VIRTUAL_FILES: 	0	
+00451e80	39	input redirection is not supported yet!	1	005e08c9
+00451ed4	22	GET_VFILE_attributes: 	0	
+00451f24	65	 INT 21h/9h should be used instead. refer to interrupt reference.	1	005e08ea
+00451fac	36	CX value (string size) is over 2000!	2	005e0c2e 005e1134
+00451ffc	44	DOS OUTPUT REDIRECTION - CX is out of memory	2	005e0e0d 005e12ca
+0045205c	24	err output redirection: 	0	
+00452094	59	wrong file handle... auxiliary device is not supported yet.	1	005e155c
+00452110	27	set_VFILE_attributes_FILE: 	0	
+0045214c	31	err get_FILENAME_from_FILENUM: 	0	
+00452190	32	err get_FILE_MODE_from_FILENUM: 	0	
+00452204	33	virtual printer does not respond.	1	005e1fef
+0045224c	36	start c:\emu8086\devices\Printer.exe	1	005e2007
+0045229c	31	err: write_to_virtual_printer: 	0	
+004522e0	4	cret	1	005ee19a
+004522f0	33	set_DEFAULTS_FOR_DOS_FILE_SYSTEM:	0	
+00452338	20	do_Find_first_file: 	0	
+004523b8	22	GetTimeZoneInformation	0	
+00452408	12	GetLocalTime	0	
+00452450	11	GetFileTime	0	
+00452494	11	SetFileTime	0	
+004524a4	4	newl	1	005ee15f
+004524e8	20	FileTimeToSystemTime	0	
+00452538	20	SystemTimeToFileTime	0	
+00452588	8	OpenFile	0	
+004525cc	11	CloseHandle	0	
+00452610	14	ShellExecuteEx	0	
+00452658	17	write_DTA_TABLE: 	0	
+00452684	19	do_Find_next_file: 	0	
+004526b0	27	do_get_set_file_DATE_TIME: 	0	
+004526ec	44	int 21h/17h: wildcards are not supported yet	0	
+0045274c	25	rename error: INT21H_17H.	0	
+004527ac	30	set_DOS_FILE_SYSTEM_DEFAULTS: 	0	
+004527f0	18	error on error :) 	0	
+00452818	13	__vbaNameFile	0	
+00452828	13	__vbaFileSeek	0	
+0045283c	19	Err: get_property: 	0	
+0045289c	45	step back disabled!  ENABLE_STEP_BACK != true	0	
+00452928	33	MAXIMUM_STEPS_BACK = 0; Disabled!	0	
+004529a4	32	step back for files is disabled!	0	
+004529ec	16	Init_Step_Back: 	0	
+00452a14	16	tmp\deleted_bkp_	5	005e5bd8 005e5a6b 005e93c9 005e870f 005e47bf
+00452a3c	15	tmp\opened_bkp_	3	005e5dce 005e9ac8 005e4861
+00452a60	24	ResetStepBackRecording: 	0	
+00452a98	10	file copy:	0	
+00452ab4	37	There are no recorded back steps ....	1	005e65b0
+00452b04	66	wrong iIO_OPERATION_INDEX in set_FILE_WRITE_OPERATION_BACKSTEP(): 	0	
+00452b90	40	err: set_FILE_WRITE_OPERATION_BACKSTEP: 	0	
+00452be8	38	Err: set_bSCREEN_SCROLL_IN_STEP_FLAG: 	0	
+00452c3c	23	set_bOUT_for_STEPBACK: 	0	
+00452c70	23	set_wOUT_for_STEPBACK: 	0	
+00452ca4	27	already doing step back....	0	
+00452ce0	60	byte-by-byte file write operations cannot be undone, however	1	005e8d06
+00452d60	70	all subsequent write operations are reverted when file open is undone.	1	005e8d34
+00452df4	34	 to turn off this notification set	1	005e8d79
+00452e40	36	 FILE_UNDO_NOTE=false in emu8086.ini	1	005e8da7
+00452e90	27	set_INT21_4E_for_STEPBACK: 	0	
+00452ecc	52	cannot re-open the file with the same file number...	1	005ea0ad
+00452f3c	21	undo is not possible.	1	005ea0c9
+00452f6c	42	DO_STEP_BACK: unknown .iFILE_IO_OPERATION=	0	
+00452fc8	42	screen scroll operations cannot be undone.	1	005ea269
+00453024	47	it applies both to automatic and manual scroll.	1	005ea297
+00453088	15	screen cleared.	2	005ea2c5 005ea57f
+004530ac	32	memory write operation exceeded 	1	005ea475
+004530f4	34	when interrupt modifies more than 	1	005ea4e3
+00453140	6	 bytes	1	005ea523
+00453154	54	it cannot be undone, it applies to RAM / video memory.	1	005ea551
+004531c8	18	cannot step-back: 	1	005eacda
+004531f4	14	RENAME_FILE : 	0	
+00453218	16	CopyFile FAILED.	0	
+00453240	12	COPY_FILE : 	0	
+00453260	4	beep	1	005ee0e9
+00453270	4	back	1	005ee124
+00453284	111	keep_BYTE_CHANGE_FOR_CURRENT_BACKSTEP_RECORD: bALLOW_MEMORY_BACKSTEP_RECORDING=FALSE!!!! should not happend!!! 	0	
+00453368	46	keep_BYTE_CHANGE_FOR_CURRENT_BACKSTEP_RECORD: 	0	
+004533cc	26	 --- should not happen!!!!	0	
+00453408	31	add_to_tracked_files_or_paths: 	0	
+0045344c	14	DELETE_FILE : 	0	
+00453470	22	set_StepBack_for_FPU: 	0	
+004534a4	17	do_FPU_StepBack: 	0	
+004534cc	18	evaluator helper: 	0	
+004534f8	20	frmEvaluatorHelper: 	0	
+00453534	11	frmUpdate: 	0	
+00453550	24	txtURL_MANUAL_GotFocus: 	0	
+00453588	11	frmASCII...	0	
+004535a4	6	 000: 	1	005eddb1
+004535c0	4	null	1	005ee0ae
+004535d4	27	frmASCII_CHARS.draw_ascii: 	0	
+00453610	16	a weird mouse...	0	
+00453638	33	err: et_number_of_mouse_buttons: 	0	
+00453680	12	int 33h/AX=0	2	005eefb5 005ef1b8
+004536a0	4	h - 	2	005ef034 005ef237
+004536b0	20	not supported yet...	2	005ef044 005ef247
+004536e0	24	error on interrupt 33h: 	0	
+00453718	24	prepare_char_in_pix8x8: 	0	
+00453750	24	prepare_char_bit_array: 	0	
+00453788	13	[END TOOLTIP]	1	005f12dc
+004537ac	27	draw_char_to_video_memory: 	0	
+00453804	21	 hardware interrupt: 	1	005f0066
+00453834	35	error check_for_harware_interrupt: 	0	
+004538a8	12	  trigirred!	0	
+004538c8	23	do_hardware_interrupt: 	0	
+004538fc	28	MAKE_DEFAULT_LANGUAGE_FILE: 	0	
+0045393c	17	LANG_FILE_VERSION	0	
+00453964	9	<a href="	1	005fd98c
+00453980	27	incompatible language files	0	
+004539bc	29	Error on LOAD_LANGUAGE_FILE: 	0	
+004539fc	39	wrong use of Set_Lang_File() procedure!	0	
+00453a50	62	New file should be created using MAKE_DEFAULT_LANGUAGE_FILE().	0	
+00453ad4	18	Lang file not set!	1	005f0b85
+00453b00	47	Use Set_Lang_File() to set language file first!	1	005f0ba1
+00453b68	71	_______________________________________________________________________	0	
+00453bfc	53	                                   [---START FORM---]	0	
+00453cb8	8	.Caption	0	
+00453cd0	44	                                   [CAPTION]	0	
+00453d30	10	[END TEXT]	4	005f12bd 005f17ff 005f1a7d 005f1d35
+00453df8	59	                                   [--- START CONTROLS ---]	0	
+00453e90	49	                                   [CONTROL NAME]	0	
+00453ef4	4	Text	2	005f1b4f 005f1ba9
+00453f04	9	txtHelper	0	
+00453f74	45	                                   [END TEXT]	0	
+00453fd0	4	List	2	005f1cac 005f1e0c
+00453fdc	9	ListCount	0	
+00453ff0	11	ToolTipText	1	005f1f2b
+0045400c	44	                                   [TOOLTIP]	0	
+004540bc	4	Left	1	005f1fbf
+004540cc	16	[---END FORM---]	1	005f129e
+00454150	5	Width	1	005f20e7
+0045415c	6	Height	1	005f217b
+00454170	51	                                   [---END FORM---]	0	
+004541dc	18	Add_To_Lang_File: 	0	
+00454204	5	Index	0	
+00454210	7	Charset	2	005f0870 005f18bf
+00454220	9	Alignment	2	005f095d 005f09b6
+00454234	11	RightToLeft	1	005f0a5a
+00454250	18	[---START FORM---]	1	005f0d57
+0045427c	9	[CAPTION]	1	005f0ea7
+004542ac	24	[--- START CONTROLS ---]	1	005f131a
+004542e4	14	[CONTROL NAME]	1	005f1339
+00454308	6	[TEXT]	1	005f17ab
+00454318	9	MultiLine	1	005f19dc
+00454330	9	[TOOLTIP]	1	005f1ebd
+00454360	30	 - not found in language file!	0	
+004543a4	20	Load_from_Lang_File:	0	
+004543d4	28	Error on load_ignore_list() 	0	
+00454410	6	Parent	0	
+00454424	29	Error on is_in_ignore_list() 	0	
+00454478	36	Error on is_in_ignore_list_BY_STR() 	0	
+004544c8	34	internal messages file not found: 	0	
+00454514	18	LANG_FILE_VERSION=	0	
+00454540	95	; === for updated default localization file check out this url: http://www.emu8086.com/dr/loc/ 	0	
+00454604	30	 - unequal number of messages!	0	
+00454644	23	__vbaVarLateMemCallLdRf	0	
+00454660	106	; === it is required to translate text at leftmost position only. names and labels should not be modified.	0	
+0045473c	100	; === numbers may be modified only if it required to increase the size of the control and rearrange 	0	
+0045480c	22	[---START MESSAGES---]	0	
+00454840	93	      the position of the controls (it may not work as expected for some controls if software	0	
+00454900	38	      rearranges them on form resize).	0	
+00454954	57	;  note: line numbers must be preserved for the messages.	0	
+004549cc	21	SAVE_RESERVED_SPACE: 	0	
+004549fc	20	[---END MESSAGES---]	0	
+00454a2c	103	;  automatic word-wrap must not be used. use plain text editors only or the automated translation tool.	0	
+00454b00	82	;  if you wish you may include your name and/or email address on top of this file.	0	
+00454bac	19	RIGHT_TO_LEFT=false	0	
+00454bd8	16	; character set:	0	
+00454c00	9	CHARSET=0	0	
+00454c18	105	;  if you decide to translate this file, you may need to update it regularly for new versions of emu8086.	0	
+00454cf0	86	;  for more information and updated template visit: http://www.emu8086.com/dr/loc/    	0	
+00454da4	39	; enable/disable bidirectional support:	0	
+00454df8	57	                                   [---START MESSAGES---]	0	
+00454e70	16	[START MESSAGES]	0	
+00454e98	55	                                   [---END MESSAGES---]	0	
+00454f0c	23	SAVE_DEFAULT_MESSAGES: 	0	
+00454f40	32	_reserved_space_for_lang.dat.txt	0	
+00454f88	16	file not found: 	0	
+00454fb0	16	checkCondition: 	0	
+00454fdc	29	Error on load_MESSAGE_FILES: 	0	
+00455038	18	 - not translated!	0	
+00455064	14	Error on cMT: 	0	
+00455088	7	CHARSET	0	
+0045509c	13	RIGHT_TO_LEFT	0	
+004550bc	22	Load_LANG_PROPERTIES: 	0	
+004550f0	16	clang free mem: 	0	
+00455114	18	__vbaLateMemCallSt	0	
+00455128	14	__vbaCheckType	0	
+00455138	17	__vbaCheckTypeVar	0	
+0045514c	21	__vbaVarLateMemCallLd	0	
+00455168	22	stop_on_condition.html	1	005f2729
+0045519c	25	frmStopOnCondition_LOAD: 	0	
+004551d4	29	frmStopOnCondition.DoShowMe: 	0	
+00455214	39	checkCondition: brrrr: wrong selection?	0	
+00455268	5	 /Fe"	1	00619b47
+00455278	31	error on compare_to_condition: 	0	
+004552bc	20	set_CONDITION_TRUE: 	0	
+004552ec	11	source code	2	005f610e 005f6239
+00455308	24	frmExportHTML_DOSHOWME: 	0	
+00455340	20	frmExportHTML_LOAD: 	0	
+00455370	6	<html>	2	005f7787 005fcee9
+00455384	6	<head>	2	005f77aa 005fcf0c
+00455398	14	       <title>	2	005fcfa0 005f783d
+004553bc	8	</title>	2	005fcfb9 005f7856
+004553d4	41	       <meta name="description" content="	2	005fd07e 005f7915
+00455438	4	.map	1	0061892f
+00455448	14	       <style>	2	005f796c 005fd0d2
+0045546c	41	           a:link {text-decoration: none}	2	005f7990 005fd0f3
+004554c4	44	           a:visited {text-decoration: none}	2	005f79b4 005fd114
+00455524	57	           a:hover {text-decoration: none; color:#ff0000}	2	005f79d8 005fd135
+0045559c	15	       </style>	2	005f79fc 005fd156
+004555c0	7	</head>	2	005f7a20 005fd177
+004555d4	17	<body leftmargin=	2	005fd2fd 005f7ba0
+004555fc	14	  rightmargin=	2	005fd310 005f7bb3
+00455620	22	 topmargin=20 bgcolor=	2	005fd32d 005f7bd0
+00455654	6	 text=	2	005fd34d 005f7bed
+00455668	33	 link=blue vlink=blue alink=blue>	2	005fd36d 005f7c0a
+004556b0	10	<!-- * -->	2	005f7ce1 005fd438
+004556cc	34	&nbsp; &nbsp;<center> <font color=	1	005f7f60
+00455718	22	> ;</font> <font size=	1	005f7f7d
+0045574c	7	 face="	3	005fd787 005f7f9a 005f81f6
+0045576c	17	 </font></center>	1	005f7fe1
+00455794	43	<!-- START AUTOMATIC ASM TO HTML EXPORT -->	1	005f80b4
+004557f0	16	<pre><font size=	1	005f81e3
+00455818	17	<pre><font face="	1	005f8294
+00455848	4	&gt;	2	005fe124 005f8580
+00455858	4	&lt;	2	005fe152 005f85a1
+00455868	5	&amp;	2	005fe0f6 005f85c2
+00455878	13	</font></pre>	1	005f86ed
+00455898	32	<br>  <br> <center> <font color=	1	005f877a
+004558e0	114	>;</font>  <font face="verdana" size=3><a href="index.html"><u>- index -</u></a></font> </center> <br>  <br><br>  	1	005f878d
+004559cc	21	<center> <font color=	2	005fdb76 005f882b
+004559fc	91	>;</font> <a href="http://www.emu8086.com" target="_blank"><font face=verdana size=1 color=	2	005fdb8c 005f883e
+00455ab8	36	> - asm2html - </font></a> </center>	2	005fdbac 005f885b
+00455b08	21	<!-- emu8086 version 	2	005fdd61 005f89d4
+00455b38	7	    -->	2	005fdde1 005f8a4e
+00455b4c	42	<!-- STOP AUTOMATIC ASM TO HTML EXPORT -->	1	005f8aae
+00455ba8	12	<!-- *** -->	2	005f8b4f 005fdedf
+00455bc8	7	</body>	2	005f8b9a 005fdf2a
+00455bdc	7	</html>	2	005f8bb3 005fdf43
+00455bf0	35	save_assembly_source_code_to_HTML: 	0	
+00455c3c	11	mycode.html	1	005f92b2
+00455c58	58	HTML files (*.html;*.htm)|*.html;*.htm|All Files (*.*)|*.*	1	005f92f0
+00455cd4	4	html	1	005f92fc
+00455ce4	41	frmExportHTML.mnuExportSingleFile_Click: 	0	
+00455d3c	12	<font color=	3	005fa471 005fa873 005fa624
+00455d5c	7	</font>	3	005fa4b9 005fa8ad 005fa65e
+00455d70	19	make_HTML_COLORED: 	0	
+00455d9c	13	+-*/[]~%^&|<>	1	00429440
+00455de4	49	%AAA%AAD%AAM%AAS%ADC%ADD%AND%CALL%CBW%CLC%CLD%CLI	1	00429450
+00455e4c	49	%CMC%CMP%CMPSB%CMPSW%CWD%DAA%DAS%DEC%DIV%HLT%IDIV	1	00429454
+00455eb4	48	%IMUL%IN%INC%INT%INTO%IRET%JA%JAE%JB%JBE%JC%JCXZ	1	00429458
+00455f1c	25	     click OK to explore.	1	005fc7db
+00455f54	51	%JE%JG%JGE%JL%JLE%JMP%JNA%JNAE%JNB%JNBE%JNC%JNE%JNG	1	0042945c
+00455fc0	50	%JNGE%JNL%JNLE%JNO%JNP%JNS%JNZ%JO%JP%JPE%JPO%JS%JZ	1	00429460
+0045602c	47	%LAHF%LDS%LEA%LES%LODSB%LODSW%LOOP%LOOPE%LOOPNE	1	00429464
+00456090	77	%LOOPNZ%LOOPZ%MOV%MOVSB%MOVSW%MUL%NEG%NOP%NOT%OR%OUT%POP%POPA%POPF%PUSH%PUSHA	1	00429468
+00456130	4	COFF	2	0060cd78 0060cd90
+00456140	49	%PUSHF%RCL%RCR%REP%REPE%REPNE%REPNZ%REPZ%RETF%RET	1	0042946c
+004561a8	57	%ROL%ROR%SAHF%SAL%SAR%SBB%SCASB%SCASW%SHL%SHR%STC%STD%STI	1	00429470
+00456220	41	%STOSB%STOSW%SUB%TEST%XCHG%XLAT%XLATB%XOR	1	00429474
+00456278	11	%WAIT%FWAIT	1	0042947c
+00456294	20	%PROC%MACRO%SEGMENT%	1	005fad13
+004562c4	41	%XMM0%XMM1%XMM2%XMM3%XMM4%XMM5%XMM6%XMM7%	1	0042949c
+0045631c	531	%F2XM1%F4X4%FABS%FADD%FADDP%FBANK%FBLD%FBSTP%FCHS%FCLEX%FCOM%FCOMP%FCOMPP%FCOS%FDECSTP%FDISI%FDIV%FDIVP%FDIVR%FDIVRP%FENI%FFREE%FIADD%FICOM%FICOMP%FIDIV%FIDIVR%FILD%FIMUL%FINCSTP%FINIT%FIST%FISTP%FISUB%FISUBR%FLD%FLD1%FLDCW%FLDENV%FLDL2E%FLDL2T%FLDLG2%FLDLN2%FLDPI%FLDZ%FMUL%FMULP%FNCLEX%FNDISI%FNENI%FNINIT%FNOP%FNSAVE%FNSTCW%FNSTENV%FNSTSW%FPATAN%FPREM%FPREM1%FPTAN%FRNDINT%FRSTOR%FSAVE%FSCALE%FSETPM%FSIN%FSINCOS%FSQRT%FST%FSTCW%FSTENV%FSTP%FSTSW%FSUB%FSUBP%FSUBR%FSUBRP%FTST%FUCOM%FUCOMP%FUCOMPP%FXAM%FXCH%FXTRACT%FYL2X%FYL2XP1	1	00429478
+00456748	49	%AX%BX%CX%DX%AH%AL%BL%BH%CH%CL%DH%DL%DI%SI%BP%SP%	1	00429484
+004567b0	32	%EAX%ECX%EDX%EBX%ESP%EBP%ESI%EDI	1	00429488
+004567f8	16	%CR0%CR2%CR3%CR4	1	0042948c
+00456820	24	%DR0%DR1%DR2%DR3%DR6%DR7	1	00429490
+00456858	32	%ST0%ST1%ST2%ST3%ST4%ST5%ST6%ST7	1	00429494
+004568a0	32	%MM0%MM1%MM2%MM3%MM4%MM5%MM6%MM7	1	00429498
+004568e8	13	%DS%ES%SS%CS%	1	004294a0
+00456908	6	%FS%GS	1	004294a4
+0045691c	67	%ORG%DB%DW%DD%DT%DQ%EQU%END%BYTE%PTR%WORD%PTR%B.%W.%OFFSET%INCLUDE%	1	005fadbd
+004569a8	20	getcolor_for_token: 	0	
+00456a08	5	note:	1	005fb83a
+00456a18	49	     it is recommended to save any unsaved code. 	1	005fb85d
+00456a80	18	path to ASM files:	1	005fb88a
+00456aac	8	asm2html	2	005fb814 005fc73b
+00456ac4	9	asm2html\	1	005fbac8
+00456adc	6	      	1	005fc7a0
+00457344	226	%AX%BX%CX%DX%AH%AL%BL%BH%CH%CL%DH%DL%DI%SI%BP%SP%%EAX%ECX%EDX%EBX%ESP%EBP%ESI%EDI%CR0%CR2%CR3%CR4%DR0%DR1%DR2%DR3%DR6%DR7%ST0%ST1%ST2%ST3%ST4%ST5%ST6%ST7%MM0%MM1%MM2%MM3%MM4%MM5%MM6%MM7%XMM0%XMM1%XMM2%XMM3%XMM4%XMM5%XMM6%XMM7%	1	005fad4f
+00457510	19	%DS%ES%SS%CS%%FS%GS	1	005fad88
+00457590	25	  are to be overwritten !	1	005fbbb8
+004575c8	23	 source files pattern: 	1	005fbbe5
+004575fc	17	 -- WARNING ! -- 	1	005fbb73
+00457624	5	*.asm	1	005fbb4d
+00457634	28	no files with this pattern: 	1	005fbeb2
+00457674	4	in: 	1	005fbed4
+00457684	6	 from 	1	005fc4c3
+00457698	5	     	1	005fc761
+004576a8	41	 files and index.html are saved to:      	1	005fc782
+00457700	5	<li> 	1	005fd8ff
+00457710	22	cannot save index.html	1	005fc916
+00457744	20	mnuExportAll_Click: 	0	
+00457774	9	<center> 	1	005fd459
+0045778c	26	&nbsp; &nbsp; <font color=	1	005fd551
+004577c8	37	> ;</font> <h3><font face="verdana"> 	1	005fd571
+00457818	13	 </font></h2>	1	005fd58e
+00457838	41	<!-- START AUTOMATIC INDEX GENERATION -->	1	005fd63f
+00457890	15	<ul><font size=	1	005fd774
+004578b4	16	<ul><font face="	1	005fd82b
+004578dc	16	" target="_top">	1	005fd99f
+00457904	4	</a>	1	005fd9c9
+00457914	15	       <br><br>	2	005fda05 005fda47
+00457938	7	       	3	005fda26 005fda89 005fdaaa
+0045794c	5	</li>	1	005fda68
+0045795c	12	</ul></font>	1	005fdae1
+0045797c	40	<!-- STOP AUTOMATIC INDEX GENERATION -->	1	005fde3e
+004579d4	9	</center>	1	005fdec6
+004579ec	12	save_index: 	0	
+00457a0c	8	 &nbsp; 	1	005fe180
+00457a60	8	lstTable	0	
+00457a6c	26	DoShowMe_with_SYMBOL_TABLE	1	00437054
+00457a98	35	frmSymbolTableViewer.load_listing: 	0	
+00457ae4	21	frmSymbolTableViwer: 	0	
+00457b14	17	get_memory_dump :	0	
+00457b68	14	out of memory!	2	005ffbfb 0060347e
+00457b8c	30	ERR: mMemoryList.show_memory: 	0	
+00457be8	59	OBSOLETE:! USE: get_physical_address_from_hex_ea() instead!	0	
+00457c70	14	err_11_offset:	0	
+00457c94	15	err_11_segment:	0	
+00457cb8	13	err selblue: 	0	
+00457cd8	15	err selyellow: 	0	
+00457d50	12	err getlb4l:	0	
+00457d84	20	frmDebugLog.sASCII: 	0	
+00457de4	9	err sdis:	0	
+00457dfc	9	JMP 0FFFF	1	00602770
+00457e14	5	JMP 0	1	00602786
+00457e30	19	fix_327xo_dis_fix: 	0	
+00457e5c	4	 ...	1	00602e8c
+00457e6c	10	err: rdd: 	0	
+00457e88	20	disassembler error: 	0	
+00457eb8	10	mDI FrEEm:	0	
+00457ef0	23	cmdDisassemble_Click() 	0	
+00457f24	34	Error on selectDisassembledLine() 	0	
+00457f70	16	0123456789abcdef	1	0060423e
+00457f98	40	get_physical_address_from_hex_ea: err1: 	0	
+00458004	40	get_physical_address_from_hex_ea: err2: 	0	
+0045805c	38	ax,dx,cx,ip,sp,al,ah,bl,bh,cl,ch,dl,dh	2	00604b70 00604b95
+004580b0	56	replace_any_wrong_register_name_inside_with_hex_BY_REF: 	0	
+00458128	50	err get_offset_from_registers_memory_combination: 	0	
+00458194	38	get_register_value: wrong parameter!: 	0	
+004581e8	33	get_segment_address_from_hex_ea: 	0	
+00458230	32	get_offset_address_from_hex_ea: 	0	
+00458274	13	__vbaVarCmpLe	0	
+00458288	13	DTA ADDRESS: 	1	0060666c
+004582a8	6	PATH: 	1	0060690b
+004582bc	10	DOS PATH: 	1	006069fa
+004582d8	12	ATTRIBUTES: 	1	00606af6
+004582f8	4	h = 	1	00606b2f
+00458314	9	PATTERN: 	1	00606d05
+0045832c	18	cmdGetInfo_Click: 	0	
+00458358	16	do_INT_21h_4Ah: 	0	
+00458380	19	cmdShowPath_Click: 	0	
+004583bc	19	FRM_DOS_FILE_LOAD: 	0	
+004583e8	14	SCANNING DIRS!	0	
+0045840c	15	SCANNING FILES!	0	
+00458430	36	set_PATH_AND_GET_FIRST_FILE_TO_DTA: 	0	
+00458498	26	do_INT_21_4E_4F_StepBack: 	0	
+004584d4	22	get_NEXT_FILE_TO_DTA: 	0	
+00458508	20	get file time failed	0	
+00458538	6	format	1	0060cc6c
+00458550	20	GET_FILE_DATE_TIME: 	0	
+00458580	21	get file time failed.	1	00609a3f
+004585b0	22	MAKE_WIN32_FILE_TIME: 	0	
+004585e4	21	set file time failed.	1	00609e2f
+00458614	13	getBitValue: 	0	
+00458634	13	setBitValue: 	0	
+00458654	20	set file time failed	1	0060a4b7
+00458684	20	SET_FILE_DATE_TIME: 	0	
+004586b4	18	CORRECT_FROM_GMT: 	0	
+004586e0	16	CORRECT_to_GMT: 	0	
+00458720	34	Allocate Memory Block OK (reusing)	0	
+0045876c	28	Allocate Memory Block FAILED	0	
+004587ac	24	Allocate Memory Block OK	0	
+004587e4	16	do_INT_21h_48h: 	0	
+0045880c	30	Release Memory Block 'success'	0	
+00458850	16	do_INT_21h_49h: 	0	
+00458878	23	Resize Memory Block OK!	0	
+004588ac	27	Resize Memory Block FAILED!	0	
+004588e8	5	name 	2	0060c6b2 00616a00
+004588fc	55	STOP: ============ TERMINATED BY STOP BUTTON ! ======= 	1	0060b4c2
+00458970	5	#fasm	2	0060bbe7 0060c86f
+00458980	5	use16	1	0060bc0f
+00458990	5	use32	1	0060bc37
+004589a0	14	; fasm example	1	0060bc5f
+004589c4	7	format 	1	0060bc87
+004589d8	13	; LIFE - fasm	1	0060bcaf
+004589f8	14	; requires FPU	1	0060bcd7
+00458a1c	8	include 	1	0060bcff
+00458a34	21	include 'win32ax.inc'	1	0060bd23
+00458a64	11	win32ax.inc	2	0060bd51 0060ce2d
+00458a80	5	#masm	2	0060bd68 00616b96
+00458a90	20	check_IS_FASM_MASM: 	0	
+00458ac0	13	db 'DEVICE  '	1	0060ce6d
+00458aec	182	all binary files (*.exe;*.com;*.bin;*.dll;*.sys;*.obj)|*.exe;*.com;*.bin;*.dll;*.sys;*.obj|exe files (*.exe)|*.exe|com files (*.com)|*.com|bin files (*.bin)|*.com|all Files (*.*)|*.*	2	0060d9f1 00617c05
+00458c60	9	set PATH=	1	0060f4c3
+00458c78	4	fasm	1	0060f4f8
+00458c88	4	BIN\	2	00616090 00616114
+00458c98	60	cannot use this filename / sharing violation / access denied	2	0060daef 00617dc1
+00458d18	8	_fasm.ok	1	0060e1d5
+00458d30	9	_fasm.bat	1	0060e227
+00458d48	18	access denied [FB]	0	
+00458d74	5	_fasm	1	0060e2e5
+00458d84	4	.bat	2	00618874 0060e330
+00458d94	40	rem    EMU8086 - FASM INCORPORATION  -- 	1	0060e47b
+00458dec	12	set include=	2	0060e9a6 0060f1bc
+00458e0c	13	fasm\include;	2	0060e9db 0060f1f1
+00458e2c	4	inc;	4	00618f03 006195af 0060ea25 0060f23b
+00458e3c	9	MySource;	4	00618f4d 006195f9 0060ea6f 0060f285
+00458e54	4	cd "	4	00619f37 0061920c 0060fad1 0060ed2f
+00458e68	15	fasm\fasm.exe "	1	0060f69f
+00458e98	6	"  > "	1	0060f738
+00458eac	22	echo    fasm-ok    > "	1	0060fb58
+00458ee0	25	error: cannot start fasm!	1	0060fc70
+00458f18	17	assembler aborted	2	0060ffd7 0061a452
+00458f40	17	no binary output!	2	006102f1 0061a866
+00458f68	8	(GLOBAL)	1	0061145b
+00458f80	20	assemble_with_fasm: 	0	
+00458fb0	20	unrecoverable error!	1	00612d75
+00458fe0	6	error:	1	00612f98
+00458ff4	14	flat assembler	1	006130a0
+00459024	16	CHECK_FASM_LOG: 	0	
+0045904c	25	extractLineNum_FASM_LOG: 	0	
+00459098	10	__vbaStrR8	0	
+004590c4	18	 control register:	1	00615157
+004590f0	15	 FPU registers:	1	0061538e
+00459114	16	showFPU_STATE : 	0	
+0045913c	9	MASM_PATH	1	00615c72
+00459154	5	\BIN\	1	00615ce6
+00459164	35	MASM_PATH is not set in emu8086.ini	1	00615e73
+00459218	37	MASM_PATH must be set to MASM folder.	1	006161eb
+00459268	14	MASM_LINK_PATH	1	0061627a
+0045928c	8	LINK.EXE	1	006162f7
+004592a4	13	BINR\LINK.EXE	1	0061635f
+004592c4	5	BINR\	1	006163aa
+004592d4	17	MASM_INCLUDE_PATH	1	006163f4
+004592fc	4	.obj	2	006180f8 006189fe
+0045930c	8	_masm.ok	1	0061870a
+00459324	9	_masm.bat	1	00618762
+0045933c	18	access denied [MB]	0	
+00459368	5	_masm	1	00618829
+00459378	40	rem    EMU8086 - MASM INCORPORATION  -- 	1	00618ac2
+004593d0	12	SET INCLUDE=	2	00618ece 0061957a
+004593f0	9	SET PATH=	1	00619717
+00459408	8	SET LIB=	1	006197ad
+0045942c	9	SET INIT=	1	0061981b
+00459444	4	INIT	1	0061983c
+00459454	14	SET HELPFILES=	1	00619889
+00459478	10	HELP\*.HLP	1	006198aa
+00459494	10	SET ASMEX=	1	006198f7
+004594b0	7	SAMPLES	1	00619918
+004594c4	8	SET TMP=	1	00619965
+004594e8	11	ml.exe /Fl"	1	00619a31
+00459504	6	" /Fm"	1	00619a64
+00459518	6	" /Fo"	1	00619a97
+0045952c	22	echo    masm-ok    > "	1	00619fbe
+00459560	25	error: cannot start MASM!	1	0061a0dc
+004595a4	10	 [A-F,a-f]	1	0061af5e
+004595c0	7	segment	1	0061b272
+004595d4	7	"STACK"	1	0061b343
+004595e8	7	'STACK'	1	0061b360
+004595fc	20	assemble_with_masm: 	0	
+0045962c	7	: error	2	0061e76b 0061e8d3
+00459640	16	CHECK_MASM_LOG: 	0	
+00459668	25	extractLineNum_MASM_LOG: 	0	
+00459700	22	frmAssemble_ALL_IN_DIR	0	
+0045971b	25	Assemble All Files in Dir	0	
+00459764	8	fileBox1	0	
+004597ec	11	frmDOS_FILE	0	
+004597fc	12	DTA settings	0	
+00459867	7	txtInfo	0	
+0045988b	10	cmdGetInfo	0	
+0045989a	11	update info	0	
+004598e5	5	Close	0	
+0045992a	63	NOTE: the selected item is returned on next call to INT 21h/4Fh	0	
+004599e0	18	frmEvaluatorHelper	0	
+004599f7	15	calculator help	0	
+00459a41	9	txtHelper	0	
+00459a5d	242	~       not (inverts all bits).\n*       multiply.\n/       divide.\n%       modulus.\n+       sum.\n-       subtract (and unary -).\n<<      shift left.\n>>      shift right.\n&       bitwise AND.\n^       bitwise XOR.\n|       bitwise OR.\n	0	
+00459b76	8	Command1	0	
+00459b83	5	close	0	
+00459bfc	8	frmMacro	0	
+00459c09	8	frmMacro	0	
+00459c5e	10	lstCurrent	0	
+00459c7f	13	lstParameters	0	
+00459ca3	18	lstMacro_Locations	0	
+00459ccc	14	lstMacro_Names	0	
+00459cf1	9	lstMacros	0	
+00459d1c	9	p.values:	0	
+00459d46	14	current macro:	0	
+00459d75	11	parameters:	0	
+00459dc7	10	locations:	0	
+00459de7	6	Label1	0	
+00459df2	6	names:	0	
+00459e6c	14	frmASCII_CHARS	0	
+00459e7f	11	ascii codes	0	
+0045a654	17	frmChooseTemplate	0	
+0045a66a	20	choose code template	0	
+0045a6b8	9	cmdCancel	0	
+0045a6c6	6	Cancel	0	
+0045a740	10	chkUseFASM	0	
+0045a74f	77	use Flat Assembler / Intel syntax   [see: fasm_compatibility.asm in examples]	0	
+0045a7c5	15	option_template	0	
+0045a7d9	12	the emulator	0	
+0045a802	15	option_template	0	
+0045a816	16	empty workspace 	0	
+0045a843	15	option_template	0	
+0045a857	69	BOOT template - for creating floppy disk boot records (very advanced)	0	
+0045a8b9	15	option_template	0	
+0045a8cd	78	BIN template - pure binary file, allows all sorts of customizations (advanced)	0	
+0045a938	15	option_template	0	
+0045a94c	70	EXE template - advanced executable file. header: relocation, checksum.	0	
+0045a9af	15	option_template	0	
+0045a9c3	73	COM template - simple and tiny executable file format, pure machine code.	0	
+0045aa90	29	ALU - arithmetic & logic unit	0	
+0045aee4	8	frmStack	0	
+0045aef1	5	stack	0	
+0045b2ac	8	lstStack	0	
+0045b2ce	9	Terminal.	0	
+0045b340	8	frm_mBox	0	
+0045b34d	7	message	0	
+0045b712	10	txtMessage	0	
+0045b7e8	15	frmEditVariable	0	
+0045b7fc	24	 edit variable or buffer	0	
+0045bbe3	9	cmdCancel	0	
+0045bbf1	6	cancel	0	
+0045bc57	8	txtValue	0	
+0045bce8	15	frmSetOutputDir	0	
+0045bcfc	20	set output directory	0	
+0045c0f4	9	cmdCancel	0	
+0045c102	6	Cancel	0	
+0045c11e	12	cmdChooseDir	0	
+0045c148	7	txtPath	0	
+0045c166	13	chkUseDefault	0	
+0045c178	40	use default [emu8086\MyBuild] directory.	0	
+0045c214	15	frmFlagAnalyzer	0	
+0045c228	21	lexical flag analyser	0	
+0045c5f3	10	txtResults	0	
+0045c60b	273	=== unsigned ===\nnot below (CF=0)\n    above (CF=0 and ZF=0)\n\n=== signed ===\nnot less (SF=OF)\n    greater (SF=OF and ZF=0)\n\nnot equal (ZF=0)\npositive (SF=0)\nno overflow (OF=0)\nparity odd  (PF=0)\nnot aux carry (AF=0)\nhw-int enabled  (IF=1)\nforward dir  (DF=0)\n	0	
+0045c7a0	11	frmRegister	0	
+0045c7b0	13	 Registration	0	
+0045cb7c	8	VerdanaD	0	
+0045cb90	9	txtRegKey	0	
+0045cbc4	11	txtUserName	0	
+0045cbfa	11	cmdRegister	0	
+0045cc40	23	Buy Registration Key...	0	
+0045cc80	8	cmdLater	0	
+0045cc8d	6	Cancel	0	
+0045ccb7	17	Registration Key:	0	
+0045ccf5	11	lblUserName	0	
+0045cd05	14	Licensee Name:	0	
+0045cda0	9	frmUpdate	0	
+0045cdae	19	check for an update	0	
+0045d192	8	cmdLater	0	
+0045d19f	8	later...	0	
+0045d1d0	17	cmdCheckForUpdate	0	
+0045d1e6	22	check for an update...	0	
+0045d225	13	txtURL_MANUAL	0	
+0045d268	64	to disable update notification set UPDATE_CHECK=0 in emu8086.ini	0	
+0045d2d7	7	lblInfo	0	
+0045d2e3	92	this software is ## days old, please click the button below to check for an updated version.	0	
+0045d3b8	7	frmVars	0	
+0045d3c4	9	variables	0	
+0045d785	8	listVars	0	
+0045d7ad	9	Terminal.	0	
+0045d7dd	11	txtElements	0	
+0045d81d	9	comboSize	0	
+0045d88e	14	comboNumSystem	0	
+0045d910	7	cmdEdit	0	
+0045d936	6	Label1	0	
+0045d941	9	elements:	0	
+0045d96d	8	show as:	0	
+0045d998	5	size:	0	
+0045da14	11	frmDebugLog	0	
+0045da24	31	debug log - debug.exe emulation	0	
+0045de0f	12	comboConcole	0	
+0045df70	13	cmdSaveToFile	0	
+0045df82	15	save to file...	0	
+0045dfba	8	cmdClear	0	
+0045dfc7	5	clear	0	
+0045e078	11	frmOrigCode	0	
+0045e088	20	original source code	0	
+0045e452	16	cmaxActualSource	0	
+0045e466	18	CodeMaxCtl.CodeMax	0	
+0045e540	8	Terminal	0	
+0045e5e6	8	mnuPopUp	0	
+0045e5f5	8	mnuPopUp	0	
+0045e609	7	mnuCopy	0	
+0045e626	10	mnuCopyAll	0	
+0045e635	8	copy all	0	
+0045e647	7	mnuFind	0	
+0045e655	7	find...	0	
+0045e669	11	mnuFindNext	0	
+0045e67b	9	find next	0	
+0045e6f0	17	frm16Color_DIALOG	0	
+0045e706	12	select color	0	
+0045ead2	9	cmdCancel	0	
+0045eae0	6	Cancel	0	
+0045eb20	11	lblSelected	0	
+0045eb30	9	selected:	0	
+0045eb51	16	lblSelectedColor	0	
+0045eb7c	8	lblCOLOR	0	
+0045eba2	8	lblCOLOR	0	
+0045ebc8	8	lblCOLOR	0	
+0045ebee	8	lblCOLOR	0	
+0045ec14	8	lblCOLOR	0	
+0045ec3a	8	lblCOLOR	0	
+0045ec60	8	lblCOLOR	0	
+0045ec86	8	lblCOLOR	0	
+0045ecac	8	lblCOLOR	0	
+0045ecd2	8	lblCOLOR	0	
+0045ecf8	8	lblCOLOR	0	
+0045ed1e	8	lblCOLOR	0	
+0045ed44	8	lblCOLOR	0	
+0045ed6a	8	lblCOLOR	0	
+0045ed90	8	lblCOLOR	0	
+0045edb6	8	lblCOLOR	0	
+0045ee38	12	frmEvaluator	0	
+0045ee49	33	calculator - expression evaluator	0	
+0045f25b	13	frameSignType	0	
+0045f26d	22	treat hex,oct,bin as: 	0	
+0045f299	11	checkSigned	0	
+0045f2a9	6	signed	0	
+0045f2bf	71	When checked values with most significant bit=1 are treated as negative	0	
+0045f310	7	optByte	0	
+0045f342	7	optWord	0	
+0045f366	7	16 bits	0	
+0045f378	8	cmdClear	0	
+0045f385	5	clear	0	
+0045f3ad	29	Clear the evaluation text box	0	
+0045f3d4	15	frameResultType	0	
+0045f3e8	16	 show result as 	0	
+0045f40e	6	optOct	0	
+0045f42c	14	Octal (base 8)	0	
+0045f462	15	Binary (base 2)	0	
+0045f47b	6	optHex	0	
+0045f49b	21	Hexadecimal (base 16)	0	
+0045f4ba	10	optDecimal	0	
+0045f4c9	7	decimal	0	
+0045f4e0	25	Decimal (regular base 10)	0	
+0045f504	14	timerEvaluator	0	
+0045f52e	12	txtEvaluator	0	
+0045f5c8	16	frmBaseConvertor	0	
+0045f5dd	14	base convertor	0	
+0045f9a7	10	txtASCII_L	0	
+0045f9e1	10	txtASCII_H	0	
+0045fa3a	8	opt16bit	0	
+0045fa8c	11	txtHEX_8bit	0	
+0045facc	12	txtHEX_16bit	0	
+0045fb54	12	txtDecSigned	0	
+0045fb95	14	txtDecUnsigned	0	
+0045fbff	12	lblSignedInt	0	
+0045fc10	6	signed	0	
+0045fc2e	6	Label1	0	
+0045fc39	8	unsigned	0	
+0045fca9	8	00000000	0	
+0045fcd7	8	lblASCII	0	
+0045fce4	11	ascii char:	0	
+0045fdb4	19	frmWriteBinToFloppy	0	
+0045fdcc	39	write .bin file to virtual floppy drive	0	
+004601af	9	comboHead	0	
+004601fc	11	comboSector	0	
+0046023b	13	comboCylinder	0	
+0046027c	8	cmdWrite	0	
+00460289	5	write	0	
+004602b7	9	cmdCancel	0	
+004602c5	5	close	0	
+004602f3	16	comboDriveNumber	0	
+0046036f	10	cmdGetFile	0	
+00460397	16	txtPathToBinFile	0	
+004603c9	39	the kernel must be written to sector 2.	0	
+00460413	44	boot sector: cylinder: 0, head: 0, sector: 1	0	
+00460462	32	note: each sector has 512 bytes.	0	
+004604a5	5	head:	0	
+004604cd	7	sector:	0	
+0046051b	9	cylinder:	0	
+00460547	13	drive number:	0	
+0046056c	20	lblSectorsInBootFile	0	
+004605bb	6	Label1	0	
+004605c6	24	path to .bin/.boot file:	0	
+00460654	7	frmInfo	0	
+00460660	16	assembler status	0	
+00460a33	8	VerdanaD	0	
+00460a49	8	cmdClose	0	
+00460a56	5	close	0	
+00460a73	11	cmdExternal	0	
+00460a83	11	external...	0	
+00460a9e	39	load this file to debug.exe  (external)	0	
+00460ad1	14	lstERROR_CAUSE	0	
+00460afa	15	MS Sans Serif,	0	
+00460b13	10	cmdEmulate	0	
+00460bc1	16	cmdBrowseMyBuild	0	
+00460bf5	17	picProgressHolder	0	
+00460c30	15	MS Sans Serif;	0	
+00460c4b	9	lstStatus	0	
+00460c6f	13	lstErr_BUFFER	0	
+00460c97	15	MS Sans Serif,	0	
+00460cb0	6	lstErr	0	
+00460cd1	14	timerAnimation	0	
+00460cfb	10	txtCURRENT	0	
+00460d29	9	Terminal0	0	
+00460d3e	14	lblPASS_NUMBER	0	
+00460d8a	12	mnuCopyPopup	0	
+00460d9d	12	mnuCopyPopup	0	
+00460db5	11	mnuCopyLine	0	
+00460dc5	18	copy selected line	0	
+00460de1	10	mnuCopyAll	0	
+00460df0	8	copy all	0	
+00460e03	11	mnuExternal	0	
+00460e13	8	external	0	
+00460e27	11	mnuDebugEXE	0	
+00460e37	9	debug.exe	0	
+00460e4f	16	mnuCommandPrompt	0	
+00460e64	14	command prompt	0	
+00460e7c	14	mnuExternalRun	0	
+00460ebb	18	mnuShowSymbolTable	0	
+00460ed2	12	symbol table	0	
+00460ee8	14	mnuShowListing	0	
+00460efb	7	listing	0	
+00460f0c	16	mnuDelimeter0001	0	
+00460f2e	10	mnuExplore	0	
+00460f3d	10	explore...	0	
+00460fb0	8	frmFLAGS	0	
+00460fbd	5	flags	0	
+00461380	10	cmdAnalize	0	
+0046138f	7	analyse	0	
+004613ac	8	fraFlags	0	
+00461404	10	Fixedsys/\n	0	
+0046140f	10	Carry Flag	0	
+00461467	30	Zero Flag (0-not zero, 1-zero)	0	
+004614c8	10	Fixedsys/"	0	
+004614d3	34	Sign Flag (0-positive, 1-negative)	0	
+00461538	10	Fixedsys/	0	
+00461543	13	Overflow Flag	0	
+0046159e	27	Parity Flag (0-odd, 1-even)	0	
+00461607	14	Auxiliary Flag	0	
+00461663	20	Interupt enable Flag	0	
+004616ba	10	Fixedsys/&	0	
+004616c5	38	Direction Flag (0-forward, 1-backward)	0	
+0046171b	10	Carry Flag	0	
+00461755	30	Zero Flag (0-not zero, 1-zero)	0	
+004617a3	34	Sign Flag (0-positive, 1-negative)	0	
+004617f5	13	Overflow Flag	0	
+00461832	27	Parity Flag (0-odd, 1-even)	0	
+0046187d	14	Auxiliary Flag	0	
+004618bb	20	Interupt enable Flag	0	
+004618ff	38	Direction Flag (0-forward, 1-backward)	0	
+00461990	23	frmScreen_ASCII_CHARMAP	0	
+004619ac	26	256 ascii chars. 8x8 each.	0	
+00461a1f	13	pic_chars_8x8	0	
+004623f8	13	frmExportHTML	0	
+0046240a	14	export to HTML	0	
+004627e3	8	lstIndex	0	
+00462804	8	FileList	0	
+00462825	16	chkFilenameOnTop	0	
+0046283a	17	file name on top.	0	
+00462865	18	chkDefaultFontSize	0	
+0046287c	15	browser default	0	
+004628a3	20	chkAddExportedByNote	0	
+004628bc	19	asm2html hyperlink.	0	
+004628e9	14	txtDescription	0	
+0046290e	8	txtTitle	0	
+0046292d	11	txtFontSize	0	
+0046294f	11	txtFontName	0	
+00462971	8	cmdClose	0	
+0046297e	5	close	0	
+004629ac	9	cmdBrowse	0	
+004629ba	7	open...	0	
+004629ec	9	txtMargin	0	
+00462a0c	9	cmdExport	0	
+00462a1a	9	export...	0	
+00462a4c	16	lblBatchProgress	0	
+00462a61	12	000 from 000	0	
+00462a96	9	Fixedsys'	0	
+00462aa9	12	lblFileSaved	0	
+00462aba	20	 html file is saved 	0	
+00462af9	8	Verdana'	0	
+00462b17	56	 note: you may need to click refresh to see the changes 	0	
+00462b79	14	lblDescription	0	
+00462b8c	12	description:	0	
+00462bb0	8	lblTitle	0	
+00462bbd	6	title:	0	
+00462bdb	11	lblFontsize	0	
+00462beb	10	font size:	0	
+00462c0d	11	lblFontname	0	
+00462c1d	10	font name:	0	
+00462c3f	9	lblMargin	0	
+00462c4d	7	margin:	0	
+00462c6d	8	mnuPopUp	0	
+00462c7c	8	mnuPopUp	0	
+00462c90	10	mnuExplore	0	
+00462c9f	10	explore...	0	
+00462cb3	7	mnuOpen	0	
+00462cbf	10	in browser	0	
+00462cd3	16	mnuOpenInNotepad	0	
+00462ce8	10	in notepad	0	
+00462cfd	11	mnuAdvanced	0	
+00462d0f	8	advanced	0	
+00462d23	17	mnuDelimeter00001	0	
+00462d46	19	mnuExportSingleFile	0	
+00462d5e	21	export source code...	0	
+00462d7d	17	mnuDelimeter00004	0	
+00462da0	12	mnuExportAll	0	
+00462db1	35	export all files with index.html...	0	
+00462dde	17	mnuDelimeter00000	0	
+00462e60	17	frmExtendedViewer	0	
+00462e76	21	extended value viewer	0	
+00463247	7	optWord	0	
+0046326d	7	optByte	0	
+00463295	13	txtMemSegment	0	
+004632ce	7	Segment	0	
+004632df	12	txtMemOffset	0	
+00463317	6	Offset	0	
+00463327	17	comboRegisterName	0	
+004633fe	15	 decimal 16 bit	0	
+00463423	16	txtDEC_16bit_UNS	0	
+0046346e	16	txtDEC_16bit_SGN	0	
+004634c6	9	unsigned:	0	
+004634f2	7	signed:	0	
+0046351e	15	 decimal 8 bit 	0	
+00463543	10	txtASCII_H	0	
+00463584	10	txtASCII_L	0	
+004635c5	12	txtDEC_L_SGN	0	
+0046360b	12	txtDEC_H_SGN	0	
+00463651	12	txtDEC_L_UNS	0	
+00463696	12	txtDEC_H_UNS	0	
+0046370e	7	signed:	0	
+00463738	9	unsigned:	0	
+0046375a	8	txtOCT_L	0	
+0046379b	8	txtOCT_H	0	
+004637f2	8	00000000	0	
+00463838	8	00000000	0	
+00463936	6	Label1	0	
+00463979	9	High Byte	0	
+004639a8	8	Low Byte	0	
+004639bb	17	lblMem_semicolumn	0	
+00463a0b	6	watch:	0	
+00463a88	8	frmAbout	0	
+00463a95	13	about emu8086	0	
+00463ae0	13	picCopyrights	0	
+00463b0d	13	txtCopyright3	0	
+00463b32	97	 Flat Assembler version 1.64\n Copyright (c) 1999-2008, Tomasz Grysztar.\n All rights reserved.\n	0	
+00463ba8	13	lblCopyright1	0	
+00463bc6	41	 2008 emu8086.com   All rights reserved. 	0	
+00463c1e	13	lblCopyright2	0	
+00463c30	65	 Portions Copyright 1997-2008 Barry Allyn.  All rights reserved. 	0	
+00463cac	32	 this product is registered to: 	0	
+00463cf5	11	cmdRegister	0	
+00463d05	43	click here to enter the registration key...	0	
+00463d59	11	lblUserName	0	
+00463dec	12	lblLicNumber	0	
+00463eb1	7	picIcon	0	
+004641fe	9	lblRegNow	0	
+00464311	14	lblDescription	0	
+00464324	28	8086 microprocessor emulator	0	
+00464382	15	www.emu8086.com	0	
+00464705	8	lblTitle	0	
+00464712	17	Application Title	0	
+00464784	10	lblVersion	0	
+00464840	20	frmSymbolTableViewer	0	
+00464859	12	symbol table	0	
+004655e1	8	lstTable	0	
+00465664	10	frmOptions	0	
+00465673	7	options	0	
+00465a3a	10	frameOther	0	
+00465a5b	21	chkConfineCaretToText	0	
+00465a75	21	confine caret to text	0	
+00465aa0	19	comboAutoIndentMode	0	
+00465b12	27	chkKeywordCaseNormalization	0	
+00465b32	26	keyword case normalization	0	
+00465b62	19	chkShowLineToolTips	0	
+00465b7a	33	show line numbers on thumb scroll	0	
+00465bbc	17	auto-indent mode:	0	
+00465bf1	18	 fonts and colors 	0	
+00465c19	10	cmdSetFont	0	
+00465c28	12	set font ...	0	
+00465c4a	12	comboObjects	0	
+00465ccb	19	picGeneralBackColor	0	
+00465d08	10	lblObjects	0	
+00465d17	8	control:	0	
+00465d42	17	background color:	0	
+00465d6c	13	frameKeywords	0	
+00465d7e	10	 keywords 	0	
+00465d9e	19	picKeywordForeColor	0	
+00465ddd	25	picKeywordBackgroundColor	0	
+00465e22	21	comboKeywordFontStyle	0	
+00465e5f	7	italic	0	
+00465e67	14	bold + italic 	0	
+00465e9c	16	comboKeywordItem	0	
+00465eea	16	decimal numbers 	0	
+00465f18	8	strings 	0	
+00465f2c	12	segment reg\n	0	
+00465f78	15	lblKeyForeColor	0	
+00465f8c	17	foreground color:	0	
+00465fb7	15	lblKeyBackColor	0	
+00465fcb	17	background color:	0	
+00465ff6	15	lblKeyFontStyle	0	
+0046600a	11	font style:	0	
+00466053	14	lblKeywordItem	0	
+00466084	9	frameTabs	0	
+004660ae	14	chkConvertTabs	0	
+004660c1	35	convert tabs to spaces while typing	0	
+004660fa	10	txtTabSize	0	
+00466139	10	lblTabSize	0	
+00466148	9	tab size:	0	
+0046616a	12	cmdAssociate	0	
+0046618d	16	frameLineNumbers	0	
+004661a2	14	 line numbers 	0	
+004661c6	23	comboLineNumberingStyle	0	
+00466235	23	txtStartLineNumberingAt	0	
+0046628e	9	start at:	0	
+004662ba	6	style:	0	
+004662d9	10	picDefault	0	
+004663ea	18	cmdResetToDefaults	0	
+00466401	9	reset all	0	
+0046642a	5	close	0	
+004664b8	14	frmBatchStatus	0	
+0046724f	8	Command1	0	
+0046725c	8	tab stub	0	
+0046727a	7	cmdStop	0	
+004672f1	9	Terminal'	0	
+00467304	10	lblVersion	0	
+00467313	36	emu8086 assembler emulator [version]	0	
+00467379	45	To hide -> emu8086.ini: SILENT_ASSEMBLER=true	0	
+004673da	10	shapeFrame	0	
+004673f8	9	lblStatus	0	
+00467406	35	file [i] out of [total]: [filename]	0	
+004674c0	9	frmMemory	0	
+004674ce	20	Random Access Memory	0	
+00468273	10	picMemView	0	
+004682a7	15	MS Sans Serif;	0	
+004682c0	12	txtMicroEdit	0	
+004682f5	7	optList	0	
+00468333	8	optTable	0	
+00468340	5	table	0	
+00468375	13	txtMemoryAddr	0	
+004683bc	13	cmdShowMemory	0	
+004683ce	6	update	0	
+004683f7	20	update memory viewer	0	
+00468415	9	lstMemory	0	
+0046844b	14	lblCurrentAddr	0	
+0046848f	11	shapeBorder	0	
+0046850c	9	frmScreen	0	
+0046851a	15	emulator screen	0	
+004692a4	15	picHotKeyNotice	0	
+004692dd	15	lblHotKeyNotice	0	
+004692f1	20	SCREEN_HOTKEYS=false	0	
+0046932c	8	Verdana'	0	
+0046933f	21	timerHideHotKeyNotice	0	
+00469370	15	timer_Flash_HID	0	
+0046939b	13	cmdChangeFont	0	
+004693ad	11	change font	0	
+004693d0	10	timerInput	0	
+004693f6	14	cmdClearScreen	0	
+00469409	12	clear screen	0	
+0046942d	9	picSCREEN	0	
+00469463	9	Terminal;	0	
+00469476	16	txtCommandPrompt	0	
+004694b7	23	lblHardwareIntsDisabled	0	
+004694d3	34	 hardware interrupts are disabled 	0	
+00469519	22	lblKeyboardBufferASCII	0	
+00469569	17	lblKeyboardBuffer	0	
+004695fc	18	frmStopOnCondition	0	
+00469613	17	stop on condition	0	
+0046a3b0	13	txtMemoryAddr	0	
+0046a508	14	timerRemoveRed	0	
+0046a532	14	comboCondition	0	
+0046a5a9	17	comboRegisterName	0	
+0046a610	9	word at:\n	0	
+0046a61a	11	Carry Flag 	0	
+0046a626	10	Zero Flag 	0	
+0046a646	7	Parity 	0	
+0046a64e	10	Auxiliary 	0	
+0046a659	10	Interrupt 	0	
+0046a6c0	13	txtExpression	0	
+0046a6f0	47	hex values must start with 0 and have h suffix.	0	
+0046a74e	18	lblConditionIsTrue	0	
+0046a765	23	 the condition is true 	0	
+0046a7a0	10	lblOperand	0	
+0046a7af	7	operand	0	
+0046a7e3	12	lblCondition	0	
+0046a7f4	9	condition	0	
+0046a82a	8	lblValue	0	
+0046a837	10	expression	0	
+0046a8cc	20	frmSORRY_2_INTERRUPT	0	
+0046a8e5	17	 demo version....	0	
+0046acd1	34	CLICK HERE TO BUY THIS SOFTWARE...	0	
+0046ad1e	8	Command3	0	
+0046ad2b	11	Purchase...	0	
+0046b06c	8	Command2	0	
+0046b079	29	Enter the Registration Key...	0	
+0046b3cc	8	Command1	0	
+0046b3d9	6	Cancel	0	
+0046b715	13	lblemu8086com	0	
+0046b727	15	www.emu8086.com	0	
+0046ba86	60	Thank you for taking time to evaluate this software product.	0	
+0046baee	68	If you'd like to continue using this software, you must purchase it.	0	
+0046bb53	19	lblSorryToInterrupt	0	
+0046bb6b	52	Your free evaluation period has expired 500 days ago	0	
+0046bc40	10	frmStartUp	0	
+0046bc4f	12	launching...	0	
+0046c01c	8	VerdanaD	0	
+0046c032	10	cmdSamples	0	
+0046c041	13	code examples	0	
+0046c5c0	12	cmdTutorials	0	
+0046c5d1	17	quick start tutor	0	
+0046cb54	9	cmdRecent	0	
+0046cb62	12	recent files	0	
+0046d0d0	15	fraRegisteredTo	0	
+0046d0e4	32	 this product is registered to: 	0	
+0046d13e	12	lblLicNumber	0	
+0046d1c8	11	lblUserName	0	
+0046d25f	8	Verdana'	0	
+0046d7e4	14	cmdEnterRegKey	0	
+0046d7f7	40	PLEASE  ENTER  THE  REGISTRATION  KEY...	0	
+0046d853	7	picIcon	0	
+0046dba2	15	MS Sans Serif;	0	
+0046dc92	16	lbl_URL_OR_EMAIL	0	
+0046e04b	14	lblDescription	0	
+0046e05e	49	microprocessor emulator with integrated assembler	0	
+0046e0c8	8	lblTitle	0	
+0046e0d5	17	Application Title	0	
+0046e14b	10	lblVersion	0	
+0046e15a	7	version	0	
+0046e1ad	9	mnuRecent	0	
+0046e1c0	8	Recent 1	0	
+0046e1d4	9	mnuRecent	0	
+0046e1e7	8	Recent 2	0	
+0046e1fb	9	mnuRecent	0	
+0046e20e	8	Recent 3	0	
+0046e222	9	mnuRecent	0	
+0046e235	8	Recent 4	0	
+0046e249	9	mnuRecent	0	
+0046e268	9	mnuRecent	0	
+0046e287	9	mnuRecent	0	
+0046e2a6	9	mnuRecent	0	
+0046e2c5	9	mnuRecent	0	
+0046e2e4	9	mnuRecent	0	
+0046e303	9	mnuRecent	0	
+0046e322	9	mnuRecent	0	
+0046e341	9	mnuRecent	0	
+0046e360	9	mnuRecent	0	
+0046e37f	9	mnuRecent	0	
+0046e39e	9	mnuRecent	0	
+0046e3bd	9	mnuRecent	0	
+0046e3dc	9	mnuRecent	0	
+0046e3fb	9	mnuRecent	0	
+0046e41a	9	mnuRecent	0	
+0046e439	9	mnuRecent	0	
+0046e458	9	mnuRecent	0	
+0046e477	9	mnuRecent	0	
+0046e494	13	mnuOtherFiles	0	
+0046e4a6	14	other files...	0	
+0046e4be	11	mnu_nothing	0	
+0046e53c	12	frmEmulation	0	
+0046e54d	28	8086 microprocessor emulator	0	
+0046e923	13	picPleaseWait	0	
+0046e95a	13	lblPleaseWait	0	
+0046e96c	15	please wait....	0	
+0046e9ae	10	picLOADING	0	
+0046e9e4	14	cmdStopLoading	0	
+0046e9f7	9	cancel...	0	
+0046ea36	15	please wait....	0	
+0046ea78	10	txtDisAddr	0	
+0046eabc	10	picDisList	0	
+0046eb00	9	scrollDis	0	
+0046eb33	23	timer_CLOSE_frmDebugLog	0	
+0046eb66	10	picDragger	0	
+0046eb97	8	cmdReset	0	
+0046eba4	5	reset	0	
+0046ebb9	101	reset emulator: restore interrupt vector, close all file handles, clear screen and reload the program	0	
+0046ec33	5	debug	0	
+0046ec48	27	log and debug.exe emulation	0	
+0046ec8d	42	show defined variables, arrays and strings	0	
+0046ecc1	7	cmdBack	0	
+0046eccd	9	step back	0	
+0046f23e	48	revert the changes made by previous step forward	0	
+0046f27c	15	sliderSTEPDELAY	0	
+0046f28f	18	MSComctlLib.Slider	0	
+0046f352	23	txtIntegratedMemoryAddr	0	
+0046f3a3	13	timerINT15_86	0	
+0046f3c7	9	cmdReload	0	
+0046f3d5	6	reload	0	
+0046f941	22	reload executable file	0	
+0046f965	19	timerStartTurboMode	0	
+0046f994	8	cmdStack	0	
+0046f9a1	5	stack	0	
+0046f9b6	34	memory at SS:SP from bottom to top	0	
+0046f9e2	19	cmdShowActualSource	0	
+0046f9fa	6	source	0	
+0046fa10	20	original source code	0	
+0046fa2e	8	cmdFlags	0	
+0046fa3b	5	flags	0	
+0046fa50	19	show flags register	0	
+0046fa8b	15	auxiliary tools	0	
+0046faa4	11	chkAutoStep	0	
+0046fada	33	make [single steps] automatically	0	
+00470112	6	screen	0	
+00470128	23	emulator virtual screen	0	
+00470149	12	fraRegisters	0	
+0047015a	11	 registers 	0	
+0047057a	6	Label1	0	
+0047059c	7	Counter	0	
+004705af	6	Label1	0	
+004705d1	16	Extended Segment	0	
+004705ed	6	Label1	0	
+0047060f	12	Base Pointer	0	
+00470627	6	Label1	0	
+00470649	12	Data Segment	0	
+00470661	6	Label1	0	
+00470683	17	Destination Index	0	
+004706a0	6	Label1	0	
+004706c2	12	Source Index	0	
+004706da	6	Label1	0	
+004706fc	13	Stack Pointer	0	
+00470715	6	Label1	0	
+00470737	13	Stack Segment	0	
+00470750	6	Label1	0	
+00470772	19	Instruction Pointer	0	
+00470791	6	Label1	0	
+004707b3	12	Code Segment	0	
+004707cb	6	Label1	0	
+004707ed	13	Data register	0	
+00470806	6	Label1	0	
+00470828	12	Base address	0	
+0047085c	8	Low Byte	0	
+0047088c	9	High Byte	0	
+004708a1	6	Label1	0	
+004708c3	11	Accumulator	0	
+004708d9	7	cmdStep	0	
+004708e5	11	single step	0	
+00470e56	28	process instruction at CS:IP	0	
+00470e80	7	cmdLoad	0	
+004713e6	32	load executable file to emulator	0	
+00471414	9	timerStep	0	
+00471434	18	picWaitingForInput	0	
+0047146b	12	cmdStopInput	0	
+00471496	18	lblWaitingForInput	0	
+004714ad	17	waiting for input	0	
+004714f4	10	picMemList	0	
+00471538	9	scrollMem	0	
+0047156b	15	lblHW_INTERRUPT	0	
+0047157f	24	 hardware interrupt: NN 	0	
+00471624	11	lblStepTime	0	
+00471634	16	step delay ms: 0	0	
+00471670	7	popLoad	0	
+0047168c	7	mnuLoad	0	
+00471698	18	load executable...	0	
+004716b4	9	mnuReLoad	0	
+004716c2	6	reload	0	
+004716d5	16	mnuDelimter71345	0	
+004716f7	10	mnuSamples	0	
+00471706	8	examples	0	
+0047171c	13	mnuSample_ARR	0	
+00471731	12	Hello, world	0	
+00471749	13	mnuSample_ARR	0	
+0047175e	14	add / subtract	0	
+00471778	13	mnuSample_ARR	0	
+0047178d	13	calculate sum	0	
+004717a6	13	mnuSample_ARR	0	
+004717bb	15	compare numbers	0	
+004717d6	13	mnuSample_ARR	0	
+004717eb	28	binary, hex and octal values	0	
+00471813	13	mnuSample_ARR	0	
+00471828	14	traffic lights	0	
+00471842	13	mnuSample_ARR	0	
+00471857	10	palindrome	0	
+0047186d	13	mnuSample_ARR	0	
+00471882	11	LED display	0	
+00471899	13	mnuSample_ARR	0	
+004718ae	13	stepper motor	0	
+004718c7	13	mnuSample_ARR	0	
+004718dc	10	simple i/o	0	
+004718f2	13	mnuSample_ARR	0	
+00471907	16	more examples...	0	
+00471922	16	mnuDelimeter3321	0	
+00471944	24	mnuResetEmulator_and_RAM	0	
+00471961	22	reset emulator and ram	0	
+00471981	14	mnuDELIMITER_0	0	
+004719a1	24	mnuCommandLineParameters	0	
+004719be	27	set command line parameters	0	
+004719e3	12	mnuDelimeter	0	
+00471a01	19	mnuSaveCurrentState	0	
+00471a19	25	save the emulator's state	0	
+00471a3c	20	mnuLoadPreviousState	0	
+00471a55	24	load from previous state	0	
+00471a79	16	mnuDelimeter8981	0	
+00471a9d	9	mnuRecent	0	
+00471ab0	8	Recent 1	0	
+00471ac4	9	mnuRecent	0	
+00471ad7	8	Recent 2	0	
+00471aeb	9	mnuRecent	0	
+00471afe	8	Recent 3	0	
+00471b12	9	mnuRecent	0	
+00471b25	8	Recent 4	0	
+00471b39	9	mnuRecent	0	
+00471b58	9	mnuRecent	0	
+00471b77	9	mnuRecent	0	
+00471b96	9	mnuRecent	0	
+00471bb5	9	mnuRecent	0	
+00471bd4	9	mnuRecent	0	
+00471bf3	9	mnuRecent	0	
+00471c12	9	mnuRecent	0	
+00471c31	9	mnuRecent	0	
+00471c50	9	mnuRecent	0	
+00471c6f	9	mnuRecent	0	
+00471c8e	9	mnuRecent	0	
+00471cad	9	mnuRecent	0	
+00471ccc	9	mnuRecent	0	
+00471ceb	9	mnuRecent	0	
+00471d0a	9	mnuRecent	0	
+00471d29	9	mnuRecent	0	
+00471d48	9	mnuRecent	0	
+00471d67	9	mnuRecent	0	
+00471d84	16	mnuDelimeter6126	0	
+00471db2	18	close the emulator	0	
+00471dcf	7	mnuMath	0	
+00471deb	12	mnuEvaluator	0	
+00471dfc	21	multi base calculator	0	
+00471e1b	13	mnuCalculator	0	
+00471e2d	14	base converter	0	
+00471e46	8	mnuDebug	0	
+00471e53	5	debug	0	
+00471e64	13	mnuSingleStep	0	
+00471e76	11	single step	0	
+00471e8e	11	mnuStepOver	0	
+00471e9e	9	step over	0	
+00471eb4	17	mnuDelimeter61234	0	
+00471ed7	17	mnuSingleStepBack	0	
+00471eed	9	step back	0	
+00471f03	16	mnuDelimeter1000	0	
+00471f25	18	mnuStopOnCondition	0	
+00471f3c	20	stop on condition...	0	
+00471f5a	16	mnuDelimeter1001	0	
+00471f7c	19	mnuRunUntilSelected	0	
+00471f94	15	run until (...)	0	
+00471fcb	7	mnuStop	0	
+00471fe5	16	mnuDelimeter3123	0	
+00472007	18	mnu_Set_BreakPoint	0	
+0047201e	21	set break point (...)	0	
+0047203d	20	mnu_Clear_BreakPoint	0	
+00472056	17	clear break point	0	
+00472071	17	mnuShowBreakPoint	0	
+00472087	24	show current break point	0	
+004720ab	19	mnuDelimeter4235432	0	
+004720d0	24	mnuSelect_lines_at_CS_IP	0	
+004720ed	35	show current instruction (at CS:IP)	0	
+0047211d	15	mnuDelimeter734	0	
+0047213e	25	mnu_set_CS_IP_to_selected	0	
+0047215c	42	set CS:IP to selected position (????:????)	0	
+004721b0	11	mnuDebugLog	0	
+004721c0	27	log and debug.exe emulation	0	
+004721e8	17	mnuDelimeters7750	0	
+0047220b	23	mnuExtendedRegisterView	0	
+00472227	21	extended value viewer	0	
+00472246	12	mnuDelim6123	0	
+00472264	8	mnuStack	0	
+00472271	5	stack	0	
+00472280	15	mnuDelimeter123	0	
+004722a1	12	mnuVariables	0	
+004722b2	9	variables	0	
+004722c5	23	mnuExternalMemoryViewer	0	
+004722e1	6	memory	0	
+004722f1	17	mnuDelimeter00001	0	
+00472314	18	mnuShowSymbolTable	0	
+0047232b	12	symbol table	0	
+00472341	14	mnuShowListing	0	
+00472354	7	listing	0	
+00472365	17	mnuDelimeter00002	0	
+00472388	15	mnuActualSource	0	
+0047239c	20	original source code	0	
+004723ba	16	mnuDelimete37723	0	
+004723dc	10	mnuOptions	0	
+004723eb	7	options	0	
+004723fc	17	mnuDelimeter61123	0	
+0047242a	26	arithmetic && logical unit	0	
+0047244e	16	mnuDelimeter7134	0	
+00472470	8	mnuFlags	0	
+0047247d	5	flags	0	
+0047248c	15	mnuDelimeter634	0	
+004724ad	15	mnuFlagAnalyzer	0	
+004724c1	21	lexical flag analyzer	0	
+004724e0	15	mnuDelimeter824	0	
+00472501	8	mnuASCII	0	
+0047250e	11	ascii codes	0	
+00472541	13	mnuUserScreen	0	
+00472553	15	emulator screen	0	
+0047256d	11	mnuExternal	0	
+0047257d	8	external	0	
+00472591	11	mnuMS_DEBUG	0	
+004725a1	26	start debug.exe (external)	0	
+004725c8	18	mnuDelimeters61234	0	
+004725ec	16	mnuCommandPrompt	0	
+00472601	25	command prompt (external)	0	
+00472624	17	mnuDelimeters7771	0	
+00472647	14	mnuExternalRun	0	
+0047265a	14	run (external)	0	
+00472673	17	mnuVirtualDevices	0	
+00472689	15	virtual devices	0	
+004726a6	17	mnuExternalDevice	0	
+004726cb	16	mnuDelimeter7843	0	
+004726ee	8	mnuDrive	0	
+004726fb	13	virtual drive	0	
+00472714	17	mnuBootFromFloppy	0	
+0047272a	24	boot from virtual floppy	0	
+00472750	21	mnuBoot_from_FLOPPY_X	0	
+0047276d	8	FLOPPY_0	0	
+00472781	21	mnuBoot_from_FLOPPY_X	0	
+0047279e	8	FLOPPY_1	0	
+004727b2	21	mnuBoot_from_FLOPPY_X	0	
+004727cf	8	FLOPPY_2	0	
+004727e3	21	mnuBoot_from_FLOPPY_X	0	
+00472800	8	FLOPPY_3	0	
+00472813	16	mnuDelimeter5312	0	
+00472835	18	mnuWriteBootRecord	0	
+0047284c	43	write 512 bytes at 0000:7c00 to boot sector	0	
+00472885	27	mnuWriteBootRecord_FLOPPY_X	0	
+004728a8	8	FLOPPY_0	0	
+004728bc	27	mnuWriteBootRecord_FLOPPY_X	0	
+004728df	8	FLOPPY_1	0	
+004728f3	27	mnuWriteBootRecord_FLOPPY_X	0	
+00472916	8	FLOPPY_2	0	
+0047292a	27	mnuWriteBootRecord_FLOPPY_X	0	
+0047294d	8	FLOPPY_3	0	
+00472960	23	mnuWriteBinFileToFloppy	0	
+0047297c	30	write '.bin' file to floppy...	0	
+004729a4	13	mnuDelimter51	0	
+004729c3	18	mnuMakeEmptyFloppy	0	
+004729da	23	create new floppy drive	0	
+00472a18	13	mnuHelpTopics	0	
+00472a2a	27	documentation and tutorials	0	
+00472a52	13	mnuDelimeter1	0	
+00472a71	17	mnuCheckForUpdate	0	
+00472a87	22	check for an update...	0	
+00472aa7	13	mnuDelimeter2	0	
+00472ac6	8	mnuAbout	0	
+00472ad3	8	about...	0	
+00472b02	13	mnuMemory_AUX	0	
+00472b14	6	memory	0	
+00472b24	10	mnuAlu_AUX	0	
+00472b5c	24	mnuAUX_stop_on_condition	0	
+00472b79	17	stop on condition	0	
+00472b94	17	mnuDelimeter00211	0	
+00472bb7	13	mnuSymbol_AUX	0	
+00472bc9	12	symbol table	0	
+00472bdf	14	mnuListing_AUX	0	
+00472bf2	7	listing	0	
+00472c6f	13	8086 emulator	0	
+0047304e	11	lst_opNames	0	
+004739e2	14	 LOCK (prefix)	0	
+00473d40	14	#NOTBIT ew,ib 	0	
+004740ae	14	 REPZ (prefix)	0	
+00474d77	12	lst_Opcodes1	0	
+004764cd	13	lst_EA_TCONST	0	
+004768e7	38	C2   CA   D2   DA   E2   EA   F2   FA%	0	
+0047695c	38	C5   CD   D5   DD   E5   ED   F5   FD%	0	
+00476983	38	C6   CE   D6   DE   E6   EE   F6   FE%	0	
+00476a7e	7	picIcon	0	
+0047781a	12	lblLaunching	0	
+0047782b	12	launching...	0	
+00477860	6	Label1	0	
+0047786b	42	microprocessor emulator and 8086 assembler	0	
+00477920	7	frmMain	0	
+0047792c	47	emu8086 - assembler and microprocessor emulator	0	
+00477d11	17	Combo_output_type	0	
+00477d50	9	make BIN 	0	
+00477d79	29	Output file type for compiler	0	
+00477da0	15	Timer_ResizeBug	0	
+00477dcb	10	StatusBar1	0	
+00477dd9	21	MSComctlLib.StatusBar	0	
+00477ea0	37	            drag a file here to open$	0	
+00477eec	36	            drag a file here to open	0	
+00477f71	10	ImageList1	0	
+00477f7f	21	MSComctlLib.ImageList	0	
+0047f973	8	Toolbar1	0	
+0047f97f	19	MSComctlLib.Toolbar	0	
+0047f9f8	10	ImageList1	0	
+0047faa0	7	samples	0	
+0047fb54	7	compile	0	
+0047fb90	7	emulate	0	
+0047fbd2	11	calculator\n	0	
+0047fbea	10	calculator	0	
+0047fc1a	10	convertor 	0	
+0047fc30	9	convertor	0	
+0047fc88	7	options	0	
+0047fcf0	5	about	0	
+0047fd15	18	Timer_DelayCommand	0	
+0047fd43	12	frameLoading	0	
+0047fd75	10	Loading...	0	
+0047fda9	8	txtInput	0	
+0047fdb5	18	CodeMaxCtl.CodeMax	0	
+0047fe8f	8	Terminal	0	
+0047ff34	22	cmdCompile_and_Emulate	0	
+0047ff4f	19	Compile and Emulate	0	
+0047ff87	49	Compile Source Code and Load it into the Emulator	0	
+0047ffce	27	Documentation and Tutorials	0	
+0047fffd	25	Documentation & Tutorials	0	
+00480020	8	cmdAbout	0	
+0048002d	5	About	0	
+00480046	25	About Box & Home page URL	0	
+00480069	10	cmdOptions	0	
+00480078	7	Options	0	
+00480093	23	Font and other Settings	0	
+004800b4	7	cmdSave	0	
+004800d8	16	Save Source Code	0	
+004800f2	7	cmdLoad	0	
+00480116	16	Open Source Code	0	
+00480135	10	cmdEmulate	0	
+00480144	8	Emulator	0	
+00480171	17	Open the Emulator	0	
+0048018c	20	lst_Relocation_Table	0	
+004801b9	17	lst_Segment_Sizes	0	
+00480232	11	con1 hello\n	0	
+00480279	10	cmdCompile	0	
+00480288	7	Compile	0	
+004802a3	47	Compile the Source Code and build an executable	0	
+004802dc	10	lst_Source	0	
+00480310	15	lst_Precompiled	0	
+0048036d	15	New Source Code	0	
+004803bb	27	Segment name - size - class	0	
+004803ef	7	mnuFile	0	
+00480425	14	mnuCOMTemplate	0	
+00480438	12	com template	0	
+0048044e	14	mnuEXETemplate	0	
+00480461	12	exe template	0	
+00480477	14	mnuBINTemplate	0	
+0048048a	12	bin template	0	
+004804a0	15	mnuBOOTTemplate	0	
+004804b4	13	boot template	0	
+004804cb	16	mnuCleanTemplate	0	
+004804e2	5	empty	0	
+0048050f	10	mnuSamples	0	
+0048051e	8	examples	0	
+00480534	13	mnuSample_ARR	0	
+00480549	12	Hello, world	0	
+00480561	13	mnuSample_ARR	0	
+00480576	14	add / subtract	0	
+00480590	13	mnuSample_ARR	0	
+004805a5	13	calculate sum	0	
+004805be	13	mnuSample_ARR	0	
+004805d3	15	compare numbers	0	
+004805ee	13	mnuSample_ARR	0	
+00480603	28	binary, hex and octal values	0	
+0048062b	13	mnuSample_ARR	0	
+00480640	14	traffic lights	0	
+0048065a	13	mnuSample_ARR	0	
+0048066f	10	palindrome	0	
+00480685	13	mnuSample_ARR	0	
+0048069a	16	LED display test	0	
+004806b6	13	mnuSample_ARR	0	
+004806cb	13	stepper motor	0	
+004806e4	13	mnuSample_ARR	0	
+004806f9	10	simple i/o	0	
+0048070f	13	mnuSample_ARR	0	
+00480724	16	more examples...	0	
+0048073f	17	mnuDelimeter61234	0	
+00480762	7	mnuLoad	0	
+0048076e	7	open...	0	
+004807a0	7	mnuSave	0	
+004807ba	9	mnuSaveAs	0	
+004807c8	10	save as...	0	
+004807dc	16	mnuDelimeter5896	0	
+004807fe	8	mnuPrint	0	
+0048080b	8	print...	0	
+0048081d	15	mnuExportToHTML	0	
+00480831	17	export to HTML...	0	
+0048084c	12	mnuDelim1345	0	
+0048086c	9	mnuRecent	0	
+0048087f	8	Recent 1	0	
+00480893	9	mnuRecent	0	
+004808a6	8	Recent 2	0	
+004808ba	9	mnuRecent	0	
+004808cd	8	Recent 3	0	
+004808e1	9	mnuRecent	0	
+004808f4	8	Recent 4	0	
+00480908	9	mnuRecent	0	
+00480927	9	mnuRecent	0	
+00480946	9	mnuRecent	0	
+00480965	9	mnuRecent	0	
+00480984	9	mnuRecent	0	
+004809a3	9	mnuRecent	0	
+004809c2	9	mnuRecent	0	
+004809e1	9	mnuRecent	0	
+00480a00	9	mnuRecent	0	
+00480a1f	9	mnuRecent	0	
+00480a3e	9	mnuRecent	0	
+00480a5d	9	mnuRecent	0	
+00480a7c	9	mnuRecent	0	
+00480a9b	9	mnuRecent	0	
+00480aba	9	mnuRecent	0	
+00480ad9	9	mnuRecent	0	
+00480af8	9	mnuRecent	0	
+00480b17	9	mnuRecent	0	
+00480b36	9	mnuRecent	0	
+00480b53	16	mnuDelimeter0002	0	
+00480b90	7	mnuEdit	0	
+00480bc6	7	mnuRedo	0	
+00480be0	15	mnuDelimeter512	0	
+00480c19	7	mnuCopy	0	
+00480c33	8	mnuPaste	0	
+00480c40	5	paste	0	
+00480c4f	12	mnuDelim5432	0	
+00480c6d	12	mnuSelectAll	0	
+00480c7e	10	select all	0	
+00480c92	14	mnuDelimter112	0	
+00480cb2	11	mnuFindText	0	
+00480cc2	31	find...                  Ctrl+F	0	
+00480ceb	11	mnuFindNext	0	
+00480cfb	25	find next              F3	0	
+00480d1e	10	mnuReplace	0	
+00480d2d	28	replace...            Ctrl+H	0	
+00480d70	11	mnuGotoLine	0	
+00480d80	28	go to line...         Ctrl+G	0	
+00480da6	15	mnuDelimeter541	0	
+00480dc7	9	mnuIndent	0	
+00480dd5	28	indent                   Tab	0	
+00480dfb	10	mnuOutdent	0	
+00480e0a	33	outdent                 Shift+Tab	0	
+00480e35	15	mnuDelimeter642	0	
+00480e56	15	mnuCommentBlock	0	
+00480e6a	13	comment block	0	
+00480e84	17	mnuUncommentBlock	0	
+00480e9a	15	uncomment block	0	
+00480eb6	15	mnuDelimeter643	0	
+00480ed7	8	mnuMacro	0	
+00480ee4	22	advanced editor macros	0	
+00480f08	12	mnuPlayMacro	0	
+00480f1c	12	Play Macro 1	0	
+00480f34	12	mnuPlayMacro	0	
+00480f48	12	Play Macro 2	0	
+00480f60	12	mnuPlayMacro	0	
+00480f74	12	Play Macro 3	0	
+00480f8c	12	mnuPlayMacro	0	
+00480fa0	12	Play Macro 4	0	
+00480fb8	12	mnuPlayMacro	0	
+00480fcc	12	Play Macro 5	0	
+00480fe4	12	mnuPlayMacro	0	
+00480ff8	12	Play Macro 6	0	
+00481010	12	mnuPlayMacro	0	
+00481024	12	Play Macro 7	0	
+0048103c	12	mnuPlayMacro	0	
+00481050	12	Play Macro 8	0	
+00481068	12	mnuPlayMacro	0	
+0048107c	12	Play Macro 9	0	
+00481094	12	mnuPlayMacro	0	
+004810a8	13	Play Macro 10	0	
+004810bf	14	mnuDelim000111	0	
+004810df	20	mnuRepeatNextCommand	0	
+004810f8	32	Repeat Next Command...    Ctrl+R	0	
+00481122	16	mnuDelim00011122	0	
+00481144	20	mnuNewKeystrokeMacro	0	
+0048115d	26	Record new Keystroke Macro	0	
+00481182	11	mnuAdvanced	0	
+00481192	8	advanced	0	
+004811a6	18	mnuShowLineNumbers	0	
+004811bd	17	show line numbers	0	
+004811d8	15	mnuDelimeter834	0	
+004811f9	18	mnuTabifySelection	0	
+00481210	16	tabify selection	0	
+0048122a	20	mnuUntabifySelection	0	
+00481243	18	untabify selection	0	
+0048125f	16	mnuDelimeter7123	0	
+00481281	21	mnuLowercaseSelection	0	
+0048129b	35	lowercase selection          Ctrl+L	0	
+004812c8	21	mnuUppercaseSelection	0	
+004812e2	35	uppercase selection          Ctrl+U	0	
+0048130f	16	mnuDelimeter6178	0	
+00481331	20	mnuDisplayWhitespace	0	
+0048134a	18	display whitespace	0	
+00481368	12	mnuBookmarks	0	
+00481379	9	bookmarks	0	
+0048138e	17	mnuToggleBookmark	0	
+004813a4	42	toggle bookmark                    Ctrl+F2	0	
+004813d8	15	mnuDelimeter613	0	
+004813f9	15	mnuPrevBookmark	0	
+0048140d	41	previous bookmark                Shift+F2	0	
+00481440	15	mnuNextBookmark	0	
+00481454	38	next bookmark                       F2	0	
+00481484	15	mnuDelimeter135	0	
+004814a5	16	mnuFirstBookmark	0	
+004814ba	13	jump to first	0	
+004814d1	15	mnuLastBookmark	0	
+004814e5	12	jump to last	0	
+004814fb	17	mnuDelimeter78123	0	
+0048151e	20	mnuClearAllBookmarks	0	
+00481537	19	clear all bookmarks	0	
+00481555	10	popCompile	0	
+00481564	9	assembler	0	
+00481579	10	mnuCompile	0	
+00481588	7	compile	0	
+00481599	20	mnuCompileAndEmulate	0	
+004815b2	32	compile and load in the emulator	0	
+004815f9	15	mnuDelimeter623	0	
+0048161a	15	mnuSetOutPutDir	0	
+0048162e	23	set output directory...	0	
+00481650	11	popEmulator	0	
+00481660	8	emulator	0	
+00481674	11	mnuEmulator	0	
+00481684	13	show emulator	0	
+0048169b	22	mnuCompileAndEmulate_2	0	
+004816b6	33	assemble and load in the emulator	0	
+004816e2	7	mnuMath	0	
+004816fe	12	mnuEvaluator	0	
+0048170f	21	multi base calculator	0	
+0048172e	13	mnuCalculator	0	
+00481740	14	base converter	0	
+00481759	13	mnuAsciiCodes	0	
+0048176b	11	ascii codes	0	
+0048179e	13	mnuHelpTopics	0	
+004817b0	27	documentation and tutorials	0	
+004817d8	9	mnuDelim1	0	
+004817f3	17	mnuCheckForUpdate	0	
+00481809	22	check for an update...	0	
+00481829	13	mnuDelimeter2	0	
+00481848	8	mnuAbout	0	
+00481855	8	about...	0	
+004861b0	52	emu8086 - 8086 assembler and microprocessor emulator	0	
+00486278	15	lCORRECT_TO_ORG	1	00481f54
+00486288	10	bCOMPILING	0	
+00486294	11	sOpenedFile	0	
+004862a0	9	sFilename	5	004818b4 00481b44 00481cb8 00481cf4 00481e54
+004862ac	14	bFORCE_TO_EDIT	1	00481cf8
+004862bc	9	bEXAMPLES	1	00481cfc
+004862c8	13	iTEMPLATE_NUM	1	00481abc
+004862d8	9	bUSE_FASM	1	00481ac0
+004862e4	5	Index	3	004818a4 004818bc 00481a1c
+004862ec	10	fStartTime	1	00481b04
+00486320	5	lLine	3	00481ca0 00481cac 00481cc4
+00486328	31	sCOPY_OF_LINE_THAT_CAUSED_ERROR	3	00481ca8 00481cb4 00481ccc
+00486348	10	iErrorLine	0	
+00486354	12	bSHOW_ERRORS	1	00481984
+00486364	5	fStep	1	00481970
+0048636c	5	sName	2	00481a74 00481b24
+00486374	8	lCurLine	1	00481a78
+004863c8	14	byteBREAK_FLAG	0	
+004863d8	16	bSTOP_EVERYTHING	1	00482050
+004863ec	15	bSET_CF_ON_IRET	1	00481f1c
+004863fc	17	bCLEAR_CF_ON_IRET	1	00481f38
+00486410	15	bSET_ZF_ON_IRET	1	00482114
+00486420	17	bCLEAR_ZF_ON_IRET	1	00482018
+00486434	19	lPROG_LOADED_AT_ADR	0	
+00486448	22	lPROG_LOADED_AT_OFFSET	0	
+00486460	17	sOpenedExecutable	0	
+00486474	11	bTERMINATED	0	
+00486480	11	bCOM_LOADED	0	
+0048648c	17	bFORCE_TO_EMULATE	1	00481cbc
+004864a0	5	iRows	2	00481b58 00481b68
+004864ac	23	bACTIVATE_ACTUAL_SOURCE	1	00481cc0
+004864c4	7	lLoadCS	1	00481e58
+004864cc	7	lLoadIP	1	00481e5c
+004864d4	17	bSetReturnToStack	1	00481e60
+004864e8	18	lMAX_BYTES_TO_LOAD	1	00481e64
+004864fc	20	bSET_CX_to_FILE_SIZE	1	00481e68
+00486514	5	byteL	1	00481c64
+0048651c	5	byteH	1	00481c68
+0048652c	6	bValue	2	00481a38 00481a60
+00486534	9	bVALUE_lb	1	00481c5c
+00486540	9	bVALUE_hb	1	00481c60
+0048654c	9	bRegIndex	3	00481a34 00481a54 00481a6c
+00486558	6	wValue	1	00481a70
+00486568	8	bNEW_VAL	1	00481c44
+00486574	9	bNO_CHECK	1	00481c48
+00486580	6	iValue	0	
+00486588	7	KeyCode	1	00481c28
+00486590	5	Shift	1	00481c2c
+0048659c	6	lValue	2	00481900 00481a50
+004865b4	7	tbFIRST	1	00481c04
+004865bc	7	curByte	1	00481c08
+004865d0	6	sInput	0	
+004865d8	5	iSize	0	
+004865e8	6	lColor	2	00482130 00481bd4
+004865f0	13	lDefaultColor	1	00481bd8
+00486600	13	bCURSOR_DRAWN	0	
+00486610	5	uMODE	0	
+00486618	5	iCols	2	00481b54 00481b64
+00486620	23	bFIRST_TIME_SHOW_SCREEN	0	
+00486638	21	bSHOW_BLINKING_CURSOR	0	
+00486650	7	bSCROLL	3	00481af8 00481edc 004821b4
+00486658	5	uPage	5	00481ab4 00481ac4 00481c00 00481ed8 004821a4
+00486660	16	bAdvancePosition	1	004821a8
+00486674	19	bContainsAttributes	1	004821ac
+00486688	17	uDefaultAttribute	1	004821b0
+0048669c	12	bMSDOS_STYLE	2	00481ee0 004821b8
+004866ac	11	uPageNumber	1	00481b34
+004866b8	14	bUPDATE_SCREEN	1	00481b38
+004866c8	17	bUpdate_two_bytes	1	00481a28
+004866dc	16	iTimes_to_Scroll	1	00481a64
+004866f0	10	bATTRIBUTE	1	00481a68
+004866fc	14	row_upper_left	2	00481e9c 00481eb4
+0048670c	14	col_upper_left	2	00481ea0 00481eb8
+0048671c	15	row_lower_right	2	00481ea4 00481ebc
+0048672c	15	col_lower_right	2	00481ea8 00481ec0
+0048673c	17	iInsertAttribChar	2	00481eac 00481ec4
+00486750	15	times_to_Scroll	2	00481eb0 00481ec8
+00486760	15	MaxCharsToInput	1	00481ae4
+00486780	5	bChar	1	00481ecc
+00486788	7	bAttrib	1	00481ed0
+00486790	9	bTELETYPE	1	00481ed4
+0048679c	10	uStartLine	1	00481b14
+004867a8	11	uBottomLine	1	00481b18
+004867b4	5	lBack	1	00481b74
+004867bc	5	lFore	0	
+004867c4	6	uValue	1	004818b8
+004867cc	17	lShownFromAddress	0	
+004867e0	18	lShownUntilAddress	1	00482168
+004867f4	10	bSET_FLAGS	1	00481ee4
+00486808	12	bALLOW_FLAGS	10	00481af0 00481b00 00481b10 00481b20 00481c18 00481c84 00481cd8 00481ce4 00481cf0 00481d48
+00486840	11	bitsToShift	1	00481a30
+0048684c	5	bBYTE	2	00481c4c 00481c70
+00486854	8	bCounter	4	00481c20 00481c50 00481c74 00481c98
+00486860	9	iBitToAdd	4	00481c24 00481c54 00481c78 00481c9c
+0048686c	5	iWORD	2	00481c1c 00481c94
+0048687c	9	byteValue	1	004819ec
+00486888	7	sParams	1	00481898
+00486890	8	sCommand	0	
+0048689c	6	lSEG_1	1	0048221c
+004868a4	9	lOFFSET_1	1	00482220
+004868b0	7	lAddr_1	1	00482224
+004868b8	6	lSEG_2	1	00482228
+004868c0	9	lOFFSET_2	1	0048222c
+004868cc	7	lAddr_2	1	00482230
+004868d4	7	lLength	1	00482234
+004868dc	26	bHighLightBytes_in_MemList	1	00481a20
+004868f8	21	s_16bit_REGISTER_NAME	0	
+00486910	20	s16bit_REGISTER_NAME	1	004819a8
+00486928	5	lLeft	1	00481bb0
+00486938	8	lADDRESS	2	00481b90 00481bb8
+00486944	8	lSEGMENT	0	
+00486964	5	sPath	1	00481bec
+0048696c	8	sPattern	1	00481bf0
+00486978	7	iAttrib	1	00481bf4
+00486980	10	iListIndex	1	00481aac
+0048698c	20	bRevertListIndexOnly	1	00481ab0
+004869a4	8	byteChar	1	00481b8c
+004869b0	14	byteCharAttrib	1	00481b94
+004869c0	6	sValue	1	004820a4
+0061f674	12	MSVBVM60.DLL	0	
+0061f684	12	__vbaR8FixI4	0	
+0061f694	13	__vbaVarTstGt	0	
+0061f6a4	11	__vbaVarSub	0	
+0061f6b2	10	__vbaStrI2	0	
+0061f6c0	6	_CIcos	0	
+0061f6ca	10	_adj_fptan	0	
+0061f6d8	12	__vbaVarMove	0	
+0061f6e8	10	__vbaStrI4	0	
+0061f6f6	18	__vbaVarVargNofree	0	
+0061f70c	12	__vbaAryMove	0	
+0061f71c	10	__vbaCyMul	0	
+0061f72a	12	__vbaFreeVar	0	
+0061f73a	15	__vbaStrVarMove	0	
+0061f74c	12	__vbaLenBstr	0	
+0061f75c	17	__vbaLineInputStr	0	
+0061f770	15	__vbaLateIdCall	0	
+0061f782	8	__vbaEnd	0	
+0061f78e	16	__vbaFreeVarList	0	
+0061f7a2	9	__vbaPut3	0	
+0061f7ae	13	_adj_fdiv_m64	0	
+0061f7be	9	__vbaPut4	0	
+0061f7ca	16	__vbaFreeObjList	0	
+0061f7de	18	__vbaStrErrVarCopy	0	
+0061f7f4	11	_adj_fprem1	0	
+0061f802	17	__vbaRecAnsiToUni	0	
+0061f816	10	__vbaI2Abs	0	
+0061f824	14	__vbaCopyBytes	0	
+0061f836	11	__vbaResume	0	
+0061f844	11	__vbaStrCat	0	
+0061f852	13	__vbaVarCmpNe	0	
+0061f862	15	__vbaLsetFixstr	0	
+0061f874	15	__vbaEraseNoPop	0	
+0061f886	16	__vbaRecDestruct	0	
+0061f89a	19	__vbaSetSystemError	0	
+0061f8b0	13	__vbaNameFile	0	
+0061f8c0	20	__vbaHresultCheckObj	0	
+0061f8d8	16	__vbaVargVarCopy	0	
+0061f8ec	11	__vbaLenVar	0	
+0061f8fa	13	_adj_fdiv_m32	0	
+0061f90a	11	__vbaAryVar	0	
+0061f918	13	__vbaVarCmpGe	0	
+0061f928	16	__vbaAryDestruct	0	
+0061f93c	14	__vbaLateMemSt	0	
+0061f94e	12	__vbaBoolStr	0	
+0061f95e	12	__vbaStrBool	0	
+0061f96e	15	__vbaVarForInit	0	
+0061f980	13	__vbaExitProc	0	
+0061f990	10	__vbaI4Abs	0	
+0061f99e	10	__vbaCyAdd	0	
+0061f9ac	12	__vbaOnError	0	
+0061f9bc	11	__vbaObjSet	0	
+0061f9ca	12	__vbaStrLike	0	
+0061f9da	14	_adj_fdiv_m16i	0	
+0061f9ec	17	__vbaObjSetAddref	0	
+0061fa00	15	_adj_fdivr_m16i	0	
+0061fa12	17	__vbaVarIndexLoad	0	
+0061fa26	9	__vbaFpR4	0	
+0061fa32	14	__vbaStrFixstr	0	
+0061fa44	12	__vbaBoolVar	0	
+0061fa54	10	__vbaFPFix	0	
+0061fa62	9	__vbaFpR8	0	
+0061fa6e	14	__vbaRefVarAry	0	
+0061fa80	16	__vbaBoolVarNull	0	
+0061fa94	6	_CIsin	0	
+0061fa9e	10	__vbaErase	0	
+0061faac	16	__vbaVargVarMove	0	
+0061fac0	16	__vbaLateMemStAd	0	
+0061fad4	11	__vbaChkstk	0	
+0061fae2	9	__vbaI2Cy	0	
+0061faee	14	__vbaFileClose	0	
+0061fb00	10	__vbaCyVar	0	
+0061fb0e	17	EVENT_SINK_AddRef	0	
+0061fb22	24	__vbaGenerateBoundsError	0	
+0061fb3e	9	__vbaGet3	0	
+0061fb4a	9	__vbaCyI2	0	
+0061fb56	11	__vbaStrCmp	0	
+0061fb64	14	__vbaPutOwner3	0	
+0061fb76	9	__vbaGet4	0	
+0061fb82	18	__vbaAryConstruct2	0	
+0061fb98	13	__vbaVarTstEq	0	
+0061fba8	10	__vbaR4Str	0	
+0061fbb6	14	__vbaPutOwner4	0	
+0061fbc8	9	__vbaCyI4	0	
+0061fbd4	13	__vbaPrintObj	0	
+0061fbe4	15	__vbaVarLikeVar	0	
+0061fbf6	9	__vbaI2I4	0	
+0061fc02	11	__vbaObjVar	0	
+0061fc10	15	DllFunctionCall	0	
+0061fc22	17	__vbaVarLateMemSt	0	
+0061fc36	10	__vbaVarOr	0	
+0061fc44	10	__vbaFpUI1	0	
+0061fc52	10	__vbaCySub	0	
+0061fc60	15	__vbaCastObjVar	0	
+0061fc72	18	__vbaRedimPreserve	0	
+0061fc88	11	__vbaLbound	0	
+0061fc96	10	__vbaStrR4	0	
+0061fca4	11	_adj_fpatan	0	
+0061fcb2	10	__vbaR4Var	0	
+0061fcc0	9	__vbaR4Cy	0	
+0061fccc	17	__vbaLateIdCallLd	0	
+0061fce0	10	__vbaStrR8	0	
+0061fcee	10	__vbaCyUI1	0	
+0061fcfc	10	__vbaRedim	0	
+0061fd0a	9	__vbaR8Cy	0	
+0061fd16	17	__vbaRecUniToAnsi	0	
+0061fd2a	18	EVENT_SINK_Release	0	
+0061fd40	8	__vbaNew	0	
+0061fd4c	10	__vbaUI1I2	0	
+0061fd5a	7	_CIsqrt	0	
+0061fd64	10	__vbaObjIs	0	
+0061fd72	11	__vbaVarAnd	0	
+0061fd80	25	EVENT_SINK_QueryInterface	0	
+0061fd9c	10	__vbaUI1I4	0	
+0061fdaa	11	__vbaStrUI1	0	
+0061fdb8	12	__vbaFpCmpCy	0	
+0061fdc8	18	__vbaExceptHandler	0	
+0061fdde	17	__vbaStrToUnicode	0	
+0061fdf2	14	__vbaPrintFile	0	
+0061fe04	10	__vbaCyFix	0	
+0061fe12	10	_adj_fprem	0	
+0061fe20	14	_adj_fdivr_m64	0	
+0061fe32	15	__vbaLateIdStAd	0	
+0061fe44	10	__vbaI2Str	0	
+0061fe52	13	__vbaVarCmpLe	0	
+0061fe62	16	__vbaFPException	0	
+0061fe76	15	__vbaStrCompVar	0	
+0061fe88	13	__vbaInStrVar	0	
+0061fe98	14	__vbaGetOwner3	0	
+0061feaa	14	__vbaStrVarVal	0	
+0061febc	11	__vbaUbound	0	
+0061feca	14	__vbaGetOwner4	0	
+0061fedc	11	__vbaVarCat	0	
+0061feea	14	__vbaCheckType	0	
+0061fefc	10	__vbaI2Var	0	
+0061ff0a	13	__vbaFileSeek	0	
+0061ff1a	6	_CIlog	0	
+0061ff24	18	__vbaErrorOverflow	0	
+0061ff3a	13	__vbaFileOpen	0	
+0061ff4a	23	__vbaVarLateMemCallLdRf	0	
+0061ff64	12	__vbaVar2Vec	0	
+0061ff74	10	__vbaR8Str	0	
+0061ff82	9	__vbaNew2	0	
+0061ff8e	10	__vbaInStr	0	
+0061ff9c	12	__vbaCyMulI2	0	
+0061ffac	14	_adj_fdiv_m32i	0	
+0061ffbe	15	_adj_fdivr_m32i	0	
+0061ffd0	12	__vbaStrCopy	0	
+0061ffe0	10	__vbaI4Str	0	
+0061ffee	11	__vbaVarNot	0	
+0061fffc	13	__vbaVarCmpLt	0	
+0062000c	16	__vbaFreeStrList	0	
+00620020	14	_adj_fdivr_m32	1	0043f3bc
+00620032	12	__vbaPowerR8	0	
+00620042	11	_adj_fdiv_r	0	
+00620050	13	__vbaVarTstNe	0	
+00620060	10	__vbaI4Var	0	
+0062006e	13	__vbaVarCmpEq	0	
+0062007e	9	__vbaFpCy	0	
+0062008a	11	__vbaVarAdd	0	
+00620098	12	__vbaAryLock	0	
+006200a8	14	__vbaStrToAnsi	0	
+006200ba	12	__vbaStrComp	0	
+006200ca	11	__vbaVarDup	0	
+006200d8	17	__vbaVerifyVarObj	0	
+006200ec	9	__vbaFpI2	0	
+006200f8	17	__vbaCheckTypeVar	0	
+0062010c	21	__vbaVarLateMemCallLd	0	
+00620124	9	__vbaFpI4	0	
+00620130	12	__vbaVarCopy	0	
+00620140	20	__vbaRecDestructAnsi	0	
+00620158	12	__vbaR8IntI2	0	
+00620168	18	__vbaLateMemCallLd	0	
+0062017e	7	_CIatan	0	
+00620188	11	__vbaUI1Str	0	
+00620196	12	__vbaStrMove	0	
+006201a6	12	__vbaCastObj	0	
+006201b6	12	__vbaAryCopy	0	
+006201c6	15	__vbaStrVarCopy	0	
+006201d8	9	__vbaI4Cy	0	
+006201e4	7	_allmul	0	
+006201ee	13	__vbaFpCSngR4	0	
+006201fe	13	__vbaLateIdSt	0	
+0062020e	18	__vbaLateMemCallSt	0	
+00620224	6	_CItan	0	
+0062022e	10	__vbaFPInt	0	
+0062023c	11	__vbaUI1Var	0	
+0062024a	14	__vbaAryUnlock	0	
+0062025c	15	__vbaVarForNext	0	
+0062026e	6	_CIexp	0	
+00620278	16	__vbaMidStmtBstr	0	
+0062028c	12	__vbaR8FixI2	0	
+0062029c	13	__vbaI4ErrVar	0	
+006202ac	12	__vbaFreeObj	0	
+006202bc	12	__vbaFreeStr	0	
+00637152	11	VarFileInfo	0	
+00637172	11	Translation	0	
+00637196	14	StringFileInfo	0	
+006371ba	8	040904B0	0	
+006371d2	8	Comments	0	
+006371e4	33	emu8086 - microprocessor emulator	0	
+0063722e	11	CompanyName	0	
+00637248	15	www.emu8086.com	0	
+0063726e	15	FileDescription	0	
+00637290	7	emu8086	0	
+006372a6	14	LegalCopyright	0	
+006372c4	51	Copyright (c) 2007 emu8086.com  All Rights Reserved	0	
+00637332	15	LegalTrademarks	0	
+00637354	11	emu8086.com	0	
+00637372	11	ProductName	0	
+0063738c	28	8086 Microprocessor Emulator	0	
+006373ce	11	FileVersion	0	
+006373e8	9	4.00.0008	0	
+00637402	14	ProductVersion	0	
+00637420	9	4.00.0008	0	
+0063743a	12	InternalName	0	
+00637454	7	emu8086	0	
+0063746a	16	OriginalFilename	0	
+0063748c	11	emu8086.exe	0	
+006374a4	9	GroupIcon	0	
+ffdff1ac	0		0	
+ffdffc00	0		0	
+ffdfff50	36	00000000-0000-0000-0000-000000000000	0	
