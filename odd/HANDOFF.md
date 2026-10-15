@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 114 + 109 + 0 passed, 0 failed   (228)
+cargo test --workspace   0 + 5 + 114 + 2 + 109 + 0 passed, 0 failed   (230)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     78f83c5   (signed; every commit in this session is GPG-signed)
+HEAD                     71ea3a8   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -24,12 +24,13 @@ Two gates, both live, both proved to fail when broken:
 |---|---|
 | `every_first_opcode_byte_the_8086_defines_decodes` | all 256 first opcode bytes, `probed == 256` literal, no exclusions |
 | `every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole` | 96 `(opcode, /digit)` pairs, `96`, `5` and `91` as literals, cross-checked in both directions |
+| `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
 
 ## Completed units
 
-`U1` opcode map re-transcribed · `U2` reject 80186-only encodings · `U3` repair the shipped core (6 defects) · `U4` group 1 on memory · `U5` segment and stack group · `U6` the remaining opcodes · `U7` segment override prefixes · `AUDIT-1` word wrap · `AUDIT-3` `8F` mod · `AUDIT-5` prefix recursion · `AUDIT-7` `BP` → `SS` · `F5` `REP` as a latch · `F1` string-source segment override · `F8` `REP` negates `MUL`/`IMUL`/`IDIV` · `F9` `A8`/`A9` are `TEST` · `F4` four research briefs marked superseded.
+`U1` opcode map re-transcribed · `F10` flag-contract gate, and the `LAHF`/`SAHF` transposition it found · `U2` reject 80186-only encodings · `U3` repair the shipped core (6 defects) · `U4` group 1 on memory · `U5` segment and stack group · `U6` the remaining opcodes · `U7` segment override prefixes · `AUDIT-1` word wrap · `AUDIT-3` `8F` mod · `AUDIT-5` prefix recursion · `AUDIT-7` `BP` → `SS` · `F5` `REP` as a latch · `F1` string-source segment override · `F8` `REP` negates `MUL`/`IMUL`/`IDIV` · `F9` `A8`/`A9` are `TEST` · `F4` four research briefs marked superseded.
 
 The core covers the whole 8086 instruction set including 24 undocumented opcodes the manual prints as `(not used)`. The 8086 has **no opcode holes**: all 256 first bytes decode.
 
@@ -115,6 +116,7 @@ Every architecture bug this project shipped came from the same place — **reaso
 | `CA`/`CB` immediate | the pairing was swapped |
 | `BP` default segment | one default segment for every base |
 | string-source segment override | a prefix that reaches a memory operand reaches every one of them |
+| `LAHF`/`SAHF` transposed | `9E` and `9F` are adjacent, so swapping them changes nothing structurally — and two unit tests asserted the wrong opcode's behaviour, so code and test agreed |
 | `REP` negates `MUL`/`IMUL`/`IDIV` | dismissed, because "the multiply reads no flags" conflated FLAGS with the internal `F1` latch |
 | `A8`/`A9` | the same claim in reverse: a source said silicon runs `CMP` and that was adopted with no citation |
 
@@ -131,10 +133,8 @@ The last two are the same mistake pointing opposite ways, in one session: a true
 Three ways to stop it, in increasing order of cost and decreasing order of independence:
 
 1. **Cheapest, and worth doing now: make the cell and the behaviour one commit.** Every mnemonic change edits the §1.3 cell in the same commit. It is a convention, not a check, and conventions are what this project has already broken once.
-2. **A semantic gate over the grid.** For each of the 256 first bytes, execute the opcode and assert the flags the cell claims — not merely that it decodes. Today `every_first_opcode_byte_the_8086_defines_decodes` only proves the byte is not a hole, which is why a cell can read `CMP` while the code does `TEST` and stay green. Roughly 256 assertions, mechanical, and it would have failed the `A8`/`A9` commit on its own.
-3. **The real fix, and the one that changes the project's position: gate against silicon, not against a transcription.** `SingleStepTests/8086` ships per-opcode captures from a real P80C86A-2 and a per-opcode `metadata.json` naming the flags each opcode leaves undefined. A gate can assert, for every opcode, that the emulator's undefined-flag set matches the hardware's — one JSON file, 256 opcodes, no hardware, no transcription in the loop. This also closes several questions below that are still open, because the same data settles flag semantics rather than just naming.
-
-Option 3 makes §1.3 a *derived* document rather than an authority, which is a structural change to how this project works and needs a decision, not a task.
+2. **DONE — a semantic gate over the flag table.** `crates/core/tests/flag_contract.rs` reads the §1.4 rows out of the document and runs one representative instruction per row, asserting that a row marked untouched really is untouched, that `0` clears and `1` sets. Each case runs twice, all flags set and all cleared, so a write in either direction is caught. **It paid for itself on its first run: it found that `0x9E` and `0x9F` were swapped, so every `LAHF` and `SAHF` in every program was inverted, and 228 tests had missed it because the two unit tests covering those opcodes asserted the wrong opcode's behaviour.** Proved by mutation: three mutants killed (LAHF writing a flag, CLC no longer clearing CF, INC writing CF).
+3. **NOT DONE, and it is a decision rather than a task: gate against silicon.** `SingleStepTests/8086` ships per-opcode captures from a real P80C86A-2 and a per-opcode `metadata.json` naming the flags each opcode leaves undefined. A gate can assert, for every opcode, that the emulator's undefined-flag set matches the hardware's — one JSON file, 256 opcodes, no hardware, and no transcription in the loop. This also closes several questions in "Still open" below, because the same data settles flag semantics rather than just naming them. It makes §1.3 a *derived* document rather than an authority, which changes how this project works. **Deliberately not started**, because option 2 already covers the class of defect that bit us and option 3 has to be weighed against losing the manual as an independent second witness.
 
 ## Three tooling hazards
 
