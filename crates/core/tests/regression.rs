@@ -1920,3 +1920,98 @@ fn xlat_reads_its_table_through_the_override() {
     c.step().unwrap();
     assert_eq!(c.regs.byte(Reg8::Al), 0x3C, "no prefix means DS");
 }
+
+// ---- AUDIT-7 and its neighbours, settled from the manual --------------------
+//
+// AUDIT-7: BP-based memory operands default to SS. The manual is explicit at
+// section 2: "All data references which explicitly or implicitly involve SP
+// or BP are taken by default to be relative to SS." The direct disp16 form
+// shares rm=110 with [BP+disp] and is told apart by the mod field alone, so
+// it stays DS.
+
+/// One distinct word per segment at the same offset, so a wrong default
+/// segment shows up as a wrong value rather than as a fault.
+fn fill_segments(c: &mut Cpu, offset: u16) {
+    // Distinct bases, or every segment maps to the same physical bytes and
+    // the test cannot tell a right answer from a lucky one.
+    // CS is left alone: `cpu()` already put the code there.
+    for (n, (seg, base)) in [(Seg::Ds, 0x2000u16), (Seg::Es, 0x3000), (Seg::Ss, 0x4000)]
+        .into_iter()
+        .enumerate()
+    {
+        c.regs.set_segment(seg, base);
+        c.mem.write_u16(base, offset, 0x1100 + n as u16);
+    }
+}
+
+#[test]
+fn bp_based_operands_default_to_ss_and_the_rest_to_ds() {
+    // Every form is built so the offset lands on 0x20h with the registers
+    // zeroed, so the only thing under test is the default segment.
+    // `[BP]`, `[BP+SI]` and `[BP+DI]` share rm=110/010/011 under mod=01, and
+    // `[BX]`, `[SI]`, `[DI]` share 111/100/101.
+    let cases: [(u8, bool, &str); 6] = [
+        (0b01_000_110, true, "[BP+disp8]"),
+        (0b01_000_111, false, "[BX+disp8]"),
+        (0b01_000_010, true, "[BP+SI+disp8]"),
+        (0b01_000_011, true, "[BP+DI+disp8]"),
+        (0b01_000_100, false, "[SI+disp8]"),
+        (0b01_000_101, false, "[DI+disp8]"),
+    ];
+    for (modrm, expects_ss, name) in cases {
+        let mut c = cpu(&[0x8B, modrm, 0x20]); // MOV AX, [r/m+20h]
+        fill_segments(&mut c, 0x0020);
+        c.step().unwrap();
+        let word = c.regs.word(Reg16::Ax);
+        let from_ss = word == 0x1102;
+        let from_ds = word == 0x1100;
+        assert!(
+            from_ss || from_ds,
+            "{name}: read {word:#06x}, expected DS (0x1100) or SS (0x1102)"
+        );
+        assert_eq!(
+            from_ss, expects_ss,
+            "{name} used the wrong default segment: {word:#06x}"
+        );
+    }
+}
+
+#[test]
+fn the_bp_base_reaches_ss_even_with_a_displacement() {
+    // mod=01 rm=110 is [BP+disp8]; the segment default must follow BP.
+    let mut c = cpu(&[0x8B, 0x46, 0x20]); // MOV AX, [BP+20h]
+    fill_segments(&mut c, 0x0040);
+    c.regs.set_word(Reg16::Bp, 0x0020);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1102, "SS, not DS");
+}
+
+#[test]
+fn the_direct_disp16_form_shares_rm_with_bp_but_is_not_ss() {
+    // mod=00 rm=110 is the direct form, not [BP]. It must stay DS even though
+    // the r/m bits are the ones that mean BP in every other mod value.
+    let mut c = cpu(&[0x8B, 0x06, 0x40, 0x00]); // MOV AX, [0040h]
+    fill_segments(&mut c, 0x0040);
+    c.regs.set_word(Reg16::Bp, 0x0000);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1100, "DS, not SS");
+}
+
+#[test]
+fn a_segment_override_beats_the_bp_default() {
+    // 26 is the ES override. It must win over BP's SS default.
+    let mut c = cpu(&[0x26, 0x8B, 0x46, 0x20]); // ES: MOV AX, [BP+20h]
+    fill_segments(&mut c, 0x0040);
+    c.regs.set_word(Reg16::Bp, 0x0020);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1101, "the override wins");
+}
+
+#[test]
+fn lea_ignores_the_default_segment_entirely() {
+    // LEA returns the offset. BP's SS default is irrelevant to the value.
+    let mut c = cpu(&[0x8D, 0x46, 0x20]); // LEA AX, [BP+20h]
+    c.regs.set_word(Reg16::Bp, 0x0020);
+    c.step().unwrap();
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0040, "just the offset");
+}

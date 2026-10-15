@@ -1850,7 +1850,8 @@ fn apply(cpu: &mut crate::Cpu, op: AluOp, left: u16, right: u16, bits: u8, mask:
 /// The decoder indexes its slice from zero, so it gets a cursor rather than
 /// the absolute `IP`; the consumed length is folded back into `IP` after.
 fn decode_from(cpu: &mut crate::Cpu) -> Result<crate::modrm::ModRm, ExecError> {
-    let default_seg = operand_seg(cpu);
+    // The decoder indexes its slice from zero, so it gets a cursor rather than
+    // the absolute `IP`; the consumed length is folded back into `IP` after.
     let seg = cpu.regs.segment(Seg::Cs);
     let start = cpu.regs.ip;
     let mut window = [0u8; 4];
@@ -1858,9 +1859,22 @@ fn decode_from(cpu: &mut crate::Cpu) -> Result<crate::modrm::ModRm, ExecError> {
         *slot = cpu.mem.read_u8(seg, start.wrapping_add(i as u16));
     }
     let mut cursor = 0u16;
-    let result = decode_modrm(&window, &mut cursor, default_seg);
+    let result = decode_modrm(&window, &mut cursor, Seg::Ds);
     cpu.regs.ip = start.wrapping_add(cursor);
-    result.map_err(Into::into)
+    let mut decoded: crate::modrm::ModRm =
+        result.map_err::<crate::exec::ExecError, _>(Into::into)?;
+
+    // A prefix wins; otherwise the base register decides, and `BP` means
+    // `SS` rather than `DS`. Decoding before choosing matters: the direct
+    // `disp16` form shares `rm = 110` with `[BP+disp]`, and only the `mod`
+    // field tells them apart.
+    if let Operand::Mem {
+        base, ref mut seg, ..
+    } = decoded.rm
+    {
+        *seg = cpu.seg_override.unwrap_or(base.default_segment());
+    }
+    Ok(decoded)
 }
 
 /// A register destination that the ModR/M `reg` field can name.

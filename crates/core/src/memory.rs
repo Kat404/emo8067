@@ -62,26 +62,24 @@ impl Memory {
 
     /// Read a little-endian word through a `segment:offset` pair.
     ///
-    /// The effective address is computed **once**, to 20 bits, and the high
-    /// byte is read from the next physical address. The offset is not
-    /// recomputed from the segment for that second byte, which is what makes
-    /// a word at `offset = 0xFFFF` straddle the top of the bus instead of
-    /// jumping back to the start of the segment. See
-    /// [`Memory::physical`] and the `read_u16` tests.
+    /// The offset wraps modulo 2^16 inside the segment, so the high byte of
+    /// a word at `FFFFh` comes from offset `0000h` of the same segment. The
+    /// 8086 does not carry from the offset into the segment base; that was
+    /// the mistake corrected here, after an earlier revision assumed it did.
     #[must_use]
     pub fn read_u16(&self, segment: u16, offset: u16) -> u16 {
         let low = Self::physical(segment, offset);
-        let high = (low + 1) & BUS_MASK;
+        let high = Self::physical(segment, offset.wrapping_add(1));
         u16::from_le_bytes([self.bytes[low as usize], self.bytes[high as usize]])
     }
 
     /// Write a little-endian word through a `segment:offset` pair.
     ///
-    /// The high byte lands one physical address above the low byte, exactly
-    /// as [`Memory::read_u16`] reads it.
+    /// The high byte lands at the wrapped offset, exactly where
+    /// [`Memory::read_u16`] would read it from.
     pub fn write_u16(&mut self, segment: u16, offset: u16, value: u16) {
         let low = Self::physical(segment, offset);
-        let high = (low + 1) & BUS_MASK;
+        let high = Self::physical(segment, offset.wrapping_add(1));
         let [lo, hi] = value.to_le_bytes();
         self.bytes[low as usize] = lo;
         self.bytes[high as usize] = hi;
@@ -142,34 +140,38 @@ mod tests {
     }
 
     #[test]
-    fn a_word_can_straddle_the_top_of_the_bus() {
+    fn a_word_wraps_the_offset_inside_the_segment() {
+        // FFFF:000F is physical 0xFFFFF, the last byte on the bus. The high
+        // byte of the word comes from offset 0010h of the same segment, which
+        // is physical 0x100000 truncated to 0x00000. The 8086 does not carry
+        // from the offset into the segment base.
         let mut m = Memory::new();
-        // F000:FFFF is physical 0xFFFFF, the very last byte on the bus. The
-        // word's high byte must land at physical 0x00000.
-        m.write_u16(0xF000, 0xFFFF, 0xBEEF);
-        assert_eq!(m.read_u8(0x0000, 0x0000), 0xBE, "high byte wrapped to 0");
+        m.write_u16(0xFFFF, 0x000F, 0xBEEF);
         assert_eq!(m.bytes[0xFFFFF], 0xEF, "low byte at the top of the bus");
+        assert_eq!(m.read_u8(0x0000, 0x0000), 0xBE, "high byte wrapped to 0");
+        assert_eq!(m.read_u16(0xFFFF, 0x000F), 0xBEEF);
     }
 
     #[test]
-    fn the_high_byte_does_not_return_to_the_segment_base() {
+    fn the_high_byte_reads_the_segment_base_not_the_next_byte() {
+        // SS:FFFFh has physical (SS<<4)+FFFFh. Model A would take the next
+        // physical byte; the chip takes offset 0000h of the same segment.
         let mut m = Memory::new();
-        // FFFF:FFFF is physical 0x0FFEF. Adding one to the *physical*
-        // address gives 0x0FFF0. Recomputing from the segment with a wrapped
-        // offset would instead give 0xFFFF0, which is a different byte.
-        m.write_u16(0xFFFF, 0xFFFF, 0xBEEF);
-        assert_eq!(m.bytes[0x0FFEF], 0xEF, "low byte");
-        assert_eq!(m.bytes[0x0FFF0], 0xBE, "high byte is physical + 1");
-        assert_eq!(m.bytes[0xFFFF0], 0x00, "segment base must not be reused");
-    }
+        let physical = Memory::physical(0x2000, 0xFFFF); // 0x2FFFF
+        m.bytes[physical as usize] = 0xEF;
+        m.bytes[Memory::physical(0x2000, 0x0000) as usize] = 0xBE; // 0x20000
+        m.bytes[((physical + 1) & 0xFFFFF) as usize] = 0x11; // what the wrong model reads
 
-    #[test]
-    fn a_word_reads_the_same_bytes_it_writes() {
-        let mut m = Memory::new();
-        m.write_u16(0x0100, 0x0002, 0x1234);
-        assert_eq!(m.read_u16(0x0100, 0x0002), 0x1234);
-        m.write_u16(0xF000, 0xFFFF, 0x1234);
-        assert_eq!(m.read_u16(0xF000, 0xFFFF), 0x1234);
+        assert_eq!(
+            m.read_u16(0x2000, 0xFFFF),
+            0xBEEF,
+            "segment base, not physical+1"
+        );
+        assert_eq!(
+            m.bytes[((physical + 1) & 0xFFFFF) as usize],
+            0x11,
+            "the byte the wrong model would have read is untouched"
+        );
     }
 
     #[test]

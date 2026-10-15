@@ -106,6 +106,23 @@ pub fn decode_modrm(code: &[u8], ip: &mut u16, default_seg: Seg) -> Result<ModRm
     })
 }
 
+impl Base {
+    /// The segment a memory operand defaults to when no override is present.
+    ///
+    /// The manual is explicit: "All data references which explicitly or
+    /// implicitly involve SP or BP are taken by default to be relative to
+    /// SS" (8086 Family User's Manual, section 2). So the three BP-based
+    /// forms default to `SS` and everything else, including the direct
+    /// `disp16` form, defaults to `DS`.
+    #[must_use]
+    pub const fn default_segment(self) -> Seg {
+        match self {
+            Self::Bp | Self::BpSi | Self::BpDi => Seg::Ss,
+            Self::BxSi | Self::BxDi | Self::Si | Self::Di | Self::Bx | Self::Direct => Seg::Ds,
+        }
+    }
+}
+
 const fn base_of(rm: u8) -> Base {
     match rm {
         0 => Base::BxSi,
