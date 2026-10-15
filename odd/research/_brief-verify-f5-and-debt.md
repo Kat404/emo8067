@@ -1,5 +1,11 @@
 # Brief — verify F5, and clear the §1.3 documentation debt
 
+**Superseded in part.** This brief is kept as the record of what was believed when it was written, and the body below is unchanged. Three of its claims were disproved by this project's own later work; reading them as current guidance will reintroduce a defect.
+
+1. **The permutation probe, "Part 1" item 1 (~line 11).** It asks whether the same covered instruction reaches the same final state behind every permutation of `{F0, F1, 26, 2E, 36, 3E, F2, F3}`. That is no longer the project's claim: order **does** matter between two segment overrides, because the last one wins. The permuted test was also vacuous, because the override was discarded on the SI side. `fe16b6c` replaced it.
+2. **The `F1` sign flag question, "Part 1" item 2 (~line 12).** It asks what the multiply does with the `F1` sign flag still set, repeating the false premise that a `REP` prefix negates a multiply or divide result. Void: `F7 E1` decodes as `MUL CX`, not `IDIV CX` — the ModR/M reg field is bits 5-3 of `0xE1`, which is `100`, i.e. `/4` — and `mul_group` in `crates/core/src/exec.rs` reads no flags at all, so no prefix can influence it.
+3. **The `CX = 0` expectation, "Part 1" item 3 (~line 13).** It says a `REP` with `CX = 0` must do one iteration. The printed manual, Vol. 2 p. 2-41, says the string instruction is not executed at all, and the emulator runs zero iterations. That is what the manual prints and what the core does; whether silicon agrees is a separate, still-open erratum question and is not settled here. Pinned by `rep_with_a_zero_count_runs_no_iterations` in `314f493`, from the REP-latch work in `e03650c`.
+
 Two jobs. The first is verification. The second is documentation debt that verification of the previous units has already proven wrong.
 
 ## Part 1 — verify F5

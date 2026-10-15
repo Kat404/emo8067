@@ -1,5 +1,11 @@
 # Brief — F5: make REP a latch, so prefix order stops mattering
 
+**Superseded in part.** This brief is kept as the record of what was believed when it was written, and the body below is unchanged. Three of its claims were disproved by this project's own later work; reading them as current guidance will reintroduce a defect.
+
+1. **The `CX = 0` bullet, "Tests to add" (~line 56).** It says a `REP` with `CX = 0` does one iteration, as the hardware does. It does not. The printed manual, Vol. 2 p. 2-41, states: "If CX is 0, the string instruction is not executed, and control goes to the following instruction". The emulator runs zero iterations. Settled while implementing the REP latch, in `e03650c`, and pinned by `rep_with_a_zero_count_runs_no_iterations` in `314f493`.
+2. **The `IMUL`/`IDIV` bullet, "Out of scope" (~line 61).** It says a `REP` in front of `IMUL`/`IDIV` negates the result, and that `F3 F7 E1` computes a negated quotient. That is false and void. `F7 E1` decodes as `MUL CX`, not `IDIV CX`: the ModR/M reg field is bits 5-3 of `0xE1`, which is `100`, i.e. `/4`. And `mul_group` in `crates/core/src/exec.rs` reads no flags at all, so no prefix can influence its result. Treat this item as deleted from the project's records.
+3. **The eight-prefix-byte bullet, "Tests to add".** It asks that a run of mixed prefixes in every permutation of `{F0, F1, 26, 2E, 36, 3E, F2, F3}` before the same instruction reach the same final state. That is no longer what the project claims: order **does** matter between two segment overrides, because the last one wins. `fe16b6c` replaced the old permutation test, which was vacuous, with tests that discriminate, and pins last-override-wins.
+
 You are working on **emu8067**, a clean-room FOSS Intel 8086/8088 emulator in Rust at `/home/josel/Proyectos/emo8067`.
 
 ## Skills to load before work

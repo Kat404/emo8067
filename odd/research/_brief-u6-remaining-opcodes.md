@@ -1,5 +1,9 @@
 # Brief — U6: the remaining 8086 opcodes
 
+**Superseded in part.** This brief is kept as the record of what was believed when it was written, and the body below is unchanged. One of its claims was disproved by this project's own later work; reading it as current guidance will reintroduce a defect.
+
+1. **"`0x84` and `0x85` carry an open question" (~lines 33-35).** It says silicon agrees with the reading that `84`/`85` are an 80186 extension. It does not. Both are real 8086 instructions, and the manual's printing is right. The project applies them and tests them. Settled in `ec669a4`, which confirmed the resolution from two primary sources against the real microcode rather than from prose.
+
 You are implementing one unit of **emo8067**, a clean-room FOSS Intel 8086/8088 emulator in Rust at `/home/josel/Proyectos/emo8067`. Work inside the allowed edit surfaces below and nowhere else.
 
 ## Skills to load before work

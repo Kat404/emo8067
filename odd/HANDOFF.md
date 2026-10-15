@@ -53,17 +53,18 @@ The code runs **zero** iterations, following the printed manual, Vol. 2 p. 2-41:
 - The `FF` group's latch interactions have never been re-examined.
 - No silicon `REP` with `CX = 0`.
 
-### 4. Stale briefs — reported by verification, deliberately not edited
+### 4. CLOSED — stale briefs, marked rather than rewritten
 
-Each contains a claim this work overturned. Reading one as current guidance will reintroduce a defect:
+Each contained a claim this work overturned. Reading one as current guidance would reintroduce a defect, so each file now carries one banner at the top naming the superseded claims, what is actually true, and the commit where it was settled. **The bodies are unchanged** — the stale claims stay as the record of what was believed, which is why the banners exist instead of edits. Four files, 21 inserted lines, 0 deletions:
 
-- `odd/research/_brief-f5-rep-latch.md:56` — says `CX = 0` runs one iteration. Wrong; the manual says zero.
-- `odd/research/_brief-f5-rep-latch.md:61` — says `F3` negates an `IDIV` result. **Stale and wrong**: `F7 E1` decodes as `MUL CX`, not `IDIV`, and `mul_group` reads no flags at all. The item should be deleted from the project's records.
-- `odd/research/_brief-u6-remaining-opcodes.md:33-35` — claims silicon agrees with the "80186 extension" reading of `84`/`85`. Wrong; both are real 8086 instructions.
-- `odd/research/_brief-u7-segment-prefixes.md:51` — describes `F2`/`F3` as separate dispatcher arms. They are prefix latches now.
-- `odd/research/_brief-u7-segment-prefixes.md:80` — says `8F` is `mod=00` only. Wrong.
+- `odd/research/_brief-f5-rep-latch.md` — `CX = 0` does one iteration (manual says zero); `F3` negates an `IDIV` result (**void**: `F7 E1` is `MUL CX` and `mul_group` reads no flags); the eight-prefix-byte permutation claim.
+- `odd/research/_brief-u6-remaining-opcodes.md:33-35` — silicon does not agree with the "80186 extension" reading of `84`/`85`; both are real 8086 instructions.
+- `odd/research/_brief-u7-segment-prefixes.md` — `F2`/`F3` are prefix latches now, not dispatcher arms; `8F` takes `mod=00`, `01` and `10`.
+- `odd/research/_brief-verify-f5-and-debt.md` — **not in the list above when this item was written**: the same three false claims appear again at ~lines 11-13. A worker found it while doing the other three.
 
-### 5. `odd/research/_brief-audit7-and-friends.md` is the single most valuable document here
+Still open, and named by the work that did the banners: `documentation-guide.md` §1.3 footnote ‡3 and log entry L14 are marked "now the wrong documents" by `ec669a4`. Untouched.
+
+### 5. `odd/research/_prompt-audit7-and-friends.md` is the single most valuable document here
 
 A research prompt whose answers closed **four** audit items, two of which reversed decisions the parent had already committed. Reuse it as the template for any future architecture question to another model: it demanded a source hierarchy, asked claims to be labelled by how they were verified, and explicitly made *"not decidable from available sources"* a valid answer. That framing is why it found two things the parent and two verifiers had both missed.
 
@@ -101,7 +102,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 
 1. ~~Fix the string-source segment override (item 1)~~ — done in `fe16b6c`; its replacement permutation test had to be written from scratch, because the F5 verification report it referred to is in neither memory nor the repo.
 2. Decide item 2 with a primary source, and record it the way `A8`/`A9` was recorded.
-3. Correct the five stale briefs (item 4) — they are actively misleading.
+3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
 4. Then `T12`: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`); what remains is running the 86 shipped `.asm` examples, which needs `T13`, the assembler.
 
 ## Files worth reading first
@@ -110,6 +111,6 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 |---|---|
 | `odd/tasks/emu8067-foss.md` | specs, every decision, the U1..U8 plan, audit items, and the log |
 | `odd/tooling.md` | environment facts: Ghidra paths, what `analyzeHeadless` needs, `innoextract` |
-| `odd/research/_brief-audit7-and-friends.md` | the research prompt template |
+| `odd/research/_prompt-audit7-and-friends.md` | the research prompt template |
 | `re/FINDINGS.md` | the behavioural contract recovered from the reference implementation |
 | `odd/research/feature*`, `softonic-build-comparison.md` | feature inventory and the repack analysis |

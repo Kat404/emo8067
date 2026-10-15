@@ -1,5 +1,10 @@
 # Brief — U7: segment override prefixes
 
+**Superseded in part.** This brief is kept as the record of what was believed when it was written, and the body below is unchanged. Two of its claims were superseded by this project's own later work; reading them as current guidance will reintroduce a defect.
+
+1. **The `F2`/`F3` and `F0`/`F1` note, "Scope" (~line 51).** It says they already exist as separate arms in the dispatcher and must not be folded into the new mechanism. Superseded for `F2`/`F3`: they are prefix latches now, one mechanism with the segment overrides. Settled in `e03650c`.
+2. **The AUDIT-3 item, "Open audit items" (~line 80).** It lists `8F` as `mod=00` only and forbids pinning either reading with a test. Superseded: `8F` takes `mod=00`, `01` and `10`, and the AUDIT-3 audit item is closed. Settled in `ed3845f`, which rewrote the test that pinned the old rule instead of deleting it.
+
 You are working on **emu8067**, a clean-room FOSS Intel 8086/8088 emulator in Rust at `/home/josel/Proyectos/emo8067`. This is the last implementation unit before the core covers the whole 8086 instruction set.
 
 ## Skills to load before work
