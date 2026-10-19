@@ -979,7 +979,7 @@ fn test_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
 /// used to do while claiming otherwise.
 fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let immediate = matches!(opcode, 0xE4..=0xE7);
-    let _port = if immediate {
+    let port = if immediate {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     } else {
         cpu.regs.word(Reg16::Dx)
@@ -987,19 +987,37 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let word = opcode & 1 != 0;
     match opcode {
         // A port is not a memory address: the 8086 has a separate I/O bus,
-        // and with nothing attached to it a read returns all ones. The
-        // captures say the same of their own runs: "All reads of IO port
-        // addresses should return 0xFF and incur no wait states". The device
-        // bus itself is T15's work; until then the bus is empty.
+        // and the bus is where a port goes. The captures say what the bare
+        // chip does with nothing attached - "All reads of IO port addresses
+        // should return 0xFF and incur no wait states" - which is what an
+        // empty bus does.
         0xE4 | 0xE5 | 0xEC | 0xED => {
+            let mut bus = cpu.bus.borrow_mut();
             if word {
-                cpu.regs.set_word(Reg16::Ax, 0xFFFF)
+                // The 8086's bus is a byte bus: a word is two transfers.
+                let low = bus.read(port);
+                let high = bus.read(port);
+                cpu.regs
+                    .set_word(Reg16::Ax, u16::from_le_bytes([low, high]));
             } else {
-                cpu.regs.set_byte(Reg8::Al, 0xFF)
+                cpu.regs.set_byte(Reg8::Al, bus.read(port));
             }
         }
-        // A write to an empty bus goes nowhere: it changes no memory.
-        0xE6 | 0xE7 | 0xEE | 0xEF => {}
+        // A write goes to the device that owns the port, and to nothing else.
+        0xE6 | 0xE7 | 0xEE | 0xEF => {
+            let value = if word {
+                cpu.regs.word(Reg16::Ax)
+            } else {
+                u16::from(cpu.regs.byte(Reg8::Al))
+            };
+            let mut bus = cpu.bus.borrow_mut();
+            if word {
+                bus.write(port, (value & 0xFF) as u8);
+                bus.write(port, (value >> 8) as u8);
+            } else {
+                bus.write(port, value as u8);
+            }
+        }
         other => return Err(ExecError::UnknownOpcode(other)),
     }
     Ok(())
@@ -2290,6 +2308,56 @@ mod tests {
             0x00,
             "a write to an empty bus changes no memory"
         );
+    }
+
+    /// A device answers on its own port, a port nobody owns reads as all
+    /// ones, and a write reaches the device and nothing else.
+    #[test]
+    fn a_device_answers_on_its_own_port() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        struct Lamp {
+            port: u16,
+            written: Rc<RefCell<Vec<u8>>>,
+        }
+        impl crate::devices::Device for Lamp {
+            fn port(&self) -> u16 {
+                self.port
+            }
+            fn read(&mut self) -> u8 {
+                0x5A
+            }
+            fn write(&mut self, value: u8) {
+                self.written.borrow_mut().push(value);
+            }
+        }
+
+        let written = Rc::new(RefCell::new(Vec::new()));
+        let lamp = || {
+            Box::new(Lamp {
+                port: 0x60,
+                written: Rc::clone(&written),
+            }) as Box<dyn crate::devices::Device>
+        };
+
+        // IN AL, 60h reads the device.
+        let mut cpu = cpu_with(&[0xE4, 0x60]);
+        cpu.bus.borrow_mut().add(lamp());
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x5A, "the device answered");
+
+        // A port nobody owns reads as ones.
+        let mut cpu = cpu_with(&[0xE4, 0x61]);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xFF, "nothing drives the lines");
+
+        // OUT 60h, AL reaches the device.
+        let mut cpu = cpu_with(&[0xE6, 0x60]);
+        cpu.bus.borrow_mut().add(lamp());
+        cpu.regs.set_byte(Reg8::Al, 0xC3);
+        cpu.step().unwrap();
+        assert_eq!(*written.borrow(), vec![0xC3], "the device was written");
     }
 
     #[test]

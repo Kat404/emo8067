@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod devices;
 pub mod exec;
 pub mod flags;
 pub mod memory;
@@ -68,6 +69,12 @@ pub struct Cpu {
     pub halted: bool,
     /// The reason execution stopped, for the debugger and for tests.
     pub stop_reason: StopReason,
+    /// The I/O bus: the devices a port reaches.
+    ///
+    /// It is shared, so a device can be watched from outside the emulator
+    /// while the emulator runs. An empty bus reads every port as all ones,
+    /// which is what a bare chip with nothing plugged into it does.
+    pub bus: devices::SharedBus,
 }
 
 /// Why the CPU stopped.
@@ -96,6 +103,7 @@ impl Cpu {
             rep: None,
             halted: false,
             stop_reason: StopReason::None,
+            bus: devices::empty_bus(),
         }
     }
 
