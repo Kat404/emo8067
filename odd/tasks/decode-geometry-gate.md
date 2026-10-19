@@ -63,6 +63,11 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   destination starts executing.
 - **T4** — Record the acceptance result in this document: each of the eight
   defects from this session, mapped to whichever task or phase kills it.
+- **T5** — **DONE.** The `AAA` masking question, which the handoff carried as
+  open and possibly wrong. Route: inline. Two defects, both against the
+  manual: `AAA`/`AAS` masked `AL` only inside the adjustment branch, and
+  `DAA`/`DAS` never wrote `AF` at all. Mutants killed: the mask moved out of
+  the branch, and the `AF` write removed.
 
 ## Log
 
@@ -154,3 +159,41 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   - In `programs.rs`, the padding bytes of both search programs are never
     executed, the backwards-copy program asserts pointers but not content, and
     `run()` never checks where a program halted.
+
+- **L6 (2026-10-19).** The maintainer answered four questions, and the answers
+  are the plan's constraints from here on.
+
+  1. **The oracle stays the manual; the hardware captures come in phase 2.**
+     The geometry — how many bytes an encoding consumes, and what its operand
+     format implies — exists only in the manual, and the captures record flags
+     and not operand formats, so they cannot close T2 or T3 on their own.
+  2. **The 86 example programs are local gold, not repository content.** They
+     live in `re/extracted/app/examples/`, which `.gitignore` excludes because
+     it is derived from a proprietary binary. They may be run and compared
+     against, and neither they nor their golden states go into the tree.
+  3. **`8F` with `mod=11` stays open.** The structural argument says a register
+     `POP`; no source states it, and the captures record `8F` by `/digit` only.
+  4. **The `AAA` question is settled against the manual, and the core was
+     wrong.** The handoff said `aaa` masks `AL` to its low nibble and that
+     "Intel's pseudocode has no such mask". Both halves of that are false.
+     The manual's own page 2-35 says the opposite in prose — "AAA ... changes
+     the contents of register AL to a valid unpacked decimal number; the
+     high-order half-byte is zeroed" — and Intel's SDM writes the mask as a
+     step of its own, outside the branch (Volume 2A, page 3-19):
+     `AL := AL AND 0FH;` after the `IF`. The rule the handoff quoted, `AL >
+     99h`, belongs to `DAA`, not `AAA`. So the mask is right, and it was
+     **unconditional** in the document and **conditional** in the code: `AL =
+     35h` with `AF` clear must end as `05h`, and it ended as `35h`. The same
+     reading found the second defect: `DAA`/`DAS` never wrote `AF`, although
+     Table 2-21 gives both an `X` in that column and the prose says `DAA`
+     "updates AF, CF, PF, SF and ZF".
+
+  **One divergence left open, and it is narrow.** The SDM tests the *old* `AL`
+  against `99h` in `DAA`'s second rule, where the classic 8086-era pseudocode
+  tests the `AL` the first rule produced. The two differ only when the first
+  rule fired and the old value was `94h`..`99h` with `AF` set. The 1979 manual
+  has no rule text, the SDM's own worked example contradicts its own operation
+  block, and the SDM describes later processors rather than the 8086, so the
+  code was left as it is and the divergence is recorded here as debt. Settling
+  it needs silicon or a source that says which the 8086 does.
+

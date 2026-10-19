@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 115 + 3 + 4 + 28 + 109 + 0 passed   (264)
+cargo test --workspace   0 + 5 + 116 + 3 + 4 + 30 + 109 + 0 passed   (267)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     086c3bf   (signed; every commit in this session is GPG-signed)
+HEAD                     8dcc9da   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -166,7 +166,17 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | Does unsigned `DIV` (`/6`) negate under `REP`? | left alone as a policy | the captures do not cover prefixes. Needs a `F3 F6 /6` case, or the `8086_microcode_v2.zip` listing |
 | Is the microcode ROM identical across 8086 steppings? | not decidable | needs a 1978 Stepping 1 die, which is a collector item. Affects all five microcode findings if the ROM changed |
 | `SHL`/`SHR`: does silicon update S, Z, P or preserve them? | code follows the manual's prose | the `metadata.json` cannot tell — it records unreliability, not change. The per-opcode capture files carry initial *and* final state and would settle it |
-| `AAA`/`DAA` against the manual's pseudocode | **open, and possibly wrong** | `aaa` masks `AL` to its low nibble after the `+ 6` adjustment. Intel's pseudocode has no such mask: the second rule then tests `AL > 99h` on the *unmasked* value, which the mask destroys. Nothing here has checked it, and no end-to-end program covers it because the expected value could not be stated without guessing. Settling it needs the manual's `AAA` and `DAA` text |
+| `AAA`/`DAA` against the manual's pseudocode | **CLOSED — the core was wrong twice** | The manual (Oct 1979, page 2-35) says `AAA` zeroes the high-order half-byte of `AL`, and Intel's SDM (Vol 2A, page 3-19) writes the mask as its own step, outside the branch. The core masked only inside the branch, and `DAA`/`DAS` never wrote `AF` at all, although Table 2-21 gives both an `X` in that column. Both fixed in `8dcc9da`, with the mutants shown to fail |
+| Does `DAA`'s second rule test the old `AL` or the adjusted one? | **open, and narrow** | The SDM tests `old_AL > 99h`; the classic 8086-era pseudocode tests the `AL` the first rule produced. They differ only when the first rule fired and the old value was `94h`..`99h` with `AF` set. The 1979 manual has no rule text and the SDM's own worked example contradicts its operation block, so the code was left alone. Settling it needs silicon or a source that says which the 8086 does |
+
+## Decisions of 2026-10-19, and what they settle
+
+| Question | Decision | Why it matters |
+|---|---|---|
+| What is the oracle for the flags? | **The manual first; the hardware captures come in phase 2** | The captures record flags and not operand formats, so they cannot close the geometry half of the phase. `documentation-guide.md` §1.4 stays the oracle until phase 2 says otherwise |
+| What happens to the 86 example programs? | **Local gold, never committed** | They live under `re/extracted*/`, which is gitignored because it is derived from a proprietary binary. Running them is allowed; versioning them is not |
+| `8F` with `mod=11` | **Stays open** | The structural argument says a register `POP`; no source states it, and the captures record `8F` by `/digit` only. A `mod=11` case in `SingleStepTests` would settle it |
+| `AAA`/`DAA` against the manual | **The core is corrected, not the manual** | Two defects: the mask was conditional and `AF` was never written. The manual's page 2-35 and the SDM's Volume 2A agree, and the SDM's `AL := AL AND 0FH` sits outside the branch |
 
 ## Next session, in order
 
@@ -176,7 +186,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 4. **Decide the oracle question** in "A second cause" above — the cheap semantic gate first, and whether §1.3 becomes a derived document gated on the hardware captures. It is a decision before it is a task, and it changes what the next unit is allowed to trust.
 5. **Keep growing the program corpus.** `crates/core/tests/programs.rs` has twenty-eight programs and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. Batches two and three added: the direction flag moving pointers backwards, `INT`/`IRET`, a far `CALL`/`RET`, a signed `XLAT` index, writing a segment register and indexing through it, `LOOP`'s counting rule, `CBW`/`CWD`, an overflowing byte multiply, a shift loop, an XOR checksum, a program reading its own instruction stream, `REP` with a zero count, nested `CALL`s, self-modifying code written through `DS` and executed through `CS`, two segments at one offset, a linear search in both outcomes, and `REPE CMPSB` over two buffers. **Two rules for every new program.** Mutate the exact rule its name claims — one of the twenty-eight proved nothing until a mutation survived it. And never write an expected value from memory: the packed-BCD program was cut rather than guessed, which is how the `AAA` masking question in "Still open" was found. Hand-assembly errors so far, all caught because the emulator disagreed: `BE` for `SI`, `BB` for `BX`, `46` for `INC SI`, `5E` for `POP SI`, `disp16` byte order, `89 C6` read as a memory store when `mod=11` makes it a register move, and a program one byte short.
 6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus now makes its value concrete: twenty-one tests had to be hand-re-encoded against Intel's table, which is exactly the work an assembler does once and for all.
-7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). Note that `re/` currently contains **no** `.asm` files — the 86 examples are not in the tree, so this needs either locating them in the extracted reference build or writing them.
+7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). The 86 examples are at `re/extracted/app/examples/`, but `.gitignore` excludes `re/extracted*/` because they are derived from a proprietary binary, so they are local gold and not repository content: they may be run and compared against, and neither they nor their golden states go into the tree.
 8. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
 
 ## Files worth reading first
