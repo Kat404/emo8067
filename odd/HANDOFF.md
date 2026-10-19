@@ -1,6 +1,8 @@
 # Session handoff — emo8067
 
-Written 2026-10-15 at the end of a long session. Everything below is a claim with a source; anything marked **UNRESOLVED** is a real open item, not a reminder.
+Written 2026-10-15 at the end of a long session, and kept current since: the
+2026-10-19 work is folded into it. Everything below is a claim with a source;
+anything marked **UNRESOLVED** is a real open item, not a reminder.
 
 ## What the project is
 
@@ -11,11 +13,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 116 + 4 + 4 + 1 + 30 + 109 + 5 + 0 passed   (275)
+cargo test --workspace   302 passed, 0 failed
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     a5c0289   (signed; every commit in this session is GPG-signed)
+HEAD                     189c711   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -27,6 +29,7 @@ Two gates, both live, both proved to fail when broken:
 | `the_word_register_field_names_the_register_intel_table_4_9_says` | all eight `B8`..`BF` encodings, plus the same field in a ModR/M byte. Written against instruction bytes, not the API, because the API is where the encoding mistake hid |
 | `every_encoding_consumes_exactly_what_the_manual_says` | 177 encodings: 55 that carry an immediate and 122 that carry a displacement, each with the length the manual's operand format implies, stated by hand. Plain instructions by where `IP` lands, relative jumps by their displacement, `INT`/far `CALL` by the pushed return address, `RET` by how far the stack moved. Phase 1 of `odd/tasks/decode-geometry-gate.md` |
 | `an_instruction_touches_only_what_it_is_documented_to_touch` | one instruction of every family, in `crates/core/tests/touched.rs`: the registers it writes, the memory it writes, and every other register, every other byte of the megabyte and every flag the guide marks `—` checked not to have changed. The flags it may change are read out of §1.4, not typed by hand |
+| `the_flags_come_out_the_way_a_real_8086_leaves_them` | 1533 cases from `SingleStepTests/8086`, a real Intel P80C86A-2: the machine state, the instruction, and the flags the chip left. The flags the chip leaves undefined are masked out of both sides, because "undefined" means the chip left whatever was there. Nine cases still disagree and the gate names and counts them |
 | `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
@@ -256,7 +259,10 @@ wins, so a device that writes a port byte does not reach the program.
 3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
 4. ~~Decide the oracle question~~ — decided 2026-10-19: the manual stays the oracle and the hardware captures come in phase 2. See "Decisions of 2026-10-19" above. **Phase 2 is now the next unit of the plan**: replacing the document as the flag oracle with the captures, which is what would close the `X` and `U` rows.
 5. **Keep growing the program corpus.** `crates/core/tests/programs.rs` has thirty programs — the two BCD ones landed with the `AAA`/`DAA` fix — and twenty-eight and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. Batches two and three added: the direction flag moving pointers backwards, `INT`/`IRET`, a far `CALL`/`RET`, a signed `XLAT` index, writing a segment register and indexing through it, `LOOP`'s counting rule, `CBW`/`CWD`, an overflowing byte multiply, a shift loop, an XOR checksum, a program reading its own instruction stream, `REP` with a zero count, nested `CALL`s, self-modifying code written through `DS` and executed through `CS`, two segments at one offset, a linear search in both outcomes, and `REPE CMPSB` over two buffers. **Two rules for every new program.** Mutate the exact rule its name claims — one of the twenty-eight proved nothing until a mutation survived it. And never write an expected value from memory: the packed-BCD program was cut rather than guessed, which is how the `AAA` masking question in "Still open" was found, and it is written now — the touches gate found four of its own expectations wrong the same way, every one of them a sentence remembered rather than computed. Hand-assembly errors so far, all caught because the emulator disagreed: `BE` for `SI`, `BB` for `BX`, `46` for `INC SI`, `5E` for `POP SI`, `disp16` byte order, `89 C6` read as a memory store when `mod=11` makes it a register move, and a program one byte short.
-6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus now makes its value concrete: twenty-one tests had to be hand-re-encoded against Intel's table, which is exactly the work an assembler does once and for all.
+6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus makes its value concrete: twenty-one tests had to be hand-encoded against Intel's table, which is exactly the work an assembler does once and for all.
+   - **The plan is `odd/tasks/assembler.md`** — eight specs, seven tasks — and the decision it settles is that the assembler reads the *same document the emulator is checked against*: §1.3 of `documentation-guide.md`, at compile time, the way the flag contract reads §1.4. The instruction table then exists once in the project instead of twice.
+   - **Done:** the crate `crates/asm` (no dependencies), the reader of §1.3, the ModR/M byte with the 8086's register order, the matcher that turns a form plus the operands into bytes, and the three group tables. The reader also settled a question the plan had wrong: the map has one cell per opcode, not eight columns to an opcode.
+   - **Next:** the addressing modes, the literal rules, the source parser, the thirteen type checks, and the directives.
 7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). The 86 examples are at `re/extracted/app/examples/`, but `.gitignore` excludes `re/extracted*/` because they are derived from a proprietary binary, so they are local gold and not repository content: they may be run and compared against, and neither they nor their golden states go into the tree.
 8. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
 
