@@ -74,9 +74,13 @@ checked against.
   Table 4-13 has eight columns; the guide's transcription flattened them, and
   the `/digit` of a group lives in the guide's group tables, not in the grid.
   The group forms are T2's work.
-- **T2** — **TODO.** The encoder for the register forms: `r/m8` and `r16` in
-  both directions, with the `REG` field in the 8086's order, and the ModR/M
-  byte with its mod and rm fields.
+- **T2** — **DONE, the ModR/M half.** The byte and its three fields, with
+  the `REG` field naming the 16-bit registers in the 8086's order
+  (`AX CX DX BX SP BP SI DI`), and the 8-bit field unable to reach
+  `AH CH DH BH` — which the 8086 can name only through a register operand.
+  Still to come in this task: matching an operand form to the bytes it
+  encodes, and the group's `/digit` forms, which live in the guide's group
+  tables rather than in the grid.
 - **T3** — **TODO.** The addressing modes: the base and index registers, the
   displacement's width, the direct form, and the default segment per base.
 - **T4** — **TODO.** The immediates and the literals, with the reference's
