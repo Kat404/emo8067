@@ -219,6 +219,22 @@ calls untouched is one the chip left alone.
 whole opcode space, with the gate naming and counting the two families
 that still disagree.
 
+## The I/O bus
+
+A port is not a memory address. The 8086 has a separate I/O bus, and the
+reference implementation made it a 64 KB file at `C:\emu8086.io` with byte N
+of the file behind port N, so reaching a device meant a writable file at the
+root of the drive. The core now has the bus in the process: a `Device` trait,
+a bus that hands each port to the device that owns it, and a shared handle so
+a device can be watched from outside the emulator while it runs. A port
+nobody owns reads as all ones and swallows writes, which is what the bare
+chip does and what the captures confirm.
+
+The three devices with a documented port map (traffic lights on 4, stepper
+motor on 7, robot on 9/10/11) and the framed socket transport are still to
+come; their protocols are in `odd/research/features-and-ux.md`, DEV-4 to
+DEV-6.
+
 ## Decisions of 2026-10-19, and what they settle
 
 | Question | Decision | Why it matters |
