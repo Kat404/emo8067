@@ -1,0 +1,93 @@
+# The assembler (T13)
+
+Objective: an assembler that takes the reference's MASM-style source and
+produces the bytes. Branch: `main`. Delivery: one commit per task, each
+leaving the tree green. Test runner: `cargo test --workspace`, plus the
+examples in `re/extracted/app/examples/` (eighty-six of them, local gold, never
+committed).
+
+Written 2026-10-19, after the device bus closed. This is the one large piece
+of construction the project has left, and it is the piece the rest of the
+toolchain waits on: T12's exit criterion is the examples running, and running
+them means assembling them.
+
+## Why this and not more
+
+Twenty-one of the tests in this repository are hand-encoded, and every
+hand-encoding is an opportunity to encode the wrong thing. The project has
+already paid for that twice: a `disp16` written the wrong way round, and a
+program one byte short so a `jmp` landed past its end. An assembler is the
+answer to both, and it is also what makes the rest of the plan safe to
+change.
+
+The reference's own grammar was recovered verbatim into
+`re/FINDINGS.md`: the operand-type signatures, the thirteen `STRICT_SYNTAX`
+checks, the accepted prefixes, the numeric literal rules and the register
+names. That is the specification, and it is the same document the emulator is
+checked against.
+
+## Specs
+
+- **S1** — The assembler is driven by the **same document the emulator is
+  checked against**: `odd/research/documentation-guide.md` §1.3, read at
+  compile time, the way `flag_contract.rs` reads §1.4. The opcode map is not
+  written out a second time in the assembler, so the two cannot drift.
+- **S2** — MASM-style source: the instruction mnemonics of §1.3, the
+  operand forms of §1.3 (`r/m8`, `r16`, `i8`, `i16`, `m8`, `m16`, `sreg`,
+  `short`, `near`, `far`), and the reference's numeric literals: `&HFF`,
+  `1234h`, `0123456789$` (MASM's radix suffix), decimal, and the
+  `zero prefix must be added to a HEX value` rule.
+- **S3** — The reference's addressing: `[BX]`, `[SI]`, `[BP+SI]`,
+  `[BX+DI]`, `[BP]` with `SS` as its default segment, `[disp16]`, the
+  segment overrides `cs: ds: es: ss:` and `.cs: .ds: .es: .ss:`, and the
+  two legality checks the reference made — `[BX] cannot go with [BP]` and
+  `[SI] cannot go with [DI]`.
+- **S4** — The operand types are checked the way the reference checked them:
+  an 8-bit register and a 16-bit register do not match, a segment register
+  and an immediate do not match, `CS` and `IP` cannot be the destination of a
+  `MOV`, memory to memory is not allowed, and a port number is not an
+  immediate. The thirteen checks are listed verbatim in `re/FINDINGS.md`.
+- **S5** — The directives: `ORG`, `DB`, `DW`, `DD`, `EQU`, `LABEL`, `SEGMENT`,
+  `END`, `PROC`/`ENDP`, `DUP`, `INCLUDE`, `RADIX`, `MACRO`/`ENDM`, and the
+  build directives `#make_bin#`, `#make_com#`, `#make_exe#`, `#make_boot#`,
+  `#start=…#`, `#mem=addr,bytes-…#` and the register initialisers
+  `#cs= #ds= #es= #ss= #ip= #sp= #si= #di= #bp=`.
+- **S6** — Macros expand, and a macro may call another; the reference
+  reported a pass count and refused a recursive definition, so the assembler
+  counts its passes and refuses a definition that would not terminate.
+- **S7** — The errors are the reference's, verbatim where the reference
+  printed one: `not enough operands for …`, `first operand can be AL or AX`,
+  `second operand cannot be AL`, `segment registers cannot go together!`,
+  `mem to mem`, `memory to memory is not allowed for 8086:`. A message that
+  says which line and which instruction is worth more than one that does not.
+- **S8** — The examples assemble: all eighty-six of them, and the bytes the
+  assembler produces are the bytes the reference produced. The examples are
+  local gold and are not committed; the goldens are.
+
+## Tasks
+
+- **T1** — **TODO.** The crate and the reader: the opcode map out of §1.3,
+  read at compile time, into a table of mnemonics and their forms.
+- **T2** — **TODO.** The encoder for the register forms: `r/m8` and `r16` in
+  both directions, with the `REG` field in the 8086's order, and the ModR/M
+  byte with its mod and rm fields.
+- **T3** — **TODO.** The addressing modes: the base and index registers, the
+  displacement's width, the direct form, and the default segment per base.
+- **T4** — **TODO.** The immediates and the literals, with the reference's
+  rules for a hex value and for a radix suffix.
+- **T5** — **TODO.** The type checks, the thirteen of them, with the
+  reference's messages.
+- **T6** — **TODO.** The directives, the macros and the build directives.
+- **T7** — **TODO.** The eighty-six examples, and the goldens.
+
+## Log
+
+- **L1 (2026-10-19).** The maintainer chose the assembler after the device
+  bus closed. The design that this document settles, and that the next
+  session should not re-litigate: **the assembler reads the same document
+  the emulator is checked against**. §1.3 is the opcode map, transcribed
+  from the manual; the flag contract already reads §1.4 at compile time;
+  so the assembler can read §1.3 the same way, and the instruction table
+  exists once in the project instead of twice. The cost is a parser for
+  the table's prose, and the benefit is that an assembler bug and a
+  transcription bug cannot both be true and cancel out.
