@@ -75,11 +75,11 @@ fn at(c: &mut Cpu, segment: u16, offset: u16, bytes: &[u8]) {
 #[test]
 fn sums_a_byte_array_with_an_indexed_loop() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h
+        0xBE, 0x00, 0x01, // mov si, 0100h
         0xB9, 0x08, 0x00, // mov cx, 8
         0x31, 0xC0, // xor ax, ax
         0x02, 0x04, // L1: add al, [si]   (/0 is ADD r/m,r; /2 is ADD r,r/m)
-        0x45, // inc si   (40+r follows the REG field, so SI is 101b = 45h)
+        0x46, // inc si   (40+r follows the REG field, so SI is 110b = 46h)
         0x49, // dec cx
         0x75, 0xFA, // jnz L1  (next is +14, target is +8)
         0xF4, // hlt
@@ -107,8 +107,8 @@ fn sums_a_byte_array_with_an_indexed_loop() {
 #[test]
 fn copies_a_block_from_ds_into_es_with_rep_movs() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h   (BD is MOV SI)
-        0xBE, 0x00, 0x01, // mov di, 0100h   (BE is MOV DI)
+        0xBE, 0x00, 0x01, // mov si, 0100h   (BE is MOV SI)
+        0xBF, 0x00, 0x01, // mov di, 0100h   (BF is MOV DI)
         0xB9, 0x10, 0x00, // mov cx, 10h
         0xFC, // cld
         0xF3, 0xA4, // rep movsb
@@ -206,7 +206,7 @@ fn divides_a_wide_dividend_by_a_word_divisor() {
 #[test]
 fn scans_es_for_a_byte_and_stops_on_the_match() {
     let mut c = machine(&[
-        0xBE, 0x00, 0x01, // mov di, 0100h   (BE is MOV DI)
+        0xBF, 0x00, 0x01, // mov di, 0100h   (BF is MOV DI)
         0xB9, 0x10, 0x00, // mov cx, 10h
         0xB0, 0x5A, // mov al, 5Ah
         0xF2, 0xAE, // repne scasb
@@ -270,7 +270,7 @@ fn calls_a_subroutine_and_returns_to_the_instruction_after_it() {
 #[test]
 fn translates_through_a_table_with_xlat() {
     let mut c = machine(&[
-        0xBF, 0x00, 0x01, // mov bx, 0100h   (BF is MOV BX; BB is MOV SP)
+        0xBB, 0x00, 0x01, // mov bx, 0100h   (BB is MOV BX; BC is MOV SP)
         0xB0, 0x02, // mov al, 02h
         0xD7, // xlat
         0xF4, // hlt
@@ -331,8 +331,8 @@ fn reads_through_a_segment_override_to_the_code_segment() {
 #[test]
 fn copies_a_block_backwards_when_df_is_set() {
     let mut c = machine(&[
-        0xBD, 0x10, 0x01, // mov si, 0110h
-        0xBE, 0x10, 0x02, // mov di, 0210h
+        0xBE, 0x10, 0x01, // mov si, 0110h
+        0xBF, 0x10, 0x02, // mov di, 0210h
         0xB9, 0x10, 0x00, // mov cx, 10h
         0xFD, // std
         0xF3, 0xA4, // rep movsb
@@ -465,7 +465,7 @@ fn a_far_call_saves_and_restores_the_code_segment() {
 #[test]
 fn xlat_signs_its_index() {
     let mut c = machine(&[
-        0xBF, 0x00, 0x01, // mov bx, 0100h
+        0xBB, 0x00, 0x01, // mov bx, 0100h
         0xB0, 0xFF, // mov al, FFh
         0xD7, // xlat
         0xF4, // hlt
@@ -497,7 +497,7 @@ fn writes_a_segment_register_and_then_indexes_through_it() {
     let mut c = machine(&[
         0xB8, 0x00, 0x12, // mov ax, 1200h
         0x8E, 0xD8, // mov ds, ax
-        0xBF, 0x80, 0x00, // mov bx, 0080h   (BF is MOV BX; BB is MOV SP)
+        0xBB, 0x80, 0x00, // mov bx, 0080h   (BB is MOV BX; BC is MOV SP)
         0x8A, 0x07, // mov al, [bx]
         0xF4, // hlt
     ]);
@@ -606,11 +606,11 @@ fn shifts_a_bit_into_a_mask_with_a_loop() {
 #[test]
 fn checksums_a_block_with_xor() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h
+        0xBE, 0x00, 0x01, // mov si, 0100h
         0xB9, 0x10, 0x00, // mov cx, 10h
         0x31, 0xC0, // xor ax, ax
         0x32, 0x04, // L: xor al, [si]
-        0x45, // inc si
+        0x46, // inc si
         0x49, // dec cx
         0x75, 0xFA, // jnz L
         0xF4, // hlt
@@ -676,8 +676,8 @@ fn reads_a_byte_of_its_own_instruction_stream() {
 #[test]
 fn rep_with_a_zero_count_writes_nothing() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h
-        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xBE, 0x00, 0x01, // mov si, 0100h
+        0xBF, 0x00, 0x02, // mov di, 0200h
         0xB9, 0x00, 0x00, // mov cx, 0
         0xF3, 0xA4, // rep movsb
         0xF4, // hlt
@@ -750,11 +750,11 @@ fn nested_calls_unwind_the_stack_in_order() {
 #[test]
 fn writes_its_own_code_and_then_jumps_into_it() {
     let mut c = machine(&[
-        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xBF, 0x00, 0x02, // mov di, 0200h
         0xB8, 0xB8, 0x34, // mov ax, 34B8h
         0x89,
         0x05, // mov [di], ax   (mod=00, rm=101 is [DI]; C6 was mod=11, a register move)   (r/m is the destination: DI is 110b)
-        0xBE, 0x02, 0x02, // mov di, 0202h
+        0xBF, 0x02, 0x02, // mov di, 0202h
         0xB8, 0x12, 0xF4, // mov ax, F412h
         0x89, 0x05, // mov [di], ax   (mod=00, rm=101 is [DI]; C6 was mod=11, a register move)
         0xEA, 0x00, 0x02, 0x00, 0x10, // jmp far 1000h:0200h
@@ -780,7 +780,7 @@ fn writes_its_own_code_and_then_jumps_into_it() {
 #[test]
 fn reads_two_segments_at_the_same_offset() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h
+        0xBE, 0x00, 0x01, // mov si, 0100h
         0x8A, 0x04, // mov al, [si]
         0x2E, 0x8A, 0x1C, // mov bl, cs:[si]
         0xF4, // hlt
@@ -809,10 +809,10 @@ fn reads_two_segments_at_the_same_offset() {
 fn a_signed_divide_undoes_a_signed_multiply() {
     let mut c = machine(&[
         0xB8, 0xFC, 0xFF, // mov ax, FFFCh
-        0xBF, 0x07, 0x00, // mov bx, 0007h
-        0xF7, 0xEF, // imul bx
+        0xBB, 0x07, 0x00, // mov bx, 0007h
+        0xF7, 0xEB, // imul bx
         0x8B, 0xCA, // mov cx, dx
-        0xF7, 0xFF, // idiv bx
+        0xF7, 0xFB, // idiv bx
         0xF4, // hlt
     ]);
 
@@ -844,17 +844,17 @@ fn a_signed_divide_undoes_a_signed_multiply() {
 #[test]
 fn searches_an_array_and_reports_where_it_stopped() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // 0000: mov si, 0100h
+        0xBE, 0x00, 0x01, // 0000: mov si, 0100h
         0xB9, 0x08, 0x00, // 0003: mov cx, 8
         0xB0, 0x2A, // 0006: mov al, 2Ah
         0x38, 0x04, // 0008: cmp [si], al
         0x74, 0x0E, // 0010: je found   (next is +12, found is +26)
-        0x45, // 0012: inc si
+        0x46, // 0012: inc si
         0xE2, 0xF9, // 0013: loop search (next is +15, search is +8)
-        0xBF, 0xFF, 0xFF, // 0015: mov bx, FFFFh
+        0xBB, 0xFF, 0xFF, // 0015: mov bx, FFFFh
         0xEB, 0x09, // 0018: jmp done    (next is +20, done is +29)
         0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // 0020: padding
-        0x8B, 0xFD, // 0026: found: mov bx, si
+        0x8B, 0xDE, // 0026: found: mov bx, si
         0xF4, // 0029: done: hlt
     ]);
     let mut haystack = [0x11u8; 8];
@@ -890,17 +890,17 @@ fn searches_an_array_and_reports_where_it_stopped() {
 #[test]
 fn a_search_that_finds_nothing_returns_the_sentinel() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // 0000: mov si, 0100h
+        0xBE, 0x00, 0x01, // 0000: mov si, 0100h
         0xB9, 0x08, 0x00, // 0003: mov cx, 8
         0xB0, 0x2A, // 0006: mov al, 2Ah
         0x38, 0x04, // 0008: cmp [si], al
         0x74, 0x0E, // 0010: je found
-        0x45, // 0012: inc si
+        0x46, // 0012: inc si
         0xE2, 0xF9, // 0013: loop search
-        0xBF, 0xFF, 0xFF, // 0015: mov bx, FFFFh
+        0xBB, 0xFF, 0xFF, // 0015: mov bx, FFFFh
         0xEB, 0x09, // 0018: jmp done
         0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, // 0020: padding
-        0x8B, 0xFD, // 0026: found: mov bx, si
+        0x8B, 0xDE, // 0026: found: mov bx, si
         0xF4, // 0029: done: hlt
     ]);
     at(&mut c, DATA, 0x0100, &[0x11; 8]);
@@ -932,14 +932,14 @@ fn a_search_that_finds_nothing_returns_the_sentinel() {
 fn the_stack_gives_back_what_was_pushed_last_first() {
     let mut c = machine(&[
         0xB8, 0x11, 0x11, // mov ax, 1111h
-        0xBF, 0x22, 0x22, // mov bx, 2222h
+        0xBB, 0x22, 0x22, // mov bx, 2222h
         0xB9, 0x33, 0x33, // mov cx, 3333h
         0x50, // push ax
-        0x57, // push bx   (50+r, and BX is 111b)
+        0x53, // push bx   (50+r, and BX is 011b)
         0x51, // push cx
         0x5A, // pop dx    (58+r)
-        0x5D, // pop si    (SI is 101b)
-        0x5E, // pop di    (DI is 110b)
+        0x5E, // pop si    (SI is 110b)
+        0x5F, // pop di    (DI is 111b)
         0xF4, // hlt
     ]);
     let stack = c.regs.word(Reg16::Sp);
@@ -967,8 +967,8 @@ fn the_stack_gives_back_what_was_pushed_last_first() {
 #[test]
 fn repe_cmpsb_stops_at_the_first_mismatch_between_two_buffers() {
     let mut c = machine(&[
-        0xBD, 0x00, 0x01, // mov si, 0100h
-        0xBE, 0x00, 0x02, // mov di, 0200h
+        0xBE, 0x00, 0x01, // mov si, 0100h
+        0xBF, 0x00, 0x02, // mov di, 0200h
         0xB9, 0x08, 0x00, // mov cx, 8
         0xF3, 0xA6, // repe cmpsb
         0xF4, // hlt

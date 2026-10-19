@@ -621,12 +621,13 @@ fn mov_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             RegArg::from_bits(reg_field, bits).write(&mut cpu.regs, value);
         }
         0x8C => {
-            // 8C needs a memory destination. With mod=11 it names a register,
-            // which is an 80186 encoding the 8086 does not have, so it is
-            // rejected rather than silently storing a segment in a register.
-            if matches!(m.rm, Operand::Reg(_)) {
-                return Err(ExecError::NotOn8086(opcode));
-            }
+            // 8C moves a segment into a memory operand or into a general
+            // register. The register form is not an 80186 addition: the
+            // captures from a real P80C86A-2 show `8C DF` as `MOV DI,DS`,
+            // with the segment landing in the register. The 1979 print
+            // shows `(not used)` for those cells, and the print is what is
+            // wrong here.
+            //
             // 8C moves a 16-bit segment value whatever the opcode's low bit
             // says. Deriving the width from bit 0 made it a byte store.
             let value = cpu.regs.segment(Seg::from_bits(reg_field));
@@ -1283,6 +1284,13 @@ fn daa(cpu: &mut crate::Cpu, add: bool) {
     let old_cf = cpu.regs.flags.get(CF);
     let old_af = cpu.regs.flags.get(AF);
     let mut al = cpu.regs.byte(Reg8::Al);
+    // The high-nibble rule tests the value the low rule started from, not
+    // the value the low rule produced. The manual is silent about the rule
+    // itself, but the hardware is not: the captures from a real P80C86A-2
+    // show `DAA` on `AL = FAh` leaving `AL = 60h` with the carry set, which
+    // is the old value testing true, and Intel's SDM writes the same
+    // (`IF ((old_AL > 99H) or (old_CF = 1))`).
+    let old_al = al;
 
     // The low correction fires on the low nibble or on a carry out of it, and
     // it is what writes AF. The manual's Table 2-21 gives DAA and DAS an `X`
@@ -1305,7 +1313,7 @@ fn daa(cpu: &mut crate::Cpu, add: bool) {
     cpu.regs.flags.set(AF, low);
 
     let mut cf = old_cf;
-    if al > 0x99 || old_cf {
+    if old_al > 0x99 || old_cf {
         cf = true;
         al = if add {
             al.wrapping_add(0x60)
@@ -2144,7 +2152,7 @@ mod tests {
 
     #[test]
     fn push_and_pop_round_trip() {
-        let mut cpu = cpu_with(&[0x50, 0x5F]); // PUSH AX ; POP BX
+        let mut cpu = cpu_with(&[0x50, 0x5B]); // PUSH AX ; POP BX
         cpu.regs.set_segment(Seg::Ss, 0x1000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.regs.set_word(Reg16::Ax, 0xBEEF);
@@ -2625,6 +2633,23 @@ mod tests {
     }
 
     #[test]
+    fn daa_tests_the_old_al_in_the_high_rule() {
+        // 27 = DAA. AL = FAh: the low nibble is out of range, so the low rule
+        // adds six and the byte wraps to 00h. The high rule then tests the
+        // value the low rule *started* from, FAh, which is above 99h, so the
+        // high correction adds 60h and the carry is set. The captures from a
+        // real P80C86A-2 show exactly this, and the classic pseudocode's
+        // "the adjusted AL" would leave AL at 00h with the carry clear.
+        let mut cpu = cpu_with(&[0x27]);
+        cpu.regs.set_byte(Reg8::Al, 0xFA);
+        cpu.regs.flags.set(CF, false);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x60);
+        assert!(cpu.regs.flags.get(CF), "the tens carried");
+    }
+
+    #[test]
     fn daa_repairs_a_packed_bcd_result() {
         // 27 = DAA. 0x28 + 0x37 = 0x5F, whose low nibble F is not a digit.
         // The low correction turns it into 0x65, which is valid, and nothing
@@ -2699,7 +2724,7 @@ mod tests {
     #[test]
     fn jmp_indirect_takes_its_target_from_an_operand() {
         // FF /4 = JMP near r/m16.
-        let mut cpu = cpu_with(&[0xFF, 0xE6]); // JMP DI
+        let mut cpu = cpu_with(&[0xFF, 0xE7]); // JMP DI
         cpu.regs.set_word(Reg16::Di, 0x1234);
         cpu.step().unwrap();
         assert_eq!(cpu.regs.ip, 0x1234);
@@ -2770,7 +2795,7 @@ mod tests {
     #[test]
     fn call_indirect_pushes_and_loads_from_the_operand() {
         // FF /2 = CALL near r/m16.
-        let mut cpu = cpu_at(&[0xFF, 0xD6]); // CALL DI
+        let mut cpu = cpu_at(&[0xFF, 0xD7]); // CALL DI
         cpu.regs.set_segment(Seg::Ss, 0x2000);
         cpu.regs.set_word(Reg16::Sp, 0x0100);
         cpu.regs.set_word(Reg16::Di, 0x0300);
@@ -2942,8 +2967,8 @@ mod tests {
 
     #[test]
     fn mov_between_registers_in_both_directions() {
-        // 89 C7 = MOV BX, AX.  8B F8 = MOV BX, AX.
-        for code in [vec![0x89, 0xC7], vec![0x8B, 0xF8]] {
+        // 89 C3 = MOV BX, AX.  8B D8 = MOV BX, AX.
+        for code in [vec![0x89, 0xC3], vec![0x8B, 0xD8]] {
             let mut cpu = cpu_with(&code);
             cpu.regs.set_word(Reg16::Ax, 0x1111);
             cpu.regs.set_word(Reg16::Bx, 0x1234);
@@ -3028,8 +3053,8 @@ mod tests {
 
     #[test]
     fn xchg_swaps_two_registers_without_touching_flags() {
-        // 97 is XCHG AX, BX. Plain 0x90 is NOP and never reads a ModR/M byte.
-        let mut cpu = cpu_with(&[0x97]);
+        // 93 is XCHG AX, BX. Plain 0x90 is NOP and never reads a ModR/M byte.
+        let mut cpu = cpu_with(&[0x93]);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.regs.set_word(Reg16::Bx, 0x2222);
         cpu.regs.flags.set(SF, true);
@@ -3041,9 +3066,9 @@ mod tests {
 
     #[test]
     fn xchg_word_form_still_swaps_through_a_modrm_byte() {
-        // 87 C7 = XCHG AX, BX by ModR/M, and 87 06 34 12 = XCHG [1234h], AX.
+        // 87 C3 = XCHG AX, BX by ModR/M, and 87 06 34 12 = XCHG [1234h], AX.
         // 93 does the same job in one byte, so only this form reads the queue.
-        let mut cpu = cpu_with(&[0x87, 0xC7]);
+        let mut cpu = cpu_with(&[0x87, 0xC3]);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.regs.set_word(Reg16::Bx, 0x2222);
         cpu.step().unwrap();
@@ -3084,10 +3109,10 @@ mod tests {
 
     #[test]
     fn sixteen_bit_modrm_register_operands_use_the_whole_word() {
-        // 01 C7 is ADD BX, AX: reg field 000 names AX, r/m field 111 names BX,
+        // 01 C3 is ADD BX, AX: reg field 000 names AX, r/m field 011 names BX,
         // and r/m is the destination. BX = 0x1234 + AX = 0x1111 -> 0x2345.
         // Reading BX as its low byte would silently produce 0x1245.
-        let mut cpu = cpu_with(&[0x01, 0xC7]);
+        let mut cpu = cpu_with(&[0x01, 0xC3]);
         cpu.regs.set_word(Reg16::Bx, 0x1234);
         cpu.regs.set_word(Reg16::Ax, 0x1111);
         cpu.step().unwrap();
@@ -3226,7 +3251,7 @@ mod tests {
     fn mul16_produces_a_32_bit_result_in_dx_ax() {
         // F7 /4 = MUL BX.  0x00FF * 0x00FF = 0xFE01, which fits in 16 bits, so
         // DX is zero and neither CF nor OF is raised.
-        let mut cpu = cpu_with(&[0xF7, 0xE7]);
+        let mut cpu = cpu_with(&[0xF7, 0xE3]);
         cpu.regs.set_word(Reg16::Ax, 0x00FF);
         cpu.regs.set_word(Reg16::Bx, 0x00FF);
         cpu.step().unwrap();
@@ -3237,7 +3262,7 @@ mod tests {
 
     #[test]
     fn mul16_signals_overflow_when_dx_is_not_zero() {
-        let mut cpu = cpu_with(&[0xF7, 0xE7]);
+        let mut cpu = cpu_with(&[0xF7, 0xE3]);
         cpu.regs.set_word(Reg16::Ax, 0xFFFF);
         cpu.regs.set_word(Reg16::Bx, 0xFFFF);
         cpu.step().unwrap();
@@ -3318,7 +3343,7 @@ mod tests {
     #[test]
     fn div16_uses_the_full_dx_ax_dividend() {
         // F7 /6 = DIV BX.  0x0000_0064 / 7 = 14 remainder 2.
-        let mut cpu = cpu_with(&[0xF7, 0xF7]);
+        let mut cpu = cpu_with(&[0xF7, 0xF3]);
         cpu.regs.set_word(Reg16::Dx, 0);
         cpu.regs.set_word(Reg16::Ax, 100);
         cpu.regs.set_word(Reg16::Bx, 7);
@@ -3330,7 +3355,7 @@ mod tests {
     #[test]
     fn idiv16_divides_signed() {
         // F7 /7 = IDIV BX.  -1000 / 7 = -142 remainder -6.
-        let mut cpu = cpu_with(&[0xF7, 0xFF]);
+        let mut cpu = cpu_with(&[0xF7, 0xFB]);
         cpu.regs.set_word(Reg16::Dx, 0xFFFF);
         cpu.regs.set_word(Reg16::Ax, 0xFC18); // -1000
         cpu.regs.set_word(Reg16::Bx, 7);
@@ -3428,7 +3453,7 @@ mod tests {
 
         // 85 D8 = TEST AX, BX: 0100h and 0100h share 0100h. Reading either
         // operand as a byte would AND two zeros and wrongly set ZF.
-        let mut cpu = cpu_with(&[0x85, 0xF8]);
+        let mut cpu = cpu_with(&[0x85, 0xD8]);
         cpu.regs.set_word(Reg16::Ax, 0x0100);
         cpu.regs.set_word(Reg16::Bx, 0x0100);
         cpu.step().unwrap();

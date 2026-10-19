@@ -192,11 +192,17 @@ fn al_ff(c: &mut Cpu) {
     al(0xFF, c)
 }
 
-/// The 16-bit REG field is **not** the order `Reg16`'s discriminants run in.
-/// Intel Table 4-9 gives `011` to `SP` and `111` to `BX`, while the 8-bit field
-/// gives `011` to `BL` and `100` to `AH`. Reading a hardware field through the
-/// discriminant order permutes five of the eight registers, and every test
-/// written as `set_word(Reg16::Bx, ..)` then agrees with it, so nothing notices.
+/// The 16-bit REG field is the order `Reg16`'s discriminants run in, and it
+/// is **not** the order every modern reference quotes. Intel Table 4-9 of
+/// the 1979 manual gives `011` to `BX` and `100` to `SP`, while the 8-bit
+/// field gives `011` to `BL` and `100` to `AH`; the 80186 moved the 16-bit
+/// registers to `AX CX DX SP BP SI DI BX` to make room for the high bytes,
+/// and that later table is the one most references print. A real P80C86A-2
+/// agrees with the manual: `MOV SP,AX` is `8B E0`.
+///
+/// Reading a hardware field through the wrong order permutes five of the
+/// eight registers, and every test written as `set_word(Reg16::Bx, ..)` then
+/// agrees with it, so nothing notices.
 ///
 /// This gate goes through instruction bytes rather than the API, because the
 /// API is where the mistake hides.
@@ -208,11 +214,11 @@ fn the_word_register_field_names_the_register_intel_table_4_9_says() {
         (0xB8u8, Reg16::Ax, "AX"),
         (0xB9, Reg16::Cx, "CX"),
         (0xBA, Reg16::Dx, "DX"),
-        (0xBB, Reg16::Sp, "SP"),
-        (0xBC, Reg16::Bp, "BP"),
-        (0xBD, Reg16::Si, "SI"),
-        (0xBE, Reg16::Di, "DI"),
-        (0xBF, Reg16::Bx, "BX"),
+        (0xBB, Reg16::Bx, "BX"),
+        (0xBC, Reg16::Sp, "SP"),
+        (0xBD, Reg16::Bp, "BP"),
+        (0xBE, Reg16::Si, "SI"),
+        (0xBF, Reg16::Di, "DI"),
     ];
     for (opcode, want, name) in table {
         let mut c = machine(&[opcode, 0x34, 0x12]);
@@ -244,11 +250,11 @@ fn the_modrm_register_operand_follows_the_same_field() {
         (0xC0u8, Reg16::Ax, "AX"),
         (0xC1, Reg16::Cx, "CX"),
         (0xC2, Reg16::Dx, "DX"),
-        (0xC3, Reg16::Sp, "SP"),
-        (0xC4, Reg16::Bp, "BP"),
-        (0xC5, Reg16::Si, "SI"),
-        (0xC6, Reg16::Di, "DI"),
-        (0xC7, Reg16::Bx, "BX"),
+        (0xC3, Reg16::Bx, "BX"),
+        (0xC4, Reg16::Sp, "SP"),
+        (0xC5, Reg16::Bp, "BP"),
+        (0xC6, Reg16::Si, "SI"),
+        (0xC7, Reg16::Di, "DI"),
     ];
     for (modrm, source, name) in table {
         let mut c = machine(&[0x8B, modrm]);

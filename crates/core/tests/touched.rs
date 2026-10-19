@@ -39,7 +39,6 @@
 mod common;
 
 use emo8067_core::Cpu;
-use emo8067_core::exec::ExecError;
 use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::memory::{ADDR_SPACE, Memory};
 use emo8067_core::regs::{Reg16, Seg};
@@ -144,8 +143,8 @@ const EFFECTS: &[Effect] = &[
         "ADD r/m16,r16",
         &[0x01, 0xD8],
         row: Some("ADD"),
-        // The 16-bit REG field names AX CX DX SP BP SI DI BX, so `011` is SP.
-        regs: &[(Reg16::Ax, 0x1211)],
+        // The 16-bit REG field names AX CX DX BX SP BP SI DI, so `011` is BX.
+        regs: &[(Reg16::Ax, 0x5555)],
         segs: &[],
         mem: &[],
         ip: None,
@@ -175,7 +174,7 @@ const EFFECTS: &[Effect] = &[
         "MOV r/m16,r16",
         &[0x89, 0xD8],
         row: Some("MOV"),
-        regs: &[(Reg16::Ax, 0x0100)],
+        regs: &[(Reg16::Ax, 0x4444)],
         segs: &[],
         mem: &[],
         ip: None,
@@ -195,7 +194,7 @@ const EFFECTS: &[Effect] = &[
         "MOV r16,r/m16",
         &[0x8B, 0xD8],
         row: Some("MOV"),
-        regs: &[(Reg16::Sp, 0x1111)],
+        regs: &[(Reg16::Bx, 0x1111)],
         segs: &[],
         mem: &[],
         ip: None,
@@ -905,8 +904,7 @@ fn an_instruction_that_moves_the_stack_touches_only_what_it_should() {
 /// leaves them nothing to read.
 #[test]
 fn the_forms_the_8086_does_not_have_are_refused() {
-    let cases: [(&str, &[u8]); 7] = [
-        ("8C with a register destination", &[0x8C, 0xC3]),
+    let cases: [(&str, &[u8]); 6] = [
         ("8F with a register destination", &[0x8F, 0xC3]),
         ("8F with a non-zero digit", &[0x8F, 0xC8]),
         ("LEA with a register operand", &[0x8D, 0xC3]),
@@ -927,18 +925,30 @@ fn the_forms_the_8086_does_not_have_are_refused() {
     }
 }
 
-/// `8C` and `8E` with a displacement: the manual prints `(not used)`, and
-/// nothing in this repository settles whether the chip runs them anyway.
+/// `8C` and `8E` run every `MOD` the 8086 has, and the manual's print is
+/// what is wrong.
 ///
-/// The guide's note says the 8086 accepts `MOD=000` only for both, and the
-/// core executes every `MOD` for both. Refusing them would be a behaviour
-/// change on a document's print rather than on evidence about the chip, and
-/// `MOV DS,AX` is a bread-and-butter 8086 instruction, so this is recorded
-/// rather than decided here.
+/// The 1979 print shows `8C MOD 1--` and `8E MOD 1--` as `(not used)`, and
+/// this project believed it: it refused `8C` with a register destination as an
+/// 80186 encoding. The captures from a real P80C86A-2 show otherwise — the
+/// chip runs all four `MOD` values for both, and `8C DF` is `MOV DI,DS` with
+/// the segment landing in the register.
 #[test]
-fn the_segment_move_forms_the_manual_prints_as_unused_are_still_open() {
-    // The refusal of `8C` with a register destination is settled, and this
-    // test says so next to the open question, so the two cannot be confused.
-    let mut c = machine(&[0x8C, 0xC3]);
-    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8C)));
+fn the_segment_moves_run_on_the_8086_the_way_the_chip_runs_them() {
+    // `8C DF`: the segment goes into the general register the R/M field
+    // names, which under the 8086's field order is `DI`.
+    let mut c = machine(&[0x8C, 0xDF]);
+    c.regs.set_segment(Seg::Ds, 0x1234);
+    c.step().expect("the 8086 runs MOV r16,Sreg");
+    assert_eq!(c.regs.word(Reg16::Di), 0x1234, "the segment landed in DI");
+
+    // `8E` with a displacement reads the word through the effective address,
+    // and the segment register is the destination: `8E 06 34 12` is
+    // `MOV ES,[1234h]`.
+    let mut c = machine(&[0x8E, 0x06, 0x34, 0x01]);
+    c.mem.write_u8(DATA, 0x0134, 0x78);
+    c.mem.write_u8(DATA, 0x0135, 0x56);
+    c.step()
+        .expect("the 8086 runs MOV Sseg,r/m16 with a displacement");
+    assert_eq!(c.regs.segment(Seg::Es), 0x5678, "the word landed in ES");
 }

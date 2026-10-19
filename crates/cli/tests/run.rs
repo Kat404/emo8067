@@ -59,7 +59,7 @@ fn a_subroutine_returns_to_the_caller() {
             0xE8, 0x03, 0x00, // 0000: CALL 0006
             0xF4, // 0003: HLT
             0x90, 0x90, // 0004, 0005: padding
-            0xBF, 0x05, 0x00, // 0006: MOV BX, 5   (BF is MOV BX; BB is MOV SP)
+            0xBB, 0x05, 0x00, // 0006: MOV BX, 5   (BB is MOV BX; BC is MOV SP)
             0xC3, // 0009: RET
         ],
         100,
@@ -74,7 +74,7 @@ fn rep_stosb_fills_a_block_and_an_interrupt_returns_from_it() {
     let mut cpu = Cpu::new();
     let program = [
         0xFC, // CLD
-        0xBE, 0x00, 0x30, // MOV DI, 3000h   (BE is MOV DI; BF is MOV BX)
+        0xBF, 0x00, 0x30, // MOV DI, 3000h   (BF is MOV DI; BB is MOV BX)
         0xB0, 0x20, // MOV AL, 20h
         0xB9, 0x10, 0x00, // MOV CX, 10h
         0xF3, 0xAA, // REP STOSB

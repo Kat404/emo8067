@@ -129,7 +129,7 @@ fn a8_leaves_af_alone_the_way_test_does() {
 /// A catch-all match arm over `AC..=AF` ran `SCAS` for `LODSB`.
 #[test]
 fn repe_lodsb_loads_the_byte_into_al() {
-    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAC]);
+    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAC]);
     c.mem.write_u8(0x0000, 0x0020, 0x5A);
     run(&mut c, 3);
     assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "REPE LODSB must load AL");
@@ -139,7 +139,7 @@ fn repe_lodsb_loads_the_byte_into_al() {
 
 #[test]
 fn rep_lodsw_loads_the_word_into_ax() {
-    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAD]);
+    let mut c = cpu(&[0xB9, 0x01, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAD]);
     c.mem.write_u16(0x0000, 0x0020, 0xBEEF);
     run(&mut c, 3);
     assert_eq!(c.regs.word(Reg16::Ax), 0xBEEF);
@@ -291,9 +291,20 @@ fn probe(op: u8) -> Cpu {
 /// such instruction, and accepting it would put a segment register where
 /// the hardware cannot.
 #[test]
-fn mov_segment_to_register_is_rejected_on_the_8086() {
-    let mut c = cpu(&[0x8C, 0xC3]);
-    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8C)));
+fn mov_segment_to_a_register_is_an_8086_instruction() {
+    // 8C with MOD=011 moves the segment into a general register, and the
+    // 8086 does it: the captures from a real P80C86A-2 show `8C DF` as
+    // `MOV DI,DS`, with the segment landing in the register. The 1979 print
+    // shows `(not used)` for that cell and this project believed the print
+    // for two units, refusing an instruction the chip runs.
+    let mut c = cpu(&[0x8C, 0xDF]);
+    c.regs.set_segment(Seg::Ds, 0x1234);
+    c.step().expect("the 8086 runs MOV r16,Sreg");
+    assert_eq!(
+        c.regs.word(Reg16::Di),
+        0x1234,
+        "the segment landed in the register"
+    );
 }
 
 /// `LEA` computes an address and must never read the segment into the
@@ -356,7 +367,7 @@ fn movs_advances_both_pointers() {
 
 #[test]
 fn rep_lods_advances_only_si() {
-    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xBD, 0x20, 0x00, 0xF3, 0xAC]);
+    let mut c = cpu(&[0xB9, 0x03, 0x00, 0xBE, 0x20, 0x00, 0xF3, 0xAC]);
     c.regs.set_word(Reg16::Di, 0x0300);
     c.mem.write_u16(0x0000, 0x0020, 0x0000);
     for _ in 0..3 {
@@ -994,7 +1005,7 @@ fn test_rm_r_leaves_af_alone_and_writes_no_result() {
     assert_eq!(c.regs.ip, 2);
 
     // 85 D8 = TEST AX, BX
-    let mut c = cpu(&[0x85, 0xF8]);
+    let mut c = cpu(&[0x85, 0xD8]);
     c.regs.set_word(Reg16::Ax, 0x1234);
     c.regs.set_word(Reg16::Bx, 0x1000);
     c.regs.flags.set(AF, true);
@@ -1899,7 +1910,7 @@ fn lea_under_an_override_still_computes_the_offset_alone() {
 #[test]
 fn an_override_in_front_of_a_register_operand_is_consumed_and_forgotten() {
     // 26 03 C3 is ADD AX, BX with mod=11: no memory, so ES goes nowhere.
-    let mut c = four_segments(&[0x26, 0x03, 0xC7, 0xA1, 0x00, 0x01]);
+    let mut c = four_segments(&[0x26, 0x03, 0xC3, 0xA1, 0x00, 0x01]);
     c.regs.set_word(Reg16::Ax, 0x0010);
     c.regs.set_word(Reg16::Bx, 0x0002);
     c.step().unwrap();
@@ -3039,9 +3050,11 @@ fn the_rep_latch_does_not_outlive_its_instruction() {
 /// instruction that faults.
 #[test]
 fn a_faulting_prefixed_instruction_clears_both_latches() {
-    // 8C /r with a register destination is an 80186 encoding.
-    let mut c = cpu(&[0xF3, 0x26, 0x8C, 0xC3]);
-    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8C)));
+    // `8F` with MOD=011 is not defined for the 8086, and the project refuses
+    // it: the captures leave that form out because the chip does something
+    // undefined with it, and refusing is the conservative choice.
+    let mut c = cpu(&[0xF3, 0x26, 0x8F, 0xC3]);
+    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)));
     assert_eq!(c.rep, None, "the REP latch must not survive a fault");
     assert_eq!(c.seg_override, None);
 }

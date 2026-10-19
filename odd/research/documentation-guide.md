@@ -88,11 +88,23 @@ Consequences the emulator must implement (all **verified** from Table 4-10):
   `[BX]+D16` form lives at `mod=10, rm=111` (`[BX]+D16`). There is no
   `(disp16)` alias at `mod=00, rm=111` — that alias belongs to the 80186, not
   the 8086. Do not accept it. [1]
-- **AH/CH/DH/BH are unencodable in a 16-bit `reg` field.** Table 4-9 maps REG
-  `100/101/110/111` to `SP/BP/SI/DI` when `W=1`; the high-byte registers only
-  appear when `W=0`. So an operand that must be a 16-bit register cannot be AH,
-  CH, DH or BH, and an assembler that offers `MOV AH, [BX]` must emit the
-  `MOV r8, r/m8` form. [1]
+- **The REG field names the 16-bit registers in the 8086's order, and the
+  later order is not the same one.** Table 4-9 prints two columns over the
+  same eight slots: the 8-bit column is `AL CL DL BL AH CH DH BH` and the
+  16-bit column is `AX CX DX BX SP BP SI DI` [1]. So `011` is `BX` and `100`
+  is `SP`, and an operand that must be a 16-bit register can be any of the
+  eight, while `AH`, `CH`, `DH` and `BH` are reachable only through the
+  8-bit field. [1]
+  - **This transcription was wrong once, and the wrong version is the one
+    every modern reference quotes.** The 80186 gave the 8-bit field its high
+    half back and moved the 16-bit registers to `AX CX DX SP BP SI DI BX` to
+    make room; a table transcribed from that source puts `SP` at `011`. The
+    1979 manual's own table, and a real P80C86A-2, both say `BX`. The
+    hardware is what settles it: the captures in
+    `crates/core/tests/hardware_flags.rs` show `MOV SP,AX` as `8B E0` and
+    `ADD CX,SP` as `01 E1`, and neither is possible under the later order.
+    **The 8086's field is `AX CX DX BX SP BP SI DI`**, and the emulator
+    implements that.
 - An 8-bit displacement is sign-extended to 16 bits before address calculation;
   immediates always follow displacements, and the high-order byte of a two-byte
   value is stored second. [1]
@@ -235,10 +247,21 @@ Notes on individual cells, all traceable to Table 4-13 unless stated otherwise
   instructions; footnote ‡3 records the evidence and withdraws the earlier
   do-not-implement note. **`C0`/`C1` are `RET imm16` and `RET`**, not shifts by
   immediate; see footnote ‡8.
-- **`8C` and `8E` accept `MOD=000` only**; `8C MOD 1--` and `8E MOD 1--` print
-  `(not used)`. `8F` takes `MOD 000`, `MOD 001` and `MOD 010` with `REG=000`,
-  decoding the R/M field like any other memory operand; `MOD 011` is not defined
-  for `8F`, and neither is any non-zero `/digit`.
+- **`8C` and `8E` take every `MOD` the chip runs, and this note was wrong
+  about it.** The 1979 print shows `8C MOD 1--` and `8E MOD 1--` as `(not
+  used)`, and this guide used to say the same: `MOD=000` only, with `8C MOD
+  011` refused as an 80186 encoding. **The hardware disagrees on both
+  counts.** The captures from a real P80C86A-2 run all four `MOD` values for
+  `8C` and `8E`, and `8C` with `MOD=011` moves the segment into a general
+  register — `8C DF` is `MOV DI,DS` on the chip, and the DI ends up holding
+  the segment. So the 8086 has both the register form and the displacement
+  forms, and the `MOD=000`-only claim is withdrawn; the print is the thing
+  that is wrong here, and the erratum is recorded in
+  `odd/tasks/hardware-capture-oracle.md`.
+  `8F` is the one that is restricted: it takes `MOD 000`, `MOD 001` and
+  `MOD 010` with `REG=000`, decoding the R/M field like any other memory
+  operand; `MOD 011` is not defined for `8F`, and neither is any non-zero
+  `/digit`.
 - **`60`–`6F` are the conditional jumps `70`–`7F`**, with the condition taken
   from the low four bits, and **`C8`/`C9` are `RETF imm16` and `RETF`**; see
   footnote ‡8.
