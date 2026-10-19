@@ -11,8 +11,8 @@ pub enum Operand {
     Immediate(i64),
     /// A memory reference, by its parts.
     Memory(Memory),
-    /// A relative jump's target, by name.
-    Relative(String),
+    /// A relative jump's target, by address.
+    Relative(i64),
 }
 
 /// A memory reference, in the parts the 8086's addressing needs.
@@ -79,8 +79,9 @@ pub fn encode(
     mnemonic: &str,
     form: &str,
     operands: &[Operand],
+    address: u16,
 ) -> Result<Vec<u8>, Error> {
-    encode_inner(opcode, mnemonic, form, operands, None)
+    encode_inner(opcode, mnemonic, form, operands, None, address)
 }
 
 /// The encoding, with the REG field pinned when a group's digit chose the
@@ -91,6 +92,7 @@ fn encode_inner(
     form: &str,
     operands: &[Operand],
     digit: Option<u8>,
+    address: u16,
 ) -> Result<Vec<u8>, Error> {
     if form.starts_with("Group") || form.starts_with("Shift") {
         // A group is chosen by the operation the source asked for: ADD in
@@ -104,6 +106,7 @@ fn encode_inner(
             group.operands(),
             operands,
             Some(group.digit),
+            address,
         );
     }
     let parts: Vec<&str> = form.split(',').map(str::trim).collect();
@@ -207,6 +210,31 @@ fn encode_inner(
             out.extend(displacement);
             let value = immediate(&operands[1], width)?;
             out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
+        }
+        // A jump to a label: the displacement is where the target is, less
+        // where the instruction ends.
+        ["short"] | ["short (intra)"] | ["near"] => {
+            let width = if parts[0] == "near" { 2 } else { 1 };
+            let target = match operands[0] {
+                Operand::Relative(target) => target,
+                Operand::Immediate(target) => target,
+                _ => {
+                    return Err(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    });
+                }
+            };
+            let end = i64::from(address) + 1 + width as i64;
+            let displacement = target - end;
+            if width == 1 && !(-128..=127).contains(&displacement) {
+                return Err(Error::Type {
+                    form: "a displacement that fits in a byte".to_string(),
+                    position: 0,
+                });
+            }
+            // The opcode is already the first byte.
+            out.extend_from_slice(&(displacement as i16).to_le_bytes()[..width]);
         }
         // An immediate against the accumulator.
         ["AL", "i8"] | ["AX", "i16"] => {

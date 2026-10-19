@@ -36,3 +36,15 @@ fn the_directives_that_say_nothing_are_passed_over() {
     assert_eq!(program.bytes, vec![0xB8, 0x00, 0x00]);
     assert_eq!(program.names, vec![("start".to_string(), 0)]);
 }
+
+#[test]
+fn a_jump_knows_where_it_is_going() {
+    // The program is walked twice: the first time the names are collected
+    // and the addresses counted, the second time the bytes are made.
+    let program = assemble_program("org 100h\nmov ax, 1\nhere:\njmp here\n").unwrap();
+    assert_eq!(program.bytes, vec![0xB8, 0x01, 0x00, 0xE9, 0xFD, 0xFF]);
+}
+
+// The conditional jumps are not here yet: the guide's row 0x60 is a copy of
+// its row 0x70, so the guide gives JE the opcode 64h instead of 74h. The
+// row has to be fixed against the manual first.

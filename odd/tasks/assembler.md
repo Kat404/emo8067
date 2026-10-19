@@ -153,11 +153,28 @@ checked against.
   its names mean (`EQU`, `LABEL`, and the label written as `name:`). A
   program is assembled from its lines: the origin, the bytes, and the names
   with the addresses they are at. A constant is folded into the operand
-  that names it. Still to come in this task: the macros (`MACRO`/`ENDM`) and
-  the jumps to a label, which need the names the program has not read yet.
+  that names it.
+  **DONE, the jumps to a label.** A program is walked twice: the first time
+  the names are collected and the addresses counted, the second time the
+  bytes are made, and by then a jump knows where it is going. A jump's size
+  does not depend on where it goes, so the first walk can count it with a
+  target of zero. `JMP label` is the near form and the conditional jumps
+  are the short one, as the table gives them. Still to come in this task:
+  the macros (`MACRO`/`ENDM`).
 - **T7** — **TODO.** The eighty-six examples, and the goldens.
 
 ## Log
+
+- **L3 (2026-10-19).** A defect in the guide, found while the assembler
+  was learning the jumps: **the guide's row `60` of §1.3 is a copy of its
+  row `70`** — both are the row of the conditional short jumps. The 8086's
+  row `60` (PUSH ES, POP ES, and the rest) is missing from the grid. The
+  assembler therefore gives `JE` the opcode `64h` instead of `74h`, and the
+  emulator's decoder has the same mistake (`crates/core/src/exec.rs` maps
+  `0x60..=0x7F` to the jumps). The hardware captures do not reach that row,
+  so the oracle never caught it. The row has to be written from the manual
+  before the conditional jumps can be assembled, and the decoder has to be
+  checked against it.
 
 - **L2 (2026-10-19).** The bet of S1 was checked before anything was
   written: §1.3 was parsed as a table and the shape of it measured. Sixteen

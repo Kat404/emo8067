@@ -63,11 +63,17 @@ pub fn check(form: &str, operands: &[Operand]) -> Result<(), Error> {
         return Ok(());
     }
     // The first operand of a form that does not take one.
-    if !matches!(parts[0], "i8" | "i16" | "1") && kind_of(&operands[0]) == Kind::Immediate {
+    // A form that takes an immediate, or a place to jump to, is the only
+    // one whose first operand may be one.
+    if !matches!(
+        parts[0],
+        "i8" | "i16" | "1" | "near" | "far" | "short" | "short (intra)"
+    ) && kind_of(&operands[0]) == Kind::Immediate
+    {
         return Err("first operand cannot be an immediate value");
     }
     // The second operand, when the form wants eight bits of it.
-    if parts[1] == "i8" {
+    if parts.len() > 1 && parts[1] == "i8" {
         if let Operand::Immediate(value) = operands[1] {
             if value > 0xFF {
                 return Err("second operand is over 8 bits!");

@@ -28,15 +28,20 @@ pub enum Error {
 /// Assemble one line of source.
 pub fn assemble(source: &str) -> Result<Vec<u8>, Error> {
     let line = line::parse(source).map_err(|_| Error::Empty)?;
-    assemble_parts(&line, &line.operands)
-}
-
-/// Assemble a line that has already been taken apart.
-pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec<u8>, Error> {
-    let operands: Vec<Operand> = operand_texts
+    let operands: Vec<Operand> = line
+        .operands
         .iter()
         .map(|text| operand(text))
         .collect::<Result<Vec<_>, _>>()?;
+    assemble_parts(&line, &operands, 0)
+}
+
+/// Assemble a line that has already been taken apart.
+pub fn assemble_parts(
+    line: &line::Line,
+    operands: &[Operand],
+    address: u16,
+) -> Result<Vec<u8>, Error> {
     // The manual has no NOP: the 8086's 90h is XCHG AX,AX, and that is what
     // a NOP is.
     if line.mnemonic.eq_ignore_ascii_case("NOP") && operands.is_empty() {
@@ -48,7 +53,7 @@ pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec
     // rather than a form, so the group's own table is searched too.
     // The checks that need no form come first: their answer does not depend
     // on which instruction the source meant.
-    checks::check_pair(&operands).map_err(|message| Error::Type { message })?;
+    checks::check_pair(operands).map_err(|message| Error::Type { message })?;
     let options = options_for(&line.mnemonic);
     // The reference's own checks come first: they say why a pair of
     // operands is refused, in its words, and the form is only chosen when
@@ -57,9 +62,9 @@ pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec
     let mut exact: Option<&'static str> = None;
     let mut chosen: Option<(&u8, &String)> = None;
     for (opcode, takes, form) in &options {
-        match checks::check(takes, &operands) {
+        match checks::check(takes, operands) {
             Ok(()) => {
-                if form_takes(takes, &operands) {
+                if form_takes(takes, operands) {
                     chosen = Some((opcode, form));
                     break;
                 }
@@ -71,7 +76,7 @@ pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec
                 if complaint.is_none() {
                     complaint = Some(message);
                 }
-                if exact.is_none() && form_takes(takes, &operands) {
+                if exact.is_none() && form_takes(takes, operands) {
                     exact = Some(message);
                 }
             }
@@ -85,8 +90,10 @@ pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec
             },
         });
     };
-    operands::encode(*opcode, &line.mnemonic, form, &operands).map_err(|_| Error::BadOperand {
-        text: line.operands.join(", "),
+    operands::encode(*opcode, &line.mnemonic, form, operands, address).map_err(|_| {
+        Error::BadOperand {
+            text: line.operands.join(", "),
+        }
     })
 }
 
@@ -99,7 +106,7 @@ pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec
 fn options_for(mnemonic: &str) -> Vec<(u8, String, String)> {
     let mut options: Vec<(u8, String, String)> = Vec::new();
     for cell in table::forms() {
-        if cell.mnemonic.eq_ignore_ascii_case(mnemonic) {
+        if names_match(cell.mnemonic, mnemonic) {
             options.push((
                 cell.opcode,
                 cell.operands.to_string(),
@@ -108,7 +115,7 @@ fn options_for(mnemonic: &str) -> Vec<(u8, String, String)> {
         }
     }
     for group in groups::forms() {
-        if group.mnemonic().eq_ignore_ascii_case(mnemonic) {
+        if names_match(group.mnemonic(), mnemonic) {
             options.push((
                 group.opcode,
                 group.operands().to_string(),
@@ -117,6 +124,15 @@ fn options_for(mnemonic: &str) -> Vec<(u8, String, String)> {
         }
     }
     options
+}
+
+/// Whether a name is one a cell answers to.
+///
+/// The table's cells carry two names for the same instruction - `JE/JZ`,
+/// `JB/JNAE` - and the source may use either.
+fn names_match(cell: &str, mnemonic: &str) -> bool {
+    cell.split('/')
+        .any(|part| part.trim().eq_ignore_ascii_case(mnemonic))
 }
 
 /// Whether a form takes these operands.
@@ -172,7 +188,10 @@ fn part_takes(part: &str, operand: &Operand) -> bool {
 }
 
 /// One operand, as the source wrote it.
-fn operand(text: &str) -> Result<Operand, Error> {
+///
+/// A word that is neither a register, a number nor a reference is a name:
+/// the program assembler knows which names it has.
+pub fn operand(text: &str) -> Result<Operand, Error> {
     let text = text.trim();
     let upper = text.to_ascii_uppercase();
     // A reference: it has brackets, or it says PTR.
@@ -193,10 +212,11 @@ fn operand(text: &str) -> Result<Operand, Error> {
         return Ok(Operand::Register(upper));
     }
     // A number.
-    let value = literals::parse(text).map_err(|_| Error::BadOperand {
-        text: text.to_string(),
-    })?;
-    Ok(Operand::Immediate(value))
+    match literals::parse(text) {
+        Ok(value) => Ok(Operand::Immediate(value)),
+        // A name: the program assembler knows which names it has.
+        Err(_) => Ok(Operand::Relative(0)),
+    }
 }
 
 /// Whether a word names a register.
