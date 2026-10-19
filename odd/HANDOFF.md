@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 116 + 4 + 4 + 30 + 109 + 5 + 0 passed   (273)
+cargo test --workspace   0 + 5 + 116 + 4 + 4 + 1 + 30 + 109 + 5 + 0 passed   (275)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     0dfc58f   (signed; every commit in this session is GPG-signed)
+HEAD                     a5c0289   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -168,10 +168,31 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | Is the microcode ROM identical across 8086 steppings? | not decidable | needs a 1978 Stepping 1 die, which is a collector item. Affects all five microcode findings if the ROM changed |
 | `SHL`/`SHR`: does silicon update S, Z, P or preserve them? | code follows the manual's prose | the `metadata.json` cannot tell — it records unreliability, not change. The per-opcode capture files carry initial *and* final state and would settle it |
 | `AAA`/`DAA` against the manual's pseudocode | **CLOSED — the core was wrong twice** | The manual (Oct 1979, page 2-35) says `AAA` zeroes the high-order half-byte of `AL`, and Intel's SDM (Vol 2A, page 3-19) writes the mask as its own step, outside the branch. The core masked only inside the branch, and `DAA`/`DAS` never wrote `AF` at all, although Table 2-21 gives both an `X` in that column. Both fixed in `8dcc9da`, with the mutants shown to fail |
-| Does `DAA`'s second rule test the old `AL` or the adjusted one? | **open, and narrow** | The SDM tests `old_AL > 99h`; the classic 8086-era pseudocode tests the `AL` the first rule produced. They differ only when the first rule fired and the old value was `94h`..`99h` with `AF` set. The 1979 manual has no rule text and the SDM's own worked example contradicts its operation block, so the code was left alone. Settling it needs silicon or a source that says which the 8086 does |
+| Does `DAA`'s second rule test the old `AL` or the adjusted one? | **CLOSED — the chip says the old one** | The hardware settles it: `DAA` on `AL = FAh` leaves `AL = 60h` with the carry set, which is the old value testing true. Intel's SDM writes the same (`IF ((old_AL > 99H) or (old_CF = 1))`). The 1979 manual has no rule text and the classic pseudocode says the adjusted value; the captures in `crates/core/tests/hardware_flags.rs` decide it |
+| The 16-bit `REG` field | **CLOSED — the 80186's order had been implemented** | The 8086's Table 4-9 gives `AX CX DX BX SP BP SI DI`; the 80186 moved the 16-bit registers to make room for `AH CH DH BH` in the 8-bit field, and every modern reference quotes that later table. The 1979 manual's own table and a real P80C86A-2 agree with each other: `MOV SP,AX` is `8B E0`. The core, the guide's note and every hand-assembled program had followed the later order. Fixed in `98fc6f3`, with thirty-eight hand-assembled tests re-encoded |
+| `8C` with a register destination | **CLOSED — it is an 8086 instruction** | The project refused it as an 80186 encoding, on the strength of the manual printing `(not used)`. The chip runs it: `8C DF` is `MOV DI,DS`, with the segment landing in the register. The refusal is withdrawn, and so is the guide's claim that `8C` and `8E` take `MOD=000` only — the chip runs all four `MOD` values for both |
+| `8C`/`8E` with a displacement | **open, and the captures can close it** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. `odd/tasks/hardware-capture-oracle.md`, T5 |
 | `8C`/`8E` with a displacement | **open, and left as the core has it** | The manual prints `(not used)` for `8C MOD 1--` and `8E MOD 1--`, and §1.3's note says so; the core executes every `MOD`. Refusing them would be a change on a document's print rather than on evidence about the chip, and `MOV DS,AX` is a bread-and-butter 8086 instruction. The microcode's `MOV Sreg` entry would say whether the address unit computes an effective address for them |
 | The length table's missing families | **open, and cheap** | `8F` (`POP r/m16`, legal at MOD=00/01/10 per ‡8) and `C4`/`C5` (`LES`/`LDS`, which read a four-byte pointer through the R/M field) have no rows in the length table, and `FF /2`–`FF /5` are left out because an indirect jump leaves no trace of how many bytes it read. All three are straightforward row additions |
 | The flag rows marked `X` and `U` | **open, and the phase's biggest hole** | `X` is value-dependent and `U` is undefined, so the flag contract asserts nothing for them: for `ADD`, `ADC`, `SUB`, `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS` it proves only that `D`, `I` and `T` are untouched. Two of the eight defects from the last session lived in that hole. The touches gate claims which flags *may* change, not what they become. Closing it means asserting values, which means the operand values, which means the gate has to become a specification rather than a consistency check |
+
+## The hardware oracle
+
+`SingleStepTests/8086` — Daniel Balsom's hardware-generated suite for the
+Intel P80C86A-2 — is now the project's oracle for what a flag *becomes*. It
+is 160 MB of gzipped JSON, so it is not vendored: a script in
+`odd/research/extract_capture_oracle.py` takes it apart into a small text
+file, and `crates/core/tests/hardware_flags.rs` runs the cases against the
+emulator. The first slice is the eight ALU groups: 400 cases, 58 opcodes.
+
+It has already paid for itself twice, and both times by disagreeing with
+this project:
+
+- the 16-bit `REG` field was the 80186's order, not the 8086's;
+- `DAA`'s second rule tests the old `AL`, not the adjusted one.
+
+`odd/tasks/hardware-capture-oracle.md` is the plan. T5 is the next unit:
+the other 198 opcodes, where every disagreement is a finding.
 
 ## Decisions of 2026-10-19, and what they settle
 
