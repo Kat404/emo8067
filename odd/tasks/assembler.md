@@ -78,9 +78,16 @@ checked against.
   the `REG` field naming the 16-bit registers in the 8086's order
   (`AX CX DX BX SP BP SI DI`), and the 8-bit field unable to reach
   `AH CH DH BH` — which the 8086 can name only through a register operand.
-  Still to come in this task: matching an operand form to the bytes it
-  encodes, and the group's `/digit` forms, which live in the guide's group
-  tables rather than in the grid.
+  Still to come in this task: the group's `/digit` forms, which live in the
+  guide's group tables rather than in the grid.
+
+  **DONE, the matcher.** A form from the document plus the operands the
+  source gave, and the bytes. Which operand goes in the `REG` field and
+  which in the `R/M` field is the instruction's business, not the field's,
+  so the matcher decides it: the `r8`/`r16` operand always names `REG`,
+  and the `r/m` one always names `R/M`. The forms that are not encoded
+  yet — a group's `/digit`, and a memory operand until the addressing
+  modes land — say so instead of guessing.
 - **T3** — **TODO.** The addressing modes: the base and index registers, the
   displacement's width, the direct form, and the default segment per base.
 - **T4** — **TODO.** The immediates and the literals, with the reference's

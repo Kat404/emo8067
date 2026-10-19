@@ -6,6 +6,7 @@
 //! against, so the table exists once in the project instead of twice.
 
 pub mod modrm;
+pub mod operands;
 pub mod table;
 
 pub use table::{CELLS_PER_ROW, Form};
