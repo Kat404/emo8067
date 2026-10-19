@@ -5,6 +5,7 @@
 //! contract reads §1.4 from and the same document the emulator is checked
 //! against, so the table exists once in the project instead of twice.
 
+pub mod groups;
 pub mod modrm;
 pub mod operands;
 pub mod table;

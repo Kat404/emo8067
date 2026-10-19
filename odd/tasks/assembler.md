@@ -78,8 +78,12 @@ checked against.
   the `REG` field naming the 16-bit registers in the 8086's order
   (`AX CX DX BX SP BP SI DI`), and the 8-bit field unable to reach
   `AH CH DH BH` — which the 8086 can name only through a register operand.
-  Still to come in this task: the group's `/digit` forms, which live in the
-  guide's group tables rather than in the grid.
+  **DONE, the group forms.** The three group tables of the document - Group
+  1, Shift and Group 2 - read into ninety-six forms: six opcodes, four and
+  two, each with eight digits. A group is chosen by the *operation* the
+  source asked for, not by the digit: `ADD` in Group 1 is the digit whose
+  cell says `ADD`, which is how the reference chose it too. The digit then
+  goes in the `REG` field, so `ADD BL,1` is `80 C3 01h`.
 
   **DONE, the matcher.** A form from the document plus the operands the
   source gave, and the bytes. Which operand goes in the `REG` field and

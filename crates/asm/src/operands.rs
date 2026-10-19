@@ -60,17 +60,43 @@ pub enum Error {
 /// The form is the document's own: `r/m8,r8`, `AL,i8`, `r16,r/m16`. Which
 /// operand goes in the `REG` field and which in the `R/M` field is the
 /// instruction's business, not the field's, so it is decided here.
-pub fn encode(opcode: u8, form: &str, operands: &[Operand]) -> Result<Vec<u8>, Error> {
+pub fn encode(
+    opcode: u8,
+    mnemonic: &str,
+    form: &str,
+    operands: &[Operand],
+) -> Result<Vec<u8>, Error> {
+    encode_inner(opcode, mnemonic, form, operands, None)
+}
+
+/// The encoding, with the REG field pinned when a group's digit chose the
+/// form.
+fn encode_inner(
+    opcode: u8,
+    mnemonic: &str,
+    form: &str,
+    operands: &[Operand],
+    digit: Option<u8>,
+) -> Result<Vec<u8>, Error> {
+    if form.starts_with("Group") || form.starts_with("Shift") {
+        // A group is chosen by the operation the source asked for: ADD in
+        // Group 1 is the digit whose cell says ADD.
+        let group = crate::groups::find(opcode, mnemonic).ok_or(Error::Unsupported {
+            form: form.to_string(),
+        })?;
+        return encode_inner(
+            opcode,
+            mnemonic,
+            group.operands(),
+            operands,
+            Some(group.digit),
+        );
+    }
     let parts: Vec<&str> = form.split(',').map(str::trim).collect();
     if parts.len() != operands.len() {
         return Err(Error::Count {
             form: form.to_string(),
             got: operands.len(),
-        });
-    }
-    if form.starts_with("Group") || form.starts_with("Shift") {
-        return Err(Error::Unsupported {
-            form: form.to_string(),
         });
     }
     let mut out = vec![opcode];
@@ -88,7 +114,10 @@ pub fn encode(opcode: u8, form: &str, operands: &[Operand]) -> Result<Vec<u8>, E
             } else {
                 Width::Word
             };
-            let reg = register(&operands[reg_part], width)?;
+            let reg = match digit {
+                Some(digit) => digit,
+                None => register(&operands[reg_part], width)?,
+            };
             let rm = match &operands[rm_part] {
                 Operand::Register(name) => width.field_of(name).ok_or_else(|| Error::Type {
                     form: form.to_string(),
@@ -108,6 +137,32 @@ pub fn encode(opcode: u8, form: &str, operands: &[Operand]) -> Result<Vec<u8>, E
                 }
             };
             out.push(byte_for(Mod::Register, reg, rm));
+        }
+        // A group's form: the digit is in the REG field and the operand
+        // follows it.
+        ["r/m8", "i8"] | ["r/m16", "i16"] => {
+            let width = if parts[0].ends_with('8') {
+                Width::Byte
+            } else {
+                Width::Word
+            };
+            let reg = digit.ok_or(Error::Unsupported {
+                form: form.to_string(),
+            })?;
+            let rm = match &operands[0] {
+                Operand::Register(name) => width.field_of(name).ok_or(Error::Type {
+                    form: form.to_string(),
+                    position: 0,
+                })?,
+                _ => {
+                    return Err(Error::Unsupported {
+                        form: form.to_string(),
+                    });
+                }
+            };
+            out.push(byte_for(Mod::Register, reg, rm));
+            let value = immediate(&operands[1], width)?;
+            out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
         }
         // An immediate against the accumulator.
         ["AL", "i8"] | ["AX", "i16"] => {
