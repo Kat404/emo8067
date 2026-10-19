@@ -463,7 +463,7 @@ fn a_far_call_saves_and_restores_the_code_segment() {
 ///     hlt
 /// ```
 #[test]
-fn xlat_signs_its_index() {
+fn xlat_indexes_with_an_unsigned_al() {
     let mut c = machine(&[
         0xBB, 0x00, 0x01, // mov bx, 0100h
         0xB0, 0xFF, // mov al, FFh
@@ -472,13 +472,13 @@ fn xlat_signs_its_index() {
     ]);
     let table = *b"ABCDEFGH";
     at(&mut c, DATA, 0x0100, &table);
-    c.mem.write_u8(DATA, 0x00FF, 0xFE); // the byte just below the table
+    c.mem.write_u8(DATA, 0x01FF, 0xFE); // 255 bytes above the table
 
     run(&mut c, 100);
     assert_eq!(
         c.regs.byte(Reg8::Al),
         0xFE,
-        "AL = -1 indexes one byte below BX, not 255 bytes above it"
+        "AL = FFh indexes 255 bytes above BX: the index is unsigned"
     );
 }
 

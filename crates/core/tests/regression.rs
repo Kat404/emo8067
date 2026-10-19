@@ -654,20 +654,22 @@ fn ff_six_pushes_a_memory_word() {
 /// `matches!(m.rm, Operand::Reg(_))` only ever sees mod=11, so mod=01 and
 /// mod=10 slip through while the comment claims otherwise.
 #[test]
-fn pop_rm16_refuses_only_what_the_8086_leaves_undefined() {
-    // The register form and a non-zero /digit are undefined for this
-    // encoding. mod=01 and mod=10 are NOT: an earlier revision refused
-    // them on the strength of a prose note that contradicted this
-    // project's own opcode table and the microcode.
+fn pop_rm16_pops_the_way_the_8086_pops() {
+    // The register form pops into the register, and the /digit is ignored:
+    // the captures from a real P80C86A-2 show `8F` popping with every digit
+    // and naming the register forms "pop dx", "pop si", "pop bp" and "pop bx".
+    // This project refused both for two units, on the strength of a prose
+    // note that contradicted this project's own opcode table.
     for code in [
-        &[0x8F, 0xC3][..],             // mod=11
-        &[0x8F, 0x0E, 0x40, 0x00][..], // mod=00 but reg=001
-        &[0x8F, 0x8E, 0x40, 0x00][..], // mod=10 but reg=001
+        &[0x8F, 0xC3][..],             // mod=11, into BX
+        &[0x8F, 0x0E, 0x40, 0x00][..], // mod=00 with a non-zero digit
+        &[0x8F, 0x8E, 0x40, 0x00][..], // mod=10 with a non-zero digit
     ] {
         let mut c = cpu(code);
         c.regs.set_word(Reg16::Sp, 0x0100);
-        assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)), "{code:02X?}");
-        assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
+        c.mem.write_u16(0x0000, 0x0100, 0xCAFE);
+        c.step().expect("the 8086 pops");
+        assert_eq!(c.regs.word(Reg16::Sp), 0x0102, "{code:02X?}: SP moved");
     }
 }
 
@@ -851,16 +853,20 @@ fn aad_clears_ah_even_when_the_sum_runs_past_ffh() {
 /// `D7` indexes `DS:[BX+AL]` with AL read as a **signed** byte, and Table
 /// 2-21 leaves all nine flags blank.
 #[test]
-fn xlat_uses_a_signed_index() {
+fn xlat_uses_an_unsigned_index() {
     let mut c = cpu(&[0xD7]);
     c.regs.set_word(Reg16::Bx, 0x0100);
-    c.regs.set_byte(Reg8::Al, 0x80); // -128 signed, +128 unsigned
+    c.regs.set_byte(Reg8::Al, 0x80); // 128 either way
     c.mem.write_u8(0x0000, 0x0080, 0x5A); // 0100h - 80h
     c.mem.write_u8(0x0000, 0x0180, 0x11); // 0100h + 80h
     let before = c.regs.flags.0;
     c.step().unwrap();
 
-    assert_eq!(c.regs.byte(Reg8::Al), 0x5A, "the index is signed");
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x11,
+        "the index is unsigned: the manual says the unsigned byte in AL"
+    );
     assert_eq!(c.regs.ip, 1);
     assert_eq!(c.regs.flags.0, before, "Table 2-21: XLAT writes no flag");
 }
@@ -2141,15 +2147,16 @@ fn pop_rm16_accepts_every_memory_addressing_mode() {
 /// this encoding, and an undefined encoding is a policy call rather than a
 /// guess at behaviour.
 #[test]
-fn pop_rm16_still_refuses_the_register_and_non_zero_digits() {
+fn pop_rm16_pops_with_every_digit_and_into_a_register() {
     for code in [
-        &[0x8F, 0xC3][..],             // mod=11
+        &[0x8F, 0xC3][..],             // mod=11, into BX
         &[0x8F, 0x0E, 0x40, 0x00][..], // reg=001
     ] {
         let mut c = cpu(code);
         c.regs.set_word(Reg16::Sp, 0x0100);
-        assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)), "{code:02X?}");
-        assert_eq!(c.regs.word(Reg16::Sp), 0x0100, "{code:02X?}: SP moved");
+        c.mem.write_u16(0x0000, 0x0100, 0xCAFE);
+        c.step().expect("the 8086 pops");
+        assert_eq!(c.regs.word(Reg16::Sp), 0x0102, "{code:02X?}: SP moved");
     }
 }
 
@@ -3050,11 +3057,10 @@ fn the_rep_latch_does_not_outlive_its_instruction() {
 /// instruction that faults.
 #[test]
 fn a_faulting_prefixed_instruction_clears_both_latches() {
-    // `8F` with MOD=011 is not defined for the 8086, and the project refuses
-    // it: the captures leave that form out because the chip does something
-    // undefined with it, and refusing is the conservative choice.
-    let mut c = cpu(&[0xF3, 0x26, 0x8F, 0xC3]);
-    assert_eq!(c.step(), Err(ExecError::NotOn8086(0x8F)));
+    // `LEA` with a register operand has no address to compute, which is a
+    // fault the 8086 does not have but this emulator reports.
+    let mut c = cpu(&[0xF3, 0x26, 0x8D, 0xC3]);
+    assert!(c.step().is_err());
     assert_eq!(c.rep, None, "the REP latch must not survive a fault");
     assert_eq!(c.seg_override, None);
 }

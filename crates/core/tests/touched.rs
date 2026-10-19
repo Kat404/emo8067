@@ -904,16 +904,10 @@ fn an_instruction_that_moves_the_stack_touches_only_what_it_should() {
 /// leaves them nothing to read.
 #[test]
 fn the_forms_the_8086_does_not_have_are_refused() {
-    let cases: [(&str, &[u8]); 6] = [
-        ("8F with a register destination", &[0x8F, 0xC3]),
-        ("8F with a non-zero digit", &[0x8F, 0xC8]),
+    let cases: [(&str, &[u8]); 3] = [
         ("LEA with a register operand", &[0x8D, 0xC3]),
         ("LES with a register operand", &[0xC4, 0xC3]),
         ("LDS with a register operand", &[0xC5, 0xC3]),
-        (
-            "8F with a displacement and a non-zero digit",
-            &[0x8F, 0x48, 0x00],
-        ),
     ];
     for (name, code) in cases {
         let mut c = machine(code);

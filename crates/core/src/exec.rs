@@ -717,10 +717,11 @@ fn xchg_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let bits: u8 = if opcode == 0xC7 { 16 } else { 8 };
     let m = decode_from(cpu)?;
-    if m.reg != 0 {
-        // C6 /1..7 and C7 /1..7 are the 80186+ shifts. Not 8086.
-        return Err(ExecError::UnknownOpcode(opcode));
-    }
+    // The /digit is ignored: the captures from a real P80C86A-2 run `C6`
+    // with every digit, and the set's own README says the field is ignored.
+    // (`C6 /1..7` and `C7 /1..7` are the 80186's shifts by immediate, and
+    // the 8086 does not have them - but the field does not select them
+    // either.)
     let value = if bits == 16 {
         fetch_u16(&cpu.mem, &mut cpu.regs)
     } else {
@@ -731,7 +732,7 @@ fn mov_to_immediate(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 }
 
 /// `8F /0` is `POP r/m16`, the one pop that writes memory.
-fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
+fn pop_to_memory(cpu: &mut crate::Cpu, _opcode: u8) -> Result<(), ExecError> {
     let m = decode_from(cpu)?;
     // `8F` is Group 2 with /0 and decodes its ModR/M the ordinary way: `rm`
     // names the destination, so mod=00, 01 and 10 all address memory like
@@ -744,19 +745,15 @@ fn pop_to_memory(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     // `POP rmw` entry at ROM `0x040` contains no branch at all. An `8F` with
     // `mod=01` or `mod=10` therefore cannot fail on those grounds.
     //
-    // mod=11 and reg!=0 stay refused as an explicit policy, and this is an OPEN
-    // question rather than a settled one. The microcode's `M` pseudo-register
-    // predicts a register destination for mod=11, since the hardware substitutes
-    // a register when there is no effective address, and no group substitution
-    // exists to make reg!=0 meaningful. But no source states either behaviour: a
-    // research report claimed both as verified and cited an article that never
-    // mentions 8F, so the structural argument stands alone. Refusing is the
-    // conservative choice, and it is recorded as a decision this project made
-    // without hardware. An 8086 settles it in seconds: point SP at a known value,
-    // run `8F C3`, and see whether BX changes.
-    if m.reg != 0 || m.mod_bits == 0b11 {
-        return Err(ExecError::NotOn8086(opcode));
-    }
+    // mod=11 pops into the register the R/M field names, and the 8086 does
+    // that: the captures from a real P80C86A-2 name the forms "pop dx",
+    // "pop si", "pop bp" and "pop bx". This project refused the form for two
+    // units on the strength of a structural argument, and wrote down that an
+    // 8086 settles it in seconds.
+    //
+    // The /digit is ignored: the captures from a real P80C86A-2 pop with
+    // every digit, and the set's README says the field is ignored. (The
+    // manual calls the digit undefined for this encoding; the chip pops.)
 
     let value = pop(&cpu.mem, &mut cpu.regs);
     write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, 16, value);
@@ -1230,7 +1227,10 @@ fn rotate_left(value: u16, count: u16, bits: u8) -> (u16, bool) {
         return (v, v & msb(bits) != 0);
     }
     let r = ((v << k) | (v >> (n - k))) & mask;
-    (r, v & (1u16 << (n - k)) != 0) // bit n-k is the one that left the top
+    // The overflow is the top bit of the result against the top bit of the
+    // operand, not the bit that left the top: the captures from a real
+    // P80C86A-2 show `ROL` setting OF where the bit that left was clear.
+    (r, (r & msb(bits) != 0) != (v & msb(bits) != 0))
 }
 
 fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
@@ -1242,7 +1242,9 @@ fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
         return (v, v & lsb(bits) != 0);
     }
     let r = ((v >> k) | (v << (n - k))) & mask;
-    (r, v & (1u16 << (k - 1)) != 0) // bit k-1 is the one that left the bottom
+    // The overflow is the top bit of the result against the top bit of the
+    // operand, for the same reason the rotate left is.
+    (r, (r & msb(bits) != 0) != (v & msb(bits) != 0))
 }
 
 /// `RCL` and `RCR` rotate the carry through the operand, so the working
@@ -1383,7 +1385,19 @@ fn inc_dec(cpu: &mut crate::Cpu, op: Operand, bits: u8, up: bool) -> Result<(), 
     };
     write_operand(&mut cpu.mem, &mut cpu.regs, op, bits, after);
     let f = &mut cpu.regs.flags;
-    f.set(OF, sign_bit(before, bits) != sign_bit(after, bits));
+    // The overflow is the result leaving the signed range, and the sign
+    // changing is only half of it: a decrement of 0080h lands on 007Fh with
+    // the sign changed and no overflow, and an increment of 7FFFh lands on
+    // 8000h with the sign changed and an overflow. The captures from a real
+    // P80C86A-2 show the difference: `DEC AX` with AX = 0000h leaves OF
+    // clear.
+    let crossed = sign_bit(before, bits) != sign_bit(after, bits);
+    let from_the_right_end = if up {
+        !sign_bit(before, bits)
+    } else {
+        sign_bit(before, bits)
+    };
+    f.set(OF, crossed && from_the_right_end);
     f.set(SF, sign_bit(after, bits));
     f.set(ZF, after == 0);
     f.set(AF, (before ^ after) & 0x10 != 0);
@@ -1600,7 +1614,11 @@ fn aad(cpu: &mut crate::Cpu) {
 /// `D7` is `XLAT`: AL takes DS:[BX + AL], the index read as a signed byte.
 /// No flags move.
 fn xlat(cpu: &mut crate::Cpu) {
-    let index = cpu.regs.byte(Reg8::Al) as i8 as i16 as u16;
+    // The index is the unsigned byte in AL: the manual says "the unsigned
+    // byte in AL is used as an index into the translation table", and the
+    // captures from a real P80C86A-2 agree - a table at the top of memory is
+    // reached with a high AL, not with a negative one.
+    let index = u16::from(cpu.regs.byte(Reg8::Al));
     let at = cpu.regs.word(Reg16::Bx).wrapping_add(index);
     let table = cpu.regs.segment(operand_seg(cpu));
     let value = cpu.mem.read_u8(table, at);
@@ -2350,12 +2368,23 @@ mod tests {
         let f = cpu.regs.flags;
         assert!(f.get(CF) && f.get(ZF) && f.get(OF), "POP touches no flag");
 
-        // Table 4-13 gives /0 with mod=00 only, so the register form and the
-        // other digits are refused instead of popping into a register.
+        // The register form pops into the register: the 8086 does it, and
+        // the captures from a real P80C86A-2 name the forms "pop dx",
+        // "pop si", "pop bp" and "pop bx".
         let mut cpu = cpu_with(&[0x8F, 0xC3]);
-        assert_eq!(cpu.step(), Err(ExecError::NotOn8086(0x8F)));
+        cpu.regs.set_segment(Seg::Ss, 0x2000);
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0xCAFE);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Bx), 0xCAFE, "the word went into BX");
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102, "and the stack gave it up");
+
+        // A non-zero /digit is ignored: the chip pops with every digit.
         let mut cpu = cpu_with(&[0x8F, 0x0E, 0x34, 0x12]);
-        assert_eq!(cpu.step(), Err(ExecError::NotOn8086(0x8F)));
+        cpu.regs.set_word(Reg16::Sp, 0x0100);
+        cpu.mem.write_u16(0x2000, 0x0100, 0xCAFE);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.word(Reg16::Sp), 0x0102, "the stack gave it up");
     }
 
     /// `86 /r` is `XCHG r/m8, r8`, the byte sibling of the word form at `87`.
@@ -3676,7 +3705,7 @@ mod tests {
     /// `D7` is `XLAT`: AL takes DS:[BX + AL] with the index read as a signed
     /// byte. No flag moves.
     #[test]
-    fn xlat_reads_ds_bx_plus_a_signed_al() {
+    fn xlat_reads_ds_bx_plus_an_unsigned_al() {
         let mut cpu = cpu_with(&[0xD7]);
         cpu.regs.set_word(Reg16::Bx, 0x0020);
         cpu.regs.set_byte(Reg8::Al, 0x05);
@@ -3689,13 +3718,13 @@ mod tests {
         let f = cpu.regs.flags;
         assert!(f.get(CF) && f.get(ZF), "XLAT touches no flag");
 
-        // FFh is -1, so the table is read at 0020h - 1.
+        // FFh is 255, so the table is read 255 bytes above BX.
         let mut cpu = cpu_with(&[0xD7]);
         cpu.regs.set_word(Reg16::Bx, 0x0020);
         cpu.regs.set_byte(Reg8::Al, 0xFF);
-        cpu.mem.write_u8(0x0000, 0x001F, 0x77);
+        cpu.mem.write_u8(0x0000, 0x011F, 0x77);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.byte(Reg8::Al), 0x77, "the index is signed");
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x77, "the index is unsigned");
     }
 
     /// `EA` is `JMP FAR PTR16:16`: the far pointer is loaded and nothing is
