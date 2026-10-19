@@ -36,57 +36,15 @@
 //! nothing by design: `X` is value-dependent and `U` is undefined.
 
 use emo8067_core::Cpu;
-use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
+use emo8067_core::flags::{CF, OF};
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 
-/// §1.4 transcribes Table 2-18's `ODITSZAPC` column order.
-/// Nine flags, `ODITSZAPC`.
-const COLUMNS: [u16; 9] = [OF, DF, IF, TF, SF, ZF, AF, PF, CF];
+/// The guide and its §1.4 rows are read by the shared module, so that the
+/// parser exists once: two copies of it are two copies that can drift.
+mod common;
 
-/// The em dash §1.4 uses for "not altered", which is not the same as `U`.
-const UNCHANGED_STR: &str = "\u{2014}";
+use common::{COLUMNS, GUIDE, Mark, row_marks};
 
-const GUIDE: &str = include_str!("../../../odd/research/documentation-guide.md");
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Mark {
-    /// `—` in §1.4: the flag must come out exactly as it went in.
-    Unchanged,
-    /// `0`: cleared.
-    Cleared,
-    /// `1`: set.
-    Set,
-    /// `X`, `U` or `R`: nothing assertable without operand values.
-    Free,
-}
-
-/// Read one §1.4 row out of the document, by the instruction name its first cell
-/// starts with.
-fn row_marks(doc: &str, name: &str) -> [Mark; 9] {
-    let needle = format!("| `{name}`");
-    let line = doc
-        .lines()
-        .find(|l| l.starts_with(&needle))
-        .unwrap_or_else(|| panic!("no section 1.4 row starting with {needle}"));
-    let cells: Vec<&str> = line.split('|').collect();
-    assert!(
-        cells.len() >= 11,
-        "row for {name} has {} cells, expected 11: {line}",
-        cells.len()
-    );
-    std::array::from_fn(|i| match cells[i + 2].trim() {
-        UNCHANGED_STR => Mark::Unchanged,
-        "0" => Mark::Cleared,
-        "1" => Mark::Set,
-        other => {
-            assert!(
-                matches!(other, "X" | "U" | "R"),
-                "unexpected mark {other:?} in the row for {name}"
-            );
-            Mark::Free
-        }
-    })
-}
 /// One representative execution per §1.4 row that has something assertable.
 struct Case {
     row: &'static str,
