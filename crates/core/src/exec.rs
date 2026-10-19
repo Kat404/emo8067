@@ -1103,10 +1103,10 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let (result, cf) = result;
     let f = &mut cpu.regs.flags;
     // A count of zero changes nothing, and on an 8086 that includes CF. A
-    // rotate by a whole number of revolutions does the same: no bit left.
+    // rotate by a whole number of revolutions is not that: the bits do go
+    // round, and the carry that comes out is the bit that left last.
     let rotates = matches!(op, 0x0..=0x3);
-    let no_bits_moved = rotates && count % bits as u16 == 0;
-    if count != 0 && !no_bits_moved {
+    if count != 0 {
         f.set(CF, cf);
         if count == 1 {
             f.set(OF, signed_overflow_shift(value, result, op, bits, cf));
@@ -1687,6 +1687,11 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             write_operand(&mut cpu.mem, &mut cpu.regs, m.rm, bits, result);
             let f = &mut cpu.regs.flags;
             f.set(CF, value != 0);
+            // The auxiliary carry is the borrow out of the low nibble: it is
+            // set when the low nibble of the operand was not zero. The
+            // captures from a real P80C86A-2 agree in every case they cover,
+            // and the manual's Table 2-21 gives NEG an `X` in that column.
+            f.set(AF, value & 0x0F != 0);
             // NEG overflows only for the minimum value, which is its own negative.
             f.set(OF, sign_bit(value, bits) && sign_bit(result, bits));
             set_result_flags(result, bits, f);

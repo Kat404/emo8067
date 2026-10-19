@@ -426,17 +426,34 @@ fn rcr_rolls_the_old_carry_into_the_top() {
 /// rotate computed `v >> width` on a u16.
 #[test]
 fn rotating_by_zero_is_a_no_op_and_does_not_panic() {
-    // D3 C0 = ROL AX, CL with CL = 0. CL=16 is also a zero rotation on a word.
-    for cl in [0u8, 16] {
-        let mut c = cpu(&[0xB9, cl, 0x00, 0xD3, 0xC0]);
-        c.regs.set_word(Reg16::Ax, 0x1234);
-        c.regs.flags.set(CF, true);
-        c.step().unwrap(); // MOV CX, cl
-        c.regs.set_byte(Reg8::Cl, cl);
-        c.step().unwrap(); // ROL AX, CL
-        assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "CL={cl} must not rotate");
-        assert!(c.regs.flags.get(CF), "a zero rotate leaves CF alone");
-    }
+    // D3 C0 = ROL AX, CL with CL = 0. A count of zero changes nothing at all,
+    // the carry included.
+    let mut c = cpu(&[0xB9, 0x00, 0x00, 0xD3, 0xC0]);
+    c.regs.set_word(Reg16::Ax, 0x1234);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap(); // MOV CX, 0
+    c.regs.set_byte(Reg8::Cl, 0);
+    c.step().unwrap(); // ROL AX, CL
+    assert_eq!(
+        c.regs.word(Reg16::Ax),
+        0x1234,
+        "a zero count must not rotate"
+    );
+    assert!(c.regs.flags.get(CF), "and it leaves CF alone");
+
+    // A count of sixteen is a whole number of revolutions on a word: the
+    // value comes back, and the carry is the bit that left last.
+    let mut c = cpu(&[0xB9, 0x10, 0x00, 0xD3, 0xC0]);
+    c.regs.set_word(Reg16::Ax, 0x1234);
+    c.regs.flags.set(CF, true);
+    c.step().unwrap(); // MOV CX, 16
+    c.regs.set_byte(Reg8::Cl, 16);
+    c.step().unwrap(); // ROL AX, CL
+    assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "the value comes back");
+    assert!(
+        !c.regs.flags.get(CF),
+        "and the carry is the bit that left, which was clear"
+    );
 }
 
 /// CF reports the bit that left, which is bit n-k for ROL and bit k-1 for ROR.

@@ -345,8 +345,6 @@ const KNOWN_DIVERGENCES: &[(&str, &str)] = &[
     ("D1", "the rotate's carry and overflow"),
     ("D2", "the rotate's carry and overflow"),
     ("D3", "the rotate's carry and overflow"),
-    ("F6.3", "the negate's carry"),
-    ("F7.3", "the negate's carry"),
     (
         "E4",
         "the port read: this emulator reads memory at the port, the chip returns FFh",
@@ -368,7 +366,7 @@ const KNOWN_DIVERGENCES: &[(&str, &str)] = &[
 /// How many cases are allowed to land in the families above. The number was
 /// read off the gate's own output and pinned, so a family that grows is a
 /// failure rather than a quieter gate.
-const KNOWN_DIVERGENCE_COUNT: usize = 9;
+const KNOWN_DIVERGENCE_COUNT: usize = 6;
 
 #[test]
 fn the_flags_come_out_the_way_a_real_8086_leaves_them() {
