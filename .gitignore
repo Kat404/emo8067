@@ -17,3 +17,6 @@
 /crates/core/.scratch
 # Codegraph index — local SQLite, regenerable with `codegraph init`
 .codegraph/
+
+# The hardware captures are fetched by odd/research/extract_capture_oracle.py, not vendored
+odd/research/.captures/
