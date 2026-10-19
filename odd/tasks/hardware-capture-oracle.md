@@ -82,6 +82,9 @@ be regenerated rather than trusted.
 - **T6** — **TODO.** The captures as the flag oracle for the `X` rows, so
   that the flag contract stops asserting nothing for `ADD`, `ADC`, `SUB`,
   `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS`.
+- **T7** — **TODO.** Nine cases: the carry of a rotate by more than one, and
+  the negate's carry. Both are rules the 1979 manual does not state, and both
+  are decided by the captures once the count's treatment is settled.
 
 ## Log
 
@@ -114,8 +117,12 @@ be regenerated rather than trusted.
     prose rule or a structural argument instead of the chip. The overflow
     of `INC`/`DEC` and of the rotates, the `POP` into a register, the
     unsigned index of `XLAT`, and the `/digit` that `C6`/`C7` ignore.
-    Two families are still open: the rotates' carry, and the port reads,
-    where the difference is the emulator's I/O model rather than a rule.
+    Three more came out of closing the two families that were open: the
+    shift group's overflow, the count of `CL` (the 8086 does not mask it to
+    five bits, which is what the later processors do), and the I/O bus (a
+    port is not a memory address; with nothing attached to it a read
+    returns all ones). Nine cases still disagree: the carry of a rotate
+    by more than one, and the negate's carry.
   - **The rule of the rotates came from the captures, not from the manual.**
     The overflow is the top bit of the result against the top bit of the
     operand, and 2133 of 2133 hardware cases agree; the bit that left
