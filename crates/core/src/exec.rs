@@ -979,61 +979,27 @@ fn test_accumulator(cpu: &mut crate::Cpu, bits: u8) -> Result<(), ExecError> {
 /// used to do while claiming otherwise.
 fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let immediate = matches!(opcode, 0xE4..=0xE7);
-    let port = if immediate {
+    let _port = if immediate {
         u16::from(fetch_u8(&cpu.mem, &mut cpu.regs))
     } else {
         cpu.regs.word(Reg16::Dx)
     };
     let word = opcode & 1 != 0;
     match opcode {
-        0xE4 | 0xE5 => {
-            let v = if word {
-                cpu.mem.read_u16(0x0000, port)
-            } else {
-                u16::from(cpu.mem.read_u8(0x0000, port))
-            };
+        // A port is not a memory address: the 8086 has a separate I/O bus,
+        // and with nothing attached to it a read returns all ones. The
+        // captures say the same of their own runs: "All reads of IO port
+        // addresses should return 0xFF and incur no wait states". The device
+        // bus itself is T15's work; until then the bus is empty.
+        0xE4 | 0xE5 | 0xEC | 0xED => {
             if word {
-                cpu.regs.set_word(Reg16::Ax, v)
+                cpu.regs.set_word(Reg16::Ax, 0xFFFF)
             } else {
-                cpu.regs.set_byte(Reg8::Al, v as u8)
+                cpu.regs.set_byte(Reg8::Al, 0xFF)
             }
         }
-        0xEC | 0xED => {
-            let v = if word {
-                cpu.mem.read_u16(0x0000, port)
-            } else {
-                u16::from(cpu.mem.read_u8(0x0000, port))
-            };
-            if word {
-                cpu.regs.set_word(Reg16::Ax, v)
-            } else {
-                cpu.regs.set_byte(Reg8::Al, v as u8)
-            }
-        }
-        0xE6 | 0xE7 => {
-            let v = if word {
-                cpu.regs.word(Reg16::Ax)
-            } else {
-                u16::from(cpu.regs.byte(Reg8::Al))
-            };
-            if word {
-                cpu.mem.write_u16(0x0000, port, v)
-            } else {
-                cpu.mem.write_u8(0x0000, port, v as u8)
-            }
-        }
-        0xEE | 0xEF => {
-            let v = if word {
-                cpu.regs.word(Reg16::Ax)
-            } else {
-                u16::from(cpu.regs.byte(Reg8::Al))
-            };
-            if word {
-                cpu.mem.write_u16(0x0000, port, v)
-            } else {
-                cpu.mem.write_u8(0x0000, port, v as u8)
-            }
-        }
+        // A write to an empty bus goes nowhere: it changes no memory.
+        0xE6 | 0xE7 | 0xEE | 0xEF => {}
         other => return Err(ExecError::UnknownOpcode(other)),
     }
     Ok(())
@@ -1096,8 +1062,12 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let m = decode_from(cpu)?;
     let op = m.reg & 0b111;
 
+    // The count is the whole of CL: the 8086 does not mask it, and the
+    // later processors that do (masking to five bits) are a different chip.
+    // The captures from a real P80C86A-2 show shifts by more than 31, and
+    // their own harness masks CL to six bits only to keep the runs short.
     let count = if from_cl {
-        (cpu.regs.byte(Reg8::Cl) & 0b1_1111) as u16
+        u16::from(cpu.regs.byte(Reg8::Cl))
     } else {
         1
     };
@@ -1167,21 +1137,20 @@ const fn width(bits: u8) -> u16 {
 
 /// `OF` is only architecturally defined after a rotate by one, and after a
 /// left shift by one. A right shift always clears it.
-fn signed_overflow_shift(before: u16, after: u16, op: u8, bits: u8, cf: bool) -> bool {
+/// The overflow of the shift and rotate group.
+///
+/// The captures from a real P80C86A-2 decide these, and they agree in every
+/// case they cover: the top bit of the result against the top bit of the
+/// operand for the rotates and the logical shift left, the top bit of the
+/// operand for the logical shift right, and never for the arithmetic one.
+fn signed_overflow_shift(before: u16, after: u16, op: u8, bits: u8, _cf: bool) -> bool {
     match op {
-        // RCL and RCR: the overflow is the two ends of the rotated result
-        // disagreeing, which is CF against the new top bit.
-        0x2 | 0x3 => cf != (after & msb(bits) != 0),
-        0x0 => {
-            let top = before & msb(bits) != 0;
-            top && (after & msb(bits) == 0) || !top && (after & msb(bits) != 0)
-        }
-        0x1 => {
-            let top = before & msb(bits) != 0;
-            top && (after & lsb(bits) == 0) || !top && (after & lsb(bits) != 0)
-        }
-        0x4 => before & msb(bits) != 0 && after & msb(bits) == 0,
-        // SETMO is not a shift at all, so it has no shift overflow; it lands
+        // ROL, ROR, RCL, RCR and SHL: the top bit of the result against the
+        // top bit of the operand.
+        0x0..=0x4 => (after & msb(bits) != 0) != (before & msb(bits) != 0),
+        // SHR: the top bit of the operand, which is the bit that leaves.
+        0x5 => before & msb(bits) != 0,
+        // SAR never overflows, and SETMO is not a shift at all; it lands
         // here with `after` already all ones, which the `_` arm also covers.
         _ => false,
     }
@@ -1227,10 +1196,7 @@ fn rotate_left(value: u16, count: u16, bits: u8) -> (u16, bool) {
         return (v, v & msb(bits) != 0);
     }
     let r = ((v << k) | (v >> (n - k))) & mask;
-    // The overflow is the top bit of the result against the top bit of the
-    // operand, not the bit that left the top: the captures from a real
-    // P80C86A-2 show `ROL` setting OF where the bit that left was clear.
-    (r, (r & msb(bits) != 0) != (v & msb(bits) != 0))
+    (r, v & (1u16 << (n - k)) != 0) // bit n-k is the one that left the top
 }
 
 fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
@@ -1242,9 +1208,7 @@ fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
         return (v, v & lsb(bits) != 0);
     }
     let r = ((v >> k) | (v << (n - k))) & mask;
-    // The overflow is the top bit of the result against the top bit of the
-    // operand, for the same reason the rotate left is.
-    (r, (r & msb(bits) != 0) != (v & msb(bits) != 0))
+    (r, v & (1u16 << (k - 1)) != 0) // bit k-1 is the one that left the bottom
 }
 
 /// `RCL` and `RCR` rotate the carry through the operand, so the working
@@ -2303,16 +2267,24 @@ mod tests {
     }
 
     #[test]
-    fn in_and_out_reach_a_port() {
+    fn in_and_out_reach_an_empty_port() {
         // E4 ib = IN AL, imm8.  E6 ib = OUT imm8, AL.
+        //
+        // A port is not a memory address. The 8086 has a separate I/O bus,
+        // and with nothing attached to it a read returns all ones and a
+        // write goes nowhere. The captures from a real P80C86A-2 say the
+        // same of their own runs.
         let mut cpu = cpu_with(&[0xE4, 0x60, 0xE6, 0x61]);
-        // Port 0x60 is physical byte 0x60: segment 0, offset 0x60.
         cpu.mem.write_u8(0x0000, 0x60, 0xC3);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.byte(Reg8::Al), 0xC3);
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0xFF, "an empty bus reads as ones");
         cpu.regs.set_byte(Reg8::Al, 0x5A);
         cpu.step().unwrap();
-        assert_eq!(cpu.mem.read_u8(0x0000, 0x61), 0x5A, "port 61 took the byte");
+        assert_eq!(
+            cpu.mem.read_u8(0x0000, 0x61),
+            0x00,
+            "a write to an empty bus changes no memory"
+        );
     }
 
     #[test]
@@ -2322,11 +2294,19 @@ mod tests {
         cpu.regs.set_word(Reg16::Dx, 0x70);
         cpu.mem.write_u16(0x0000, 0x70, 0xBEEF);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.word(Reg16::Ax), 0xBEEF);
+        assert_eq!(
+            cpu.regs.word(Reg16::Ax),
+            0xFFFF,
+            "an empty bus reads as ones, whatever memory holds"
+        );
         cpu.regs.set_word(Reg16::Ax, 0x1234);
         cpu.regs.set_word(Reg16::Dx, 0x71);
         cpu.step().unwrap();
-        assert_eq!(cpu.mem.read_u16(0x0000, 0x71), 0x1234);
+        assert_eq!(
+            cpu.mem.read_u8(0x0000, 0x71),
+            0xBE,
+            "and a write to it changes no memory"
+        );
     }
 
     #[test]
@@ -2586,13 +2566,16 @@ mod tests {
     }
 
     #[test]
-    fn shift_count_comes_from_cl_and_is_masked_to_five_bits() {
-        // D2 /4 = SHL r/m8, CL.  The count is masked, so 32 means 0.
+    fn the_shift_count_is_the_whole_of_cl() {
+        // D2 /4 = SHL r/m8, CL. The 8086 does not mask the count to five
+        // bits: that is what the later processors do, and the captures from
+        // a real P80C86A-2 show shifts by more than 31. A count of 32 on a
+        // byte shifts everything out.
         let mut cpu = cpu_with(&[0xD2, 0xE0]);
         cpu.regs.set_byte(Reg8::Al, 0x01);
         cpu.regs.set_byte(Reg8::Cl, 32);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.byte(Reg8::Al), 0x01, "a count of 32 shifts by 0");
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x00, "a count of 32 shifts it out");
 
         let mut cpu = cpu_with(&[0xD2, 0xE0]);
         cpu.regs.set_byte(Reg8::Al, 0x01);

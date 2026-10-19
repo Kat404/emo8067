@@ -368,7 +368,7 @@ const KNOWN_DIVERGENCES: &[(&str, &str)] = &[
 /// How many cases are allowed to land in the families above. The number was
 /// read off the gate's own output and pinned, so a family that grows is a
 /// failure rather than a quieter gate.
-const KNOWN_DIVERGENCE_COUNT: usize = 71;
+const KNOWN_DIVERGENCE_COUNT: usize = 9;
 
 #[test]
 fn the_flags_come_out_the_way_a_real_8086_leaves_them() {

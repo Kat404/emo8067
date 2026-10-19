@@ -486,7 +486,8 @@ const EFFECTS: &[Effect] = &[
         "IN AL,i8",
         &[0xE4, 0x60],
         row: None,
-        regs: &[(Reg16::Ax, 0x1160)],
+        // The I/O bus is empty: a port read returns all ones.
+        regs: &[(Reg16::Ax, 0x11FF)],
         segs: &[],
         mem: &[],
         ip: None,
@@ -498,7 +499,8 @@ const EFFECTS: &[Effect] = &[
         row: None,
         regs: &[],
         segs: &[],
-        mem: &[(0x0000, 0x0060, b"\x11")],
+        // A write to an empty bus changes no memory, so nothing is declared.
+        mem: &[],
         ip: None,
         pre: None,
     ),
