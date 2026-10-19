@@ -165,16 +165,18 @@ checked against.
 
 ## Log
 
-- **L3 (2026-10-19).** A defect in the guide, found while the assembler
-  was learning the jumps: **the guide's row `60` of §1.3 is a copy of its
-  row `70`** — both are the row of the conditional short jumps. The 8086's
-  row `60` (PUSH ES, POP ES, and the rest) is missing from the grid. The
-  assembler therefore gives `JE` the opcode `64h` instead of `74h`, and the
-  emulator's decoder has the same mistake (`crates/core/src/exec.rs` maps
-  `0x60..=0x7F` to the jumps). The hardware captures do not reach that row,
-  so the oracle never caught it. The row has to be written from the manual
-  before the conditional jumps can be assembled, and the decoder has to be
-  checked against it.
+- **L3 (2026-10-19).** A false alarm, caught before it cost anything: the
+  guide's row `60` of §1.3 looks like a copy of its row `70`, and the
+  assembler duly gave `JE` the opcode `64h`. But the guide is right and the
+  hardware agrees: the captures of a real P80C86A-2 show `60h` running `JO`
+  (the IP moves by two and then by the displacement), and the guide's
+  footnote ‡8 says why - the microcode for the conditional jumps runs for
+  the whole bit pattern `011?????`, so `60h`-`6Fh` alias `70h`-`7Fh`, and
+  Table 4-13 prints them as `(not used)`. The emulator's decoder has known
+  this all along (`crates/core/src/exec.rs`: "they alias `70`-`7F`").
+  What was wrong was the assembler, which took the alias for the canonical
+  opcode; it now writes `74h`, the opcode people write, and the alias row
+  is left out of the candidates.
 
 - **L2 (2026-10-19).** The bet of S1 was checked before anything was
   written: §1.3 was parsed as a table and the shape of it measured. Sixteen

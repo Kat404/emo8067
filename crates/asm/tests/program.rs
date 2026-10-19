@@ -45,6 +45,12 @@ fn a_jump_knows_where_it_is_going() {
     assert_eq!(program.bytes, vec![0xB8, 0x01, 0x00, 0xE9, 0xFD, 0xFF]);
 }
 
-// The conditional jumps are not here yet: the guide's row 0x60 is a copy of
-// its row 0x70, so the guide gives JE the opcode 64h instead of 74h. The
-// row has to be fixed against the manual first.
+#[test]
+fn a_conditional_jump_is_the_short_form() {
+    let program = assemble_program("org 0\nje there\nnop\nthere:\nnop\n").unwrap();
+    // The jump is at 0 and ends at 2; the label is after the nop, at 3, so
+    // the displacement is one. The canonical opcode is 74h: the guide's row
+    // 60 is the chip's alias of the 70h row, and the assembler writes the
+    // canonical one.
+    assert_eq!(program.bytes, vec![0x74, 0x01, 0x90, 0x90]);
+}

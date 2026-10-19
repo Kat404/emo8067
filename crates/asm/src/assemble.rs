@@ -106,6 +106,14 @@ pub fn assemble_parts(
 fn options_for(mnemonic: &str) -> Vec<(u8, String, String)> {
     let mut options: Vec<(u8, String, String)> = Vec::new();
     for cell in table::forms() {
+        // The guide's row 60 is the chip's alias: the microcode for the
+        // conditional jumps runs for the whole bit pattern 011?????, so 60h
+        // runs JO, 61h runs JNO and so on (the guide's footnote 8). The
+        // canonical opcodes are the 70h-7Fh row, so the alias is left out
+        // and the assembler writes the opcodes people write.
+        if (0x60..=0x6F).contains(&cell.opcode) {
+            continue;
+        }
         if names_match(cell.mnemonic, mnemonic) {
             options.push((
                 cell.opcode,
