@@ -71,10 +71,14 @@ be regenerated rather than trusted.
   started from, not the value it produced. The 1979 manual has no rule text
   and the classic pseudocode says the adjusted value; the chip says the old
   one, and so does the SDM.
-- **T5** — **TODO.** The rest of the opcode space: the other 198 opcodes,
-  the group forms, the string operations, the shifts, the divides with their
-  exceptions. Each one that disagrees is a finding, and the findings are the
-  point.
+- **T5** — **DONE in `4cb26a5` and `e7bd116`.** The rest of the opcode
+  space: 1533 cases from 233 opcodes, the group forms included. It found
+  five more defects — the overflow of `INC`/`DEC` and of the rotates, the
+  `POP` into a register, the unsigned index of `XLAT`, and the `/digit`
+  that `C6`/`C7` ignore. Seventy-one cases still disagree, in two
+  families, and the gate names and counts them: the rotates' carry, and
+  the port reads, where this emulator reads memory at the port and the
+  chip returns `FFh` because nothing is attached to it.
 - **T6** — **TODO.** The captures as the flag oracle for the `X` rows, so
   that the flag contract stops asserting nothing for `ADD`, `ADC`, `SUB`,
   `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS`.
@@ -105,3 +109,14 @@ be regenerated rather than trusted.
     the register field: the emulator named the wrong register, so the
     operands were different and the flags came out different. That is the
     gate working, not the gate being wrong.
+  - **The full space found five more**, and the pattern is the same one:
+    every one of them is a place where this project believed a note, a
+    prose rule or a structural argument instead of the chip. The overflow
+    of `INC`/`DEC` and of the rotates, the `POP` into a register, the
+    unsigned index of `XLAT`, and the `/digit` that `C6`/`C7` ignore.
+    Two families are still open: the rotates' carry, and the port reads,
+    where the difference is the emulator's I/O model rather than a rule.
+  - **The rule of the rotates came from the captures, not from the manual.**
+    The overflow is the top bit of the result against the top bit of the
+    operand, and 2133 of 2133 hardware cases agree; the bit that left
+    the top, which is what the code used, matches in half of them.
