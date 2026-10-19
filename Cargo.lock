@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "emo8067-asm"
+version = "0.1.0"
+
+[[package]]
 name = "emo8067-cli"
 version = "0.1.0"
 dependencies = [

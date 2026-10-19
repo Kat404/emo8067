@@ -1,0 +1,13 @@
+[package]
+name = "emo8067-asm"
+description = "MASM-style assembler for the 8086/8088. No dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

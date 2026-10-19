@@ -66,8 +66,14 @@ checked against.
 
 ## Tasks
 
-- **T1** — **TODO.** The crate and the reader: the opcode map out of §1.3,
-  read at compile time, into a table of mnemonics and their forms.
+- **T1** — **DONE.** The crate (`crates/asm`, no dependencies) and the
+  reader: the opcode map out of §1.3, read at compile time, into one form per
+  opcode — the mnemonic and the operand form, verbatim. The reader also
+  settled a question the plan had wrong: the map has **one cell per opcode**,
+  sixteen opcodes to a row, not eight columns to an opcode. The manual's
+  Table 4-13 has eight columns; the guide's transcription flattened them, and
+  the `/digit` of a group lives in the guide's group tables, not in the grid.
+  The group forms are T2's work.
 - **T2** — **TODO.** The encoder for the register forms: `r/m8` and `r16` in
   both directions, with the `REG` field in the 8086's order, and the ModR/M
   byte with its mod and rm fields.
