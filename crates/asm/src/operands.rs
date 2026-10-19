@@ -26,6 +26,8 @@ pub struct Memory {
     pub index: Option<String>,
     /// The displacement, when the source gave one.
     pub displacement: Option<i64>,
+    /// The width the source asked for, when it said: `BYTE PTR` or `WORD PTR`.
+    pub width: Option<Width>,
 }
 
 impl From<Memory> for Operand {
@@ -158,29 +160,39 @@ fn encode_inner(
             out.push(byte_for(modrm, reg, rm));
             out.extend(displacement);
         }
-        // A group's form: the digit is in the REG field and the operand
-        // follows it.
-        ["r/m8", "i8"] | ["r/m16", "i16"] => {
+        // An immediate against a register or a reference: the group's form,
+        // where the digit is in the REG field, and the `MOV r/m,i` form,
+        // where the digit is ignored and the REG field is zero.
+        ["r/m8", "i8"] | ["r/m16", "i16"] | ["m8", "i8"] | ["m16", "i16"] => {
             let width = if parts[0].ends_with('8') {
                 Width::Byte
             } else {
                 Width::Word
             };
-            let reg = digit.ok_or(Error::Unsupported {
-                form: form.to_string(),
-            })?;
-            let rm = match &operands[0] {
-                Operand::Register(name) => width.field_of(name).ok_or(Error::Type {
-                    form: form.to_string(),
-                    position: 0,
-                })?,
+            let (modrm, rm, displacement) = match &operands[0] {
+                Operand::Register(name) => {
+                    let rm = width.field_of(name).ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    })?;
+                    (Mod::Register, rm, Vec::new())
+                }
+                Operand::Memory(memory) if digit.is_none() => {
+                    let (modrm, rm, displacement) =
+                        memory.encode().map_err(|error| Error::Addressing {
+                            form: form.to_string(),
+                            reason: format!("{error:?}"),
+                        })?;
+                    (modrm, rm, displacement)
+                }
                 _ => {
                     return Err(Error::Unsupported {
                         form: form.to_string(),
                     });
                 }
             };
-            out.push(byte_for(Mod::Register, reg, rm));
+            out.push(byte_for(modrm, digit.unwrap_or(0), rm));
+            out.extend(displacement);
             let value = immediate(&operands[1], width)?;
             out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
         }

@@ -6,6 +6,7 @@
 //! against, so the table exists once in the project instead of twice.
 
 pub mod addressing;
+pub mod assemble;
 pub mod groups;
 pub mod line;
 pub mod literals;

@@ -109,19 +109,22 @@ checked against.
   its displacement: `MOV [BX+SI],CL` is `88 08h` and `MOV [BX+4],BX` is
   `89 5F 04h`. The R/M field names a register or a memory reference, and
   a memory reference is the one that brings the displacement.
-- **T4** — **DONE, the literals and the line.** The literals are below.
-  **DONE, the line.** A source line, taken apart: the mnemonic, the operands
-  as the source wrote them, and the prefixes that came before - the repeat
-  prefixes, `LOCK`, and the segment overrides, which may carry a colon. An
-  operand may hold a comma inside brackets, so the line splits on the commas
-  that are not inside any, and a semicolon starts a comment.
-- **T4** — **DONE, the literals.** Four ways to write a number, all of
-  them from the reference's own diagnostics: `&HFF`, `1234h`, `16$FF` (MASM's
-  radix: the base, then the `$`, then the digits) and plain decimal. A hex
-  value has to begin with a digit or it reads as a name, so `FFh` is refused
-  and `0FFh` is not; and a value that will not fit in sixteen bits is
-  refused rather than truncated. Still to come in this task: the source
-  parser that turns a line into operands, and the prefixes.
+- **T4** — **DONE, the literals, the line and the whole thread.** Four ways
+  to write a number, all of them from the reference's own diagnostics:
+  `&HFF`, `1234h`, `16$FF` (MASM's radix: the base, then the `$`, then the
+  digits) and plain decimal. A hex value has to begin with a digit or it
+  reads as a name, so `FFh` is refused and `0FFh` is not; and a value that
+  will not fit in sixteen bits is refused rather than truncated. A source
+  line, taken apart: the mnemonic, the operands as the source wrote them,
+  and the prefixes that came before - the repeat prefixes, `LOCK`, and the
+  segment overrides, which may carry a colon. An operand may hold a comma
+  inside brackets, so the line splits on the commas that are not inside any,
+  and a semicolon starts a comment. And the whole thread, end to end: a
+  line's name, the form the document's table gives it, the operands, and the
+  bytes - `MOV AX,BX` is `89 D8h`, `ADD BL,1` is `80 C3 01h`, `MOV [BX+SI],CL`
+  is `88 08h`. A mnemonic can name many forms, so the operands pick the one;
+  a group's cell names the operation rather than a form, so the group's own
+  table is searched too.
 - **T5** — **TODO.** The type checks, the thirteen of them, with the
   reference's messages.
 - **T6** — **TODO.** The directives, the macros and the build directives.

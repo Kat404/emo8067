@@ -47,8 +47,9 @@ fn a_displacement_says_how_wide_it_is() {
 #[test]
 fn the_direct_form_carries_a_word() {
     let (modrm, rm, bytes) = encode(&address(None, None, Some(0x1234))).unwrap();
-    assert_eq!(modrm, Mod::Word);
-    assert_eq!(rm, 0b110, "the direct form is R/M 110 with MOD 00");
+    assert_eq!(modrm, Mod::Memory, "the direct form is MOD 00 with R/M 110");
+    assert_eq!(rm, 0b110);
+    assert_eq!(bytes, vec![0x34, 0x12]);
     assert_eq!(bytes, vec![0x34, 0x12]);
 }
 

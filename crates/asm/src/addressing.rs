@@ -62,6 +62,8 @@ pub enum Error {
     NotABase { name: String },
     /// The text is not a memory reference at all.
     NotAReference { text: String },
+    /// The reference names no address at all.
+    NoAddress,
 }
 
 /// A memory reference, as the source wrote it.
@@ -223,17 +225,14 @@ pub fn encode(address: &Address) -> Result<(Mod, u8, Vec<u8>), Error> {
         (None, None) => 0b110,
         _ => 0b110,
     };
-    let displacement = address.displacement.unwrap_or(0);
-    // The direct form, with no register at all, is the only one that must
-    // carry a word.
+    // The direct form, with no register at all, is MOD 00 and R/M 110, and
+    // it always carries a word of displacement.
     let plain = address.base.is_none() && address.index.is_none();
     let (modrm, bytes) = if plain {
-        if displacement == 0 {
-            return Err(Error::DisplacementTooBig { value: 0 });
-        }
-        (Mod::Word, displacement_word(displacement)?)
+        let displacement = address.displacement.ok_or(Error::NoAddress)?;
+        (Mod::Memory, displacement_word(displacement)?)
     } else {
-        match displacement {
+        match address.displacement.unwrap_or(0) {
             0 => (Mod::Memory, Vec::new()),
             d if (-128..=127).contains(&d) => (Mod::Byte, vec![d as u8]),
             d => (Mod::Word, displacement_word(d)?),
@@ -244,8 +243,8 @@ pub fn encode(address: &Address) -> Result<(Mod, u8, Vec<u8>), Error> {
 
 /// The two bytes of a word displacement, little endian.
 fn displacement_word(value: i64) -> Result<Vec<u8>, Error> {
-    if !(0..=0xFFFF).contains(&value) {
+    if !(-32768..=0xFFFF).contains(&value) {
         return Err(Error::DisplacementTooBig { value });
     }
-    Ok((value as u16).to_le_bytes().to_vec())
+    Ok((value as i16 as u16).to_le_bytes().to_vec())
 }

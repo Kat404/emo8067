@@ -94,6 +94,7 @@ fn a_memory_operand_brings_its_own_mod_and_displacement() {
         base: Some("BX".to_string()),
         index: Some("SI".to_string()),
         displacement: None,
+        width: None,
     };
     assert_eq!(
         encode(0x88, "MOV", "r/m8,r8", &[memory.into(), reg("CL")]).unwrap(),
@@ -106,6 +107,7 @@ fn a_memory_operand_brings_its_own_mod_and_displacement() {
         base: Some("BX".to_string()),
         index: None,
         displacement: Some(4),
+        width: None,
     };
     assert_eq!(
         encode(0x89, "MOV", "r/m16,r16", &[memory.into(), reg("BX")]).unwrap(),
