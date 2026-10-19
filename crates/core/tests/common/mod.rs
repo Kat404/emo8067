@@ -5,6 +5,8 @@
 //! read them, and a parser that exists twice is a parser that will drift, so
 //! it lives here once.
 
+#![allow(dead_code)] // each test binary uses a different part of this
+
 use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
 
 /// The guide, read at compile time so a test and its oracle cannot disagree
@@ -31,20 +33,21 @@ pub enum Mark {
 }
 
 /// Read one §1.4 row out of the document, by the instruction name its first
-/// cell starts with.
-pub fn row_marks(doc: &str, name: &str) -> [Mark; 9] {
+/// cell starts with, or `None` when the document has no such row.
+///
+/// The `None` matters: the hardware names instructions the document has no
+/// row for, because a row only exists for an instruction that touches a
+/// flag.
+pub fn find_row_marks(doc: &str, name: &str) -> Option<[Mark; 9]> {
     let needle = format!("| `{name}`");
-    let line = doc
-        .lines()
-        .find(|l| l.starts_with(&needle))
-        .unwrap_or_else(|| panic!("no section 1.4 row starting with {needle}"));
+    let line = doc.lines().find(|l| l.starts_with(&needle))?;
     let cells: Vec<&str> = line.split('|').collect();
     assert!(
         cells.len() >= 11,
         "row for {name} has {} cells, expected 11: {line}",
         cells.len()
     );
-    std::array::from_fn(|i| match cells[i + 2].trim() {
+    Some(std::array::from_fn(|i| match cells[i + 2].trim() {
         UNCHANGED_STR => Mark::Unchanged,
         "0" => Mark::Cleared,
         "1" => Mark::Set,
@@ -55,5 +58,12 @@ pub fn row_marks(doc: &str, name: &str) -> [Mark; 9] {
             );
             Mark::Free
         }
-    })
+    }))
+}
+
+/// Read one §1.4 row out of the document, by the instruction name its first
+/// cell starts with.
+pub fn row_marks(doc: &str, name: &str) -> [Mark; 9] {
+    find_row_marks(doc, name)
+        .unwrap_or_else(|| panic!("no section 1.4 row starting with | `{name}`"))
 }

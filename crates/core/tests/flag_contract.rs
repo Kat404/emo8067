@@ -32,8 +32,17 @@
 //!
 //! Coverage note: `INT`/`INTO` are absent because they trap, and `IRET`/`POPF`
 //! because they *restore* the flags rather than write them, so no mark in those
-//! rows is assertable without modelling the stack. `X` and `U` marks assert
-//! nothing by design: `X` is value-dependent and `U` is undefined.
+//! rows is assertable without modelling the stack.
+//!
+//! **`X` and `U` are no longer a hole.** They assert nothing *here*, because
+//! `X` is value-dependent and `U` is undefined — but the hardware says what
+//! those values are. `crates/core/tests/hardware_flags.rs` runs 1533 cases
+//! from a real P80C86A-2 and compares every flag the chip defined, and it
+//! checks the document against the chip in the other direction too: a row
+//! that marks a flag with an em dash says the instruction does not touch it,
+//! and the captures say whether the chip agreed. So the `X` rows are backed by
+//! the chip's own numbers, and a row that claims a flag is untouched while
+//! the chip writes it fails the gate.
 
 use emo8067_core::Cpu;
 use emo8067_core::flags::{CF, OF};

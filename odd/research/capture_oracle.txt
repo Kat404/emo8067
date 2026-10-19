@@ -16,6 +16,7 @@
 
 op 00
   mask 0FD5
+  rows ADD
   case
     bytes 00 E1
     regs ax=339C cx=BAA8 dx=AA04 bx=B0E4 sp=F9A1 bp=39A1 si=A73E di=0000 cs=E899 ds=0C72 es=DA66 ss=EF46 ip=5891
@@ -67,6 +68,7 @@ op 00
 
 op 01
   mask 0FD5
+  rows ADD
   case
     bytes 01 54 DB
     regs ax=F65A cx=5364 dx=D2BD bx=C4E2 sp=7CF8 bp=CDDC si=B324 di=05C1 cs=C1AE ds=D966 es=D574 ss=4DB1 ip=2FF2
@@ -106,6 +108,7 @@ op 01
 
 op 02
   mask 0FD5
+  rows ADD
   case
     bytes 02 E1
     regs ax=ABC4 cx=A80E dx=864F bx=ED8A sp=7CA4 bp=CA43 si=F8D3 di=D6EC cs=A272 ds=5AB4 es=76DF ss=C6CC ip=8812
@@ -139,6 +142,7 @@ op 02
 
 op 03
   mask 0FD5
+  rows ADD
   case
     bytes 26 03 EF
     regs ax=18EA cx=8F8E dx=31E1 bx=854A sp=77BE bp=D3A2 si=237E di=0000 cs=00FE ds=FBDD es=DA05 ss=0E56 ip=1174
@@ -178,6 +182,7 @@ op 03
 
 op 04
   mask 0FD5
+  rows ADD
   case
     bytes 2E 04 7E
     regs ax=3C00 cx=EB98 dx=3BAF bx=F821 sp=0000 bp=D37F si=96F9 di=2CDE cs=296C ds=5B52 es=82C6 ss=FFB5 ip=F8A3
@@ -217,6 +222,7 @@ op 04
 
 op 05
   mask 0FD5
+  rows ADD
   case
     bytes 3E 05 3C E8
     regs ax=FA8D cx=CBBC dx=89BB bx=DE12 sp=B37A bp=82D8 si=10AB di=EA36 cs=3C90 ds=5194 es=91C1 ss=CA15 ip=916F
@@ -244,6 +250,7 @@ op 05
 
 op 06
   mask 0FD5
+  rows PUSH
   case
     bytes 06
     regs ax=339C cx=BAA8 dx=AA04 bx=B0E4 sp=F9A1 bp=39A1 si=A73E di=0000 cs=E899 ds=0C72 es=DA66 ss=EF46 ip=5891
@@ -271,6 +278,7 @@ op 06
 
 op 07
   mask 0FD5
+  rows POP
   case
     bytes 07
     regs ax=F65A cx=5364 dx=D2BD bx=C4E2 sp=7CF8 bp=CDDC si=B324 di=05C1 cs=C1AE ds=D966 es=D574 ss=4DB1 ip=2FF2
@@ -298,6 +306,7 @@ op 07
 
 op 08
   mask 0FC5
+  rows OR
   case
     bytes 08 E1
     regs ax=ABC4 cx=A80E dx=864F bx=ED8A sp=7CA4 bp=CA43 si=F8D3 di=D6EC cs=A272 ds=5AB4 es=76DF ss=C6CC ip=8812
@@ -331,6 +340,7 @@ op 08
 
 op 09
   mask 0FC5
+  rows OR
   case
     bytes 26 09 EF
     regs ax=18EA cx=8F8E dx=31E1 bx=854A sp=77BE bp=D3A2 si=237E di=0000 cs=00FE ds=FBDD es=DA05 ss=0E56 ip=1174
@@ -364,6 +374,7 @@ op 09
 
 op 0A
   mask 0FC5
+  rows OR
   case
     bytes 2E 0A 7E 88
     regs ax=3C00 cx=EB98 dx=3BAF bx=F821 sp=0000 bp=D37F si=96F9 di=2CDE cs=296C ds=5B52 es=82C6 ss=FFB5 ip=F8A3
@@ -409,6 +420,7 @@ op 0A
 
 op 0B
   mask 0FC5
+  rows OR
   case
     bytes 3E 0B 3C
     regs ax=FA8D cx=CBBC dx=89BB bx=DE12 sp=B37A bp=82D8 si=10AB di=EA36 cs=3C90 ds=5194 es=91C1 ss=CA15 ip=916F
@@ -436,6 +448,7 @@ op 0B
 
 op 0C
   mask 0FC5
+  rows OR
   case
     bytes 36 0C 94
     regs ax=08A1 cx=CD5E dx=5DD8 bx=16B7 sp=CAB1 bp=858B si=E775 di=6BC7 cs=FB20 ds=BE00 es=FEAC ss=FEF2 ip=3D06
@@ -469,6 +482,7 @@ op 0C
 
 op 0D
   mask 0FC5
+  rows OR
   case
     bytes 26 0D CD D6
     regs ax=289F cx=43A2 dx=2658 bx=64AE sp=36E5 bp=4555 si=7A98 di=5619 cs=9F2D ds=B02D es=5319 ss=B5BE ip=BFE2
@@ -496,6 +510,7 @@ op 0D
 
 op 0E
   mask 0FD5
+  rows PUSH
   case
     bytes 0E
     regs ax=2418 cx=E0C0 dx=0000 bx=1F2A sp=85F1 bp=EE52 si=9EA3 di=0FEF cs=299C ds=BE30 es=33B1 ss=1959 ip=74A4
@@ -523,6 +538,7 @@ op 0E
 
 op 10
   mask 0FD5
+  rows ADC
   case
     bytes 10 99 EB 0B
     regs ax=8849 cx=8E48 dx=9548 bx=67DB sp=2E53 bp=2160 si=A43D di=043A cs=5944 ds=E2A0 es=5A5C ss=2599 ip=6AED
@@ -562,6 +578,7 @@ op 10
 
 op 11
   mask 0FD5
+  rows ADC
   case
     bytes 36 11 8C 19 51
     regs ax=2C79 cx=C1B8 dx=2DDB bx=2D77 sp=8756 bp=B3B8 si=3DDF di=57DD cs=A256 ds=8B49 es=42E6 ss=5239 ip=08FC
@@ -607,6 +624,7 @@ op 11
 
 op 12
   mask 0FD5
+  rows ADC
   case
     bytes 12 FB
     regs ax=5E35 cx=C456 dx=7271 bx=0000 sp=0000 bp=0000 si=1B42 di=93F4 cs=E373 ds=5A79 es=92D5 ss=A9FC ip=3F1B
@@ -640,6 +658,7 @@ op 12
 
 op 13
   mask 0FD5
+  rows ADC
   case
     bytes 3E 13 7B 81
     regs ax=077C cx=3DCE dx=0000 bx=3CA9 sp=43FB bp=D0EE si=C6C0 di=4E24 cs=6EE3 ds=7662 es=C45F ss=B6B0 ip=EC9A
@@ -679,6 +698,7 @@ op 13
 
 op 14
   mask 0FD5
+  rows ADC
   case
     bytes 3E 14 45
     regs ax=ADEE cx=A1B4 dx=4038 bx=FD34 sp=5BDF bp=D8D9 si=0000 di=2DB1 cs=D271 ds=8702 es=CE41 ss=F076 ip=8490
@@ -718,6 +738,7 @@ op 14
 
 op 15
   mask 0FD5
+  rows ADC
   case
     bytes 26 15 85 30
     regs ax=ED4A cx=2E6C dx=6A11 bx=1B58 sp=96B2 bp=5292 si=5574 di=3F46 cs=89CC ds=8FFD es=AB02 ss=A8B6 ip=9D45
@@ -751,6 +772,7 @@ op 15
 
 op 16
   mask 0FD5
+  rows PUSH
   case
     bytes 16
     regs ax=335A cx=D9E8 dx=3EB8 bx=2F2B sp=85F5 bp=5E1C si=6511 di=3B34 cs=6484 ds=B20D es=FB95 ss=CB15 ip=AEA6
@@ -778,6 +800,7 @@ op 16
 
 op 17
   mask 0FD5
+  rows POP
   case
     bytes 17
     regs ax=8DA2 cx=A2A4 dx=384A bx=AD90 sp=7580 bp=0C47 si=F001 di=996C cs=2E77 ds=AD80 es=E163 ss=4ACC ip=5136
@@ -805,6 +828,7 @@ op 17
 
 op 18
   mask 0FD5
+  rows SBB
   case
     bytes 3E 18 B3 23 51
     regs ax=61FF cx=FC8E dx=06A4 bx=0B5C sp=6CE7 bp=90FE si=1A51 di=A881 cs=93AB ds=AA60 es=F95C ss=BA9D ip=9C4E
@@ -844,6 +868,7 @@ op 18
 
 op 19
   mask 0FD5
+  rows SBB
   case
     bytes 19 25
     regs ax=99CC cx=91A4 dx=8625 bx=C317 sp=0000 bp=E3B4 si=7824 di=2C24 cs=C049 ds=927D es=B101 ss=A950 ip=CBE6
@@ -889,6 +914,7 @@ op 19
 
 op 1A
   mask 0FD5
+  rows SBB
   case
     bytes 1A 58 9D
     regs ax=5581 cx=4010 dx=09F5 bx=69C1 sp=81ED bp=D923 si=3F06 di=8E8B cs=871E ds=D480 es=EA0A ss=928A ip=155D
@@ -934,6 +960,7 @@ op 1A
 
 op 1B
   mask 0FD5
+  rows SBB
   case
     bytes 36 1B B4 95 86
     regs ax=97AE cx=2250 dx=069B bx=A5D3 sp=E05C bp=0000 si=56C8 di=5B43 cs=2DE9 ds=7B6D es=F00B ss=B963 ip=2F0C
@@ -979,6 +1006,7 @@ op 1B
 
 op 1C
   mask 0FD5
+  rows SBB
   case
     bytes 36 1C DA
     regs ax=9346 cx=2216 dx=C3FF bx=A89F sp=ADDD bp=6585 si=B121 di=2542 cs=CE53 ds=9B66 es=F92E ss=E194 ip=C875
@@ -1018,6 +1046,7 @@ op 1C
 
 op 1D
   mask 0FD5
+  rows SBB
   case
     bytes 1D C6 78
     regs ax=C0A2 cx=0C90 dx=F6F1 bx=0000 sp=CB3E bp=6C82 si=B36C di=37AE cs=0FBD ds=A06B es=B23B ss=38B9 ip=0B7F
@@ -1051,6 +1080,7 @@ op 1D
 
 op 1E
   mask 0FD5
+  rows PUSH
   case
     bytes 1E
     regs ax=9C90 cx=0A54 dx=80D1 bx=66F5 sp=4230 bp=FD03 si=A217 di=75D6 cs=EF9B ds=B0D2 es=AA86 ss=2E1B ip=8A65
@@ -1078,6 +1108,7 @@ op 1E
 
 op 1F
   mask 0FD5
+  rows POP
   case
     bytes 1F
     regs ax=25ED cx=3C18 dx=D750 bx=1790 sp=D32D bp=4E76 si=4CAE di=2B00 cs=8C0A ds=2D4D es=136B ss=193A ip=BCD3
@@ -1105,6 +1136,7 @@ op 1F
 
 op 20
   mask 0FC5
+  rows AND
   case
     bytes 20 F5
     regs ax=A551 cx=B9EA dx=DF00 bx=BAC9 sp=398A bp=F0EE si=0CC3 di=5D8C cs=474F ds=FA2D es=EF03 ss=5B05 ip=029C
@@ -1144,6 +1176,7 @@ op 20
 
 op 21
   mask 0FC5
+  rows AND
   case
     bytes 36 21 7D BF
     regs ax=9B62 cx=6142 dx=A769 bx=ED5B sp=D6B6 bp=3BEE si=0000 di=044A cs=9EAA ds=461F es=0BA0 ss=E27E ip=C7D5
@@ -1183,6 +1216,7 @@ op 21
 
 op 22
   mask 0FC5
+  rows AND
   case
     bytes 36 22 D6
     regs ax=F8E7 cx=B700 dx=26AB bx=F5B0 sp=F871 bp=1183 si=F18F di=2696 cs=B60A ds=ED9B es=7612 ss=90A5 ip=287D
@@ -1216,6 +1250,7 @@ op 22
 
 op 23
   mask 0FC5
+  rows AND
   case
     bytes 26 23 F4
     regs ax=74BA cx=7B46 dx=AB5D bx=2B84 sp=95D2 bp=68D7 si=0000 di=76AB cs=9513 ds=2795 es=85C4 ss=AB0C ip=FBDD
@@ -1243,6 +1278,7 @@ op 23
 
 op 24
   mask 0FC5
+  rows AND
   case
     bytes 26 24 9F
     regs ax=1422 cx=C882 dx=D1BD bx=0A3F sp=FD5C bp=3FEF si=4D8B di=211D cs=5CCF ds=CFDD es=91FE ss=F741 ip=452A
@@ -1276,6 +1312,7 @@ op 24
 
 op 25
   mask 0FC5
+  rows AND
   case
     bytes 3E 25 8E 5E
     regs ax=8D1E cx=171C dx=11EA bx=AAE3 sp=E16A bp=5E12 si=1718 di=C791 cs=6000 ds=81E7 es=3AB8 ss=E5AF ip=FE7C
@@ -1309,6 +1346,7 @@ op 25
 
 op 27
   mask 07D5
+  rows DAA
   case
     bytes 27
     regs ax=C8FA cx=7B9C dx=FE2D bx=0000 sp=604B bp=BC7A si=8203 di=C301 cs=8FE2 ds=6616 es=4F1C ss=4188 ip=5BD7
@@ -1348,6 +1386,7 @@ op 27
 
 op 28
   mask 0FD5
+  rows SUB
   case
     bytes 26 28 CF
     regs ax=6BCA cx=0000 dx=21D1 bx=39EF sp=84CE bp=8421 si=D7B4 di=EB25 cs=1511 ds=5209 es=1A63 ss=B777 ip=5B9E
@@ -1393,6 +1432,7 @@ op 28
 
 op 29
   mask 0FD5
+  rows SUB
   case
     bytes 29 85 12 88
     regs ax=4FE9 cx=D916 dx=C0D9 bx=8CAD sp=8227 bp=D5A1 si=A176 di=6D76 cs=7559 ds=F9BC es=18E9 ss=6CB7 ip=405E
@@ -1432,6 +1472,7 @@ op 29
 
 op 2A
   mask 0FD5
+  rows SUB
   case
     bytes 2A 6C D8
     regs ax=0946 cx=A3C0 dx=C37D bx=2663 sp=9D98 bp=FB7A si=D05E di=405A cs=F79F ds=A8A3 es=49B7 ss=3588 ip=7111
@@ -1471,6 +1512,7 @@ op 2A
 
 op 2B
   mask 0FD5
+  rows SUB
   case
     bytes 2B 99 9D ED
     regs ax=74B8 cx=AC4C dx=4FD3 bx=9509 sp=39E7 bp=D238 si=F0B1 di=C279 cs=FBB3 ds=36F3 es=EF18 ss=B56B ip=A38B
@@ -1504,6 +1546,7 @@ op 2B
 
 op 2C
   mask 0FD5
+  rows SUB
   case
     bytes 26 2C 26
     regs ax=D465 cx=7B66 dx=2E35 bx=B10C sp=9B76 bp=A4CA si=A9C5 di=1451 cs=CA8B ds=228C es=8093 ss=E227 ip=35F7
@@ -1543,6 +1586,7 @@ op 2C
 
 op 2D
   mask 0FD5
+  rows SUB
   case
     bytes 2E 2D C7 8F
     regs ax=0000 cx=3DC0 dx=8564 bx=EA8F sp=8629 bp=058E si=7504 di=B9F6 cs=7EBF ds=7C53 es=09FC ss=E63C ip=96E9
@@ -1570,6 +1614,7 @@ op 2D
 
 op 2F
   mask 07D5
+  rows DAS
   case
     bytes 2F
     regs ax=466B cx=B412 dx=E33F bx=2229 sp=D316 bp=B2F0 si=ED31 di=1166 cs=262C ds=6E2C es=E8F1 ss=7617 ip=46A3
@@ -1609,6 +1654,7 @@ op 2F
 
 op 30
   mask 0FC5
+  rows XOR
   case
     bytes 30 7A F1
     regs ax=624C cx=704C dx=4834 bx=A6B7 sp=6505 bp=5C9F si=48F9 di=8CD4 cs=F4F5 ds=7771 es=8469 ss=3FCD ip=3E76
@@ -1642,6 +1688,7 @@ op 30
 
 op 31
   mask 0FC5
+  rows XOR
   case
     bytes 3E 31 69 9D
     regs ax=CE14 cx=EAE6 dx=8DD8 bx=CB19 sp=F177 bp=C816 si=5BD6 di=0996 cs=387D ds=40C3 es=58C8 ss=C790 ip=75D8
@@ -1675,6 +1722,7 @@ op 31
 
 op 32
   mask 0FC5
+  rows XOR
   case
     bytes 32 52 FF
     regs ax=9C47 cx=BC54 dx=4F28 bx=D94C sp=D7FE bp=097E si=0B0B di=2084 cs=350E ds=4E89 es=572B ss=501E ip=224B
@@ -1708,6 +1756,7 @@ op 32
 
 op 33
   mask 0FC5
+  rows XOR
   case
     bytes 2E 33 EB
     regs ax=BCD2 cx=09FC dx=4327 bx=E910 sp=079F bp=416C si=E5E0 di=E3D2 cs=A610 ds=5611 es=E3FB ss=8B5E ip=C687
@@ -1741,6 +1790,7 @@ op 33
 
 op 34
   mask 0FC5
+  rows XOR
   case
     bytes 34 0A
     regs ax=1781 cx=0D08 dx=EA3E bx=1A4D sp=EE96 bp=7C80 si=E9A4 di=5EAE cs=B127 ds=D67D es=13BB ss=DFC6 ip=5DF0
@@ -1774,6 +1824,7 @@ op 34
 
 op 35
   mask 0FC5
+  rows XOR
   case
     bytes 35 76 FF
     regs ax=7BF2 cx=C046 dx=BAEC bx=1E1F sp=9154 bp=E588 si=4A7B di=CA2A cs=F2D4 ds=F8B7 es=945E ss=0FA0 ip=16B8
@@ -1807,6 +1858,7 @@ op 35
 
 op 37
   mask 0711
+  rows AAA
   case
     bytes 37
     regs ax=137F cx=5B46 dx=2A7D bx=46C1 sp=E64F bp=4A65 si=C51E di=04BA cs=9415 ds=E1FA es=7764 ss=D7A9 ip=DE6F
@@ -1834,6 +1886,7 @@ op 37
 
 op 38
   mask 0FD5
+  rows CMP
   case
     bytes 36 38 AB 9C F9
     regs ax=6A3E cx=EB24 dx=57F5 bx=0B7C sp=C8EE bp=433C si=96DF di=1701 cs=E5EF ds=E23E es=0519 ss=A343 ip=EE21
@@ -1873,6 +1926,7 @@ op 38
 
 op 39
   mask 0FD5
+  rows CMP
   case
     bytes 36 39 E4
     regs ax=E0E2 cx=5992 dx=8FF2 bx=47B1 sp=B8E7 bp=9AE9 si=1438 di=6445 cs=E709 ds=F43A es=6CAF ss=4368 ip=E393
@@ -1900,6 +1954,7 @@ op 39
 
 op 3A
   mask 0FD5
+  rows CMP
   case
     bytes 2E 3A 6E 87
     regs ax=9251 cx=B670 dx=8ACB bx=FCCF sp=1FD3 bp=0000 si=20D9 di=2495 cs=331A ds=97A6 es=077B ss=20A5 ip=2443
@@ -1939,6 +1994,7 @@ op 3A
 
 op 3B
   mask 0FD5
+  rows CMP
   case
     bytes 3B 93 EF 74
     regs ax=D709 cx=2876 dx=BCEF bx=E67E sp=FF82 bp=0000 si=405D di=592C cs=4FE1 ds=94DD es=59CD ss=2AA4 ip=65C2
@@ -1978,6 +2034,7 @@ op 3B
 
 op 3C
   mask 0FD5
+  rows CMP
   case
     bytes 3C DB
     regs ax=DFF6 cx=275E dx=961A bx=5070 sp=0CE2 bp=8922 si=561F di=61DA cs=6441 ds=34E2 es=B9B1 ss=982B ip=0F81
@@ -2017,6 +2074,7 @@ op 3C
 
 op 3D
   mask 0FD5
+  rows CMP
   case
     bytes 36 3D 4B 49
     regs ax=5043 cx=3F70 dx=2D18 bx=AC00 sp=0000 bp=CE6B si=71D3 di=C18C cs=B640 ds=9437 es=6041 ss=F5B4 ip=35D9
@@ -2062,6 +2120,7 @@ op 3D
 
 op 3F
   mask 0711
+  rows AAS
   case
     bytes 3F
     regs ax=0000 cx=243A dx=1CED bx=30D3 sp=9EB5 bp=0000 si=900C di=0000 cs=55D1 ds=2FF1 es=ACD7 ss=9B98 ip=A09A
@@ -2095,6 +2154,7 @@ op 3F
 
 op 40
   mask 0FD5
+  rows INC
   case
     bytes 40
     regs ax=9AA8 cx=267C dx=0000 bx=5CE7 sp=19B2 bp=BEB0 si=E8CD di=1D32 cs=3014 ds=6C7B es=EC13 ss=7879 ip=D387
@@ -2134,6 +2194,7 @@ op 40
 
 op 41
   mask 0FD5
+  rows INC
   case
     bytes 41
     regs ax=DF64 cx=4C7C dx=D95D bx=4A93 sp=430F bp=2561 si=0D94 di=ECA0 cs=5AA1 ds=C0FB es=6109 ss=23D4 ip=A5E8
@@ -2167,6 +2228,7 @@ op 41
 
 op 42
   mask 0FD5
+  rows INC
   case
     bytes 42
     regs ax=6A31 cx=A0F6 dx=EEFC bx=C483 sp=0608 bp=F43F si=E82B di=8007 cs=C6E9 ds=0888 es=37BC ss=321F ip=0B2F
@@ -2194,6 +2256,7 @@ op 42
 
 op 43
   mask 0FD5
+  rows INC
   case
     bytes 43
     regs ax=07E9 cx=3474 dx=0000 bx=B4CA sp=43C3 bp=06FC si=F8E5 di=4855 cs=0FAC ds=8C62 es=7651 ss=315C ip=634F
@@ -2233,6 +2296,7 @@ op 43
 
 op 44
   mask 0FD5
+  rows INC
   case
     bytes 44
     regs ax=7837 cx=3610 dx=0000 bx=71CD sp=0235 bp=6910 si=8B55 di=891A cs=C97B ds=4E20 es=1BF4 ss=AEAE ip=EF7D
@@ -2266,6 +2330,7 @@ op 44
 
 op 45
   mask 0FD5
+  rows INC
   case
     bytes 45
     regs ax=F411 cx=DF36 dx=1B99 bx=07B3 sp=A3C9 bp=19F1 si=AE8E di=9175 cs=008C ds=05E4 es=E5FE ss=887C ip=17AC
@@ -2299,6 +2364,7 @@ op 45
 
 op 46
   mask 0FD5
+  rows INC
   case
     bytes 46
     regs ax=4EDC cx=383A dx=35FB bx=558B sp=F9CC bp=1252 si=E917 di=8104 cs=D635 ds=0011 es=9AD7 ss=AB92 ip=E24F
@@ -2344,6 +2410,7 @@ op 46
 
 op 47
   mask 0FD5
+  rows INC
   case
     bytes 47
     regs ax=BA92 cx=186E dx=FE5F bx=691D sp=A811 bp=5671 si=47C9 di=AAFF cs=5D85 ds=C82B es=8F69 ss=60D1 ip=FA7B
@@ -2371,6 +2438,7 @@ op 47
 
 op 48
   mask 0FD5
+  rows DEC
   case
     bytes 48
     regs ax=31C6 cx=4E92 dx=96DB bx=7D48 sp=D007 bp=5E71 si=0000 di=D5C0 cs=C11A ds=EFA1 es=37E3 ss=A850 ip=8D9C
@@ -2404,6 +2472,7 @@ op 48
 
 op 49
   mask 0FD5
+  rows DEC
   case
     bytes 49
     regs ax=65C1 cx=BF5C dx=3152 bx=FF53 sp=9F88 bp=802C si=64D0 di=0000 cs=7A7B ds=C8A2 es=FBE2 ss=D04D ip=B9A0
@@ -2431,6 +2500,7 @@ op 49
 
 op 4A
   mask 0FD5
+  rows DEC
   case
     bytes 4A
     regs ax=BF45 cx=97A0 dx=05B9 bx=5093 sp=0096 bp=2F21 si=E4D8 di=571C cs=F281 ds=F3DE es=24D5 ss=60C9 ip=87A9
@@ -2464,6 +2534,7 @@ op 4A
 
 op 4B
   mask 0FD5
+  rows DEC
   case
     bytes 4B
     regs ax=B794 cx=7236 dx=EC43 bx=813D sp=5AED bp=74BD si=A658 di=47D0 cs=1BA6 ds=CC87 es=BAE4 ss=D055 ip=C7B2
@@ -2497,6 +2568,7 @@ op 4B
 
 op 4C
   mask 0FD5
+  rows DEC
   case
     bytes 4C
     regs ax=4E64 cx=A062 dx=F03E bx=6150 sp=1080 bp=E62D si=804B di=D7C9 cs=9D80 ds=D3A4 es=6873 ss=59FB ip=E732
@@ -2524,6 +2596,7 @@ op 4C
 
 op 4D
   mask 0FD5
+  rows DEC
   case
     bytes 4D
     regs ax=0990 cx=6FFE dx=6341 bx=7EC0 sp=F7DF bp=3EA7 si=3A67 di=DCF5 cs=398A ds=476E es=4986 ss=731F ip=F749
@@ -2551,6 +2624,7 @@ op 4D
 
 op 4E
   mask 0FD5
+  rows DEC
   case
     bytes 4E
     regs ax=1A77 cx=4CFA dx=B981 bx=455E sp=9055 bp=5414 si=E174 di=4EDD cs=85B4 ds=4FAA es=1065 ss=1BDD ip=A870
@@ -2590,6 +2664,7 @@ op 4E
 
 op 4F
   mask 0FD5
+  rows DEC
   case
     bytes 4F
     regs ax=84ED cx=BB7A dx=BD8B bx=7A20 sp=DF97 bp=DC43 si=E6F9 di=2B11 cs=9FAE ds=5BF5 es=DE28 ss=0E19 ip=2260
@@ -2629,6 +2704,7 @@ op 4F
 
 op 50
   mask 0FD5
+  rows PUSH
   case
     bytes 50
     regs ax=ADA0 cx=80B4 dx=CB2D bx=4659 sp=DD6B bp=B973 si=F2CD di=7509 cs=C31E ds=DB3E es=5C87 ss=6708 ip=66DB
@@ -2656,6 +2732,7 @@ op 50
 
 op 51
   mask 0FD5
+  rows PUSH
   case
     bytes 51
     regs ax=6877 cx=C78E dx=0ACE bx=376C sp=A761 bp=34B9 si=E7B7 di=9337 cs=3EBD ds=34A5 es=DAD3 ss=972F ip=C86E
@@ -2683,6 +2760,7 @@ op 51
 
 op 52
   mask 0FD5
+  rows PUSH
   case
     bytes 52
     regs ax=8941 cx=2558 dx=BD5C bx=CA62 sp=4A8C bp=4FF7 si=9698 di=7577 cs=A2AF ds=4AEC es=5F8B ss=50D6 ip=6BE5
@@ -2710,6 +2788,7 @@ op 52
 
 op 53
   mask 0FD5
+  rows PUSH
   case
     bytes 53
     regs ax=C483 cx=4102 dx=6C4E bx=41EA sp=7687 bp=D11F si=ADF1 di=475B cs=63A9 ds=7573 es=9945 ss=7B9A ip=D47C
@@ -2737,6 +2816,7 @@ op 53
 
 op 54
   mask 0FD5
+  rows PUSH
   case
     bytes 54
     regs ax=338E cx=E4BC dx=9298 bx=F234 sp=6068 bp=FA28 si=9832 di=4DFD cs=62E3 ds=FC8A es=AB57 ss=A291 ip=4F39
@@ -2764,6 +2844,7 @@ op 54
 
 op 55
   mask 0FD5
+  rows PUSH
   case
     bytes 55
     regs ax=7F23 cx=656A dx=865D bx=9427 sp=E44B bp=0784 si=0000 di=803C cs=3E39 ds=3F8B es=2522 ss=340F ip=84FC
@@ -2791,6 +2872,7 @@ op 55
 
 op 56
   mask 0FD5
+  rows PUSH
   case
     bytes 56
     regs ax=3416 cx=641C dx=28B1 bx=F97F sp=EC40 bp=C47F si=8344 di=EA7C cs=E71F ds=0C39 es=803E ss=1F77 ip=00CC
@@ -2818,6 +2900,7 @@ op 56
 
 op 57
   mask 0FD5
+  rows PUSH
   case
     bytes 57
     regs ax=E835 cx=3E9A dx=5A9C bx=8C82 sp=606E bp=7BD2 si=0B7D di=FB54 cs=B722 ds=04F0 es=1761 ss=46E2 ip=1165
@@ -2845,6 +2928,7 @@ op 57
 
 op 58
   mask 0FD5
+  rows POP
   case
     bytes 58
     regs ax=2BA2 cx=010E dx=0000 bx=4F78 sp=BB97 bp=C5AE si=7D56 di=4987 cs=92C7 ds=667A es=8C59 ss=B3BE ip=D5B6
@@ -2872,6 +2956,7 @@ op 58
 
 op 59
   mask 0FD5
+  rows POP
   case
     bytes 59
     regs ax=9871 cx=AA00 dx=19ED bx=0D12 sp=5263 bp=FE1F si=5B61 di=B515 cs=FB2D ds=6CEF es=ED24 ss=F872 ip=321D
@@ -2899,6 +2984,7 @@ op 59
 
 op 5A
   mask 0FD5
+  rows POP
   case
     bytes 5A
     regs ax=EF4C cx=133A dx=0000 bx=46C3 sp=441C bp=4F8F si=9300 di=F6DB cs=6AA1 ds=587F es=48B6 ss=C2F6 ip=9554
@@ -2926,6 +3012,7 @@ op 5A
 
 op 5B
   mask 0FD5
+  rows POP
   case
     bytes 5B
     regs ax=B674 cx=E6B6 dx=763B bx=56B0 sp=62B3 bp=675B si=4937 di=D66C cs=25A4 ds=40E6 es=3C8C ss=B31D ip=D6FA
@@ -2953,6 +3040,7 @@ op 5B
 
 op 5C
   mask 0FD5
+  rows POP
   case
     bytes 5C
     regs ax=338F cx=C684 dx=76F6 bx=4289 sp=76A2 bp=78C7 si=3438 di=B84B cs=94D9 ds=352D es=50DE ss=4027 ip=5B10
@@ -2980,6 +3068,7 @@ op 5C
 
 op 5D
   mask 0FD5
+  rows POP
   case
     bytes 5D
     regs ax=1EDB cx=DF80 dx=810B bx=9550 sp=24BB bp=5E52 si=EC5F di=DF3F cs=DE67 ds=3AAB es=66C5 ss=6FC0 ip=C50C
@@ -3007,6 +3096,7 @@ op 5D
 
 op 5E
   mask 0FD5
+  rows POP
   case
     bytes 5E
     regs ax=89FE cx=8324 dx=3DF4 bx=0000 sp=8593 bp=5559 si=58B2 di=7FF2 cs=6EDF ds=238A es=EC78 ss=F252 ip=D136
@@ -3034,6 +3124,7 @@ op 5E
 
 op 5F
   mask 0FD5
+  rows POP
   case
     bytes 5F
     regs ax=0000 cx=D0EE dx=F0C3 bx=0000 sp=4F31 bp=0248 si=B527 di=2379 cs=E67E ds=E711 es=EFDF ss=AB05 ip=E6C9
@@ -3061,6 +3152,7 @@ op 5F
 
 op 60
   mask 0FD5
+  rows JO
   case
     bytes 60 78
     regs ax=1544 cx=4124 dx=624F bx=0089 sp=C6E8 bp=F29B si=FC60 di=47B7 cs=0D23 ds=9925 es=D684 ss=8B23 ip=AD90
@@ -3088,6 +3180,7 @@ op 60
 
 op 61
   mask 0FD5
+  rows JNO
   case
     bytes 61 EC
     regs ax=C9C2 cx=D58A dx=CA7F bx=FA2F sp=03AF bp=4A66 si=8029 di=2522 cs=AB9E ds=81DA es=A3FD ss=6793 ip=C685
@@ -3115,6 +3208,7 @@ op 61
 
 op 62
   mask 0FD5
+  rows JB
   case
     bytes 62 3A
     regs ax=CFE1 cx=CD76 dx=BB3D bx=D70C sp=F85D bp=BFE3 si=3EDA di=4319 cs=1921 ds=B127 es=BB52 ss=D63C ip=C16E
@@ -3142,6 +3236,7 @@ op 62
 
 op 63
   mask 0FD5
+  rows JNB
   case
     bytes 63 89
     regs ax=02FE cx=8830 dx=89C7 bx=C089 sp=DFEA bp=816C si=88A3 di=42D8 cs=07C6 ds=3108 es=B215 ss=D1D0 ip=80E8
@@ -3169,6 +3264,7 @@ op 63
 
 op 64
   mask 0FD5
+  rows JZ
   case
     bytes 64 1C
     regs ax=3B72 cx=FDCA dx=822D bx=EA50 sp=DCE6 bp=F9B0 si=4141 di=382C cs=D670 ds=E635 es=C8CE ss=B904 ip=59CD
@@ -3196,6 +3292,7 @@ op 64
 
 op 65
   mask 0FD5
+  rows JNZ
   case
     bytes 65 4D
     regs ax=AFBB cx=6EF8 dx=1082 bx=1AE3 sp=8DFD bp=DD06 si=5BD6 di=FFD9 cs=C826 ds=EBBD es=127E ss=E3F5 ip=53BC
@@ -3223,6 +3320,7 @@ op 65
 
 op 66
   mask 0FD5
+  rows JBE
   case
     bytes 66 EB
     regs ax=DA4A cx=3FEE dx=4B8D bx=35FF sp=C28B bp=0000 si=FE86 di=0000 cs=254A ds=2E8C es=F2E8 ss=A53D ip=F127
@@ -3250,6 +3348,7 @@ op 66
 
 op 67
   mask 0FD5
+  rows JNBE
   case
     bytes 67 D9
     regs ax=2E2B cx=3202 dx=AAE9 bx=0E18 sp=CA63 bp=D5AE si=6F2C di=DB6C cs=DD79 ds=E3FC es=AA30 ss=98CC ip=36B3
@@ -3277,6 +3376,7 @@ op 67
 
 op 68
   mask 0FD5
+  rows JS
   case
     bytes 68 E6
     regs ax=0000 cx=FA5A dx=452B bx=9EDB sp=9011 bp=AC3F si=E2D8 di=8229 cs=AD8F ds=C6F3 es=BBB5 ss=BABA ip=8B3C
@@ -3304,6 +3404,7 @@ op 68
 
 op 69
   mask 0FD5
+  rows JNS
   case
     bytes 26 69 4F
     regs ax=0000 cx=DFEC dx=E547 bx=A7F8 sp=3869 bp=EF51 si=59FE di=4117 cs=6FA1 ds=EF83 es=8B6D ss=B006 ip=E450
@@ -3331,6 +3432,7 @@ op 69
 
 op 6A
   mask 0FD5
+  rows JP
   case
     bytes 6A BD
     regs ax=02F3 cx=8B4A dx=9DB8 bx=F8CC sp=DA54 bp=4352 si=FC09 di=0AE8 cs=57CB ds=2BB8 es=0777 ss=0B10 ip=64AE
@@ -3358,6 +3460,7 @@ op 6A
 
 op 6B
   mask 0FD5
+  rows JNP
   case
     bytes 6B 92
     regs ax=A2BA cx=48B6 dx=D85F bx=3EAC sp=05CD bp=6634 si=F2E7 di=C570 cs=7E5A ds=6449 es=8F1E ss=4427 ip=5F18
@@ -3385,6 +3488,7 @@ op 6B
 
 op 6C
   mask 0FD5
+  rows JL
   case
     bytes 3E 6C E0
     regs ax=685E cx=F704 dx=CAD7 bx=E01F sp=0969 bp=11F6 si=9B3F di=0EB8 cs=2F10 ds=FB9B es=48FB ss=85C8 ip=E869
@@ -3412,6 +3516,7 @@ op 6C
 
 op 6D
   mask 0FD5
+  rows JNL
   case
     bytes 2E 6D 2E
     regs ax=3DDD cx=DDA8 dx=B5BF bx=94EB sp=B8A9 bp=CB07 si=5B84 di=B71F cs=4021 ds=462A es=E9E4 ss=1F75 ip=0133
@@ -3439,6 +3544,7 @@ op 6D
 
 op 6E
   mask 0FD5
+  rows JLE
   case
     bytes 6E EF
     regs ax=0718 cx=EA08 dx=7994 bx=069C sp=86B7 bp=9A41 si=6AE5 di=A39D cs=0402 ds=8E16 es=1B6F ss=A741 ip=7B35
@@ -3466,6 +3572,7 @@ op 6E
 
 op 6F
   mask 0FD5
+  rows JNLE
   case
     bytes 6F CF
     regs ax=5388 cx=E3E4 dx=2C0E bx=A801 sp=BFD9 bp=73FB si=843A di=E564 cs=BA4B ds=270F es=ADE9 ss=1674 ip=E4F0
@@ -3493,6 +3600,7 @@ op 6F
 
 op 70
   mask 0FD5
+  rows JO
   case
     bytes 70 6D
     regs ax=2D39 cx=0000 dx=14B0 bx=87EE sp=B231 bp=1E71 si=76EC di=2960 cs=3C90 ds=CD00 es=AC1D ss=CD08 ip=F82A
@@ -3520,6 +3628,7 @@ op 70
 
 op 71
   mask 0FD5
+  rows JNO
   case
     bytes 71 36
     regs ax=EEC8 cx=6BFE dx=584C bx=9F6F sp=0A88 bp=DA7D si=463C di=3807 cs=0661 ds=E04F es=18CC ss=0E8E ip=91DB
@@ -3547,6 +3656,7 @@ op 71
 
 op 72
   mask 0FD5
+  rows JB
   case
     bytes 72 25
     regs ax=B213 cx=6068 dx=FE6D bx=11FC sp=D748 bp=A68A si=358D di=1A94 cs=717E ds=1E55 es=635F ss=EA91 ip=EFC8
@@ -3574,6 +3684,7 @@ op 72
 
 op 73
   mask 0FD5
+  rows JNB
   case
     bytes 73 F2
     regs ax=8FCA cx=0454 dx=9F4B bx=A817 sp=81FB bp=0BD0 si=99D2 di=CA6F cs=893A ds=1C03 es=E8EF ss=08F8 ip=E951
@@ -3601,6 +3712,7 @@ op 73
 
 op 74
   mask 0FD5
+  rows JZ
   case
     bytes 74 88
     regs ax=E671 cx=2F58 dx=0000 bx=8838 sp=44A3 bp=9453 si=A600 di=9EA0 cs=68D8 ds=8526 es=2DD8 ss=34BA ip=A017
@@ -3628,6 +3740,7 @@ op 74
 
 op 75
   mask 0FD5
+  rows JNZ
   case
     bytes 75 08
     regs ax=024B cx=A486 dx=AB6D bx=F547 sp=0000 bp=0000 si=A4CA di=2996 cs=7FBC ds=9160 es=07CE ss=A79E ip=C81F
@@ -3655,6 +3768,7 @@ op 75
 
 op 76
   mask 0FD5
+  rows JBE
   case
     bytes 76 D5
     regs ax=6638 cx=7646 dx=E2E9 bx=27CF sp=C941 bp=1FCA si=A45C di=7DCA cs=D6AB ds=8A0B es=E1B2 ss=B3A6 ip=5E0B
@@ -3682,6 +3796,7 @@ op 76
 
 op 77
   mask 0FD5
+  rows JNBE
   case
     bytes 77 23
     regs ax=CA34 cx=CAA2 dx=263B bx=4524 sp=5F04 bp=97B5 si=0FCC di=A099 cs=28F7 ds=ABE1 es=8530 ss=0CD6 ip=AB0A
@@ -3709,6 +3824,7 @@ op 77
 
 op 78
   mask 0FD5
+  rows JS
   case
     bytes 78 CB
     regs ax=BE95 cx=7088 dx=3431 bx=A6E1 sp=FF28 bp=0BDC si=3FCA di=D73E cs=2B26 ds=631D es=99E1 ss=F943 ip=44D3
@@ -3736,6 +3852,7 @@ op 78
 
 op 79
   mask 0FD5
+  rows JNS
   case
     bytes 79 FD
     regs ax=BDF1 cx=2820 dx=D933 bx=A920 sp=C8D5 bp=0000 si=6FEE di=C68B cs=CE26 ds=2A83 es=EC8C ss=152D ip=8EA9
@@ -3763,6 +3880,7 @@ op 79
 
 op 7A
   mask 0FD5
+  rows JP
   case
     bytes 7A 8D
     regs ax=923F cx=CC32 dx=5214 bx=78AC sp=7E20 bp=CC57 si=68AC di=68BF cs=1708 ds=ED1F es=3264 ss=3AD7 ip=E7B1
@@ -3790,6 +3908,7 @@ op 7A
 
 op 7B
   mask 0FD5
+  rows JNP
   case
     bytes 7B 56
     regs ax=99A4 cx=920C dx=0075 bx=EFD1 sp=8EE7 bp=7BB7 si=CD6B di=1AD6 cs=4C9A ds=1B96 es=7874 ss=5729 ip=CAB7
@@ -3817,6 +3936,7 @@ op 7B
 
 op 7C
   mask 0FD5
+  rows JL
   case
     bytes 7C 1D
     regs ax=4A0A cx=E35C dx=09FD bx=F79F sp=7F4B bp=6D8E si=0000 di=F893 cs=B3C2 ds=3BA9 es=7A7F ss=E0C4 ip=71C5
@@ -3844,6 +3964,7 @@ op 7C
 
 op 7D
   mask 0FD5
+  rows JNL
   case
     bytes 7D E8
     regs ax=4DDD cx=9024 dx=32BB bx=50BF sp=99E9 bp=9F5F si=09E4 di=7D9B cs=743D ds=D9F0 es=B039 ss=96DA ip=E4C0
@@ -3871,6 +3992,7 @@ op 7D
 
 op 7E
   mask 0FD5
+  rows JLE
   case
     bytes 7E 58
     regs ax=6E77 cx=49FE dx=84B7 bx=C382 sp=30AE bp=CF66 si=4B72 di=DB99 cs=F2CC ds=C1B8 es=A1C0 ss=DE8B ip=F9B7
@@ -3898,6 +4020,7 @@ op 7E
 
 op 7F
   mask 0FD5
+  rows JNLE
   case
     bytes 7F 24
     regs ax=FA22 cx=25F2 dx=C9B0 bx=63DD sp=4B20 bp=6BA3 si=741F di=A2BF cs=6B84 ds=13F3 es=8DE1 ss=12CE ip=4102
@@ -3925,6 +4048,7 @@ op 7F
 
 op 80.0
   mask 0FD5
+  rows ADD
   case
     bytes 26 80 83 D4 E0 70
     regs ax=BC52 cx=0000 dx=1EF3 bx=0573 sp=3CA5 bp=9EAE si=19C9 di=DFE8 cs=0D02 ds=4CF5 es=8FE3 ss=B630 ip=F959
@@ -3958,6 +4082,7 @@ op 80.0
 
 op 80.1
   mask 0FC5
+  rows OR
   case
     bytes 80 89 B5 31 0A
     regs ax=D430 cx=54D8 dx=145C bx=05AE sp=E357 bp=3AEC si=28C0 di=243B cs=9913 ds=C292 es=4101 ss=772A ip=BCFE
@@ -3985,6 +4110,7 @@ op 80.1
 
 op 80.2
   mask 0FD5
+  rows ADC
   case
     bytes 3E 80 53 FE F8
     regs ax=AB64 cx=908A dx=4F0D bx=CCA7 sp=3F37 bp=C1B0 si=B34A di=B920 cs=56A8 ds=96AE es=12C7 ss=29AC ip=0335
@@ -4024,6 +4150,7 @@ op 80.2
 
 op 80.3
   mask 0FD5
+  rows SBB
   case
     bytes 36 80 59 05 2D
     regs ax=5388 cx=2ABE dx=086D bx=55D4 sp=F202 bp=8E7F si=3FAA di=4AE8 cs=74D6 ds=6B81 es=DF73 ss=8586 ip=5ECC
@@ -4057,6 +4184,7 @@ op 80.3
 
 op 80.4
   mask 0FC5
+  rows AND
   case
     bytes 3E 80 A3 1B BE 6A
     regs ax=E295 cx=A8F2 dx=FC73 bx=8432 sp=C896 bp=257E si=E74D di=492A cs=4DF1 ds=C609 es=3C88 ss=109B ip=7F3C
@@ -4084,6 +4212,7 @@ op 80.4
 
 op 80.5
   mask 0FD5
+  rows SUB
   case
     bytes 80 68 9F 04
     regs ax=0000 cx=99AA dx=CAB7 bx=0000 sp=7492 bp=72B4 si=8E3F di=7F19 cs=3623 ds=8493 es=73D1 ss=DE07 ip=4104
@@ -4129,6 +4258,7 @@ op 80.5
 
 op 80.6
   mask 0FC5
+  rows XOR
   case
     bytes 2E 80 F3 25
     regs ax=8832 cx=CDEC dx=B33E bx=E9A0 sp=E620 bp=3B75 si=8FE6 di=A2E7 cs=CCF2 ds=758C es=AF1D ss=355B ip=164A
@@ -4162,6 +4292,7 @@ op 80.6
 
 op 80.7
   mask 0FD5
+  rows CMP
   case
     bytes 80 BA F1 1F 46
     regs ax=F77B cx=2D9E dx=EE4F bx=0000 sp=5A60 bp=8057 si=0000 di=55ED cs=C470 ds=60D4 es=4CA9 ss=F300 ip=24EC
@@ -4201,6 +4332,7 @@ op 80.7
 
 op 81.0
   mask 0FD5
+  rows ADD
   case
     bytes 81 80 E2 0D E7 92
     regs ax=E997 cx=5EB0 dx=F161 bx=2292 sp=34B3 bp=0F98 si=348E di=7C8B cs=94C7 ds=07AD es=07F9 ss=F2CF ip=2442
@@ -4228,6 +4360,7 @@ op 81.0
 
 op 81.1
   mask 0FC5
+  rows OR
   case
     bytes 81 8A 9C 62 31 55
     regs ax=E43E cx=7266 dx=7E5D bx=2DF6 sp=E113 bp=0000 si=956E di=05D1 cs=CF9F ds=6F71 es=C953 ss=FFD7 ip=9A38
@@ -4255,6 +4388,7 @@ op 81.1
 
 op 81.2
   mask 0FD5
+  rows ADC
   case
     bytes 2E 81 50 F4 4B 13
     regs ax=FF71 cx=16CE dx=E3AB bx=2BE0 sp=D504 bp=368E si=570D di=848B cs=4257 ds=A1ED es=E23D ss=8039 ip=103F
@@ -4294,6 +4428,7 @@ op 81.2
 
 op 81.3
   mask 0FD5
+  rows SBB
   case
     bytes 81 DF 5E F1
     regs ax=C8B7 cx=9486 dx=0485 bx=ACCC sp=11CB bp=DE87 si=E293 di=EFCA cs=B8D9 ds=2C8C es=047C ss=478A ip=53CD
@@ -4321,6 +4456,7 @@ op 81.3
 
 op 81.4
   mask 0FC5
+  rows AND
   case
     bytes 81 20 4A 63
     regs ax=7C8D cx=87B0 dx=AB51 bx=5EF4 sp=413D bp=87BF si=E502 di=A371 cs=FFC5 ds=52FA es=8D4F ss=476C ip=B55E
@@ -4360,6 +4496,7 @@ op 81.4
 
 op 81.5
   mask 0FD5
+  rows SUB
   case
     bytes 36 81 6C 03 8A 8F
     regs ax=C7A5 cx=30EE dx=3391 bx=3FBF sp=A070 bp=2EBA si=097E di=E594 cs=2540 ds=10DD es=5659 ss=7105 ip=4A66
@@ -4393,6 +4530,7 @@ op 81.5
 
 op 81.6
   mask 0FC5
+  rows XOR
   case
     bytes 81 B4 5E 6C 45 76
     regs ax=5270 cx=6FA4 dx=EFD0 bx=0000 sp=0000 bp=CDCC si=3A25 di=D40C cs=028D ds=5053 es=BD7C ss=4F01 ip=2F47
@@ -4432,6 +4570,7 @@ op 81.6
 
 op 81.7
   mask 0FD5
+  rows CMP
   case
     bytes 81 7E 4C 50 40
     regs ax=0E1F cx=F48E dx=3AD8 bx=EE2D sp=81CF bp=6D06 si=B1ED di=EF46 cs=E899 ds=DA66 es=A074 ss=3C95 ip=5891
@@ -4465,6 +4604,7 @@ op 81.7
 
 op 82.0
   mask 0FD5
+  rows ADD
   case
     bytes 26 82 84 17 C5 9C
     regs ax=6AF1 cx=F8D6 dx=0BCC bx=8A14 sp=1626 bp=0000 si=0000 di=CCC2 cs=C1AE ds=4DDB es=B82D ss=3FA2 ip=2FF2
@@ -4510,6 +4650,7 @@ op 82.0
 
 op 82.1
   mask 0FC5
+  rows OR
   case
     bytes 36 82 4E 65 90
     regs ax=AF67 cx=BAE0 dx=3D33 bx=5072 sp=8F7E bp=35B8 si=418A di=2B62 cs=A272 ds=D2B2 es=9CCA ss=CD0B ip=8812
@@ -4543,6 +4684,7 @@ op 82.1
 
 op 82.2
   mask 0FD5
+  rows ADC
   case
     bytes 82 56 4C 50
     regs ax=0E1F cx=F48E dx=3AD8 bx=EE2D sp=81CF bp=6D06 si=B1ED di=EF46 cs=E899 ds=DA66 es=A074 ss=3C95 ip=5891
@@ -4588,6 +4730,7 @@ op 82.2
 
 op 82.3
   mask 0FD5
+  rows SBB
   case
     bytes 26 82 9C 17 C5 9C
     regs ax=6AF1 cx=F8D6 dx=0BCC bx=8A14 sp=1626 bp=0000 si=0000 di=CCC2 cs=C1AE ds=4DDB es=B82D ss=3FA2 ip=2FF2
@@ -4633,6 +4776,7 @@ op 82.3
 
 op 82.4
   mask 0FC5
+  rows AND
   case
     bytes 36 82 66 65 90
     regs ax=AF67 cx=BAE0 dx=3D33 bx=5072 sp=8F7E bp=35B8 si=418A di=2B62 cs=A272 ds=D2B2 es=9CCA ss=CD0B ip=8812
@@ -4672,6 +4816,7 @@ op 82.4
 
 op 82.5
   mask 0FD5
+  rows SUB
   case
     bytes 26 82 2B 6A
     regs ax=8E62 cx=5192 dx=6F8D bx=1C5D sp=EBE4 bp=3FB2 si=0000 di=DA35 cs=00FE ds=DBFE es=7DA4 ss=669C ip=1174
@@ -4705,6 +4850,7 @@ op 82.5
 
 op 82.6
   mask 0FC5
+  rows XOR
   case
     bytes 82 F4 20
     regs ax=0226 cx=056E dx=A762 bx=797C sp=E098 bp=39C3 si=E316 di=7094 cs=296C ds=FC6F es=9FCA ss=2ECD ip=F8A3
@@ -4744,6 +4890,7 @@ op 82.6
 
 op 82.7
   mask 0FD5
+  rows CMP
   case
     bytes 36 82 3A 3B
     regs ax=51D4 cx=8352 dx=303A bx=91AB sp=B2E3 bp=325F si=EFEA di=0000 cs=3C90 ds=3234 es=2097 ss=3051 ip=916F
@@ -4777,6 +4924,7 @@ op 82.7
 
 op 83.0
   mask 0FD5
+  rows ADD
   case
     bytes 36 83 41 1E ED
     regs ax=6C31 cx=1418 dx=65B0 bx=47D7 sp=9316 bp=A611 si=A1E0 di=3FA8 cs=FB20 ds=8390 es=CD70 ss=1352 ip=3D06
@@ -4810,6 +4958,7 @@ op 83.0
 
 op 83.1
   mask 0FC5
+  rows OR
   case
     bytes 83 88 3C B8 04
     regs ax=2982 cx=31A0 dx=0EC3 bx=0CEC sp=3AB1 bp=9A12 si=8FBC di=DEF2 cs=9F2D ds=2A26 es=F80B ss=179A ip=BFE2
@@ -4837,6 +4986,7 @@ op 83.1
 
 op 83.2
   mask 0FD5
+  rows ADC
   case
     bytes 83 12 17
     regs ax=D05A cx=3798 dx=2C7D bx=E44F sp=E4DF bp=ED65 si=0174 di=8988 cs=299C ds=B2BD es=4F39 ss=241F ip=74A4
@@ -4870,6 +5020,7 @@ op 83.2
 
 op 83.3
   mask 0FD5
+  rows SBB
   case
     bytes 83 1D 0E
     regs ax=9CAD cx=4F28 dx=0000 bx=B1C4 sp=1B3E bp=E900 si=F0A5 di=1D30 cs=5944 ds=B801 es=5A75 ss=F80B ip=6AED
@@ -4915,6 +5066,7 @@ op 83.3
 
 op 83.4
   mask 0FC5
+  rows AND
   case
     bytes 2E 83 20 A4
     regs ax=0464 cx=FFAA dx=E474 bx=002A sp=FCE8 bp=CE09 si=DB29 di=55D8 cs=A256 ds=35CB es=6342 ss=F45D ip=08FC
@@ -4954,6 +5106,7 @@ op 83.4
 
 op 83.5
   mask 0FD5
+  rows SUB
   case
     bytes 26 83 EE 07
     regs ax=BE48 cx=D268 dx=D6A5 bx=06EA sp=DFC0 bp=09D4 si=F529 di=3773 cs=E373 ds=939C es=D703 ss=DF83 ip=3F1B
@@ -4981,6 +5134,7 @@ op 83.5
 
 op 83.6
   mask 0FC5
+  rows XOR
   case
     bytes 83 B6 F2 F0 D8
     regs ax=DCAF cx=F4B4 dx=99AF bx=2CAE sp=AA36 bp=625D si=0090 di=8366 cs=6EE3 ds=415F es=DECE ss=EFDC ip=EC9A
@@ -5008,6 +5162,7 @@ op 83.6
 
 op 83.7
   mask 0FD5
+  rows CMP
   case
     bytes 36 83 3E C2 0B F4
     regs ax=C65C cx=ACA4 dx=E372 bx=B985 sp=E927 bp=4681 si=3583 di=0974 cs=D271 ds=D5D1 es=7418 ss=003F ip=8490
@@ -5041,6 +5196,7 @@ op 83.7
 
 op 84
   mask 0FC5
+  rows TEST
   case
     bytes 36 84 83 3B 66
     regs ax=7EC9 cx=E544 dx=1712 bx=5311 sp=5CBD bp=40A0 si=E94F di=607D cs=89CC ds=D8D2 es=5752 ss=F10D ip=9D45
@@ -5074,6 +5230,7 @@ op 84
 
 op 85
   mask 0FC5
+  rows TEST
   case
     bytes 3E 85 1E 35 B8
     regs ax=C43F cx=EADA dx=F2D5 bx=C909 sp=54A6 bp=8112 si=4F36 di=196F cs=6484 ds=4E5E es=0C9B ss=BCDD ip=AEA6
@@ -5113,6 +5270,7 @@ op 85
 
 op 86
   mask 0FD5
+  rows XCHG
   case
     bytes 36 86 F6
     regs ax=32CE cx=4CE8 dx=2E23 bx=6ECD sp=19B8 bp=F7EC si=8F05 di=8486 cs=2E77 ds=E975 es=40E7 ss=1DAF ip=5136
@@ -5140,6 +5298,7 @@ op 86
 
 op 87
   mask 0FD5
+  rows XCHG
   case
     bytes 87 BA 0A CE
     regs ax=B4B0 cx=9868 dx=91AD bx=696C sp=9872 bp=825B si=8F64 di=EE5B cs=93AB ds=BEA6 es=BACE ss=BBF6 ip=9C4E
@@ -5167,6 +5326,7 @@ op 87
 
 op 88
   mask 0FD5
+  rows MOV
   case
     bytes 3E 88 F4
     regs ax=A88F cx=E07C dx=A867 bx=8855 sp=6E42 bp=192D si=885E di=5F61 cs=C049 ds=77B3 es=235A ss=0D28 ip=CBE6
@@ -5194,6 +5354,7 @@ op 88
 
 op 89
   mask 0FD5
+  rows MOV
   case
     bytes 89 A7 53 8F
     regs ax=ECB6 cx=EFE6 dx=E6E0 bx=AD75 sp=D9DB bp=FB11 si=1299 di=173F cs=871E ds=2093 es=EAEA ss=C21C ip=155D
@@ -5221,6 +5382,7 @@ op 89
 
 op 8A
   mask 0FD5
+  rows MOV
   case
     bytes 8A 99 F4 00
     regs ax=3C09 cx=C904 dx=EE98 bx=0000 sp=E156 bp=9F82 si=28A5 di=E985 cs=2DE9 ds=EE7A es=2DC4 ss=1BFD ip=2F0C
@@ -5248,6 +5410,7 @@ op 8A
 
 op 8B
   mask 0FD5
+  rows MOV
   case
     bytes 8B 02
     regs ax=D269 cx=2528 dx=D3A5 bx=0CAA sp=E47A bp=091D si=6973 di=687B cs=CE53 ds=5120 es=18CD ss=40E5 ip=C875
@@ -5275,6 +5438,7 @@ op 8B
 
 op 8C
   mask 0FD5
+  rows MOV
   case
     bytes 8C DF
     regs ax=C427 cx=A2EE dx=EC0B bx=D415 sp=0043 bp=05A3 si=B098 di=2770 cs=0FBD ds=4A9D es=D7B9 ss=B578 ip=0B7F
@@ -5302,6 +5466,7 @@ op 8C
 
 op 8D
   mask 0FD5
+  rows LEA
   case
     bytes 26 8D 62 8B
     regs ax=0AA1 cx=F010 dx=7037 bx=FE6B sp=D1FD bp=D8DB si=0B5D di=2731 cs=EF9B ds=4C3B es=61A4 ss=5481 ip=8A65
@@ -5329,6 +5494,7 @@ op 8D
 
 op 8E
   mask 0FD5
+  rows MOV
   case
     bytes 8E 83 EC 87
     regs ax=2DD6 cx=8478 dx=2FAF bx=F390 sp=A3A5 bp=A4E2 si=D11F di=D555 cs=8C0A ds=7C31 es=0CD3 ss=0948 ip=BCD3
@@ -5356,6 +5522,7 @@ op 8E
 
 op 8F
   mask 0FD5
+  rows POP
   case
     bytes 26 8F 57 32
     regs ax=880D cx=CE74 dx=D825 bx=9F36 sp=0000 bp=E0F5 si=ED89 di=4038 cs=474F ds=5637 es=A441 ss=719D ip=029C
@@ -5383,6 +5550,7 @@ op 8F
 
 op 90
   mask 0FD5
+  rows NOP
   case
     bytes 90
     regs ax=552F cx=4E86 dx=3581 bx=A257 sp=3DA4 bp=1410 si=55A4 di=0000 cs=9EAA ds=D6D8 es=5559 ss=1A63 ip=C7D5
@@ -5410,6 +5578,7 @@ op 90
 
 op 91
   mask 0FD5
+  rows XCHG
   case
     bytes 91
     regs ax=2E4B cx=113A dx=95BE bx=CCD1 sp=FDA5 bp=ADB4 si=E3B2 di=F90E cs=B60A ds=C3AA es=4782 ss=E615 ip=287D
@@ -5437,6 +5606,7 @@ op 91
 
 op 92
   mask 0FD5
+  rows XCHG
   case
     bytes 92
     regs ax=58A1 cx=916A dx=974D bx=AFDE sp=A366 bp=1D83 si=81D5 di=BD09 cs=9513 ds=1D1F es=6D26 ss=6F1A ip=FBDD
@@ -5464,6 +5634,7 @@ op 92
 
 op 93
   mask 0FD5
+  rows XCHG
   case
     bytes 93
     regs ax=06E3 cx=1476 dx=BB5B bx=0329 sp=64E9 bp=C2DF si=D4DF di=928A cs=5CCF ds=FE30 es=7BFC ss=1A2D ip=452A
@@ -5491,6 +5662,7 @@ op 93
 
 op 94
   mask 0FD5
+  rows XCHG
   case
     bytes 94
     regs ax=3ECB cx=F48E dx=B4B0 bx=50DF sp=0000 bp=4C9C si=1752 di=7C13 cs=6000 ds=8823 es=3B09 ss=AACF ip=FE7C
@@ -5518,6 +5690,7 @@ op 94
 
 op 95
   mask 0FD5
+  rows XCHG
   case
     bytes 95
     regs ax=25A8 cx=358A dx=2E3A bx=929B sp=0000 bp=9694 si=9C7E di=9258 cs=8FE2 ds=0545 es=122E ss=EAA2 ip=5BD7
@@ -5545,6 +5718,7 @@ op 95
 
 op 96
   mask 0FD5
+  rows XCHG
   case
     bytes 96
     regs ax=3D31 cx=0000 dx=FF05 bx=C18E sp=9789 bp=E8CE si=2520 di=D369 cs=1511 ds=DDB7 es=FB2E ss=4778 ip=5B9E
@@ -5572,6 +5746,7 @@ op 96
 
 op 97
   mask 0FD5
+  rows XCHG
   case
     bytes 97
     regs ax=159D cx=7AC4 dx=D116 bx=706F sp=8C88 bp=0624 si=155E di=B8C4 cs=7559 ds=F000 es=4E55 ss=D583 ip=405E
@@ -5599,6 +5774,7 @@ op 97
 
 op 98
   mask 0FD5
+  rows CBW
   case
     bytes 98
     regs ax=A612 cx=0442 dx=EF59 bx=0000 sp=21C3 bp=E9AE si=7573 di=F0BD cs=F79F ds=25A7 es=0775 ss=D1E5 ip=7111
@@ -5626,6 +5802,7 @@ op 98
 
 op 99
   mask 0FD5
+  rows CWD
   case
     bytes 99
     regs ax=1044 cx=03CA dx=3F96 bx=0000 sp=D1D2 bp=BC1F si=DF60 di=4138 cs=FBB3 ds=78DD es=0E8D ss=B611 ip=A38B
@@ -5653,6 +5830,7 @@ op 99
 
 op 9A
   mask 0FD5
+  rows CALLF
   case
     bytes 9A 02 7C 58 35
     regs ax=D550 cx=F830 dx=F4FB bx=A9C5 sp=60DA bp=64E3 si=6803 di=A2D0 cs=CA8B ds=6559 es=D3C1 ss=061C ip=35F7
@@ -5680,6 +5858,7 @@ op 9A
 
 op 9C
   mask 0FD5
+  rows PUSHF
   case
     bytes 9C
     regs ax=88AE cx=F098 dx=A502 bx=0C02 sp=7000 bp=644E si=9DDF di=251A cs=7EBF ds=DE8E es=D723 ss=C1D8 ip=96E9
@@ -5707,6 +5886,7 @@ op 9C
 
 op 9D
   mask 0FD5
+  rows POPF
   case
     bytes 9D
     regs ax=74D0 cx=34E0 dx=058D bx=CAA0 sp=0000 bp=4721 si=5DA5 di=0000 cs=262C ds=FCD5 es=6A94 ss=AC8D ip=46A3
@@ -5740,6 +5920,7 @@ op 9D
 
 op 9E
   mask 0FD5
+  rows SAHF
   case
     bytes 9E
     regs ax=AF7D cx=7EAE dx=DA9B bx=8460 sp=3CE7 bp=4CA6 si=2F18 di=7EFA cs=F4F5 ds=92A2 es=C0D0 ss=B8DD ip=3E76
@@ -5773,6 +5954,7 @@ op 9E
 
 op 9F
   mask 0FD5
+  rows LAHF
   case
     bytes 9F
     regs ax=12F1 cx=51E4 dx=68E9 bx=88AE sp=A8DA bp=0000 si=4988 di=7554 cs=387D ds=C217 es=1D98 ss=07DE ip=75D8
@@ -5800,6 +5982,7 @@ op 9F
 
 op A0
   mask 0FD5
+  rows MOV
   case
     bytes A0 42 8C
     regs ax=F024 cx=8788 dx=D256 bx=EF9D sp=943A bp=AE96 si=9907 di=6122 cs=350E ds=5237 es=9586 ss=D9DB ip=224B
@@ -5827,6 +6010,7 @@ op A0
 
 op A1
   mask 0FD5
+  rows MOV
   case
     bytes 26 A1 E9 A2
     regs ax=A288 cx=D734 dx=E014 bx=CA78 sp=A649 bp=E226 si=E0E9 di=228D cs=A610 ds=ECC8 es=12A7 ss=119F ip=C687
@@ -5854,6 +6038,7 @@ op A1
 
 op A2
   mask 0FD5
+  rows MOV
   case
     bytes 3E A2 A1 AB
     regs ax=7D00 cx=DEBA dx=5E20 bx=16A3 sp=D51E bp=AAE4 si=981D di=E2D4 cs=B127 ds=E260 es=CE19 ss=4846 ip=5DF0
@@ -5881,6 +6066,7 @@ op A2
 
 op A3
   mask 0FD5
+  rows MOV
   case
     bytes 26 A3 78 AA
     regs ax=492C cx=C9E0 dx=DFEE bx=0B55 sp=2276 bp=B939 si=DDA4 di=3D85 cs=F2D4 ds=4DA6 es=6F34 ss=12B8 ip=16B8
@@ -5908,6 +6094,7 @@ op A3
 
 op A4
   mask 0FD5
+  rows CS REP SS
   case
     bytes 2E A4
     regs ax=2A14 cx=0036 dx=2B97 bx=7A2C sp=76DD bp=D1D2 si=987E di=35D1 cs=9415 ds=4575 es=2C46 ss=8145 ip=DE6F
@@ -5935,6 +6122,7 @@ op A4
 
 op A5
   mask 0FD5
+  rows DS REP
   case
     bytes 3E F2 A5
     regs ax=271A cx=0020 dx=0000 bx=CC15 sp=50F3 bp=F3FD si=CF7D di=0511 cs=8FDF ds=4746 es=D01A ss=925B ip=3000
@@ -5962,6 +6150,7 @@ op A5
 
 op A6
   mask 0FD5
+  rows CMPSB CS ES SS
   case
     bytes 2E F2 A6
     regs ax=03C7 cx=0050 dx=553B bx=B910 sp=C0F5 bp=34DA si=1B5D di=0000 cs=3BA5 ds=199B es=B881 ss=EFCD ip=97A0
@@ -5989,6 +6178,7 @@ op A6
 
 op A7
   mask 0FD5
+  rows CMPSW CS ES SS
   case
     bytes A7
     regs ax=79B7 cx=003A dx=5151 bx=C88E sp=81AE bp=5DEE si=76F9 di=F8A4 cs=A9E5 ds=2654 es=692A ss=ABB5 ip=981B
@@ -6034,6 +6224,7 @@ op A7
 
 op A8
   mask 0FC5
+  rows TEST
   case
     bytes A8 99
     regs ax=10CA cx=D4B2 dx=840D bx=DF8E sp=5B3B bp=85C8 si=5581 di=3052 cs=49B4 ds=70E7 es=D6C6 ss=A822 ip=5CC5
@@ -6073,6 +6264,7 @@ op A8
 
 op A9
   mask 0FC5
+  rows TEST
   case
     bytes A9 F7 E5
     regs ax=2817 cx=EA94 dx=0C55 bx=0000 sp=0000 bp=B820 si=59EC di=64AE cs=3EAC ds=E311 es=82A8 ss=35D4 ip=BD21
@@ -6112,6 +6304,7 @@ op A9
 
 op AA
   mask 0FD5
+  rows DS ES STOSB
   case
     bytes AA
     regs ax=08E8 cx=0008 dx=4E06 bx=F7F2 sp=C8BA bp=3A7C si=95A7 di=CC2E cs=7357 ds=C5CF es=D790 ss=F8DC ip=17DE
@@ -6139,6 +6332,7 @@ op AA
 
 op AB
   mask 0FD5
+  rows CS REP SS STOSW
   case
     bytes AB
     regs ax=0000 cx=0054 dx=F59E bx=39B2 sp=4CAE bp=5FE2 si=EE32 di=DC0C cs=ECB6 ds=1094 es=B254 ss=A175 ip=8ACD
@@ -6166,6 +6360,7 @@ op AB
 
 op AC
   mask 0FD5
+  rows CS ES SS
   case
     bytes 2E F2 AC
     regs ax=BEE2 cx=005C dx=E866 bx=A7F4 sp=55A7 bp=6C2F si=E697 di=D09C cs=824B ds=2130 es=19A9 ss=2163 ip=FCD4
@@ -6193,6 +6388,7 @@ op AC
 
 op AD
   mask 0FD5
+  rows DS LODSW
   case
     bytes 3E F3 AD
     regs ax=0000 cx=0036 dx=B03C bx=FEA8 sp=9DD7 bp=3CDD si=9D7D di=0225 cs=AFE1 ds=9408 es=9669 ss=35AF ip=328B
@@ -6220,6 +6416,7 @@ op AD
 
 op AE
   mask 0FD5
+  rows DS REPNE SCASB SS
   case
     bytes 3E F3 AE
     regs ax=69BE cx=0036 dx=6F7A bx=19D3 sp=0000 bp=661A si=8E0D di=FA20 cs=5F1E ds=F935 es=8F19 ss=54DD ip=1ECC
@@ -6259,6 +6456,7 @@ op AE
 
 op AF
   mask 0FD5
+  rows CS ES REPE SCASW
   case
     bytes 2E F2 AF
     regs ax=0000 cx=0000 dx=6C5D bx=4286 sp=770D bp=49AD si=AAE2 di=0000 cs=9B1B ds=B4A0 es=A759 ss=9AD7 ip=ADCE
@@ -6292,6 +6490,7 @@ op AF
 
 op B0
   mask 0FD5
+  rows MOV
   case
     bytes B0 8A
     regs ax=A991 cx=FC22 dx=EC22 bx=0000 sp=456B bp=9128 si=7771 di=6B96 cs=EBB4 ds=4C11 es=7D5A ss=39EB ip=5F6C
@@ -6319,6 +6518,7 @@ op B0
 
 op B1
   mask 0FD5
+  rows MOV
   case
     bytes B1 45
     regs ax=5790 cx=ABEE dx=3811 bx=0000 sp=5A2C bp=03A1 si=0187 di=21CD cs=5068 ds=2341 es=8193 ss=F6E1 ip=730E
@@ -6346,6 +6546,7 @@ op B1
 
 op B2
   mask 0FD5
+  rows MOV
   case
     bytes B2 3A
     regs ax=CA56 cx=7A1A dx=64B7 bx=E47F sp=ACAF bp=6FDA si=36DD di=6E49 cs=8139 ds=754D es=AAD6 ss=94DF ip=351A
@@ -6373,6 +6574,7 @@ op B2
 
 op B3
   mask 0FD5
+  rows MOV
   case
     bytes B3 E2
     regs ax=66C8 cx=0000 dx=5BE8 bx=82DA sp=1502 bp=0EBD si=835D di=3183 cs=897B ds=8BA2 es=FF4D ss=BA3E ip=F9D3
@@ -6400,6 +6602,7 @@ op B3
 
 op B4
   mask 0FD5
+  rows MOV
   case
     bytes B4 EA
     regs ax=9D6B cx=CE3E dx=44CA bx=1D6D sp=6F5F bp=D024 si=CBFE di=EE02 cs=FDA3 ds=0F44 es=3DFA ss=83D1 ip=9986
@@ -6427,6 +6630,7 @@ op B4
 
 op B5
   mask 0FD5
+  rows MOV
   case
     bytes B5 7C
     regs ax=D70D cx=B4DC dx=83DB bx=0000 sp=9842 bp=4514 si=0000 di=76F1 cs=8114 ds=F4F6 es=24C7 ss=BCA7 ip=6662
@@ -6454,6 +6658,7 @@ op B5
 
 op B6
   mask 0FD5
+  rows MOV
   case
     bytes B6 90
     regs ax=B8F4 cx=A7F4 dx=EF65 bx=459A sp=02E0 bp=C914 si=A7D3 di=0000 cs=9513 ds=9EA9 es=DB26 ss=15DB ip=9C53
@@ -6481,6 +6686,7 @@ op B6
 
 op B7
   mask 0FD5
+  rows MOV
   case
     bytes B7 56
     regs ax=0000 cx=8FB6 dx=F4B9 bx=99D3 sp=B850 bp=E412 si=7552 di=80B5 cs=BD4E ds=D67D es=A572 ss=FBE3 ip=C3A7
@@ -6508,6 +6714,7 @@ op B7
 
 op B8
   mask 0FD5
+  rows MOV
   case
     bytes B8 E2 CB
     regs ax=A804 cx=84A6 dx=2897 bx=FB40 sp=0BEB bp=80D4 si=CC43 di=2999 cs=9A20 ds=6A0A es=5F64 ss=537C ip=B601
@@ -6535,6 +6742,7 @@ op B8
 
 op B9
   mask 0FD5
+  rows MOV
   case
     bytes B9 9F 1D
     regs ax=3AEE cx=F57C dx=CDBB bx=39AF sp=06FA bp=85DF si=6A70 di=876B cs=7F30 ds=E01D es=BC12 ss=15BF ip=DFD8
@@ -6562,6 +6770,7 @@ op B9
 
 op BA
   mask 0FD5
+  rows MOV
   case
     bytes BA 0C CF
     regs ax=4758 cx=AABC dx=DA9E bx=7B27 sp=7C4E bp=9267 si=6EE9 di=F27A cs=2DD9 ds=23A6 es=DA76 ss=ADE2 ip=C277
@@ -6589,6 +6798,7 @@ op BA
 
 op BB
   mask 0FD5
+  rows MOV
   case
     bytes BB 7B 9B
     regs ax=9AFE cx=DA02 dx=67EC bx=70F3 sp=367A bp=7E1B si=5871 di=5877 cs=CB2F ds=77E4 es=CE58 ss=C2B2 ip=3F6B
@@ -6616,6 +6826,7 @@ op BB
 
 op BC
   mask 0FD5
+  rows MOV
   case
     bytes BC DF F0
     regs ax=DEF8 cx=563A dx=566E bx=71E3 sp=33DC bp=290A si=C3AD di=5C8C cs=C73B ds=707B es=1B34 ss=237D ip=3DEB
@@ -6643,6 +6854,7 @@ op BC
 
 op BD
   mask 0FD5
+  rows MOV
   case
     bytes BD 24 0A
     regs ax=9280 cx=D8F6 dx=C7C7 bx=2476 sp=3685 bp=32C5 si=C231 di=B4C8 cs=DE35 ds=7075 es=7092 ss=94B0 ip=E001
@@ -6670,6 +6882,7 @@ op BD
 
 op BE
   mask 0FD5
+  rows MOV
   case
     bytes BE A1 47
     regs ax=947F cx=1FA2 dx=A5D5 bx=E9A1 sp=6949 bp=7765 si=DE79 di=0000 cs=258C ds=D430 es=6CAA ss=2A58 ip=C0AA
@@ -6697,6 +6910,7 @@ op BE
 
 op BF
   mask 0FD5
+  rows MOV
   case
     bytes BF B0 80
     regs ax=C60C cx=A02A dx=F858 bx=11B3 sp=381F bp=9546 si=1338 di=0000 cs=52A5 ds=09D0 es=EC56 ss=297B ip=81A8
@@ -6724,6 +6938,7 @@ op BF
 
 op C0
   mask 0FD5
+  rows RETN
   case
     bytes C0 71 F6
     regs ax=DE4B cx=A574 dx=0000 bx=147C sp=D3B7 bp=0000 si=BE49 di=24CD cs=C836 ds=85F6 es=EECC ss=4479 ip=378D
@@ -6751,6 +6966,7 @@ op C0
 
 op C1
   mask 0FD5
+  rows RETN
   case
     bytes C1
     regs ax=FC0E cx=9EB4 dx=675F bx=DFFA sp=32D6 bp=ED11 si=77BE di=DBFE cs=C2D0 ds=47C7 es=7315 ss=9B09 ip=4815
@@ -6778,6 +6994,7 @@ op C1
 
 op C2
   mask 0FD5
+  rows RETN
   case
     bytes C2 91 4D
     regs ax=D0C2 cx=28FC dx=EA13 bx=0000 sp=BFD2 bp=C601 si=6952 di=3FC7 cs=05BB ds=FF8E es=835B ss=481C ip=8EFB
@@ -6805,6 +7022,7 @@ op C2
 
 op C3
   mask 0FD5
+  rows RETN
   case
     bytes C3
     regs ax=B9F9 cx=B612 dx=77EA bx=5D16 sp=74E1 bp=2112 si=F5A7 di=72CB cs=5BDA ds=1865 es=97F6 ss=3D66 ip=F989
@@ -6832,6 +7050,7 @@ op C3
 
 op C4
   mask 0FD5
+  rows LES
   case
     bytes 2E C4 58 3B
     regs ax=0000 cx=1CB4 dx=DDC6 bx=1247 sp=6FBE bp=6B90 si=A70A di=FD3F cs=4E35 ds=AA01 es=F069 ss=7C6A ip=12CE
@@ -6859,6 +7078,7 @@ op C4
 
 op C5
   mask 0FD5
+  rows LDS
   case
     bytes 36 C5 A0 2C 3E
     regs ax=CB3A cx=027E dx=3326 bx=1972 sp=8EB9 bp=F5A4 si=AB9F di=F107 cs=60CE ds=CBE1 es=8891 ss=74C8 ip=69D4
@@ -6886,6 +7106,7 @@ op C5
 
 op C6
   mask 0FD5
+  rows MOV
   case
     bytes C6 3E A2 34 6C
     regs ax=E765 cx=86CC dx=6B1E bx=3E74 sp=D195 bp=990C si=2901 di=2BAF cs=AD28 ds=D2A0 es=1000 ss=F04A ip=ECBD
@@ -6913,6 +7134,7 @@ op C6
 
 op C7
   mask 0FD5
+  rows MOV
   case
     bytes C7 96 09 FF 1D 67
     regs ax=C9E4 cx=E974 dx=3FCE bx=85D4 sp=60DE bp=165A si=6866 di=E867 cs=14D2 ds=AFC9 es=600A ss=8E6B ip=EA80
@@ -6940,6 +7162,7 @@ op C7
 
 op C8
   mask 0FD5
+  rows RETF
   case
     bytes C8 14 3A
     regs ax=3CCC cx=458E dx=7791 bx=D6A9 sp=D1F9 bp=5A4A si=52AB di=B443 cs=B240 ds=A903 es=D987 ss=5C08 ip=F288
@@ -6967,6 +7190,7 @@ op C8
 
 op C9
   mask 0FD5
+  rows RETF
   case
     bytes C9
     regs ax=BF8A cx=286E dx=8E64 bx=6F9C sp=E4B5 bp=694C si=05D6 di=9D1C cs=E0EE ds=77E9 es=12F4 ss=8E2C ip=1811
@@ -6994,6 +7218,7 @@ op C9
 
 op CA
   mask 0FD5
+  rows RETF
   case
     bytes CA A2 84
     regs ax=4C3D cx=190C dx=4EF9 bx=8D35 sp=0219 bp=5C94 si=F8AF di=F603 cs=C4BA ds=F703 es=0E08 ss=A4C4 ip=37AE
@@ -7021,6 +7246,7 @@ op CA
 
 op CB
   mask 0FD5
+  rows RETF
   case
     bytes CB
     regs ax=5FEE cx=961E dx=8470 bx=0B19 sp=38CF bp=CF8C si=D6EB di=1275 cs=9750 ds=A07C es=F478 ss=46BC ip=F319
@@ -7048,6 +7274,7 @@ op CB
 
 op CC
   mask 0FD5
+  rows INT3
   case
     bytes CC
     regs ax=BFAB cx=5472 dx=3BA9 bx=97F0 sp=6A84 bp=686F si=E9F4 di=BA15 cs=66F4 ds=044F es=DEB3 ss=F8CD ip=207C
@@ -7075,6 +7302,7 @@ op CC
 
 op CD
   mask 0FD5
+  rows INT
   case
     bytes CD F2
     regs ax=B767 cx=55B2 dx=36D6 bx=02EA sp=EA49 bp=2DB3 si=AE5A di=3548 cs=71CB ds=E568 es=CC91 ss=17C1 ip=8C92
@@ -7102,6 +7330,7 @@ op CD
 
 op CE
   mask 0FD5
+  rows INTO
   case
     bytes CE
     regs ax=7378 cx=BF86 dx=D3E1 bx=75B0 sp=D917 bp=08A2 si=C7B2 di=536F cs=5F0C ds=E982 es=8DE4 ss=D763 ip=693B
@@ -7129,6 +7358,7 @@ op CE
 
 op CF
   mask 0FD5
+  rows IRET
   case
     bytes CF
     regs ax=08AC cx=EEF2 dx=AEEC bx=CBDE sp=A23C bp=E09A si=F8C0 di=0360 cs=D5CE ds=41D3 es=1F65 ss=8AE7 ip=47B9
@@ -7168,6 +7398,7 @@ op CF
 
 op D0.0
   mask 0FD5
+  rows ROL
   case
     bytes D0 02
     regs ax=C203 cx=C812 dx=0000 bx=3808 sp=0000 bp=799B si=1EE9 di=B57F cs=693C ds=23E9 es=A000 ss=1450 ip=A6C1
@@ -7195,6 +7426,7 @@ op D0.0
 
 op D0.1
   mask 0FD5
+  rows ROR
   case
     bytes 2E D0 4C 76
     regs ax=FEF0 cx=7324 dx=3C92 bx=377B sp=E922 bp=6295 si=8056 di=A5CE cs=BA79 ds=850E es=0173 ss=8781 ip=7363
@@ -7234,6 +7466,7 @@ op D0.1
 
 op D0.2
   mask 0FD5
+  rows RCL
   case
     bytes D0 54 33
     regs ax=1EE3 cx=1F06 dx=B1A9 bx=6DDE sp=2DAC bp=CAD5 si=A640 di=ACBF cs=7A9E ds=4562 es=1C76 ss=974A ip=7A6E
@@ -7267,6 +7500,7 @@ op D0.2
 
 op D0.3
   mask 0FD5
+  rows RCR
   case
     bytes 3E D0 9F FB EB
     regs ax=25A7 cx=622C dx=A7C1 bx=EA01 sp=641A bp=99D9 si=6ACE di=62B8 cs=7FFB ds=3836 es=6157 ss=B2CA ip=01C6
@@ -7300,6 +7534,7 @@ op D0.3
 
 op D0.4
   mask 0FC5
+  rows SHL
   case
     bytes 36 D0 61 39
     regs ax=162D cx=8F2A dx=B2FA bx=0000 sp=A361 bp=5482 si=F432 di=A7DF cs=B57D ds=F748 es=75FD ss=F922 ip=BD74
@@ -7345,6 +7580,7 @@ op D0.4
 
 op D0.5
   mask 0FC5
+  rows SHR
   case
     bytes D0 EE
     regs ax=CFF7 cx=1A2E dx=0795 bx=6122 sp=01D3 bp=9972 si=7421 di=FF0A cs=1244 ds=E09A es=5A88 ss=5EC9 ip=4ABC
@@ -7378,6 +7614,7 @@ op D0.5
 
 op D0.6
   mask 0700
+  rows SETMO
   case
     bytes D0 37
     regs ax=CD98 cx=0438 dx=5691 bx=4714 sp=0000 bp=08A9 si=FC22 di=6F11 cs=5176 ds=574B es=415A ss=D9FC ip=07EE
@@ -7405,6 +7642,7 @@ op D0.6
 
 op D0.7
   mask 0FC5
+  rows SAR
   case
     bytes D0 7F 80
     regs ax=24FC cx=0000 dx=5923 bx=1048 sp=E308 bp=E5EC si=1072 di=BB7E cs=18B0 ds=6873 es=7D1A ss=9A8D ip=68E7
@@ -7444,6 +7682,7 @@ op D0.7
 
 op D1.0
   mask 0FD5
+  rows ROL
   case
     bytes D1 40 14
     regs ax=FFEB cx=6F0A dx=953A bx=46D0 sp=E03C bp=EB6A si=59EC di=F2AF cs=9C73 ds=3F26 es=3156 ss=8FC8 ip=33F9
@@ -7483,6 +7722,7 @@ op D1.0
 
 op D1.1
   mask 0FD5
+  rows ROR
   case
     bytes 2E D1 CA
     regs ax=5A99 cx=D512 dx=90A5 bx=3FE9 sp=5C2C bp=2086 si=9D8F di=B9BD cs=4F8E ds=722F es=51C1 ss=F657 ip=BB3C
@@ -7510,6 +7750,7 @@ op D1.1
 
 op D1.2
   mask 0FD5
+  rows RCL
   case
     bytes D1 97 CE 39
     regs ax=41A6 cx=471E dx=BF08 bx=9D92 sp=FE69 bp=EE26 si=53C3 di=4003 cs=63CE ds=0914 es=9463 ss=7755 ip=CAB2
@@ -7555,6 +7796,7 @@ op D1.2
 
 op D1.3
   mask 0FD5
+  rows RCR
   case
     bytes 36 D1 1D
     regs ax=0411 cx=3326 dx=FFA8 bx=B682 sp=457F bp=6471 si=3173 di=3D2C cs=FF60 ds=17D9 es=B9A8 ss=EC89 ip=7FC3
@@ -7594,6 +7836,7 @@ op D1.3
 
 op D1.4
   mask 0FC5
+  rows SHL
   case
     bytes 36 D1 66 3C
     regs ax=7EEA cx=5E30 dx=E340 bx=CAE6 sp=0858 bp=9DCF si=8B91 di=8EA4 cs=9644 ds=1F0D es=A367 ss=C8BD ip=401C
@@ -7627,6 +7870,7 @@ op D1.4
 
 op D1.5
   mask 0FC5
+  rows SHR
   case
     bytes D1 AA 28 3D
     regs ax=85F7 cx=E32E dx=0000 bx=427F sp=7F2E bp=CE08 si=BEA1 di=C241 cs=A976 ds=E190 es=7331 ss=27FA ip=B777
@@ -7666,6 +7910,7 @@ op D1.5
 
 op D1.6
   mask 0700
+  rows SETMO
   case
     bytes D1 F7
     regs ax=8A67 cx=D414 dx=FD62 bx=EF41 sp=64DE bp=0131 si=42DE di=0B95 cs=E2DA ds=6C32 es=F8DD ss=3ACA ip=72C6
@@ -7693,6 +7938,7 @@ op D1.6
 
 op D1.7
   mask 0FC5
+  rows SAR
   case
     bytes D1 FF
     regs ax=FB79 cx=5824 dx=9EBB bx=1BC4 sp=E994 bp=3762 si=0000 di=E845 cs=1D23 ds=1A92 es=10A2 ss=A5B6 ip=ACDC
@@ -7738,6 +7984,7 @@ op D1.7
 
 op D2.0
   mask 07D5
+  rows ROL
   case
     bytes 3E D2 83 6B 8A
     regs ax=EFB2 cx=0508 dx=99C3 bx=821D sp=2DDD bp=3786 si=FD42 di=2D70 cs=69A3 ds=BEF2 es=B64D ss=3B61 ip=142F
@@ -7777,6 +8024,7 @@ op D2.0
 
 op D2.1
   mask 07D5
+  rows ROR
   case
     bytes D2 88 F3 45
     regs ax=5D07 cx=5F30 dx=FC75 bx=1351 sp=B9F8 bp=7769 si=F6FB di=E264 cs=8A3D ds=8C88 es=49B9 ss=8C5F ip=654B
@@ -7816,6 +8064,7 @@ op D2.1
 
 op D2.2
   mask 07D5
+  rows RCL
   case
     bytes D2 56 30
     regs ax=C90D cx=9110 dx=CB98 bx=0000 sp=7E0A bp=6B29 si=AD7C di=D649 cs=3A44 ds=679D es=307B ss=2E62 ip=9F61
@@ -7849,6 +8098,7 @@ op D2.2
 
 op D2.3
   mask 07D5
+  rows RCR
   case
     bytes D2 5C FB
     regs ax=1954 cx=4304 dx=81F2 bx=8ED1 sp=93AE bp=F14F si=FFB9 di=E374 cs=C200 ds=0CA8 es=F91B ss=990F ip=FEB9
@@ -7894,6 +8144,7 @@ op D2.3
 
 op D2.4
   mask 07C5
+  rows SHL
   case
     bytes D2 A7 8D 3C
     regs ax=1832 cx=DD38 dx=0000 bx=79CA sp=DE7B bp=5EDE si=4363 di=324A cs=464D ds=9F3A es=A852 ss=9120 ip=05AE
@@ -7933,6 +8184,7 @@ op D2.4
 
 op D2.5
   mask 07C5
+  rows SHR
   case
     bytes 36 D2 2E 72 4C
     regs ax=F760 cx=921C dx=6944 bx=0000 sp=0000 bp=D3F6 si=D831 di=65E4 cs=9FA0 ds=4FDB es=5627 ss=1025 ip=4172
@@ -7972,6 +8224,7 @@ op D2.5
 
 op D2.6
   mask 0700
+  rows SETMOC
   case
     bytes 36 D2 F2
     regs ax=AE3D cx=B426 dx=07EA bx=C65C sp=630A bp=9264 si=D7AF di=E113 cs=99E2 ds=C147 es=4FFE ss=7C92 ip=3556
@@ -7999,6 +8252,7 @@ op D2.6
 
 op D2.7
   mask 07C5
+  rows SAR
   case
     bytes D2 7C 75
     regs ax=C540 cx=5434 dx=34D1 bx=1A8E sp=1FDD bp=2910 si=FA49 di=F0EA cs=DADD ds=3F76 es=81D5 ss=C2A3 ip=611F
@@ -8038,6 +8292,7 @@ op D2.7
 
 op D3.0
   mask 07D5
+  rows ROL
   case
     bytes 36 D3 C6
     regs ax=9EFB cx=F030 dx=7A5C bx=2A3B sp=677E bp=487E si=9C56 di=1789 cs=EC37 ds=0680 es=AA9C ss=28FB ip=63D9
@@ -8065,6 +8320,7 @@ op D3.0
 
 op D3.1
   mask 07D5
+  rows ROR
   case
     bytes 26 D3 0B
     regs ax=C06A cx=C508 dx=EF9C bx=49CE sp=5250 bp=B4B9 si=0FB9 di=AB58 cs=8D38 ds=7A67 es=4925 ss=FEDA ip=231A
@@ -8104,6 +8360,7 @@ op D3.1
 
 op D3.2
   mask 07D5
+  rows RCL
   case
     bytes 3E D3 11
     regs ax=3157 cx=9A24 dx=E138 bx=0000 sp=8EAE bp=2F4A si=D011 di=255C cs=8AFF ds=25A9 es=EDDC ss=14CD ip=0A17
@@ -8131,6 +8388,7 @@ op D3.2
 
 op D3.3
   mask 07D5
+  rows RCR
   case
     bytes D3 9E ED A7
     regs ax=6F9D cx=F820 dx=07AB bx=4863 sp=90E7 bp=77DB si=F5FB di=E9D4 cs=E015 ds=EAA6 es=0753 ss=66AB ip=E5E8
@@ -8170,6 +8428,7 @@ op D3.3
 
 op D3.4
   mask 07C5
+  rows SHL
   case
     bytes D3 21
     regs ax=6446 cx=0000 dx=F745 bx=B8DE sp=B90D bp=5CB5 si=31C9 di=9BB1 cs=D3A3 ds=2B54 es=2D4B ss=CB10 ip=A66C
@@ -8215,6 +8474,7 @@ op D3.4
 
 op D3.5
   mask 07C5
+  rows SHR
   case
     bytes D3 2C
     regs ax=0294 cx=0938 dx=5E6D bx=FA06 sp=203F bp=40E0 si=CD48 di=D104 cs=2BAD ds=8CDB es=39E1 ss=0CCA ip=4E35
@@ -8242,6 +8502,7 @@ op D3.5
 
 op D3.6
   mask 0700
+  rows SETMOC
   case
     bytes 3E D3 F5
     regs ax=1586 cx=0000 dx=7825 bx=CB49 sp=61D8 bp=1F06 si=75DF di=5B10 cs=0EC5 ds=22E9 es=D3E5 ss=B93A ip=6C36
@@ -8275,6 +8536,7 @@ op D3.6
 
 op D3.7
   mask 07C5
+  rows SAR
   case
     bytes D3 78 E8
     regs ax=F3DC cx=AA28 dx=04F5 bx=DAAD sp=95A5 bp=8FF5 si=9CF8 di=10EC cs=CAD4 ds=8781 es=105A ss=4081 ip=0C7A
@@ -8314,6 +8576,7 @@ op D3.7
 
 op D4
   mask 07C4
+  rows AAM
   case
     bytes D4 10
     regs ax=BD0E cx=7D82 dx=1347 bx=0000 sp=E5F5 bp=BBFE si=A6AC di=EFCD cs=A79D ds=8AEC es=39A9 ss=2CB4 ip=2043
@@ -8347,6 +8610,7 @@ op D4
 
 op D5
   mask 07C4
+  rows AAD
   case
     bytes D5 68
     regs ax=2E73 cx=353E dx=D098 bx=7E52 sp=96DA bp=E1C5 si=D404 di=3262 cs=D21A ds=C589 es=24B3 ss=B781 ip=88EC
@@ -8386,6 +8650,7 @@ op D5
 
 op D6
   mask 0FD5
+  rows SALC
   case
     bytes 2E D6
     regs ax=8147 cx=CF26 dx=0CCF bx=E9A4 sp=C55E bp=BA16 si=F6FD di=331B cs=6ACC ds=1734 es=4784 ss=374E ip=715D
@@ -8413,6 +8678,7 @@ op D6
 
 op D7
   mask 0FD5
+  rows XLAT
   case
     bytes D7
     regs ax=22EA cx=2436 dx=1703 bx=D7AD sp=3746 bp=CE17 si=0000 di=0000 cs=0EF2 ds=D389 es=63C0 ss=2C3D ip=0364
@@ -8440,6 +8706,7 @@ op D7
 
 op D8
   mask 0FD5
+  rows ESC
   case
     bytes D8 14
     regs ax=975C cx=16D2 dx=6A3F bx=843D sp=43E9 bp=FE89 si=0000 di=6F60 cs=E245 ds=A3F4 es=322B ss=D1C4 ip=0120
@@ -8467,6 +8734,7 @@ op D8
 
 op D9
   mask 0FD5
+  rows ESC
   case
     bytes 2E D9 41 44
     regs ax=50F6 cx=FFD0 dx=0000 bx=6565 sp=BBF1 bp=ADC4 si=0D8E di=7E6F cs=AE72 ds=B300 es=7C8B ss=4F1C ip=FCD8
@@ -8494,6 +8762,7 @@ op D9
 
 op DA
   mask 0FD5
+  rows ESC
   case
     bytes DA 71 03
     regs ax=3A6D cx=23D6 dx=3DD2 bx=0000 sp=0000 bp=103A si=A7DE di=C631 cs=783D ds=4444 es=C7B6 ss=2A44 ip=06A1
@@ -8521,6 +8790,7 @@ op DA
 
 op DB
   mask 0FD5
+  rows ESC
   case
     bytes 36 DB 32
     regs ax=064E cx=133A dx=0E56 bx=A24F sp=1121 bp=EC54 si=A697 di=8EFA cs=CE54 ds=E837 es=FC3E ss=FD1B ip=E8D6
@@ -8548,6 +8818,7 @@ op DB
 
 op DC
   mask 0FD5
+  rows ESC
   case
     bytes DC 3D
     regs ax=34F9 cx=2034 dx=427B bx=175C sp=B0F7 bp=01A8 si=0000 di=E76B cs=7860 ds=1B08 es=5710 ss=4AD8 ip=DB67
@@ -8575,6 +8846,7 @@ op DC
 
 op DD
   mask 0FD5
+  rows ESC
   case
     bytes 26 DD BE 08 0F
     regs ax=C25C cx=7CDC dx=855C bx=666F sp=DE26 bp=CC07 si=5675 di=BCA4 cs=7B04 ds=6E3C es=4365 ss=E366 ip=97E8
@@ -8602,6 +8874,7 @@ op DD
 
 op DE
   mask 0FD5
+  rows ESC
   case
     bytes 26 DE A6 C0 22
     regs ax=7EDE cx=7FF0 dx=3B7A bx=407A sp=F58B bp=8339 si=6CDA di=2270 cs=45F9 ds=5379 es=0A0E ss=3595 ip=E4CC
@@ -8629,6 +8902,7 @@ op DE
 
 op DF
   mask 0FD5
+  rows ESC
   case
     bytes 26 DF 59 23
     regs ax=DB8C cx=BD6E dx=F94F bx=22C2 sp=6A4F bp=5D72 si=459C di=CB89 cs=1290 ds=9BC0 es=32F0 ss=DE3B ip=E69E
@@ -8656,6 +8930,7 @@ op DF
 
 op E0
   mask 0FD5
+  rows LOOPNE
   case
     bytes 2E E0 C7
     regs ax=0000 cx=6E02 dx=2B73 bx=DDD7 sp=CB8D bp=FD39 si=1B29 di=203D cs=7132 ds=74EF es=58C2 ss=2E04 ip=A72A
@@ -8683,6 +8958,7 @@ op E0
 
 op E1
   mask 0FD5
+  rows LOOPE
   case
     bytes 2E E1 F5
     regs ax=37EC cx=5722 dx=3B96 bx=5B4B sp=B04E bp=0000 si=9E8A di=F95F cs=34D5 ds=B0FC es=CE95 ss=A1F6 ip=763F
@@ -8710,6 +8986,7 @@ op E1
 
 op E2
   mask 0FD5
+  rows LOOP
   case
     bytes E2 23
     regs ax=9479 cx=5922 dx=5D32 bx=EE48 sp=87CB bp=1CC4 si=0000 di=5CBE cs=DFAA ds=A238 es=19FE ss=5962 ip=AB8C
@@ -8737,6 +9014,7 @@ op E2
 
 op E3
   mask 0FD5
+  rows JCXZ
   case
     bytes E3 9F
     regs ax=8903 cx=C390 dx=672D bx=6AC9 sp=04A0 bp=CA5A si=71B2 di=C346 cs=6829 ds=21F9 es=359C ss=7875 ip=956D
@@ -8764,6 +9042,7 @@ op E3
 
 op E4
   mask 0FD5
+  rows IN
   case
     bytes E4 80
     regs ax=EE83 cx=697E dx=7E50 bx=F6C7 sp=DB42 bp=ECEB si=AA17 di=95D2 cs=978F ds=3AE8 es=FA8E ss=D579 ip=8D87
@@ -8791,6 +9070,7 @@ op E4
 
 op E5
   mask 0FD5
+  rows IN
   case
     bytes E5 67
     regs ax=051D cx=CF20 dx=5833 bx=0000 sp=9EA9 bp=0000 si=66E2 di=F7F2 cs=48ED ds=EE04 es=F5E6 ss=CBE3 ip=A742
@@ -8818,6 +9098,7 @@ op E5
 
 op E6
   mask 0FD5
+  rows OUT
   case
     bytes E6 62
     regs ax=1F31 cx=13F0 dx=0000 bx=F08D sp=96C4 bp=7F80 si=45FC di=DB3C cs=AFDD ds=2A5B es=A732 ss=737C ip=8F61
@@ -8845,6 +9126,7 @@ op E6
 
 op E7
   mask 0FD5
+  rows OUT
   case
     bytes E7 A1
     regs ax=B4FF cx=5748 dx=F510 bx=0EBF sp=A854 bp=6A9F si=EDFF di=A815 cs=B9BB ds=C87E es=66CC ss=D133 ip=5B7E
@@ -8872,6 +9154,7 @@ op E7
 
 op E8
   mask 0FD5
+  rows CALL
   case
     bytes E8 75 F4
     regs ax=4CC1 cx=2154 dx=33F6 bx=2CAA sp=15D6 bp=A551 si=AF5D di=0000 cs=2900 ds=7474 es=DAFF ss=A5EF ip=C801
@@ -8899,6 +9182,7 @@ op E8
 
 op E9
   mask 0FD5
+  rows JMP
   case
     bytes 3E E9 64 C0
     regs ax=F6F0 cx=708A dx=A6C0 bx=BF7E sp=41F2 bp=4A3F si=0000 di=C1D6 cs=155A ds=929C es=710F ss=A9FD ip=4241
@@ -8926,6 +9210,7 @@ op E9
 
 op EA
   mask 0FD5
+  rows JMPF
   case
     bytes EA 7E 25 9B 81
     regs ax=A0AF cx=6B16 dx=0000 bx=FA5B sp=8F5A bp=7943 si=8E03 di=1930 cs=9ACA ds=58C1 es=9702 ss=0A6C ip=638F
@@ -8953,6 +9238,7 @@ op EA
 
 op EB
   mask 0FD5
+  rows JMP
   case
     bytes EB 09
     regs ax=F329 cx=FC80 dx=201D bx=EE28 sp=E2A8 bp=EDC7 si=E949 di=35E3 cs=0E97 ds=8D4F es=D24F ss=2246 ip=B3AD
@@ -8980,6 +9266,7 @@ op EB
 
 op EC
   mask 0FD5
+  rows IN
   case
     bytes EC
     regs ax=001F cx=C68E dx=3277 bx=ED04 sp=25C8 bp=3BDE si=D8F7 di=6A92 cs=6A8A ds=63D2 es=0795 ss=9699 ip=1B79
@@ -9007,6 +9294,7 @@ op EC
 
 op ED
   mask 0FD5
+  rows IN
   case
     bytes ED
     regs ax=0FF0 cx=E67E dx=5773 bx=0000 sp=E53D bp=CD70 si=00FA di=0000 cs=9DE7 ds=F40A es=5D94 ss=1308 ip=ECAA
@@ -9034,6 +9322,7 @@ op ED
 
 op EE
   mask 0FD5
+  rows OUT
   case
     bytes EE
     regs ax=05D5 cx=13FA dx=7F2E bx=CF0C sp=74E4 bp=42EF si=CB97 di=A53B cs=FFB5 ds=E101 es=3E63 ss=C3D6 ip=C316
@@ -9061,6 +9350,7 @@ op EE
 
 op EF
   mask 0FD5
+  rows OUT
   case
     bytes EF
     regs ax=0000 cx=FA62 dx=B153 bx=97F5 sp=42C8 bp=DBF8 si=9D7C di=190D cs=0FFE ds=AD35 es=C29C ss=F653 ip=A62A
@@ -9088,6 +9378,7 @@ op EF
 
 op F5
   mask 0FD5
+  rows CMC
   case
     bytes F5
     regs ax=E551 cx=0000 dx=D717 bx=4626 sp=7876 bp=F73B si=D412 di=1AFF cs=050F ds=70CD es=E810 ss=FBF4 ip=DD5B
@@ -9133,6 +9424,7 @@ op F5
 
 op F6.0
   mask 0FC5
+  rows TEST
   case
     bytes 36 F6 84 55 30 DF
     regs ax=EEF4 cx=41FE dx=B446 bx=EB16 sp=038B bp=0D00 si=7E64 di=F95E cs=A9F1 ds=A4FB es=9ED1 ss=95E7 ip=B21A
@@ -9166,6 +9458,7 @@ op F6.0
 
 op F6.1
   mask 0FC5
+  rows TEST
   case
     bytes F6 0B 09
     regs ax=0000 cx=D780 dx=2E4E bx=10E4 sp=DFB9 bp=C988 si=BDCA di=F74D cs=C4AD ds=4757 es=2763 ss=AD85 ip=D241
@@ -9205,6 +9498,7 @@ op F6.1
 
 op F6.2
   mask 0FD5
+  rows NOT
   case
     bytes F6 51 DA
     regs ax=8B8D cx=5354 dx=BCC7 bx=BCDC sp=E541 bp=7A17 si=EE72 di=0804 cs=E4C1 ds=27D4 es=8E1F ss=D726 ip=75BC
@@ -9232,6 +9526,7 @@ op F6.2
 
 op F6.3
   mask 0FD5
+  rows NEG
   case
     bytes F6 DC
     regs ax=CC37 cx=AB1C dx=CEC1 bx=ABAC sp=120D bp=1626 si=1704 di=720C cs=61AD ds=0897 es=26C5 ss=3881 ip=CEDD
@@ -9271,6 +9566,7 @@ op F6.3
 
 op F6.4
   mask 0F01
+  rows MUL
   case
     bytes F6 63 79
     regs ax=0000 cx=351C dx=5EEB bx=6350 sp=26BA bp=B579 si=41D4 di=FDCE cs=3110 ds=12F9 es=D8A7 ss=E264 ip=AA9C
@@ -9298,6 +9594,7 @@ op F6.4
 
 op F6.5
   mask 0F01
+  rows IMUL
   case
     bytes 26 F6 6A 2E
     regs ax=4F34 cx=AA96 dx=2450 bx=A9AB sp=81D7 bp=1423 si=EA35 di=DDB9 cs=1574 ds=6757 es=24FA ss=79D8 ip=50C7
@@ -9331,6 +9628,7 @@ op F6.5
 
 op F6.6
   mask 0700
+  rows DIV
   case
     bytes F6 37
     regs ax=16B1 cx=F8DE dx=3140 bx=4144 sp=9771 bp=0000 si=AF49 di=0000 cs=E255 ds=54DD es=39F6 ss=B5F6 ip=8096
@@ -9370,6 +9668,7 @@ op F6.6
 
 op F6.7
   mask 0700
+  rows IDIV
   case
     bytes 2E F6 FD
     regs ax=0EE6 cx=DC0C dx=7B49 bx=470F sp=B0FD bp=C952 si=82DD di=4C3F cs=287F ds=9174 es=2C2F ss=1F1B ip=BFD6
@@ -9391,6 +9690,7 @@ op F6.7
 
 op F7.0
   mask 0FC5
+  rows TEST
   case
     bytes 3E F7 46 99 B9 91
     regs ax=D5FD cx=0000 dx=4C6E bx=5F8F sp=1559 bp=6C55 si=39B8 di=ACF2 cs=6531 ds=1E39 es=2674 ss=4C8D ip=C910
@@ -9424,6 +9724,7 @@ op F7.0
 
 op F7.1
   mask 0FC5
+  rows TEST
   case
     bytes F7 0A B1 DF
     regs ax=F3A0 cx=EF7E dx=0288 bx=FB0C sp=EC47 bp=1647 si=5304 di=C3C4 cs=2398 ds=2110 es=A2C9 ss=D9E0 ip=5797
@@ -9457,6 +9758,7 @@ op F7.1
 
 op F7.2
   mask 0FD5
+  rows NOT
   case
     bytes F7 56 0E
     regs ax=356C cx=4CC4 dx=C273 bx=BA6E sp=3508 bp=D0B0 si=33FF di=05CC cs=E075 ds=2C9E es=F816 ss=A695 ip=6EFA
@@ -9484,6 +9786,7 @@ op F7.2
 
 op F7.3
   mask 0FD5
+  rows NEG
   case
     bytes F7 5C FD
     regs ax=276E cx=A270 dx=6EBC bx=439E sp=926D bp=472F si=2FEF di=2D46 cs=36D8 ds=98ED es=4CE6 ss=A2EC ip=68AE
@@ -9517,6 +9820,7 @@ op F7.3
 
 op F7.4
   mask 0F01
+  rows MUL
   case
     bytes 26 F7 63 8B
     regs ax=0000 cx=A2B8 dx=E942 bx=DD89 sp=0000 bp=63A7 si=7379 di=F73B cs=820A ds=18CD es=4BEB ss=5ED0 ip=9F4A
@@ -9550,6 +9854,7 @@ op F7.4
 
 op F7.5
   mask 0F01
+  rows IMUL
   case
     bytes 2E F7 2C
     regs ax=E4CD cx=1EC0 dx=0000 bx=1536 sp=693E bp=ACA9 si=FEA1 di=4302 cs=D629 ds=DD51 es=E3AB ss=1422 ip=6012
@@ -9589,6 +9894,7 @@ op F7.5
 
 op F7.6
   mask 0700
+  rows DIV
   case
     bytes F7 74 C7
     regs ax=1DAE cx=B956 dx=9C34 bx=229F sp=E763 bp=3BAE si=A930 di=EE81 cs=7AEF ds=4052 es=0EB9 ss=E97D ip=4FF0
@@ -9616,6 +9922,7 @@ op F7.6
 
 op F7.7
   mask 0700
+  rows IDIV
   case
     bytes F7 BC 03 3E
     regs ax=569F cx=D5E4 dx=D92B bx=5D79 sp=561B bp=5A0C si=0000 di=F5BD cs=F8BA ds=6128 es=42C5 ss=08C1 ip=3285
@@ -9649,6 +9956,7 @@ op F7.7
 
 op F8
   mask 0FD5
+  rows CLC
   case
     bytes F8
     regs ax=658C cx=DA20 dx=42CB bx=D053 sp=17DE bp=70BC si=EDF0 di=81D6 cs=33DE ds=F76A es=26D2 ss=DC21 ip=F13E
@@ -9682,6 +9990,7 @@ op F8
 
 op F9
   mask 0FD5
+  rows STC
   case
     bytes F9
     regs ax=2D02 cx=885C dx=E808 bx=8A55 sp=E933 bp=DC2D si=4978 di=E70B cs=D3B9 ds=0D9D es=72D9 ss=C5FF ip=5332
@@ -9721,6 +10030,7 @@ op F9
 
 op FA
   mask 0FD5
+  rows CLI
   case
     bytes FA
     regs ax=941E cx=7206 dx=0000 bx=C4B9 sp=6C26 bp=B31F si=28FF di=C29F cs=E7A3 ds=9456 es=D5E8 ss=73C4 ip=01AC
@@ -9748,6 +10058,7 @@ op FA
 
 op FB
   mask 0FD5
+  rows STI
   case
     bytes FB
     regs ax=C3FF cx=A548 dx=7F43 bx=4947 sp=E5CE bp=D2BF si=9DA5 di=9BFD cs=B0C3 ds=5580 es=7CEC ss=4D20 ip=19D3
@@ -9775,6 +10086,7 @@ op FB
 
 op FC
   mask 0FD5
+  rows CLD
   case
     bytes FC
     regs ax=0258 cx=A604 dx=95E4 bx=9026 sp=2EEC bp=C3AA si=7FCA di=5BBF cs=82C8 ds=EF39 es=C214 ss=8A98 ip=FB1E
@@ -9814,6 +10126,7 @@ op FC
 
 op FD
   mask 0FD5
+  rows STD
   case
     bytes FD
     regs ax=AE6C cx=2F18 dx=649E bx=B8FE sp=DF3D bp=5A11 si=21C6 di=0F46 cs=8D7D ds=53E1 es=5C02 ss=A386 ip=93FE
@@ -9853,6 +10166,7 @@ op FD
 
 op FE.0
   mask 0FD5
+  rows INC
   case
     bytes FE 03
     regs ax=76D3 cx=CEFA dx=A4E9 bx=DD7A sp=42BB bp=5C60 si=39F8 di=8667 cs=FBC5 ds=F0B8 es=5CAD ss=9048 ip=F81A
@@ -9892,6 +10206,7 @@ op FE.0
 
 op FE.1
   mask 0FD5
+  rows DEC
   case
     bytes FE 4B E3
     regs ax=CBEC cx=0000 dx=D75F bx=44F1 sp=F190 bp=94D6 si=8989 di=64AE cs=E429 ds=ED8E es=0214 ss=01EC ip=3E97
@@ -9943,6 +10258,7 @@ op FE.1
 
 op FF.0
   mask 0FD5
+  rows INC
   case
     bytes FF 46 4C
     regs ax=0E1F cx=F48E dx=3AD8 bx=EE2D sp=81CF bp=6D06 si=B1ED di=EF46 cs=E899 ds=DA66 es=A074 ss=3C95 ip=5891
@@ -9982,6 +10298,7 @@ op FF.0
 
 op FF.1
   mask 0FD5
+  rows DEC
   case
     bytes 26 FF 8C 17 C5
     regs ax=6AF1 cx=F8D6 dx=0BCC bx=8A14 sp=1626 bp=0000 si=0000 di=CCC2 cs=C1AE ds=4DDB es=B82D ss=3FA2 ip=2FF2
@@ -10021,6 +10338,7 @@ op FF.1
 
 op FF.2
   mask 0FD5
+  rows CALL
   case
     bytes 36 FF 56 65
     regs ax=AF67 cx=BAE0 dx=3D33 bx=5072 sp=8F7E bp=35B8 si=418A di=2B62 cs=A272 ds=D2B2 es=9CCA ss=CD0B ip=8812
@@ -10048,6 +10366,7 @@ op FF.2
 
 op FF.3
   mask 0FD5
+  rows CALLF
   case
     bytes FF 5E 4C
     regs ax=0E1F cx=F48E dx=3AD8 bx=EE2D sp=81CF bp=6D06 si=B1ED di=EF46 cs=E899 ds=DA66 es=A074 ss=3C95 ip=5891
@@ -10075,6 +10394,7 @@ op FF.3
 
 op FF.4
   mask 0FD5
+  rows JMP
   case
     bytes FF A0 11 AF
     regs ax=119D cx=B6B8 dx=DBDE bx=839F sp=FC7B bp=CD33 si=A4EC di=5A2C cs=C1AE ds=B609 es=5CFD ss=B1B4 ip=2FF2
@@ -10102,6 +10422,7 @@ op FF.4
 
 op FF.5
   mask 0FD5
+  rows JMPF
   case
     bytes 2E FF 2C
     regs ax=1B5B cx=5A5A dx=D839 bx=CBDB sp=5850 bp=646C si=8953 di=0E0A cs=A272 ds=F219 es=EF1E ss=5E81 ip=8812
@@ -10129,6 +10450,7 @@ op FF.5
 
 op FF.6
   mask 0FD5
+  rows PUSH
   case
     bytes FF F5
     regs ax=F451 cx=A414 dx=54C8 bx=EB6B sp=7F9E bp=C9A5 si=9605 di=1EF2 cs=00FE ds=8B23 es=0623 ss=63DC ip=1174
@@ -10156,6 +10478,7 @@ op FF.6
 
 op FF.7
   mask 0FD5
+  rows PUSH
   case
     bytes 2E FF 3F
     regs ax=81B0 cx=D5A2 dx=97F9 bx=17FB sp=4CA7 bp=8B27 si=489B di=54FD cs=296C ds=6F71 es=CEB1 ss=D56B ip=F8A3

@@ -234,6 +234,19 @@ def select(tests: list[dict], keep: int) -> list[dict]:
     return chosen
 
 
+def row_name(test: dict) -> str:
+    """The §1.4 row this test belongs to, from the mnemonic the chip's own
+    disassembler gave it.
+
+    The captures name their instructions ("add cl, ah", "rol byte
+    [ss:bp+di]"), and the first word of that is the instruction the
+    document's §1.4 table has a row for. The name is the chip's, so the
+    mapping needs no list of this project's own.
+    """
+    name = test.get("name", "").split()
+    return name[0].upper() if name else ""
+
+
 def emit_case(out: list[str], test: dict, memory: dict[int, int]) -> None:
     """One test, in the format the Rust gate reads."""
     initial = test["initial"]["regs"]
@@ -318,6 +331,8 @@ def main() -> int:
             kept = select(tests, args.keep)
             out.append(f"op {label}")
             out.append(f"  mask {flag_mask(metadata, label):04X}")
+            rows = sorted({row_name(t) for t in kept if row_name(t)})
+            out.append("  rows " + " ".join(rows))
             for test in kept:
                 memory = memory_state(test)
                 emit_case(out, test, memory)

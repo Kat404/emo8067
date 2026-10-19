@@ -31,9 +31,13 @@
 //! kind of evidence from the document the rest of the suite checks against:
 //! it is evidence from the hardware.
 
+mod common;
+
 use emo8067_core::Cpu;
 use emo8067_core::flags::Flags;
 use emo8067_core::regs::{Reg16, Seg};
+
+use common::{COLUMNS, GUIDE, Mark, find_row_marks};
 
 /// The generated oracle. It is a text file on purpose: the crate has no
 /// dependencies, and a JSON parser is not worth one.
@@ -83,6 +87,10 @@ impl Reg {
 struct Case {
     /// The opcode, and its /digit when the instruction has one: `F6.0`.
     opcode: String,
+    /// The §1.4 rows the chip's own names put this instruction in: `ADD`.
+    /// The names come from the captures' disassembler, so the mapping needs
+    /// no list of this project's own.
+    rows: Vec<String>,
     /// The flags the chip leaves undefined, cleared from both sides.
     mask: u16,
     regs: Vec<(Reg, u16)>,
@@ -97,6 +105,7 @@ fn parse(oracle: &str) -> Vec<Case> {
     let mut cases = Vec::new();
     let mut opcode = String::new();
     let mut mask = 0u16;
+    let mut rows: Vec<String> = Vec::new();
     let mut current: Option<Case> = None;
 
     for line in oracle.lines() {
@@ -114,12 +123,17 @@ fn parse(oracle: &str) -> Vec<Case> {
             mask = u16::from_str_radix(rest.trim(), 16).expect("a mask in the oracle");
             continue;
         }
+        if let Some(rest) = line.strip_prefix("rows ") {
+            rows = rest.split_whitespace().map(str::to_string).collect();
+            continue;
+        }
         if line == "case" {
             if let Some(case) = current.take() {
                 cases.push(case);
             }
             current = Some(Case {
                 opcode: opcode.clone(),
+                rows: rows.clone(),
                 mask,
                 regs: Vec::new(),
                 flags: 0,
@@ -266,8 +280,33 @@ fn run(case: &Case) -> Result<(), String> {
             ));
         }
     }
+    // The document checked against the hardware: a row that marks a flag
+    // with an em dash says the instruction does not touch it, and the
+    // captures say whether the chip agreed. A disagreement is the document
+    // being wrong, not the chip.
+    for row in &case.rows {
+        let Some(marks) = find_row_marks(GUIDE, row) else {
+            continue;
+        };
+        for (i, mark) in marks.iter().enumerate() {
+            if !matches!(mark, Mark::Unchanged) {
+                continue;
+            }
+            let bit = COLUMNS[i];
+            if case.flags & bit != case.final_flags & bit {
+                return Err(format!(
+                    "the chip changed the {} flag of {row}, which the document \
+                     says it does not touch",
+                    FLAG_NAMES[i]
+                ));
+            }
+        }
+    }
     Ok(())
 }
+
+/// The §1.4 column order, for a failure message.
+const FLAG_NAMES: [&str; 9] = ["OF", "DF", "IF", "TF", "SF", "ZF", "AF", "PF", "CF"];
 
 /// A short description of a case, for a failure message: the instruction's
 /// bytes and the registers it started from.
