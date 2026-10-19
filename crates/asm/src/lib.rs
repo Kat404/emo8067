@@ -8,11 +8,13 @@
 pub mod addressing;
 pub mod assemble;
 pub mod checks;
+pub mod directives;
 pub mod groups;
 pub mod line;
 pub mod literals;
 pub mod modrm;
 pub mod operands;
+pub mod program;
 pub mod table;
 
 pub use table::{CELLS_PER_ROW, Form};

@@ -30,6 +30,12 @@ pub fn parse(text: &str) -> Result<i64, Error> {
     let bad = || Error::NotANumber {
         text: text.to_string(),
     };
+    // A character: `'H'`.
+    if text.len() >= 3 && text.starts_with('\'') && text.ends_with('\'') {
+        let inner = &text[1..text.len() - 1];
+        let ch = inner.chars().next().ok_or_else(bad)?;
+        return Ok(ch as i64);
+    }
     // MASM's radix: the base, then the `$`, then the digits: `16$FF`.
     if let Some((base, digits)) = text.split_once('$') {
         let base = base.trim().parse::<u32>().map_err(|_| bad())?;
@@ -60,6 +66,10 @@ pub fn parse(text: &str) -> Result<i64, Error> {
             });
         }
         return i64::from_str_radix(hex, 16).map_err(|_| bad());
+    }
+    // A binary value: `11101100b`.
+    if let Some(bits) = text.strip_suffix('b').or_else(|| text.strip_suffix('B')) {
+        return i64::from_str_radix(bits, 2).map_err(|_| bad());
     }
     // Decimal.
     text.parse::<i64>().map_err(|_| bad())

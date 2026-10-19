@@ -143,7 +143,18 @@ checked against.
   source meant; the width checks need the form, so they run against each
   candidate, and the complaint that counts is the one from the form that
   matched the operands.
-- **T6** — **TODO.** The directives, the macros and the build directives.
+- **T6** — **DONE, the directives and the program.** The reference's own
+  list of them: `LISTING` `LABEL` `PROC` `END` `ENDS` `ENDP` `DUP` `FAR`
+  `NEAR` `EQU` `ORG` `DB` `DW` `DD` `STACK` `NONE` `SEGMENT` `ASSUME`
+  `MACRO` `ENDM` `COMMENT` `PAGE` `TITLE` `NAME` `INC`. Most of them matter
+  to the assembler and not to the bytes: the segments, the procedures and
+  the listing are the shape of the source, not of the program. The rest say
+  where the program is (`ORG`), what it holds (`DB`, `DW`, `DD`), and what
+  its names mean (`EQU`, `LABEL`, and the label written as `name:`). A
+  program is assembled from its lines: the origin, the bytes, and the names
+  with the addresses they are at. A constant is folded into the operand
+  that names it. Still to come in this task: the macros (`MACRO`/`ENDM`) and
+  the jumps to a label, which need the names the program has not read yet.
 - **T7** — **TODO.** The eighty-six examples, and the goldens.
 
 ## Log

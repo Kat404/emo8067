@@ -32,6 +32,8 @@ pub enum Error {
 pub struct Line {
     /// The prefixes, in the order they were written.
     pub prefixes: Vec<Prefix>,
+    /// The label the line carries, if it carries one: `start:`.
+    pub label: Option<String>,
     /// The instruction's name, as the source wrote it.
     pub mnemonic: String,
     /// The operands, as the source wrote them.
@@ -67,8 +69,24 @@ pub fn parse(line: &str) -> Result<Line, Error> {
         prefixes.push(prefix);
         index += 1;
     }
+    // A name with a colon is a label, and the instruction follows it.
+    let mut label = None;
+    if let Some(word) = words.get(index) {
+        if let Some(name) = word.strip_suffix(':') {
+            if !name.is_empty() {
+                label = Some(name.to_string());
+                index += 1;
+            }
+        }
+    }
+    // A line that carries nothing but a label has no instruction on it.
     let Some(mnemonic) = words.get(index) else {
-        return Err(Error::Empty);
+        return Ok(Line {
+            prefixes,
+            label,
+            mnemonic: String::new(),
+            operands: Vec::new(),
+        });
     };
     let first_operand = words[index + 1..].join(" ").trim().to_string();
     let mut operands: Vec<String> = Vec::new();
@@ -78,6 +96,7 @@ pub fn parse(line: &str) -> Result<Line, Error> {
     operands.extend(parts.drain(1..));
     Ok(Line {
         prefixes,
+        label,
         mnemonic: (*mnemonic).to_string(),
         operands,
     })

@@ -114,6 +114,18 @@ fn encode_inner(
         });
     }
     let mut out = vec![opcode];
+    // A named register and an immediate: the opcode carries the register,
+    // so `MOV CX,i16` is the `B9` opcode with the word that follows.
+    if parts.len() == 2 && (parts[1] == "i8" || parts[1] == "i16") && is_register_name(parts[0]) {
+        let width = if parts[1] == "i8" {
+            Width::Byte
+        } else {
+            Width::Word
+        };
+        let value = immediate(&operands[1], width)?;
+        out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
+        return Ok(out);
+    }
     match parts.as_slice() {
         // A register against a register: the first is the REG field and the
         // second the R/M field.
@@ -223,6 +235,28 @@ fn encode_inner(
         }
     }
     Ok(out)
+}
+
+/// Whether a word names a register, of any width.
+fn is_register_name(word: &str) -> bool {
+    matches!(
+        word,
+        "AL" | "CL"
+            | "DL"
+            | "BL"
+            | "AH"
+            | "CH"
+            | "DH"
+            | "BH"
+            | "AX"
+            | "CX"
+            | "DX"
+            | "BX"
+            | "SP"
+            | "BP"
+            | "SI"
+            | "DI"
+    )
 }
 
 /// The field value of a register operand.

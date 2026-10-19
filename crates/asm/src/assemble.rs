@@ -28,11 +28,20 @@ pub enum Error {
 /// Assemble one line of source.
 pub fn assemble(source: &str) -> Result<Vec<u8>, Error> {
     let line = line::parse(source).map_err(|_| Error::Empty)?;
-    let operands: Vec<Operand> = line
-        .operands
+    assemble_parts(&line, &line.operands)
+}
+
+/// Assemble a line that has already been taken apart.
+pub fn assemble_parts(line: &line::Line, operand_texts: &[String]) -> Result<Vec<u8>, Error> {
+    let operands: Vec<Operand> = operand_texts
         .iter()
         .map(|text| operand(text))
         .collect::<Result<Vec<_>, _>>()?;
+    // The manual has no NOP: the 8086's 90h is XCHG AX,AX, and that is what
+    // a NOP is.
+    if line.mnemonic.eq_ignore_ascii_case("NOP") && operands.is_empty() {
+        return Ok(vec![0x90]);
+    }
     // The instruction's form, out of the document's table. A mnemonic can
     // name more than one form - MOV r/m8,r8 and MOV r/m16,r16 are both MOV -
     // so the operands pick the one. A group's cell names the operation
