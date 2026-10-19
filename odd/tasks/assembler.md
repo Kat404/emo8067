@@ -82,6 +82,13 @@ checked against.
 
 ## Log
 
+- **L2 (2026-10-19).** The bet of S1 was checked before anything was
+  written: §1.3 was parsed as a table and the shape of it measured. Sixteen
+  opcode rows, sixteen cells in each, ninety-five distinct operand forms,
+  and **no cell that would not parse**. The table is regular enough to be
+  read by a program, which is what S1 needs; the cost of the parser is a
+  known cost now rather than a hope.
+
 - **L1 (2026-10-19).** The maintainer chose the assembler after the device
   bus closed. The design that this document settles, and that the next
   session should not re-litigate: **the assembler reads the same document
