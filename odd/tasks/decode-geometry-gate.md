@@ -54,20 +54,58 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   Mutants killed: `JMP short` reading a `disp16`, `TEST AX,i16` reading one
   immediate byte, `RET i16` dropping its argument, `CALL near` reading a
   `disp8`.
-- **T2** — The same gate extended to displacements: MOD=01 adds one byte and
-  MOD=10 adds two, across every group that has a memory form. Route: inline.
-  Mutant: MOD=10 fetches a `disp8`.
-- **T3** — The execution half of S2: every defined encoding retires without
-  faulting and leaves untouched what it is documented not to touch, and the
-  80186-only forms are refused. Route: inline. Mutant: `8C` with a register
-  destination starts executing.
-- **T4** — Record the acceptance result in this document: each of the eight
-  defects from this session, mapped to whichever task or phase kills it.
-- **T5** — **DONE.** The `AAA` masking question, which the handoff carried as
-  open and possibly wrong. Route: inline. Two defects, both against the
-  manual: `AAA`/`AAS` masked `AL` only inside the adjustment branch, and
+- **T2** — **DONE in `42f29c9`.** The same gate extended to displacements: MOD=01
+  adds one byte and MOD=10 adds two, across every group that has a memory
+  form. 122 rows on top of the 55 the immediates needed, 177 in all, and the
+  count is pinned exactly. Mutant killed: MOD=10 fetching a `disp8`. A second
+  test in the same file checks the displacement is the offset the operand
+  lands at, not merely a number of bytes — a length check cannot see an
+  inverted `disp16`.
+- **T3** — **DONE in `0dfc58f`.** The execution half of S2, in
+  `crates/core/tests/touched.rs`: for one instruction of every family, what
+  may change is stated and everything else is checked not to have. The flags
+  that may change are read out of §1.4 rather than typed by hand, so the
+  claim comes from the oracle. Mutants killed: memory written through `ES`
+  instead of `DS`, and an `INC` that touches `CF`.
+- **T4** — **DONE.** The acceptance result, below.
+- **T5** — **DONE in `8dcc9da`.** The `AAA` masking question, which the handoff
+  carried as open and possibly wrong. Route: inline. Two defects, both against
+  the manual: `AAA`/`AAS` masked `AL` only inside the adjustment branch, and
   `DAA`/`DAS` never wrote `AF` at all. Mutants killed: the mask moved out of
   the branch, and the `AF` write removed.
+
+## T4 — the acceptance result
+
+The acceptance criterion was not a hypothetical: the eight defects this
+project found in one session, replayed against the gates. The honest answer
+is that the phase's gates kill two of them outright, five were already
+killed by gates that existed, and **one is killed by nothing structural at
+all**.
+
+| # | The defect | What kills it now |
+|---|---|---|
+| 1 | A string-source segment override was discarded — `string_op_once` read the `SI` side through a hardcoded `Seg::Ds` | The F1 regression test with its mutant. **No structural gate**: the touches gate says what an instruction touches, and a string operation with an override is not one of its cases. The `X` and `U` rows and the segment overrides are the same hole |
+| 2 | `REP` negating `MUL`/`IDIV` was dismissed as fiction, then implemented | The regression test and its mutant. The flag contract cannot see it: the `MUL` row is `X` and `U`, and `X` asserts nothing |
+| 3 | Two bugs inside that implementation, which 220 tests could not see | The same regression test, after the second mutant. **No structural gate**, for the same reason: a row of `X` and `U` marks says nothing about the values |
+| 4 | `A8`/`A9` ran as `CMP` for two units, against real silicon | The flag-contract gate, which found it on its first run |
+| 5 | `LAHF` and `SAHF` were on each other's opcodes | The flag-contract gate, which found it on its first run |
+| 6 | The 16-bit `REG` field named five of eight registers wrongly | `the_word_register_field_names_the_register_intel_table_4_9_says`, and now the touches gate as well: its expectations are written in the hardware's `REG` order, so a permutation there fails |
+| 7 | A test that proved nothing until a mutation survived it | The rule that every gate ships with the mutant that kills it. T2 and T3 both ship theirs |
+| 8 | The `AAA` mask, which the handoff called possibly wrong | T5, against the manual's page 2-35 and the SDM's Volume 2A |
+
+**What the phase did not close.** Two holes are now on the record rather
+than in the dark:
+
+- The flag rows marked `X` and `U` assert nothing, so for `ADD`, `ADC`,
+  `SUB`, `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS` the flag gate proves
+  only that `D`, `I` and `T` are untouched. That is where defects 2 and 3
+  lived, and the touches gate does not close it either: it claims which flags
+  *may* change, not what they become.
+- The `8C`/`8E` forms with a displacement are not decided. The manual prints
+  `(not used)` and the guide says so; the core executes every `MOD`. Refusing
+  them would be a change on a document's print rather than on evidence about
+  the chip, and `MOV DS,AX` is a bread-and-butter 8086 instruction.
+
 
 ## Log
 
@@ -196,4 +234,26 @@ the_8086_defines_decodes` proves a byte is not a hole, and
   block, and the SDM describes later processors rather than the 8086, so the
   code was left as it is and the divergence is recorded here as debt. Settling
   it needs silicon or a source that says which the 8086 does.
+
+- **L7 (2026-10-19).** The phase is closed, and the acceptance result is
+  above. Three things are worth writing down, because they cost time and
+  because the next person will hit them again.
+
+  1. **The 8086's `rm=011` is `[BP+DI]`, not `[BX]`.** Only `rm=111` names
+     `[BX]`. The brief that the displacement table was written from had it
+     wrong, and the worker caught it against Table 4-10 rather than following
+     it. Mistaking the two silently mis-addresses every memory operand, and
+     the length is the same either way, so a length gate cannot see it.
+  2. **A length check cannot see an inverted `disp16`.** The bytes consumed
+     are right and the operand is at the wrong offset, so the gate needed a
+     second test: the displacement is the offset the operand lands at.
+  3. **The touches gate found four wrong expectations of my own, and every
+     one of them was a case where the emulator was right and the expectation
+     was a sentence written from memory**: the 16-bit `REG` field names `AX
+     CX DX SP BP SI DI BX` and not the 8-bit order, `LAHF` loads the *low*
+     byte of FLAGS, `CALL` pushes the offset and not the physical address,
+     and `AAD` computes `AH * base + AL` instead of dividing. The rule this
+     session has been learning the hard way is the one the project already
+     wrote down: **never write an expected value from memory.**
+
 

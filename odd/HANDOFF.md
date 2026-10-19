@@ -11,11 +11,11 @@ Written 2026-10-15 at the end of a long session. Everything below is a claim wit
 ## Where the tree stands
 
 ```
-cargo test --workspace   0 + 5 + 116 + 3 + 4 + 30 + 109 + 0 passed   (267)
+cargo test --workspace   0 + 5 + 116 + 4 + 4 + 30 + 109 + 5 + 0 passed   (273)
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     8dcc9da   (signed; every commit in this session is GPG-signed)
+HEAD                     0dfc58f   (signed; every commit in this session is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -25,7 +25,8 @@ Two gates, both live, both proved to fail when broken:
 | `every_first_opcode_byte_the_8086_defines_decodes` | all 256 first opcode bytes, `probed == 256` literal, no exclusions |
 | `every_modrm_digit_of_the_8086_is_an_instruction_or_a_named_hole` | 96 `(opcode, /digit)` pairs, `96`, `5` and `91` as literals, cross-checked in both directions |
 | `the_word_register_field_names_the_register_intel_table_4_9_says` | all eight `B8`..`BF` encodings, plus the same field in a ModR/M byte. Written against instruction bytes, not the API, because the API is where the encoding mistake hid |
-| `every_encoding_consumes_exactly_what_the_manual_says` | 56 encodings that carry an immediate, each with the length the manual's operand format implies, stated by hand. Plain instructions by where `IP` lands, relative jumps by their displacement, `INT`/far `CALL` by the pushed return address, `RET` by how far the stack moved. Phase 1 of `odd/tasks/decode-geometry-gate.md` |
+| `every_encoding_consumes_exactly_what_the_manual_says` | 177 encodings: 55 that carry an immediate and 122 that carry a displacement, each with the length the manual's operand format implies, stated by hand. Plain instructions by where `IP` lands, relative jumps by their displacement, `INT`/far `CALL` by the pushed return address, `RET` by how far the stack moved. Phase 1 of `odd/tasks/decode-geometry-gate.md` |
+| `an_instruction_touches_only_what_it_is_documented_to_touch` | one instruction of every family, in `crates/core/tests/touched.rs`: the registers it writes, the memory it writes, and every other register, every other byte of the megabyte and every flag the guide marks `—` checked not to have changed. The flags it may change are read out of §1.4, not typed by hand |
 | `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
