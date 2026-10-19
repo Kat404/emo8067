@@ -5,6 +5,7 @@
 //! source wrote, and the bytes.
 
 use crate::addressing;
+use crate::checks;
 use crate::groups;
 use crate::line;
 use crate::literals;
@@ -20,6 +21,8 @@ pub enum Error {
     UnknownInstruction { name: String },
     /// An operand is not a register, a number or a reference.
     BadOperand { text: String },
+    /// The operands are of the wrong type, in the reference's own words.
+    Type { message: &'static str },
 }
 
 /// Assemble one line of source.
@@ -34,14 +37,43 @@ pub fn assemble(source: &str) -> Result<Vec<u8>, Error> {
     // name more than one form - MOV r/m8,r8 and MOV r/m16,r16 are both MOV -
     // so the operands pick the one. A group's cell names the operation
     // rather than a form, so the group's own table is searched too.
+    // The checks that need no form come first: their answer does not depend
+    // on which instruction the source meant.
+    checks::check_pair(&operands).map_err(|message| Error::Type { message })?;
     let options = options_for(&line.mnemonic);
-    let chosen = options
-        .iter()
-        .find(|(_, takes, _)| form_takes(takes, &operands))
-        .or_else(|| options.first());
-    let Some((opcode, _, form)) = chosen else {
-        return Err(Error::UnknownInstruction {
-            name: line.mnemonic.clone(),
+    // The reference's own checks come first: they say why a pair of
+    // operands is refused, in its words, and the form is only chosen when
+    // the pair survives them.
+    let mut complaint: Option<&'static str> = None;
+    let mut exact: Option<&'static str> = None;
+    let mut chosen: Option<(&u8, &String)> = None;
+    for (opcode, takes, form) in &options {
+        match checks::check(takes, &operands) {
+            Ok(()) => {
+                if form_takes(takes, &operands) {
+                    chosen = Some((opcode, form));
+                    break;
+                }
+            }
+            Err(message) => {
+                // The complaint that counts is the one from the form that
+                // matched the operands: that is the instruction the source
+                // meant, and its check is the reason it does not fit.
+                if complaint.is_none() {
+                    complaint = Some(message);
+                }
+                if exact.is_none() && form_takes(takes, &operands) {
+                    exact = Some(message);
+                }
+            }
+        }
+    }
+    let Some((opcode, form)) = chosen else {
+        return Err(match exact.or(complaint) {
+            Some(message) => Error::Type { message },
+            None => Error::UnknownInstruction {
+                name: line.mnemonic.clone(),
+            },
         });
     };
     operands::encode(*opcode, &line.mnemonic, form, &operands).map_err(|_| Error::BadOperand {
@@ -181,5 +213,6 @@ fn is_register(word: &str) -> bool {
             | "DS"
             | "ES"
             | "SS"
+            | "IP"
     )
 }

@@ -125,8 +125,24 @@ checked against.
   is `88 08h`. A mnemonic can name many forms, so the operands pick the one;
   a group's cell names the operation rather than a form, so the group's own
   table is searched too.
-- **T5** — **TODO.** The type checks, the thirteen of them, with the
-  reference's messages.
+- **T5** — **DONE, the type checks.** The reference's own words, one for
+  each refusal it made: `8 bit and 16 bit register`, `16 bit and 8 bit
+  register`, `16 bit register and 8 bit address`, `8 bit address and 16 bit
+  register`, `8 bit register and 16 bit address (add 'b.' before ...)`,
+  `16 bit address and 8 bit register (add 'b.' before ...)`, `second operand
+  is over 8 bits!`, `cannot use segment register with an immediate value`,
+  `segment registers cannot go together!`, `first operand cannot be an
+  immediate value`, `CS cannot be modified directly (use far JMP or CALL)`,
+  `IP cannot be modified directly (use JMP or CALL)`, `cannot get value of
+  IP register (use POP after CALL)`, `wrong use of segment register` and
+  `memory to memory is not allowed for 8086:`. The two wordings of a
+  mismatch belong to the position: the first operand says it one way and
+  the second says it the other. The checks that need no form - two segment
+  registers, memory to memory, a segment with an immediate, `CS`, `IP` -
+  come first, because their answer does not depend on which instruction the
+  source meant; the width checks need the form, so they run against each
+  candidate, and the complaint that counts is the one from the form that
+  matched the operands.
 - **T6** — **TODO.** The directives, the macros and the build directives.
 - **T7** — **TODO.** The eighty-six examples, and the goldens.
 

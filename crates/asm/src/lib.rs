@@ -7,6 +7,7 @@
 
 pub mod addressing;
 pub mod assemble;
+pub mod checks;
 pub mod groups;
 pub mod line;
 pub mod literals;
