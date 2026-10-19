@@ -32,7 +32,7 @@ pub fn parse(text: &str) -> Result<i64, Error> {
     };
     // MASM's radix: the base, then the `$`, then the digits: `16$FF`.
     if let Some((base, digits)) = text.split_once('$') {
-        let base = u32::from_str_radix(base.trim(), 10).map_err(|_| bad())?;
+        let base = base.trim().parse::<u32>().map_err(|_| bad())?;
         if !(2..=36).contains(&base) {
             return Err(bad());
         }
