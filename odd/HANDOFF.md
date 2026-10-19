@@ -162,7 +162,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 
 | Question | State | What would close it |
 |---|---|---|
-| `8F` with `mod=11` | refused by explicit policy, recorded as OPEN | the structural argument says register `POP`; no source states it. The hardware captures record `8F` by `/digit` only, so they do not cover `mod`. A `mod=11` case in `SingleStepTests` would settle it |
+| `8F` with `mod=11` | **CLOSED — the chip pops into the register** | The captures name the forms "pop dx", "pop si", "pop bp" and "pop bx", and they pop with every `/digit`. The refusal and the `/digit` check are both withdrawn |
 | `8F` with `reg != 0` | refused | **settled in our favour**: the captures record `8F` `/1`–`/7` as `"status": "undefined"`, so refusing matches hardware rather than contradicting it |
 | Does unsigned `DIV` (`/6`) negate under `REP`? | left alone as a policy | the captures do not cover prefixes. Needs a `F3 F6 /6` case, or the `8086_microcode_v2.zip` listing |
 | Is the microcode ROM identical across 8086 steppings? | not decidable | needs a 1978 Stepping 1 die, which is a collector item. Affects all five microcode findings if the ROM changed |
@@ -185,14 +185,24 @@ is 160 MB of gzipped JSON, so it is not vendored: a script in
 file, and `crates/core/tests/hardware_flags.rs` runs the cases against the
 emulator. The first slice is the eight ALU groups: 400 cases, 58 opcodes.
 
-It has already paid for itself twice, and both times by disagreeing with
-this project:
+It has already paid for itself seven times, and every one of them by
+disagreeing with this project:
 
 - the 16-bit `REG` field was the 80186's order, not the 8086's;
-- `DAA`'s second rule tests the old `AL`, not the adjusted one.
+- `DAA`'s second rule tests the old `AL`, not the adjusted one;
+- `8C` with a register destination is an 8086 instruction;
+- `INC`/`DEC` overflowed on the wrong side, and so did the rotates;
+- `POP r/m16` pops into a register, and ignores its `/digit`;
+- `XLAT` indexes with an unsigned `AL`;
+- `C6`/`C7` ignore their `/digit`.
 
-`odd/tasks/hardware-capture-oracle.md` is the plan. T5 is the next unit:
-the other 198 opcodes, where every disagreement is a finding.
+Seventy-one of the 1533 cases still disagree, in two families: the
+rotates' carry, and the port reads, where this emulator reads memory at
+the port and the chip returns `FFh` because nothing is attached to it.
+
+`odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
+whole opcode space, with the gate naming and counting the two families
+that still disagree.
 
 ## Decisions of 2026-10-19, and what they settle
 
@@ -200,7 +210,7 @@ the other 198 opcodes, where every disagreement is a finding.
 |---|---|---|
 | What is the oracle for the flags? | **The manual first; the hardware captures come in phase 2** | The captures record flags and not operand formats, so they cannot close the geometry half of the phase. `documentation-guide.md` §1.4 stays the oracle until phase 2 says otherwise |
 | What happens to the 86 example programs? | **Local gold, never committed** | They live under `re/extracted*/`, which is gitignored because it is derived from a proprietary binary. Running them is allowed; versioning them is not |
-| `8F` with `mod=11` | **Stays open** | The structural argument says a register `POP`; no source states it, and the captures record `8F` by `/digit` only. A `mod=11` case in `SingleStepTests` would settle it |
+| `8F` with `mod=11` | **CLOSED — the chip pops into the register** | The captures name the forms "pop dx", "pop si", "pop bp" and "pop bx", and they pop with every `/digit`. The refusal and the `/digit` check are both withdrawn |
 | `AAA`/`DAA` against the manual | **The core is corrected, not the manual** | Two defects: the mask was conditional and `AF` was never written. The manual's page 2-35 and the SDM's Volume 2A agree, and the SDM's `AL := AL AND 0FH` sits outside the branch |
 
 ## Next session, in order
