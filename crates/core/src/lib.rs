@@ -20,6 +20,7 @@ pub mod flags;
 pub mod memory;
 pub mod modrm;
 pub mod regs;
+pub mod transport;
 
 use memory::Memory;
 use regs::{Registers, Seg};

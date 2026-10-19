@@ -25,6 +25,7 @@ OPTIONS:
     --max N            stop after N instructions       (default 100000)
     --trace            print one line per instruction
     --dump ADDR:LEN    hex dump of memory at physical ADDR
+    --device-socket P serve the I/O bus on a unix socket at P
 ";
 
 fn main() -> ExitCode {
@@ -56,6 +57,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let mut max = 100_000u64;
     let mut trace = false;
     let mut dump: Option<(u32, usize)> = None;
+    let mut device_socket: Option<std::path::PathBuf> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -93,6 +95,11 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 max = value()?.parse().map_err(|_| "bad --max")?;
                 i += 1;
             }
+            "--device-socket" => {
+                let v = value()?;
+                device_socket = Some(std::path::PathBuf::from(v));
+                i += 1;
+            }
             "--trace" => trace = true,
             "--dump" => {
                 let v = value()?;
@@ -124,9 +131,27 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     cpu.regs.set_segment(Seg::Ds, ds);
     cpu.regs.set_segment(Seg::Es, ds);
 
+    // The device server: a device connects to the socket and its reads and
+    // writes go to the bus. It is served between instructions, from this
+    // thread, because the bus is shared with the emulator and a device is
+    // not `Send`.
+    let mut server = match &device_socket {
+        Some(path) => Some(
+            emo8067_core::transport::socket::DeviceServer::bind(path)
+                .map_err(|e| format!("{}: {e}", path.display()))?,
+        ),
+        None => None,
+    };
+
     let mut executed = 0u64;
     let mut failure: Option<String> = None;
     while executed < max {
+        if let Some(server) = &mut server {
+            if let Err(e) = server.poll(&mut cpu.bus.borrow_mut()) {
+                failure = Some(format!("device socket: {e}"));
+                break;
+            }
+        }
         let before = cpu.regs.ip;
         match cpu.step() {
             Ok(info) => {
