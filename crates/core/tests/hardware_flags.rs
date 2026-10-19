@@ -410,10 +410,13 @@ const KNOWN_DIVERGENCE_COUNT: usize = 6;
 #[test]
 fn the_flags_come_out_the_way_a_real_8086_leaves_them() {
     let cases = parse(ORACLE);
-    assert!(
-        cases.len() >= 1000,
-        "the oracle must stay broad: {}",
-        cases.len()
+    // The count is pinned exactly, not bounded: a file the network failed to
+    // deliver would leave a hole in the oracle, and a hole that shrinks the
+    // gate quietly is exactly what this project keeps paying for.
+    assert_eq!(
+        cases.len(),
+        1533,
+        "the oracle must hold every case the extraction writes"
     );
     let mut failures = Vec::new();
     let mut known = 0usize;

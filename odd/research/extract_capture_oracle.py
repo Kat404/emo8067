@@ -87,6 +87,15 @@ REGISTERS = [
 ]
 
 
+def is_gzip(path: Path) -> bool:
+    """Whether a cached file is a gzip and not an error page."""
+    try:
+        with path.open("rb") as handle:
+            return handle.read(2) == b"\x1f\x8b"
+    except OSError:
+        return False
+
+
 def fetch(path: str, cache: Path) -> bytes | None:
     """Download `path` once and cache it, or None when it is not there.
 
@@ -95,6 +104,10 @@ def fetch(path: str, cache: Path) -> bytes | None:
     the README says why. A missing file is data, not a failure.
     """
     cache.parent.mkdir(parents=True, exist_ok=True)
+    if cache.exists() and not is_gzip(cache):
+        # A failed download leaves an error page behind, and the next run
+        # would read it as the captures.
+        cache.unlink()
     if not cache.exists():
         url = f"{BASE}/{path}"
         try:
@@ -117,6 +130,12 @@ def fetch(path: str, cache: Path) -> bytes | None:
                 except Exception:  # noqa: BLE001, PERF203 - retried below
                     continue
             if last is not None:
+                # A file that is not there (a 404) and a file the network
+                # failed to deliver look the same from here, and the raw
+                # host times out on paths that do not exist. Either way the
+                # opcode is left out, the list of them is written into the
+                # generated file, and the gate pins the number of cases, so
+                # a hole in the oracle cannot pass unnoticed.
                 print(f"could not fetch {url}: {last}", file=sys.stderr)
                 return None
     return cache.read_bytes()
@@ -134,14 +153,20 @@ def transfers(test: dict) -> list[tuple[int, int, int]]:
         if cycle[7] not in ("MEMR", "MEMW") or cycle[8] != "T1":
             continue
         address = cycle[1]
-        # The data bus carries the byte on the T3 cycle. A word transfer
-        # puts two bytes there, low byte first.
+        # The data bus carries the byte on the T3 cycle of the *same* bus
+        # cycle, and the byte it carries may well be zero: a zero on the bus
+        # is a zero, not the absence of a byte. Reading the first non-zero
+        # value on the bus instead took the written-back byte for the
+        # operand whenever the operand was zero, which is a memory state
+        # the chip never had.
         value = 0
         width = 1
-        for later in cycles[index : index + 4]:
-            if later[8] == "T3" and later[6]:
+        for later in cycles[index + 1 : index + 4]:
+            if later[8] == "T3":
                 value = later[6]
-                width = 2 if value > 0xFF else 1
+                # BHE is active low: clear means the high byte goes too, and
+                # the transfer is a word.
+                width = 2 if later[5] == 0 else 1
                 break
         out.append((address, width, value))
     return out
