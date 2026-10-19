@@ -92,8 +92,15 @@ checked against.
   and the `r/m` one always names `R/M`. The forms that are not encoded
   yet — a group's `/digit`, and a memory operand until the addressing
   modes land — say so instead of guessing.
-- **T3** — **TODO.** The addressing modes: the base and index registers, the
-  displacement's width, the direct form, and the default segment per base.
+- **T3** — **DONE, the addressing modes.** A memory reference, taken
+  apart: the base and the index, the displacement, the R/M field they name
+  (Table 4-10's eight forms), the MOD that says how wide the displacement
+  is, the direct form with no register at all, and the default segment:
+  anything involving `SP` or `BP` is relative to `SS`, everything else to
+  `DS`. The reference's two refusals are refused too — a base of `BX` with
+  an index of `BP`, and `SI` with `DI`. Still to come in this task: the
+  source's own syntax for a reference (`[BX+SI+4]`, `WORD PTR [1234h]`),
+  and the matcher using all of it.
 - **T4** — **DONE, the literals and the line.** The literals are below.
   **DONE, the line.** A source line, taken apart: the mnemonic, the operands
   as the source wrote them, and the prefixes that came before - the repeat
