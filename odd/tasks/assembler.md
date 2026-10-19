@@ -94,8 +94,13 @@ checked against.
   modes land — say so instead of guessing.
 - **T3** — **TODO.** The addressing modes: the base and index registers, the
   displacement's width, the direct form, and the default segment per base.
-- **T4** — **TODO.** The immediates and the literals, with the reference's
-  rules for a hex value and for a radix suffix.
+- **T4** — **DONE, the literals.** Four ways to write a number, all of
+  them from the reference's own diagnostics: `&HFF`, `1234h`, `16$FF` (MASM's
+  radix: the base, then the `$`, then the digits) and plain decimal. A hex
+  value has to begin with a digit or it reads as a name, so `FFh` is refused
+  and `0FFh` is not; and a value that will not fit in sixteen bits is
+  refused rather than truncated. Still to come in this task: the source
+  parser that turns a line into operands, and the prefixes.
 - **T5** — **TODO.** The type checks, the thirteen of them, with the
   reference's messages.
 - **T6** — **TODO.** The directives, the macros and the build directives.
