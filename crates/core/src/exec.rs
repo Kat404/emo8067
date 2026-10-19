@@ -1277,34 +1277,43 @@ fn rotate_through_carry(
 /// `DAA` and `DAS` share a shape and differ only in the direction.
 ///
 /// The low nibble is corrected first, then the high one; the carry the high
-/// correction produces is the new CF. `AF` is undefined afterwards on an 8086,
-/// so it is left alone, and only CF, ZF, SF and PF are written.
+/// correction produces is the new CF. AF belongs to the low correction and is
+/// written with it, and only CF, AF, ZF, SF and PF are written at all.
 fn daa(cpu: &mut crate::Cpu, add: bool) {
     let old_cf = cpu.regs.flags.get(CF);
     let old_af = cpu.regs.flags.get(AF);
     let mut al = cpu.regs.byte(Reg8::Al);
 
+    // The low correction fires on the low nibble or on a carry out of it, and
+    // it is what writes AF. The manual's Table 2-21 gives DAA and DAS an `X`
+    // in the AF column, and its prose says DAA "updates AF, CF, PF, SF and ZF"
+    // (8086 Family User's Manual, October 1979, pages 2-36 and 2-51). Intel's
+    // SDM writes the same (Volume 2A, page 3-324):
+    //
+    //     IF (((AL AND 0FH) > 9) or AF = 1)
+    //         THEN AL := AL + 6; CF := old_CF or (carry); AF := 1;
+    //         ELSE AF := 0;
+    //     FI;
+    let low = al & 0x0F > 9 || old_af;
     if add {
-        if al & 0x0F > 9 || old_af {
+        if low {
             al = al.wrapping_add(0x06);
         }
-        let mut cf = old_cf;
-        if al > 0x99 || old_cf {
-            cf = true;
-            al = al.wrapping_add(0x60);
-        }
-        cpu.regs.flags.set(CF, cf);
-    } else {
-        if al & 0x0F > 9 || old_af {
-            al = al.wrapping_sub(0x06);
-        }
-        let mut cf = old_cf;
-        if al > 0x99 || old_cf {
-            cf = true;
-            al = al.wrapping_sub(0x60);
-        }
-        cpu.regs.flags.set(CF, cf);
+    } else if low {
+        al = al.wrapping_sub(0x06);
     }
+    cpu.regs.flags.set(AF, low);
+
+    let mut cf = old_cf;
+    if al > 0x99 || old_cf {
+        cf = true;
+        al = if add {
+            al.wrapping_add(0x60)
+        } else {
+            al.wrapping_sub(0x60)
+        };
+    }
+    cpu.regs.flags.set(CF, cf);
 
     cpu.regs.set_byte(Reg8::Al, al);
     let f = &mut cpu.regs.flags;
@@ -1314,6 +1323,24 @@ fn daa(cpu: &mut crate::Cpu, add: bool) {
 }
 
 /// `AAA` and `AAS` differ only in the direction of the adjustment.
+///
+/// The high-order half-byte of `AL` is zeroed **either way**. The manual says
+/// so in prose — "AAA ... changes the contents of register AL to a valid
+/// unpacked decimal number; the high-order half-byte is zeroed" (8086 Family
+/// User's Manual, October 1979, page 2-35) — and Intel's own SDM writes the
+/// mask as a step of its own, outside the branch (SDM Volume 2A, page 3-19):
+///
+/// ```text
+///     IF ((AL AND 0FH) > 9) or (AF = 1)
+///         THEN AX := AX + 106H; AF := 1; CF := 1;
+///         ELSE AF := 0; CF := 0;
+///     FI;
+///     AL := AL AND 0FH;
+/// ```
+///
+/// So `AL = 35h` with `AF` clear ends as `05h`, not `35h`: the adjustment never
+/// fired and the mask still did. Masking only inside the branch, as this used
+/// to, left a high nibble that no document allows.
 fn aaa(cpu: &mut crate::Cpu, add: bool) {
     let old_af = cpu.regs.flags.get(AF);
     let mut al = cpu.regs.byte(Reg8::Al);
@@ -1323,11 +1350,12 @@ fn aaa(cpu: &mut crate::Cpu, add: bool) {
     if carry {
         let delta = if adjust { 0x06u8 } else { 0xFAu8 }; // +6 or -6
         al = al.wrapping_add(delta);
-        al &= 0x0F;
         let ah = cpu.regs.byte(Reg8::Ah);
         cpu.regs
             .set_byte(Reg8::Ah, ah.wrapping_add(if adjust { 1 } else { 0xFF }));
     }
+    // The mask is not part of the adjustment: it happens in both branches.
+    al &= 0x0F;
     cpu.regs.set_byte(Reg8::Al, al);
     let f = &mut cpu.regs.flags;
     f.set(AF, carry);
@@ -2567,6 +2595,36 @@ mod tests {
     }
 
     #[test]
+    fn aaa_zeroes_the_high_half_byte_even_when_it_does_not_adjust() {
+        // The mask is not part of the adjustment. The manual says AAA "changes
+        // the contents of register AL to a valid unpacked decimal number; the
+        // high-order half-byte is zeroed", and the SDM writes the mask as its
+        // own step, outside the branch (Volume 2A, page 3-19). So AL = 35h
+        // with AF clear ends as 05h even though nothing was added to it.
+        let mut cpu = cpu_with(&[0x37]);
+        cpu.regs.set_byte(Reg8::Al, 0x35);
+        cpu.regs.set_byte(Reg8::Ah, 0x00);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(
+            cpu.regs.byte(Reg8::Al),
+            0x05,
+            "the high half-byte is zeroed"
+        );
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x00, "and no carry was invented");
+        assert!(!cpu.regs.flags.get(AF) && !cpu.regs.flags.get(CF));
+
+        // AAS masks the same way, and takes the same decision on the nibble.
+        let mut cpu = cpu_with(&[0x3F]);
+        cpu.regs.set_byte(Reg8::Al, 0x25);
+        cpu.regs.set_byte(Reg8::Ah, 0x00);
+        cpu.regs.flags.set(AF, false);
+        cpu.step().unwrap();
+        assert_eq!(cpu.regs.byte(Reg8::Al), 0x05);
+        assert_eq!(cpu.regs.byte(Reg8::Ah), 0x00);
+    }
+
+    #[test]
     fn daa_repairs_a_packed_bcd_result() {
         // 27 = DAA. 0x28 + 0x37 = 0x5F, whose low nibble F is not a digit.
         // The low correction turns it into 0x65, which is valid, and nothing
@@ -2577,6 +2635,10 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.byte(Reg8::Al), 0x65);
         assert!(!cpu.regs.flags.get(CF));
+        // The low correction is what writes AF: the manual's Table 2-21 gives
+        // DAA an `X` in the AF column and its prose says DAA "updates AF, CF,
+        // PF, SF and ZF".
+        assert!(cpu.regs.flags.get(AF), "the low nibble was corrected");
     }
 
     #[test]
@@ -2588,6 +2650,8 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.byte(Reg8::Al), 0x39);
         assert!(!cpu.regs.flags.get(CF));
+        // Nothing was corrected, so AF is cleared rather than left as it was.
+        assert!(!cpu.regs.flags.get(AF));
 
         // A high nibble above 9 does carry: 0x99 + 0x01 needs the 0x60 add.
         let mut cpu = cpu_with(&[0x27]);
@@ -2596,6 +2660,7 @@ mod tests {
         cpu.step().unwrap();
         assert_eq!(cpu.regs.byte(Reg8::Al), 0x00);
         assert!(cpu.regs.flags.get(CF));
+        assert!(cpu.regs.flags.get(AF));
     }
 
     #[test]

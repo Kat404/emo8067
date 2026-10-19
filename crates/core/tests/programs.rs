@@ -24,7 +24,7 @@
 //! prove it rather than appearing to work because everything shares a base.
 
 use emo8067_core::Cpu;
-use emo8067_core::flags::{CF, DF, OF, ZF};
+use emo8067_core::flags::{AF, CF, DF, OF, ZF};
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 
 const CODE: u16 = 0x1000;
@@ -989,4 +989,78 @@ fn repe_cmpsb_stops_at_the_first_mismatch_between_two_buffers() {
     );
     assert_eq!(c.regs.word(Reg16::Di), 0x0204, "and DI on the same index");
     assert!(!c.regs.flags.get(ZF), "ZF clear is what ended the repeat");
+}
+
+/// Two ASCII digits added, and adjusted into a binary digit and a carry.
+///
+/// ```asm
+///     mov  al, 35h        ; '5'
+///     mov  bl, 35h        ; '5'
+///     add  al, bl         ; 6Ah: the low nibble is not a digit
+///     aaa                 ; AL = 00h, AH = 01h
+///     hlt
+/// ```
+///
+/// The expected value is stated here rather than read back from the emulator,
+/// because that is the only way the test can fail. `35h + 35h` is `6Ah`: the
+/// low nibble is `Ah`, which is not a decimal digit, so `AAA` adds six, carries
+/// into `AH`, and leaves `AL` with the digit `0` and a carry of one. The
+/// manual's rule — the nibble out of range, or `AF` set, means adjust — is
+/// what the `ADD` above sets up: `5 + 5` does not carry out of the low nibble,
+/// so `AF` is clear and the adjustment is the nibble's own doing.
+#[test]
+fn adds_two_ascii_digits_into_a_binary_digit_and_a_carry() {
+    let mut c = machine(&[
+        0xB0, 0x35, // mov al, 35h
+        0xB3, 0x35, // mov bl, 35h
+        0x00, 0xD8, // add al, bl
+        0x37, // aaa
+        0xF4, // hlt
+    ]);
+
+    run(&mut c, 100);
+    assert_eq!(c.regs.byte(Reg8::Al), 0x00, "the digit is zero");
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x01, "and the carry is one");
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0100);
+    assert!(
+        c.regs.flags.get(CF),
+        "a decimal carry came out of the nibble"
+    );
+    assert!(c.regs.flags.get(AF), "and AF says the same");
+}
+
+/// Two packed BCD operands added, and the sum repaired into packed BCD.
+///
+/// ```asm
+///     mov  al, 28h
+///     mov  bl, 37h
+///     add  al, bl         ; 5Fh
+///     daa                 ; 65h
+///     hlt
+/// ```
+///
+/// `28h + 37h` is `5Fh`, whose low nibble is not a digit. `DAA` adds six to
+/// the low nibble, which carries nothing out of it, so the result is the
+/// packed pair `65h` — `28 + 37 = 65` — with no carry out of the tens. The
+/// low correction is what writes `AF`, and the manual's Table 2-21 gives `DAA`
+/// an `X` in that column, so `AF` is set here and the tens carry is not.
+#[test]
+fn repairs_a_packed_bcd_sum_into_packed_bcd() {
+    let mut c = machine(&[
+        0xB0, 0x28, // mov al, 28h
+        0xB3, 0x37, // mov bl, 37h
+        0x00, 0xD8, // add al, bl
+        0x27, // daa
+        0xF4, // hlt
+    ]);
+
+    run(&mut c, 100);
+    assert_eq!(c.regs.byte(Reg8::Al), 0x65, "28 + 37 is 65 in packed BCD");
+    assert!(!c.regs.flags.get(CF), "nothing carried out of the tens");
+    assert!(c.regs.flags.get(AF), "the low nibble was corrected");
+    assert!(!c.regs.flags.get(ZF));
+    assert!(
+        !c.regs.flags.get(OF),
+        "the sum of two positives cannot overflow"
+    );
 }
