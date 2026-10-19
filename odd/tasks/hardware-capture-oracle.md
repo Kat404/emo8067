@@ -93,8 +93,18 @@ be regenerated rather than trusted.
   number of revolutions still moves the carry. Six remain, all of them the
   carry of a rotate by more than one, where the captures agree with the rule
   the code already had in every case they cover — so those six are
-  unexplained, and the next session should start by asking why the cases
-  they come from differ from the other thousand.
+  unexplained.
+  - **One lead was tried and it is dead.** The six cases come from the
+    captures whose operand lives in memory, so the first suspicion was the
+    extraction: that the memory state it writes for a case is not the memory
+    the chip had. An audit of the effective address — computed from the
+    encoding, against the address on the chip's own bus cycles — says the
+    encoding's address and the chip's address disagree in 1058 of 1060 cases
+    of `D2.0`, and in *every* memory form of `D0.0`, `00` and `8B` as well.
+    Those last three files pass the gate, so the audit is what is wrong, not
+    the chip and not the emulator. **The next session should not repeat it**:
+    the address computation in that script is wrong, and the memory the
+    extraction writes agrees with the chip's own RAM list.
 
 ## Log
 

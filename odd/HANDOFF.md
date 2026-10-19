@@ -203,7 +203,10 @@ not a memory address; with nothing attached to it a read returns all
 ones). Six of the 1533 cases still disagree, all of them the carry of a
 rotate by more than one, and all of them unexplained: the captures
 agree with the rule the code already had in every other case they
-cover.
+cover. The suspicion that the extraction writes the wrong memory for
+those cases was tried and is dead: an audit of the effective address
+against the chip's own bus cycles is wrong itself, since it disagrees
+with the chip in the files that pass the gate too.
 
 The `X` and `U` rows of §1.4 are no longer a hole. The oracle gate
 compares every flag the chip defined, and it checks the document in the
