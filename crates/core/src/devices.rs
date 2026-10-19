@@ -131,6 +131,21 @@ impl DeviceBus {
         }
     }
 
+    /// The flat view of the port space: byte N is port N.
+    ///
+    /// The reference implementation's bus was a 64 KB file that every device
+    /// polled, so this is the image such a device expects to see. It is a
+    /// *view* and not the bus's storage: the chip swallows a write to a port
+    /// nobody owns, and the captures say so.
+    #[must_use]
+    pub fn port_space(&mut self) -> Vec<u8> {
+        let mut space = vec![0xFF; 0x10000];
+        for port in 0..=0xFFFFu16 {
+            space[port as usize] = self.read(port);
+        }
+        space
+    }
+
     /// Write a port as a word.
     pub fn write_word(&mut self, port: u16, value: u16) {
         if let Some(device) = self.devices.get_mut(&port) {

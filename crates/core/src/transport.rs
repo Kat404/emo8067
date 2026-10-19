@@ -24,9 +24,12 @@ use crate::devices::DeviceBus;
 pub const READ: u8 = 0;
 /// A write: the port, and the byte to write to it.
 pub const WRITE: u8 = 1;
+/// The whole port space, the way the reference's file showed it: 64 KB,
+/// byte N being port N.
+pub const SPACE: u8 = 2;
 
 /// One message on the wire.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Frame {
     /// Read a port.
     Read(u16),
@@ -34,6 +37,8 @@ pub enum Frame {
     Write(u16, u8),
     /// The answer to a read: the byte the port holds.
     Value(u8),
+    /// The whole port space, as the reference's file showed it.
+    Space(Vec<u8>),
 }
 
 impl Frame {
@@ -41,7 +46,7 @@ impl Frame {
     #[must_use]
     pub fn encode_request(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(4);
-        match *self {
+        match self {
             Frame::Read(port) => {
                 out.push(READ);
                 out.extend_from_slice(&port.to_le_bytes());
@@ -49,9 +54,10 @@ impl Frame {
             Frame::Write(port, value) => {
                 out.push(WRITE);
                 out.extend_from_slice(&port.to_le_bytes());
-                out.push(value);
+                out.push(*value);
             }
             Frame::Value(_) => out.push(READ),
+            Frame::Space(_) => out.push(SPACE),
         }
         out
     }
@@ -59,8 +65,14 @@ impl Frame {
     /// The bytes of a reply.
     #[must_use]
     pub fn encode_reply(&self) -> Vec<u8> {
-        match *self {
-            Frame::Value(value) => vec![value],
+        match self {
+            Frame::Value(value) => vec![*value],
+            Frame::Space(space) => {
+                let mut out = Vec::with_capacity(1 + space.len());
+                out.push(SPACE);
+                out.extend_from_slice(space);
+                out
+            }
             Frame::Read(port) => {
                 let mut out = Vec::with_capacity(3);
                 out.push(READ);
@@ -71,7 +83,7 @@ impl Frame {
                 let mut out = Vec::with_capacity(4);
                 out.push(WRITE);
                 out.extend_from_slice(&port.to_le_bytes());
-                out.push(value);
+                out.push(*value);
                 out
             }
         }
@@ -88,6 +100,7 @@ pub fn decode_request(buf: &[u8]) -> Option<(Frame, usize)> {
     match kind {
         READ => Some((Frame::Read(port), 3)),
         WRITE => Some((Frame::Write(port, *buf.get(3)?), 4)),
+        SPACE => Some((Frame::Space(Vec::new()), 1)),
         _ => None,
     }
 }
@@ -108,6 +121,7 @@ pub fn serve(bus: &mut DeviceBus, request: Frame) -> Frame {
             Frame::Value(bus.read(port))
         }
         Frame::Value(value) => Frame::Value(value),
+        Frame::Space(_) => Frame::Space(bus.port_space()),
     }
 }
 
@@ -184,7 +198,21 @@ pub mod socket {
                 while let Some((frame, used)) = decode_request(buf) {
                     buf.drain(..used);
                     let answer = serve(bus, frame);
-                    stream.write_all(&answer.encode_reply())?;
+                    // The reply can be the whole 64 KB port space, and the
+                    // socket is not blocking, so it is written in pieces.
+                    let mut reply = answer.encode_reply();
+                    while !reply.is_empty() {
+                        match stream.write(&reply) {
+                            Ok(0) => break,
+                            Ok(written) => {
+                                reply.drain(..written);
+                            }
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                std::thread::sleep(std::time::Duration::from_millis(1));
+                            }
+                            Err(e) => return Err(e),
+                        }
+                    }
                 }
             }
             Ok(())

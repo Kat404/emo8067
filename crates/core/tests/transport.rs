@@ -124,3 +124,16 @@ fn a_device_reaches_the_bus_over_a_socket() {
     assert_eq!(value, 0x2B, "and the port holds what the device made of it");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn the_port_space_is_the_flat_view_the_old_protocol_showed() {
+    let mut bus = DeviceBus::new();
+    bus.add(Box::new(Counter {
+        port: 0x60,
+        count: 0x5A,
+    }));
+    let space = bus.port_space();
+    assert_eq!(space.len(), 0x10000, "the old file was 64 KB");
+    assert_eq!(space[0x60], 0x5A, "byte N is port N");
+    assert_eq!(space[0x61], 0xFF, "and nobody owns that one");
+}
