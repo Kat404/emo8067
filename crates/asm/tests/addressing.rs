@@ -1,7 +1,7 @@
 //! The addressing modes, and the bytes they need.
 
-use emo8067_asm::addressing::{Address, Error, Reg, default_segment, encode};
-use emo8067_asm::modrm::Mod;
+use emo8067_asm::addressing::{Address, Error, Reg, default_segment, encode, parse};
+use emo8067_asm::modrm::{Mod, Width};
 
 fn address(base: Option<Reg>, index: Option<Reg>, displacement: Option<i64>) -> Address {
     Address {
@@ -13,7 +13,6 @@ fn address(base: Option<Reg>, index: Option<Reg>, displacement: Option<i64>) -> 
 
 #[test]
 fn the_eight_forms_name_the_rm_field_the_manual_gives_them() {
-    // Table 4-10: MOD=00, no displacement.
     let cases = [
         (address(Some(Reg::Bx), Some(Reg::Si), None), 0b000),
         (address(Some(Reg::Bx), Some(Reg::Di), None), 0b001),
@@ -34,7 +33,6 @@ fn the_eight_forms_name_the_rm_field_the_manual_gives_them() {
 
 #[test]
 fn a_displacement_says_how_wide_it_is() {
-    // [BX+disp8] and [BX+disp16].
     let (modrm, rm, bytes) = encode(&address(Some(Reg::Bx), None, Some(0x40))).unwrap();
     assert_eq!(modrm, Mod::Byte);
     assert_eq!(rm, 0b111);
@@ -72,4 +70,25 @@ fn the_two_illegal_pairs_are_refused() {
         encode(&address(Some(Reg::Si), Some(Reg::Di), None)),
         Err(Error::WrongAddressing { .. })
     ));
+}
+
+#[test]
+fn a_reference_is_read_the_way_the_source_wrote_it() {
+    let reference = parse("[BX+SI+4]").unwrap();
+    assert_eq!(reference.address.base, Some(Reg::Bx));
+    assert_eq!(reference.address.index, Some(Reg::Si));
+    assert_eq!(reference.address.displacement, Some(4));
+    assert_eq!(reference.width, None);
+
+    let reference = parse("WORD PTR [1234h]").unwrap();
+    assert_eq!(reference.width, Some(Width::Word));
+    assert_eq!(reference.address.displacement, Some(0x1234));
+
+    let reference = parse("BYTE PTR DS:[BX]").unwrap();
+    assert_eq!(reference.width, Some(Width::Byte));
+    assert_eq!(reference.address.base, Some(Reg::Bx));
+
+    // A sign in front of the number belongs to the number.
+    let reference = parse("[BX-4]").unwrap();
+    assert_eq!(reference.address.displacement, Some(-4));
 }

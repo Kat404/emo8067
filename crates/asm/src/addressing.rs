@@ -60,6 +60,120 @@ pub enum Error {
     DisplacementTooBig { value: i64 },
     /// The reference named a register that cannot be a base.
     NotABase { name: String },
+    /// The text is not a memory reference at all.
+    NotAReference { text: String },
+}
+
+/// A memory reference, as the source wrote it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Reference {
+    /// The address, taken apart.
+    pub address: Address,
+    /// The width the source asked for, when it said: `BYTE PTR` or `WORD PTR`.
+    pub width: Option<crate::modrm::Width>,
+}
+
+/// Read a memory reference: `[BX+SI+4]`, `WORD PTR [1234h]`, `BYTE PTR DS:[BX]`.
+pub fn parse(text: &str) -> Result<Reference, Error> {
+    let mut rest = text.trim();
+    // The size and the segment override come before the brackets.
+    let mut width = None;
+    let mut segment = None;
+    loop {
+        let (word, tail) = match rest.split_once(char::is_whitespace) {
+            Some((word, tail)) => (word, tail.trim_start()),
+            None => (rest, ""),
+        };
+        match word.to_ascii_uppercase().as_str() {
+            "BYTE" => {
+                width = Some(crate::modrm::Width::Byte);
+                rest = tail;
+                // The size is usually written `BYTE PTR`, and the PTR is
+                // only a word.
+                if let Some(tail) = rest.strip_prefix("PTR ") {
+                    rest = tail;
+                }
+            }
+            "WORD" => {
+                width = Some(crate::modrm::Width::Word);
+                rest = tail;
+                if let Some(tail) = rest.strip_prefix("PTR ") {
+                    rest = tail;
+                }
+            }
+            "CS" | "DS" | "ES" | "SS" => {
+                segment = Some(word.to_string());
+                rest = tail;
+            }
+            _ => break,
+        }
+    }
+    let _ = segment;
+    // A segment override may sit right against the bracket: `DS:[BX]`.
+    for name in ["CS", "DS", "ES", "SS"] {
+        if let Some(tail) = rest.strip_prefix(name) {
+            if let Some(tail) = tail.strip_prefix(':') {
+                rest = tail;
+            }
+        }
+    }
+    let inner = rest
+        .trim()
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .ok_or_else(|| Error::NotAReference {
+            text: text.to_string(),
+        })?;
+    let mut address = Address::default();
+    // The terms are separated by a sign, and a sign in front of a number
+    // belongs to it: `BX-4` is BX and minus four.
+    let mut rest = inner.trim();
+    let mut negative = false;
+    while !rest.is_empty() {
+        if let Some(tail) = rest.strip_prefix('-') {
+            negative = true;
+            rest = tail.trim_start();
+            continue;
+        }
+        if let Some(tail) = rest.strip_prefix('+') {
+            rest = tail.trim_start();
+            continue;
+        }
+        let (term, tail) = match rest.find(['+', '-']) {
+            Some(at) => (&rest[..at], &rest[at..]),
+            None => (rest, ""),
+        };
+        let term = term.trim();
+        match register(term) {
+            Some(reg) => {
+                if address.base.is_some() {
+                    address.index = Some(reg);
+                } else {
+                    address.base = Some(reg);
+                }
+            }
+            None => {
+                let value = crate::literals::parse(term).map_err(|_| Error::NotAReference {
+                    text: text.to_string(),
+                })?;
+                address.displacement = Some(if negative { -value } else { value });
+            }
+        }
+        rest = tail;
+    }
+    Ok(Reference { address, width })
+}
+
+/// The register a term names, if it names one.
+fn register(term: &str) -> Option<Reg> {
+    match term.to_ascii_uppercase().as_str() {
+        "BX" => Some(Reg::Bx),
+        "SP" => Some(Reg::Sp),
+        "BP" => Some(Reg::Bp),
+        "SI" => Some(Reg::Si),
+        "DI" => Some(Reg::Di),
+        _ => None,
+    }
 }
 
 /// The segment a reference is in when the source did not say.
