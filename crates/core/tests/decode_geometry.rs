@@ -28,9 +28,10 @@
 //! register-or-memory operand, and the immediate when the format names one.
 //!
 //! This file is Phase 1 of the QA hardening plan in
-//! `odd/tasks/decode-geometry-gate.md`: the immediates, at MOD=00. Displacements
-//! are the second half, and the execution half — that every defined encoding
-//! retires and touches only what it is documented to touch — is the third.
+//! `odd/tasks/decode-geometry-gate.md`: the immediates, at MOD=00, and the
+//! displacements, at MOD=01 and MOD=10. The execution half — that every
+//! defined encoding retires and touches only what it is documented to touch —
+//! is the third.
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::{Reg16, Seg};
@@ -43,6 +44,9 @@ struct Components {
     opcode: u8,
     /// A ModR/M byte, for the formats written `r/m` or `r16/m16`.
     modrm: bool,
+    /// Displacement bytes: 0, 1 for the `disp8` MOD=01 carries, 2 for the
+    /// `disp16` MOD=10 carries.
+    disp: u8,
     /// Immediate bytes: 0, 1 for `i8`, 2 for `i16`.
     imm: u8,
 }
@@ -52,6 +56,7 @@ impl Components {
         Self {
             opcode,
             modrm: false,
+            disp: 0,
             imm,
         }
     }
@@ -59,6 +64,7 @@ impl Components {
         Self {
             opcode,
             modrm: true,
+            disp: 0,
             imm,
         }
     }
@@ -68,12 +74,31 @@ impl Components {
         Self {
             opcode,
             modrm: false,
+            disp: 0,
             imm: 2,
+        }
+    }
+    /// A ModR/M byte and a displacement, with no immediate.
+    const fn modrm_disp(opcode: u8, disp: u8) -> Self {
+        Self {
+            opcode,
+            modrm: true,
+            disp,
+            imm: 0,
+        }
+    }
+    /// A ModR/M byte, a displacement and an immediate.
+    const fn modrm_disp_imm(opcode: u8, disp: u8, imm: u8) -> Self {
+        Self {
+            opcode,
+            modrm: true,
+            disp,
+            imm,
         }
     }
 
     const fn total(&self) -> u8 {
-        1 + if self.modrm { 1 } else { 0 } + self.imm
+        1 + if self.modrm { 1 } else { 0 } + self.disp + self.imm
     }
 }
 
@@ -563,6 +588,897 @@ const ENCODINGS: &[Encoding] = &[
     ),
 ];
 
+/// Every encoding that carries a displacement, taken from the same opcode map
+/// in `documentation-guide.md` §1.3.
+///
+/// Table 4-8 says MOD=01 carries an 8-bit displacement and MOD=10 a 16-bit
+/// one, and Table 4-10 says the immediate follows the displacement, never the
+/// other way round. The rows use `rm = 111`, so the operand is `[BX]` plus the
+/// displacement, except for the last pair, which uses `rm = 110` and is
+/// therefore `[BP]`. `rm = 111` and not `rm = 011` is not a detail: Table 4-10
+/// gives `011` as `[BP+DI]`, and the rows above already use `rm = 111` for
+/// their `[BX]`.
+///
+/// The ALU groups are the eight operations of `00`..`3D`, each in its two
+/// memory forms: `r/m,r` and `r,r/m`. The `reg` field names a register in
+/// both, the source in the first and the destination in the second, and the
+/// rows use `reg = 000` — `AL` or `AX` — for both.
+///
+/// `FF /2` through `FF /5` are deliberately absent. An indirect `CALL` or
+/// `JMP` leaves no trace of how many bytes it read, exactly like `EA`, which
+/// the table above excludes for the same reason. The near `CALL` could be
+/// measured through the return address it pushes, but that needs a per-row
+/// memory setup this file does not have yet.
+const DISPLACEMENT_ENCODINGS: &[Encoding] = &[
+    // ---- the eight ALU groups, each in its two memory forms
+    Encoding::new(
+        "00 ADD r/m8,r8 [BX+disp8]",
+        &[0x00, 0x47, 0x40],
+        Components::modrm_disp(0x00, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "00 ADD r/m8,r8 [BX+disp16]",
+        &[0x00, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x00, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "01 ADD r/m16,r16 [BX+disp8]",
+        &[0x01, 0x47, 0x40],
+        Components::modrm_disp(0x01, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "01 ADD r/m16,r16 [BX+disp16]",
+        &[0x01, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x01, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "02 ADD r8,r/m8 [BX+disp8]",
+        &[0x02, 0x47, 0x40],
+        Components::modrm_disp(0x02, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "02 ADD r8,r/m8 [BX+disp16]",
+        &[0x02, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x02, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "03 ADD r16,r/m16 [BX+disp8]",
+        &[0x03, 0x47, 0x40],
+        Components::modrm_disp(0x03, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "03 ADD r16,r/m16 [BX+disp16]",
+        &[0x03, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x03, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "08 OR r/m8,r8 [BX+disp8]",
+        &[0x08, 0x47, 0x40],
+        Components::modrm_disp(0x08, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "08 OR r/m8,r8 [BX+disp16]",
+        &[0x08, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x08, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "09 OR r/m16,r16 [BX+disp8]",
+        &[0x09, 0x47, 0x40],
+        Components::modrm_disp(0x09, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "09 OR r/m16,r16 [BX+disp16]",
+        &[0x09, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x09, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "0A OR r8,r/m8 [BX+disp8]",
+        &[0x0A, 0x47, 0x40],
+        Components::modrm_disp(0x0A, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "0A OR r8,r/m8 [BX+disp16]",
+        &[0x0A, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x0A, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "0B OR r16,r/m16 [BX+disp8]",
+        &[0x0B, 0x47, 0x40],
+        Components::modrm_disp(0x0B, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "0B OR r16,r/m16 [BX+disp16]",
+        &[0x0B, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x0B, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "10 ADC r/m8,r8 [BX+disp8]",
+        &[0x10, 0x47, 0x40],
+        Components::modrm_disp(0x10, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "10 ADC r/m8,r8 [BX+disp16]",
+        &[0x10, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x10, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "11 ADC r/m16,r16 [BX+disp8]",
+        &[0x11, 0x47, 0x40],
+        Components::modrm_disp(0x11, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "11 ADC r/m16,r16 [BX+disp16]",
+        &[0x11, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x11, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "12 ADC r8,r/m8 [BX+disp8]",
+        &[0x12, 0x47, 0x40],
+        Components::modrm_disp(0x12, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "12 ADC r8,r/m8 [BX+disp16]",
+        &[0x12, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x12, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "13 ADC r16,r/m16 [BX+disp8]",
+        &[0x13, 0x47, 0x40],
+        Components::modrm_disp(0x13, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "13 ADC r16,r/m16 [BX+disp16]",
+        &[0x13, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x13, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "18 SBB r/m8,r8 [BX+disp8]",
+        &[0x18, 0x47, 0x40],
+        Components::modrm_disp(0x18, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "18 SBB r/m8,r8 [BX+disp16]",
+        &[0x18, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x18, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "19 SBB r/m16,r16 [BX+disp8]",
+        &[0x19, 0x47, 0x40],
+        Components::modrm_disp(0x19, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "19 SBB r/m16,r16 [BX+disp16]",
+        &[0x19, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x19, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "1A SBB r8,r/m8 [BX+disp8]",
+        &[0x1A, 0x47, 0x40],
+        Components::modrm_disp(0x1A, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "1A SBB r8,r/m8 [BX+disp16]",
+        &[0x1A, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x1A, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "1B SBB r16,r/m16 [BX+disp8]",
+        &[0x1B, 0x47, 0x40],
+        Components::modrm_disp(0x1B, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "1B SBB r16,r/m16 [BX+disp16]",
+        &[0x1B, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x1B, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "20 AND r/m8,r8 [BX+disp8]",
+        &[0x20, 0x47, 0x40],
+        Components::modrm_disp(0x20, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "20 AND r/m8,r8 [BX+disp16]",
+        &[0x20, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x20, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "21 AND r/m16,r16 [BX+disp8]",
+        &[0x21, 0x47, 0x40],
+        Components::modrm_disp(0x21, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "21 AND r/m16,r16 [BX+disp16]",
+        &[0x21, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x21, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "22 AND r8,r/m8 [BX+disp8]",
+        &[0x22, 0x47, 0x40],
+        Components::modrm_disp(0x22, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "22 AND r8,r/m8 [BX+disp16]",
+        &[0x22, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x22, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "23 AND r16,r/m16 [BX+disp8]",
+        &[0x23, 0x47, 0x40],
+        Components::modrm_disp(0x23, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "23 AND r16,r/m16 [BX+disp16]",
+        &[0x23, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x23, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "28 SUB r/m8,r8 [BX+disp8]",
+        &[0x28, 0x47, 0x40],
+        Components::modrm_disp(0x28, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "28 SUB r/m8,r8 [BX+disp16]",
+        &[0x28, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x28, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "29 SUB r/m16,r16 [BX+disp8]",
+        &[0x29, 0x47, 0x40],
+        Components::modrm_disp(0x29, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "29 SUB r/m16,r16 [BX+disp16]",
+        &[0x29, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x29, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "2A SUB r8,r/m8 [BX+disp8]",
+        &[0x2A, 0x47, 0x40],
+        Components::modrm_disp(0x2A, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "2A SUB r8,r/m8 [BX+disp16]",
+        &[0x2A, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x2A, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "2B SUB r16,r/m16 [BX+disp8]",
+        &[0x2B, 0x47, 0x40],
+        Components::modrm_disp(0x2B, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "2B SUB r16,r/m16 [BX+disp16]",
+        &[0x2B, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x2B, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "30 XOR r/m8,r8 [BX+disp8]",
+        &[0x30, 0x47, 0x40],
+        Components::modrm_disp(0x30, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "30 XOR r/m8,r8 [BX+disp16]",
+        &[0x30, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x30, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "31 XOR r/m16,r16 [BX+disp8]",
+        &[0x31, 0x47, 0x40],
+        Components::modrm_disp(0x31, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "31 XOR r/m16,r16 [BX+disp16]",
+        &[0x31, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x31, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "32 XOR r8,r/m8 [BX+disp8]",
+        &[0x32, 0x47, 0x40],
+        Components::modrm_disp(0x32, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "32 XOR r8,r/m8 [BX+disp16]",
+        &[0x32, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x32, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "33 XOR r16,r/m16 [BX+disp8]",
+        &[0x33, 0x47, 0x40],
+        Components::modrm_disp(0x33, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "33 XOR r16,r/m16 [BX+disp16]",
+        &[0x33, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x33, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "38 CMP r/m8,r8 [BX+disp8]",
+        &[0x38, 0x47, 0x40],
+        Components::modrm_disp(0x38, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "38 CMP r/m8,r8 [BX+disp16]",
+        &[0x38, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x38, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "39 CMP r/m16,r16 [BX+disp8]",
+        &[0x39, 0x47, 0x40],
+        Components::modrm_disp(0x39, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "39 CMP r/m16,r16 [BX+disp16]",
+        &[0x39, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x39, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "3A CMP r8,r/m8 [BX+disp8]",
+        &[0x3A, 0x47, 0x40],
+        Components::modrm_disp(0x3A, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "3A CMP r8,r/m8 [BX+disp16]",
+        &[0x3A, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x3A, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "3B CMP r16,r/m16 [BX+disp8]",
+        &[0x3B, 0x47, 0x40],
+        Components::modrm_disp(0x3B, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "3B CMP r16,r/m16 [BX+disp16]",
+        &[0x3B, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x3B, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- Group 1 against an immediate. `83`'s immediate is DATA-SX: one byte
+    // on the wire, and the displacement comes before it.
+    Encoding::new(
+        "80 /0 ADD r/m8,i8 [BX+disp8]",
+        &[0x80, 0x47, 0x40, 0x01],
+        Components::modrm_disp_imm(0x80, 1, 1),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "80 /0 ADD r/m8,i8 [BX+disp16]",
+        &[0x80, 0x87, 0x34, 0x12, 0x01],
+        Components::modrm_disp_imm(0x80, 2, 1),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "81 /0 ADD r/m16,i16 [BX+disp8]",
+        &[0x81, 0x47, 0x40, 0x34, 0x12],
+        Components::modrm_disp_imm(0x81, 1, 2),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "81 /0 ADD r/m16,i16 [BX+disp16]",
+        &[0x81, 0x87, 0x34, 0x12, 0x34, 0x12],
+        Components::modrm_disp_imm(0x81, 2, 2),
+        6,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "82 /0 ADD r/m8,i8 [BX+disp8]",
+        &[0x82, 0x47, 0x40, 0x01],
+        Components::modrm_disp_imm(0x82, 1, 1),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "82 /0 ADD r/m8,i8 [BX+disp16]",
+        &[0x82, 0x87, 0x34, 0x12, 0x01],
+        Components::modrm_disp_imm(0x82, 2, 1),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "83 /0 ADD r/m16,i8:sx [BX+disp8]",
+        &[0x83, 0x47, 0x40, 0x01],
+        Components::modrm_disp_imm(0x83, 1, 1),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "83 /0 ADD r/m16,i8:sx [BX+disp16]",
+        &[0x83, 0x87, 0x34, 0x12, 0x01],
+        Components::modrm_disp_imm(0x83, 2, 1),
+        5,
+        Ip::Next,
+    ),
+    // ---- the register forms of TEST, XCHG and MOV, and LEA
+    Encoding::new(
+        "84 TEST r/m8,r8 [BX+disp8]",
+        &[0x84, 0x47, 0x40],
+        Components::modrm_disp(0x84, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "84 TEST r/m8,r8 [BX+disp16]",
+        &[0x84, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x84, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "85 TEST r/m16,r16 [BX+disp8]",
+        &[0x85, 0x47, 0x40],
+        Components::modrm_disp(0x85, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "85 TEST r/m16,r16 [BX+disp16]",
+        &[0x85, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x85, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "86 XCHG r/m8,r8 [BX+disp8]",
+        &[0x86, 0x47, 0x40],
+        Components::modrm_disp(0x86, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "86 XCHG r/m8,r8 [BX+disp16]",
+        &[0x86, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x86, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "87 XCHG r/m16,r16 [BX+disp8]",
+        &[0x87, 0x47, 0x40],
+        Components::modrm_disp(0x87, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "87 XCHG r/m16,r16 [BX+disp16]",
+        &[0x87, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x87, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "88 MOV r/m8,r8 [BX+disp8]",
+        &[0x88, 0x47, 0x40],
+        Components::modrm_disp(0x88, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "88 MOV r/m8,r8 [BX+disp16]",
+        &[0x88, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x88, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "89 MOV r/m16,r16 [BX+disp8]",
+        &[0x89, 0x47, 0x40],
+        Components::modrm_disp(0x89, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "89 MOV r/m16,r16 [BX+disp16]",
+        &[0x89, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x89, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8A MOV r8,r/m8 [BX+disp8]",
+        &[0x8A, 0x47, 0x40],
+        Components::modrm_disp(0x8A, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8A MOV r8,r/m8 [BX+disp16]",
+        &[0x8A, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x8A, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8B MOV r16,r/m16 [BX+disp8]",
+        &[0x8B, 0x47, 0x40],
+        Components::modrm_disp(0x8B, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8B MOV r16,r/m16 [BX+disp16]",
+        &[0x8B, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x8B, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8D LEA r16,r/m16 [BX+disp8]",
+        &[0x8D, 0x47, 0x40],
+        Components::modrm_disp(0x8D, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8D LEA r16,r/m16 [BX+disp16]",
+        &[0x8D, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x8D, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- an immediate into memory
+    Encoding::new(
+        "C6 /0 MOV r/m8,i8 [BX+disp8]",
+        &[0xC6, 0x47, 0x40, 0x42],
+        Components::modrm_disp_imm(0xC6, 1, 1),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C6 /0 MOV r/m8,i8 [BX+disp16]",
+        &[0xC6, 0x87, 0x34, 0x12, 0x42],
+        Components::modrm_disp_imm(0xC6, 2, 1),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C7 /0 MOV r/m16,i16 [BX+disp8]",
+        &[0xC7, 0x47, 0x40, 0x34, 0x12],
+        Components::modrm_disp_imm(0xC7, 1, 2),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C7 /0 MOV r/m16,i16 [BX+disp16]",
+        &[0xC7, 0x87, 0x34, 0x12, 0x34, 0x12],
+        Components::modrm_disp_imm(0xC7, 2, 2),
+        6,
+        Ip::Next,
+    ),
+    // ---- the shift group, at /4, which is SHL. The digit only names the
+    // operation; the length is the same for all of them.
+    Encoding::new(
+        "D0 /4 SHL r/m8,1 [BX+disp8]",
+        &[0xD0, 0x67, 0x40],
+        Components::modrm_disp(0xD0, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D0 /4 SHL r/m8,1 [BX+disp16]",
+        &[0xD0, 0xA7, 0x34, 0x12],
+        Components::modrm_disp(0xD0, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D1 /4 SHL r/m16,1 [BX+disp8]",
+        &[0xD1, 0x67, 0x40],
+        Components::modrm_disp(0xD1, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D1 /4 SHL r/m16,1 [BX+disp16]",
+        &[0xD1, 0xA7, 0x34, 0x12],
+        Components::modrm_disp(0xD1, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D2 /4 SHL r/m8,CL [BX+disp8]",
+        &[0xD2, 0x67, 0x40],
+        Components::modrm_disp(0xD2, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D2 /4 SHL r/m8,CL [BX+disp16]",
+        &[0xD2, 0xA7, 0x34, 0x12],
+        Components::modrm_disp(0xD2, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D3 /4 SHL r/m16,CL [BX+disp8]",
+        &[0xD3, 0x67, 0x40],
+        Components::modrm_disp(0xD3, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "D3 /4 SHL r/m16,CL [BX+disp16]",
+        &[0xD3, 0xA7, 0x34, 0x12],
+        Components::modrm_disp(0xD3, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- Group 3. `/0` carries an immediate and `/2` and `/3` carry none.
+    Encoding::new(
+        "F6 /0 TEST r/m8,i8 [BX+disp8]",
+        &[0xF6, 0x47, 0x40, 0x01],
+        Components::modrm_disp_imm(0xF6, 1, 1),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F6 /0 TEST r/m8,i8 [BX+disp16]",
+        &[0xF6, 0x87, 0x34, 0x12, 0x01],
+        Components::modrm_disp_imm(0xF6, 2, 1),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F6 /2 NOT r/m8 [BX+disp8]",
+        &[0xF6, 0x57, 0x40],
+        Components::modrm_disp(0xF6, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F6 /2 NOT r/m8 [BX+disp16]",
+        &[0xF6, 0x97, 0x34, 0x12],
+        Components::modrm_disp(0xF6, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F7 /0 TEST r/m16,i16 [BX+disp8]",
+        &[0xF7, 0x47, 0x40, 0x34, 0x12],
+        Components::modrm_disp_imm(0xF7, 1, 2),
+        5,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F7 /0 TEST r/m16,i16 [BX+disp16]",
+        &[0xF7, 0x87, 0x34, 0x12, 0x34, 0x12],
+        Components::modrm_disp_imm(0xF7, 2, 2),
+        6,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F7 /3 NEG r/m16 [BX+disp8]",
+        &[0xF7, 0x5F, 0x40],
+        Components::modrm_disp(0xF7, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "F7 /3 NEG r/m16 [BX+disp16]",
+        &[0xF7, 0x9F, 0x34, 0x12],
+        Components::modrm_disp(0xF7, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- the byte and word INC and DEC, and the word PUSH
+    Encoding::new(
+        "FE /0 INC r/m8 [BX+disp8]",
+        &[0xFE, 0x47, 0x40],
+        Components::modrm_disp(0xFE, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FE /0 INC r/m8 [BX+disp16]",
+        &[0xFE, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0xFE, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FE /1 DEC r/m8 [BX+disp8]",
+        &[0xFE, 0x4F, 0x40],
+        Components::modrm_disp(0xFE, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FE /1 DEC r/m8 [BX+disp16]",
+        &[0xFE, 0x8F, 0x34, 0x12],
+        Components::modrm_disp(0xFE, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /0 INC r/m16 [BX+disp8]",
+        &[0xFF, 0x47, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /0 INC r/m16 [BX+disp16]",
+        &[0xFF, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /1 DEC r/m16 [BX+disp8]",
+        &[0xFF, 0x4F, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /1 DEC r/m16 [BX+disp16]",
+        &[0xFF, 0x8F, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /6 PUSH r/m16 [BX+disp8]",
+        &[0xFF, 0x77, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "FF /6 PUSH r/m16 [BX+disp16]",
+        &[0xFF, 0xB7, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- `rm = 110` is `[BP]`, and at MOD=01 it carries one displacement
+    // byte. The word-sized displacement at `rm = 110` is the direct address of
+    // `mod=00, rm=110`, and a decoder that mistook this one for it would
+    // consume a byte too many.
+    Encoding::new(
+        "00 ADD r/m8,r8 [BP+disp8]",
+        &[0x00, 0x46, 0x40],
+        Components::modrm_disp(0x00, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "01 ADD r/m16,r16 [BP+disp8]",
+        &[0x01, 0x46, 0x40],
+        Components::modrm_disp(0x01, 1),
+        3,
+        Ip::Next,
+    ),
+];
+
 impl Encoding {
     const fn new(
         name: &'static str,
@@ -612,14 +1528,24 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
         55,
         "a deleted row means the record is now wrong, and the gate must say so"
     );
+    assert_eq!(
+        DISPLACEMENT_ENCODINGS.len(),
+        122,
+        "a deleted row means the record is now wrong, and the gate must say so"
+    );
+    assert_eq!(
+        ENCODINGS.len() + DISPLACEMENT_ENCODINGS.len(),
+        177,
+        "the two tables together are the record of what exists"
+    );
     // And every row must be findable by its label, or a failure names nothing.
-    for (i, encoding) in ENCODINGS.iter().enumerate() {
+    for (i, encoding) in ENCODINGS.iter().chain(DISPLACEMENT_ENCODINGS).enumerate() {
         assert!(
             !encoding.name.is_empty(),
             "row {i} has no label to name it by in a failure"
         );
     }
-    for encoding in ENCODINGS {
+    for encoding in ENCODINGS.iter().chain(DISPLACEMENT_ENCODINGS) {
         let label = encoding.name;
         // The breakdown has to add up to the length, or a typo in the length
         // could hide inside a correct sum.
@@ -781,5 +1707,49 @@ fn a_far_pointer_is_the_offset_then_the_segment() {
         c.regs.segment(Seg::Cs),
         0x5678,
         "the high word is the segment"
+    );
+}
+
+/// A displacement is not only a number of bytes: it is the offset the
+/// instruction addresses. A decoder that read the right number of bytes and
+/// used the wrong ones would pass the length check above, and an inverted
+/// `disp16` is one of the defects this gate was written after.
+#[test]
+fn a_displacement_is_the_offset_the_operand_lands_at() {
+    // `C7 43 40 34 12` is MOV WORD [BX+40h], 1234h. The displacement is the
+    // 40h, and the store has to land there.
+    let mut c = machine(&[0xC7, 0x47, 0x40, 0x34, 0x12]);
+    c.regs.set_word(Reg16::Bx, 0x0200);
+    c.step().unwrap();
+    assert_eq!(
+        c.mem.read_u16(0x1000, 0x0240),
+        0x1234,
+        "the disp8 is the offset, and the store landed there"
+    );
+    assert_eq!(
+        c.mem.read_u16(0x1000, 0x0200),
+        0x0000,
+        "and not at the bare base address"
+    );
+
+    // The same move with a 16-bit displacement lands at BX+1234h, and the
+    // immediate is still the one that came after it.
+    let mut c = machine(&[0xC7, 0x87, 0x34, 0x12, 0x34, 0x12]);
+    c.regs.set_word(Reg16::Bx, 0x0200);
+    c.step().unwrap();
+    assert_eq!(
+        c.mem.read_u16(0x1000, 0x1434),
+        0x1234,
+        "the disp16 is the offset, low byte first"
+    );
+
+    // And the 8-bit displacement is sign-extended: `FE` is -2, not 254.
+    let mut c = machine(&[0xC7, 0x47, 0xFE, 0x34, 0x12]);
+    c.regs.set_word(Reg16::Bx, 0x0200);
+    c.step().unwrap();
+    assert_eq!(
+        c.mem.read_u16(0x1000, 0x01FE),
+        0x1234,
+        "a disp8 is sign-extended, so FEh is -2 and not 254"
     );
 }
