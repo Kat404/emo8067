@@ -166,7 +166,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | `8F` with `reg != 0` | refused | **settled in our favour**: the captures record `8F` `/1`–`/7` as `"status": "undefined"`, so refusing matches hardware rather than contradicting it |
 | Does unsigned `DIV` (`/6`) negate under `REP`? | left alone as a policy | the captures do not cover prefixes. Needs a `F3 F6 /6` case, or the `8086_microcode_v2.zip` listing |
 | Is the microcode ROM identical across 8086 steppings? | not decidable | needs a 1978 Stepping 1 die, which is a collector item. Affects all five microcode findings if the ROM changed |
-| `SHL`/`SHR`: does silicon update S, Z, P or preserve them? | code follows the manual's prose | the `metadata.json` cannot tell — it records unreliability, not change. The per-opcode capture files carry initial *and* final state and would settle it |
+| `SHL`/`SHR`: does silicon update S, Z, P or preserve them? | **CLOSED — silicon updates them** | The captures show the shifts writing the arithmetic flags from the result, and the project had already believed the manual's prose over the table. The captures' `metadata.json` records the *undefined* flags, and the per-opcode files carry the initial and final state, which is what settled it |
 | `AAA`/`DAA` against the manual's pseudocode | **CLOSED — the core was wrong twice** | The manual (Oct 1979, page 2-35) says `AAA` zeroes the high-order half-byte of `AL`, and Intel's SDM (Vol 2A, page 3-19) writes the mask as its own step, outside the branch. The core masked only inside the branch, and `DAA`/`DAS` never wrote `AF` at all, although Table 2-21 gives both an `X` in that column. Both fixed in `8dcc9da`, with the mutants shown to fail |
 | Does `DAA`'s second rule test the old `AL` or the adjusted one? | **CLOSED — the chip says the old one** | The hardware settles it: `DAA` on `AL = FAh` leaves `AL = 60h` with the carry set, which is the old value testing true. Intel's SDM writes the same (`IF ((old_AL > 99H) or (old_CF = 1))`). The 1979 manual has no rule text and the classic pseudocode says the adjusted value; the captures in `crates/core/tests/hardware_flags.rs` decide it |
 | The 16-bit `REG` field | **CLOSED — the 80186's order had been implemented** | The 8086's Table 4-9 gives `AX CX DX BX SP BP SI DI`; the 80186 moved the 16-bit registers to make room for `AH CH DH BH` in the 8-bit field, and every modern reference quotes that later table. The 1979 manual's own table and a real P80C86A-2 agree with each other: `MOV SP,AX` is `8B E0`. The core, the guide's note and every hand-assembled program had followed the later order. Fixed in `98fc6f3`, with thirty-eight hand-assembled tests re-encoded |
@@ -196,9 +196,12 @@ disagreeing with this project:
 - `XLAT` indexes with an unsigned `AL`;
 - `C6`/`C7` ignore their `/digit`.
 
-Seventy-one of the 1533 cases still disagree, in two families: the
-rotates' carry, and the port reads, where this emulator reads memory at
-the port and the chip returns `FFh` because nothing is attached to it.
+Ten more came out of closing the two families that were open: the shift
+group's overflow, the count of `CL` (the 8086 does not mask it to five
+bits, which is what the later processors do), and the I/O bus (a port is
+not a memory address; with nothing attached to it a read returns all
+ones). Nine of the 1533 cases still disagree: the carry of a rotate by
+more than one, and the negate's carry.
 
 `odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
 whole opcode space, with the gate naming and counting the two families
