@@ -98,9 +98,13 @@ checked against.
   is, the direct form with no register at all, and the default segment:
   anything involving `SP` or `BP` is relative to `SS`, everything else to
   `DS`. The reference's two refusals are refused too — a base of `BX` with
-  an index of `BP`, and `SI` with `DI`. Still to come in this task: the
-  source's own syntax for a reference (`[BX+SI+4]`, `WORD PTR [1234h]`),
-  and the matcher using all of it.
+  an index of `BP`, and `SI` with `DI`.
+  **DONE, the reference's own syntax.** A reference as the source wrote
+  it: `[BX+SI+4]`, `WORD PTR [1234h]`, `BYTE PTR DS:[BX]`. The size and the
+  segment override come before the brackets, and a sign in front of the
+  number belongs to the number: `BX-4` is BX and minus four. Still to
+  come in this task: the matcher using all of it, so that an instruction
+  with memory comes out as bytes.
 - **T4** — **DONE, the literals and the line.** The literals are below.
   **DONE, the line.** A source line, taken apart: the mnemonic, the operands
   as the source wrote them, and the prefixes that came before - the repeat
