@@ -235,7 +235,10 @@ stepper motor on 7, robot on 9/10/11, with their protocols in
 `re/docs-txt/io.txt`. The bus also speaks a framed protocol over a unix
 socket, so a device can live in another process: the CLI takes
 `--device-socket PATH`, and the frame is `type(1) port(2) value(1)` with a
-one-byte reply. The server is served between the emulator's instructions.
+one-byte reply. The server is served between the emulator's instructions. A
+`SPACE` frame returns the flat 64 KB view of the port space, the way the
+old file showed it — but it is a view and not the bus's storage: the chip
+wins, so a device that writes a port byte does not reach the program.
 
 ## Decisions of 2026-10-19, and what they settle
 
