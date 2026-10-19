@@ -94,6 +94,12 @@ checked against.
   modes land — say so instead of guessing.
 - **T3** — **TODO.** The addressing modes: the base and index registers, the
   displacement's width, the direct form, and the default segment per base.
+- **T4** — **DONE, the literals and the line.** The literals are below.
+  **DONE, the line.** A source line, taken apart: the mnemonic, the operands
+  as the source wrote them, and the prefixes that came before - the repeat
+  prefixes, `LOCK`, and the segment overrides, which may carry a colon. An
+  operand may hold a comma inside brackets, so the line splits on the commas
+  that are not inside any, and a semicolon starts a comment.
 - **T4** — **DONE, the literals.** Four ways to write a number, all of
   them from the reference's own diagnostics: `&HFF`, `1234h`, `16$FF` (MASM's
   radix: the base, then the `$`, then the digits) and plain decimal. A hex
