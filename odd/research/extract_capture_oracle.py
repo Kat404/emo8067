@@ -105,7 +105,20 @@ def fetch(path: str, cache: Path) -> bytes | None:
                 return None
             raise SystemExit(f"could not fetch {url}: {error}") from error
         except Exception as error:  # noqa: BLE001 - the message is the report
-            raise SystemExit(f"could not fetch {url}: {error}") from error
+            # A network hiccup is not a finding about the captures, so it is
+            # retried and then reported as a file that is not there.
+            last = error
+            for _ in range(3):
+                try:
+                    with urllib.request.urlopen(url, timeout=120) as response:
+                        cache.write_bytes(response.read())
+                    last = None
+                    break
+                except Exception:  # noqa: BLE001, PERF203 - retried below
+                    continue
+            if last is not None:
+                print(f"could not fetch {url}: {last}", file=sys.stderr)
+                return None
     return cache.read_bytes()
 
 
@@ -158,8 +171,17 @@ def final_memory(test: dict, memory: dict[int, int]) -> dict[int, int]:
 
 
 def flag_mask(metadata: dict, opcode: str) -> int:
-    """The mask that clears the flags the chip leaves undefined."""
-    entry = metadata["opcodes"].get(opcode.upper(), {})
+    """The mask that clears the flags the chip leaves undefined.
+
+    A group opcode's flags live under its `reg` entries, one per /digit,
+    so `F6.4` reads the entry for digit four of `F6` and `F6` itself
+    reads the top-level one.
+    """
+    key = opcode.upper()
+    entry = metadata["opcodes"].get(key, {})
+    if "." in key:
+        base, digit = key.split(".")
+        entry = metadata["opcodes"].get(base, {}).get("reg", {}).get(digit, {})
     mask = entry.get("flags-mask", 0xFFFF)
     return mask & EMULATOR_MASK
 
@@ -278,21 +300,31 @@ def main() -> int:
     ]
     total = 0
     skipped = []
+    written = 0
     for opcode in opcode_list(args.opcodes):
-        name = f"{opcode}.json.gz"
-        raw = fetch(f"v1/{name}", CACHE / "v1" / name)
-        if raw is None:
-            skipped.append(opcode)
-            continue
-        tests = json.loads(gzip.decompress(raw))
-        kept = select(tests, args.keep)
-        out.append(f"op {opcode}")
-        out.append(f"  mask {flag_mask(metadata, opcode):04X}")
-        for test in kept:
-            memory = memory_state(test)
-            emit_case(out, test, memory)
-            total += 1
-        out.append("")
+        # A group opcode has one file per /digit, and the digit is part of
+        # the instruction, so it is part of the oracle's name too.
+        names = [f"{opcode}.json.gz"] + [f"{opcode}.{d}.json.gz" for d in range(8)]
+        found = False
+        for name in names:
+            raw = fetch(f"v1/{name}", CACHE / "v1" / name)
+            if raw is None:
+                if name == f"{opcode}.json.gz":
+                    skipped.append(opcode)
+                continue
+            found = True
+            label = name.removesuffix(".json.gz")
+            tests = json.loads(gzip.decompress(raw))
+            kept = select(tests, args.keep)
+            out.append(f"op {label}")
+            out.append(f"  mask {flag_mask(metadata, label):04X}")
+            for test in kept:
+                memory = memory_state(test)
+                emit_case(out, test, memory)
+                total += 1
+            out.append("")
+            written += 1
+    del found
 
     if skipped:
         out.insert(9, f"# opcodes with no captures: {' '.join(skipped)}")
