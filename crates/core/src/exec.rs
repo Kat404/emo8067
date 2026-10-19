@@ -994,11 +994,7 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         0xE4 | 0xE5 | 0xEC | 0xED => {
             let mut bus = cpu.bus.borrow_mut();
             if word {
-                // The 8086's bus is a byte bus: a word is two transfers.
-                let low = bus.read(port);
-                let high = bus.read(port);
-                cpu.regs
-                    .set_word(Reg16::Ax, u16::from_le_bytes([low, high]));
+                cpu.regs.set_word(Reg16::Ax, bus.read_word(port));
             } else {
                 cpu.regs.set_byte(Reg8::Al, bus.read(port));
             }
@@ -1012,8 +1008,7 @@ fn port_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             };
             let mut bus = cpu.bus.borrow_mut();
             if word {
-                bus.write(port, (value & 0xFF) as u8);
-                bus.write(port, (value >> 8) as u8);
+                bus.write_word(port, value);
             } else {
                 bus.write(port, value as u8);
             }
