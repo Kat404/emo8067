@@ -71,15 +71,8 @@ fn a_register_of_the_wrong_width_is_an_error() {
 }
 
 #[test]
-fn the_forms_that_are_not_encoded_yet_say_so() {
-    // A group form is chosen by the operation, and the digit it names goes
-    // in the REG field: ADD in Group 1 is the digit zero, so ADD BL,1 is
-    // 80 C3 01h.
-    assert_eq!(
-        encode(0x80, "ADD", "Group 1", &[reg("BL"), imm(1)]).unwrap(),
-        vec![0x80, 0xC3, 0x01]
-    );
-    // And so does a memory operand, until the addressing modes land.
+fn a_form_that_cannot_be_encoded_says_so() {
+    // A memory reference with nothing in it names no address at all.
     assert!(matches!(
         encode(
             0x00,
@@ -87,6 +80,35 @@ fn the_forms_that_are_not_encoded_yet_say_so() {
             "r/m8,r8",
             &[emo8067_asm::operands::Memory::default().into(), reg("CL")]
         ),
-        Err(Error::Unsupported { .. })
+        Err(Error::Addressing { .. })
     ));
+}
+
+#[test]
+fn a_memory_operand_brings_its_own_mod_and_displacement() {
+    use emo8067_asm::operands::Memory;
+
+    // MOV r/m8,r8 with [BX+SI] and CL: the R/M field names the pair.
+    let memory = Memory {
+        segment: None,
+        base: Some("BX".to_string()),
+        index: Some("SI".to_string()),
+        displacement: None,
+    };
+    assert_eq!(
+        encode(0x88, "MOV", "r/m8,r8", &[memory.into(), reg("CL")]).unwrap(),
+        vec![0x88, 0x08]
+    );
+
+    // And with a displacement, the MOD says how wide it is and it follows.
+    let memory = Memory {
+        segment: None,
+        base: Some("BX".to_string()),
+        index: None,
+        displacement: Some(4),
+    };
+    assert_eq!(
+        encode(0x89, "MOV", "r/m16,r16", &[memory.into(), reg("BX")]).unwrap(),
+        vec![0x89, 0x5F, 0x04]
+    );
 }

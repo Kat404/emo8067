@@ -165,7 +165,8 @@ pub fn parse(text: &str) -> Result<Reference, Error> {
 }
 
 /// The register a term names, if it names one.
-fn register(term: &str) -> Option<Reg> {
+#[must_use]
+pub fn register(term: &str) -> Option<Reg> {
     match term.to_ascii_uppercase().as_str() {
         "BX" => Some(Reg::Bx),
         "SP" => Some(Reg::Sp),

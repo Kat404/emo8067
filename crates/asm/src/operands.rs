@@ -35,6 +35,16 @@ impl From<Memory> for Operand {
 }
 
 impl Memory {
+    /// The MOD, the R/M and the displacement bytes this reference needs.
+    pub fn encode(&self) -> Result<(crate::modrm::Mod, u8, Vec<u8>), crate::addressing::Error> {
+        let address = crate::addressing::Address {
+            base: self.base.as_deref().and_then(crate::addressing::register),
+            index: self.index.as_deref().and_then(crate::addressing::register),
+            displacement: self.displacement,
+        };
+        crate::addressing::encode(&address)
+    }
+
     /// Whether the reference names no register at all, which is the direct
     /// form: `[1234h]`.
     #[must_use]
@@ -52,6 +62,8 @@ pub enum Error {
     Type { form: String, position: usize },
     /// The form is one the assembler cannot encode yet.
     Unsupported { form: String },
+    /// The addressing does not work.
+    Addressing { form: String, reason: String },
 }
 
 /// Encode one instruction: the form from the document's table, and the
@@ -118,16 +130,23 @@ fn encode_inner(
                 Some(digit) => digit,
                 None => register(&operands[reg_part], width)?,
             };
-            let rm = match &operands[rm_part] {
-                Operand::Register(name) => width.field_of(name).ok_or_else(|| Error::Type {
-                    form: form.to_string(),
-                    position: rm_part,
-                })?,
-                Operand::Memory(_) => {
-                    // The addressing modes are the next task.
-                    return Err(Error::Unsupported {
+            // The R/M field is a register or a memory reference, and a
+            // memory reference brings its own MOD and its displacement.
+            let (modrm, rm, displacement) = match &operands[rm_part] {
+                Operand::Register(name) => {
+                    let rm = width.field_of(name).ok_or_else(|| Error::Type {
                         form: form.to_string(),
-                    });
+                        position: rm_part,
+                    })?;
+                    (Mod::Register, rm, Vec::new())
+                }
+                Operand::Memory(memory) => {
+                    let (modrm, rm, displacement) =
+                        memory.encode().map_err(|error| Error::Addressing {
+                            form: form.to_string(),
+                            reason: format!("{error:?}"),
+                        })?;
+                    (modrm, rm, displacement)
                 }
                 _ => {
                     return Err(Error::Type {
@@ -136,7 +155,8 @@ fn encode_inner(
                     });
                 }
             };
-            out.push(byte_for(Mod::Register, reg, rm));
+            out.push(byte_for(modrm, reg, rm));
+            out.extend(displacement);
         }
         // A group's form: the digit is in the REG field and the operand
         // follows it.

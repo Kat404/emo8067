@@ -105,6 +105,10 @@ checked against.
   number belongs to the number: `BX-4` is BX and minus four. Still to
   come in this task: the matcher using all of it, so that an instruction
   with memory comes out as bytes.
+  **DONE, the matcher uses it.** A memory operand brings its own MOD and
+  its displacement: `MOV [BX+SI],CL` is `88 08h` and `MOV [BX+4],BX` is
+  `89 5F 04h`. The R/M field names a register or a memory reference, and
+  a memory reference is the one that brings the displacement.
 - **T4** — **DONE, the literals and the line.** The literals are below.
   **DONE, the line.** A source line, taken apart: the mnemonic, the operands
   as the source wrote them, and the prefixes that came before - the repeat
