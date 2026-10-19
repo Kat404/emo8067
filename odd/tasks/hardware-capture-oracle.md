@@ -82,9 +82,14 @@ be regenerated rather than trusted.
 - **T6** — **TODO.** The captures as the flag oracle for the `X` rows, so
   that the flag contract stops asserting nothing for `ADD`, `ADC`, `SUB`,
   `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS`.
-- **T7** — **TODO.** Nine cases: the carry of a rotate by more than one, and
-  the negate's carry. Both are rules the 1979 manual does not state, and both
-  are decided by the captures once the count's treatment is settled.
+- **T7** — **DONE, six cases short.** Three of the nine are closed: the
+  negate writes the auxiliary carry (the borrow out of the low nibble, which
+  the captures confirm in every case they cover), and a rotate by a whole
+  number of revolutions still moves the carry. Six remain, all of them the
+  carry of a rotate by more than one, where the captures agree with the rule
+  the code already had in every case they cover — so those six are
+  unexplained, and the next session should start by asking why the cases
+  they come from differ from the other thousand.
 
 ## Log
 

@@ -200,8 +200,10 @@ Ten more came out of closing the two families that were open: the shift
 group's overflow, the count of `CL` (the 8086 does not mask it to five
 bits, which is what the later processors do), and the I/O bus (a port is
 not a memory address; with nothing attached to it a read returns all
-ones). Nine of the 1533 cases still disagree: the carry of a rotate by
-more than one, and the negate's carry.
+ones). Six of the 1533 cases still disagree, all of them the carry of a
+rotate by more than one, and all of them unexplained: the captures
+agree with the rule the code already had in every other case they
+cover.
 
 `odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
 whole opcode space, with the gate naming and counting the two families
