@@ -12,6 +12,7 @@ pub mod directives;
 pub mod groups;
 pub mod line;
 pub mod literals;
+pub mod macros;
 pub mod modrm;
 pub mod operands;
 pub mod program;

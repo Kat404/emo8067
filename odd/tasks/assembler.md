@@ -159,8 +159,12 @@ checked against.
   bytes are made, and by then a jump knows where it is going. A jump's size
   does not depend on where it goes, so the first walk can count it with a
   target of zero. `JMP label` is the near form and the conditional jumps
-  are the short one, as the table gives them. Still to come in this task:
-  the macros (`MACRO`/`ENDM`).
+  are the short one, as the table gives them.
+  **DONE, the macros.** `MACRO` and `ENDM`, with the names after the
+  macro's name as its parameters. A call replaces them with the arguments,
+  word by word - a whole word, never a part of a longer name. A macro may
+  call another, and one that calls itself is refused with the reference's
+  own words: "recursive MACRO definition is over 64".
 - **T7** — **TODO.** The eighty-six examples, and the goldens.
 
 ## Log

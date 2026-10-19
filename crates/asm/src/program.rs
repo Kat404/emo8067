@@ -13,6 +13,7 @@ use crate::assemble;
 use crate::directives::{self, Directive};
 use crate::line;
 use crate::literals;
+use crate::macros::{self, Macro};
 use crate::operands::Operand;
 
 /// What went wrong.
@@ -26,6 +27,8 @@ pub enum Error {
     BadOperand { text: String },
     /// A name that the program does not define.
     UnknownName { name: String },
+    /// A macro that calls itself for ever, in the reference's own words.
+    RecursiveMacro { message: String },
 }
 
 /// A program, assembled.
@@ -58,9 +61,12 @@ enum Effect {
 
 /// Assemble a program.
 pub fn assemble_program(source: &str) -> Result<Program, Error> {
-    let lines: Vec<line::Line> = source
-        .lines()
-        .map(line::parse)
+    // A macro is a line of the source that stands for other lines.
+    let macros = macros::read(source);
+    let source_lines = expand_macros(macros::strip(source), &macros)?;
+    let lines: Vec<line::Line> = source_lines
+        .iter()
+        .map(|raw| line::parse(raw))
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| Error::Empty)?;
     // The first walk: the names, the constants, and how far the program goes.
@@ -108,6 +114,41 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
         }
     }
     Ok(program)
+}
+
+/// Replace every call to a macro with its body.
+///
+/// A macro that calls itself never ends, so the reference counted its
+/// passes and refused: "recursive MACRO definition is over ".
+fn expand_macros(lines: Vec<String>, macros: &[Macro]) -> Result<Vec<String>, Error> {
+    expand_at(lines, macros, 0)
+}
+
+/// The same, one pass deeper.
+fn expand_at(lines: Vec<String>, macros: &[Macro], depth: usize) -> Result<Vec<String>, Error> {
+    if depth > macros::MAX_DEPTH {
+        return Err(Error::RecursiveMacro {
+            message: format!("recursive MACRO definition is over {}", macros::MAX_DEPTH),
+        });
+    }
+    let mut out: Vec<String> = Vec::new();
+    for raw in lines {
+        let Ok(parsed) = line::parse(&raw) else {
+            out.push(raw);
+            continue;
+        };
+        match macros
+            .iter()
+            .find(|mac| mac.name.eq_ignore_ascii_case(&parsed.mnemonic))
+        {
+            Some(mac) => {
+                let body = macros::expand(mac, &parsed.operands);
+                out.extend(expand_at(body, macros, depth + 1)?);
+            }
+            None => out.push(raw),
+        }
+    }
+    Ok(out)
 }
 
 /// What a line does, with the names and the constants the program has.
