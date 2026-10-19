@@ -205,6 +205,13 @@ rotate by more than one, and all of them unexplained: the captures
 agree with the rule the code already had in every other case they
 cover.
 
+The `X` and `U` rows of §1.4 are no longer a hole. The oracle gate
+compares every flag the chip defined, and it checks the document in the
+other direction too: a row that marks a flag with an em dash says the
+instruction does not touch it, and the captures say whether the chip
+agreed. That check passes on all 1533 cases, so every flag the document
+calls untouched is one the chip left alone.
+
 `odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
 whole opcode space, with the gate naming and counting the two families
 that still disagree.

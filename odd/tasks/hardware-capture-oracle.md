@@ -79,9 +79,14 @@ be regenerated rather than trusted.
   families, and the gate names and counts them: the rotates' carry, and
   the port reads, where this emulator reads memory at the port and the
   chip returns `FFh` because nothing is attached to it.
-- **T6** — **TODO.** The captures as the flag oracle for the `X` rows, so
-  that the flag contract stops asserting nothing for `ADD`, `ADC`, `SUB`,
-  `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS`.
+- **T6** — **DONE in `d9b5e96`.** The captures as the flag oracle for the `X`
+  rows, and the document checked against the hardware in the other
+  direction: a row that marks a flag with an em dash says the instruction
+  does not touch it, and the captures say whether the chip agreed. The
+  mapping from an instruction to its row comes from the captures' own
+  disassembler, so this project keeps no list of its own. The check passes
+  on all 1533 cases: every flag the document calls untouched is one the
+  chip left alone, and the `X` rows are backed by the chip's numbers.
 - **T7** — **DONE, six cases short.** Three of the nine are closed: the
   negate writes the auxiliary carry (the borrow out of the low nibble, which
   the captures confirm in every case they cover), and a rotate by a whole
