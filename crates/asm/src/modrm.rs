@@ -11,13 +11,20 @@
 /// The 16-bit registers, in the order the REG and R/M fields name them.
 pub const REG16: [&str; 8] = ["AX", "CX", "DX", "BX", "SP", "BP", "SI", "DI"];
 
-/// The 8-bit registers the REG and R/M fields can name.
+/// The 8-bit registers the REG field names.
 ///
-/// The high four are not there: on the 8086 the 8-bit field cannot reach
-/// `AH`, `CH`, `DH` or `BH`. A register operand names them, through the
-/// opcode's own low bits — `MOV AH,1` is `B4 01` — but a ModR/M field does
-/// not.
-pub const REG8: [&str; 4] = ["AL", "CL", "DL", "BL"];
+/// All eight: the 8086's 8-bit field has its high half, and `AH`, `CH`, `DH`
+/// and `BH` are reachable through it. The R/M field is the one that lost
+/// its high half, and the 80186 gave it back — see [`RM8`].
+pub const REG8: [&str; 8] = ["AL", "CL", "DL", "BL", "AH", "CH", "DH", "BH"];
+
+/// The 8-bit registers the R/M field names.
+///
+/// The guide's Table 4-10 prints the register mode of the 8-bit column as
+/// `AL CL DL BL AH CH DH BH` — the whole 8-bit field, high half and all —
+/// and the reference's own examples use the high half there: `mov al, ah`
+/// is one of them, and `xor ah, ah` is another.
+pub const RM8: [&str; 8] = ["AL", "CL", "DL", "BL", "AH", "CH", "DH", "BH"];
 
 /// The width of an operand.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -29,7 +36,7 @@ pub enum Width {
 }
 
 impl Width {
-    /// The registers the field can name at this width.
+    /// The registers the REG field can name at this width.
     #[must_use]
     pub fn registers(self) -> &'static [&'static str] {
         match self {
@@ -38,10 +45,30 @@ impl Width {
         }
     }
 
+    /// The registers the R/M field can name at this width.
+    ///
+    /// The 8-bit R/M field of the 8086 lost its high half to the 80186.
+    #[must_use]
+    pub fn rm_registers(self) -> &'static [&'static str] {
+        match self {
+            Width::Byte => &RM8,
+            Width::Word => &REG16,
+        }
+    }
+
     /// The field's value for a register, if it has one at this width.
     #[must_use]
     pub fn field_of(self, name: &str) -> Option<u8> {
         self.registers()
+            .iter()
+            .position(|r| *r == name)
+            .map(|i| i as u8)
+    }
+
+    /// The R/M field's value for a register, if it has one at this width.
+    #[must_use]
+    pub fn rm_field_of(self, name: &str) -> Option<u8> {
+        self.rm_registers()
             .iter()
             .position(|r| *r == name)
             .map(|i| i as u8)

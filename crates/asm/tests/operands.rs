@@ -63,11 +63,16 @@ fn a_register_of_the_wrong_width_is_an_error() {
         encode(0x89, "MOV", "r/m16,r16", &[reg("AL"), reg("BX")], 0),
         Err(Error::Type { .. })
     ));
-    // And AH cannot be named by a ModR/M field at all.
-    assert!(matches!(
-        encode(0x00, "ADD", "r/m8,r8", &[reg("AH"), reg("CL")], 0),
-        Err(Error::Type { .. })
-    ));
+    // AH is reachable through the R/M field too: the captures from a real
+    // P80C86A-2 show `88 F4` running MOV AH,DL, whose ModR/M byte has
+    // `100` in the R/M field. The 1979 print says otherwise, and the
+    // print is what is wrong.
+    // The form is r/m8,r8, so AH is the R/M field and CL the REG field:
+    // the ModR/M byte is 11 001 100, which is CCh.
+    assert_eq!(
+        encode(0x00, "ADD", "r/m8,r8", &[reg("AH"), reg("CL")], 0).unwrap(),
+        vec![0x00, 0xCC]
+    );
 }
 
 #[test]
@@ -91,6 +96,7 @@ fn a_memory_operand_brings_its_own_mod_and_displacement() {
 
     // MOV r/m8,r8 with [BX+SI] and CL: the R/M field names the pair.
     let memory = Memory {
+        label: None,
         segment: None,
         base: Some("BX".to_string()),
         index: Some("SI".to_string()),
@@ -104,6 +110,7 @@ fn a_memory_operand_brings_its_own_mod_and_displacement() {
 
     // And with a displacement, the MOD says how wide it is and it follows.
     let memory = Memory {
+        label: None,
         segment: None,
         base: Some("BX".to_string()),
         index: None,

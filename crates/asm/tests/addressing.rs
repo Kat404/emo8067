@@ -5,6 +5,7 @@ use emo8067_asm::modrm::{Mod, Width};
 
 fn address(base: Option<Reg>, index: Option<Reg>, displacement: Option<i64>) -> Address {
     Address {
+        label: None,
         base,
         index,
         displacement,

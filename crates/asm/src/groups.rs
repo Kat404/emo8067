@@ -11,7 +11,7 @@ const GUIDE: &str = include_str!("../../../odd/research/documentation-guide.md")
 
 /// One form of a group: the opcode, the digit that chooses it, and the
 /// form the document prints for it.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct GroupForm {
     /// The opcode the group hangs off.
     pub opcode: u8,
@@ -26,6 +26,12 @@ impl GroupForm {
     #[must_use]
     pub fn mnemonic(&self) -> &'static str {
         self.text.split_once(' ').map_or(self.text, |(m, _)| m)
+    }
+
+    /// The names the cell answers to, when it carries more than one:
+    /// `SHL/SAL` is both.
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.mnemonic().split('/').map(str::trim)
     }
 
     /// The operand form, with the mnemonic taken off.
@@ -70,7 +76,9 @@ pub fn forms() -> Vec<GroupForm> {
             continue;
         };
         for (opcode, cell) in opcodes.iter().zip(cells[1..].iter()) {
-            let text = cell.trim();
+            // The footnotes are the document's commentary, not part of the
+            // form: `PUSH r/m8 \u{2021}8` is `PUSH r/m8`.
+            let text = cell.split('\u{2021}').next().unwrap_or(cell).trim();
             if text.is_empty() {
                 continue;
             }
@@ -84,6 +92,21 @@ pub fn forms() -> Vec<GroupForm> {
     out
 }
 
+/// The group's cell whose text is exactly this.
+///
+/// The group's digit is in the ModR/M byte, and the cell that names the
+/// operation also says which operands it takes, so the cell's own text is
+/// enough to name it: `CALL m16 (inter)` is `FF /3` and `CALL r16/m16
+/// (intra)` is `FF /2`.
+#[must_use]
+pub fn find_text(opcode: u8, mnemonic: &str, text: &str) -> Option<GroupForm> {
+    forms().into_iter().find(|form| {
+        form.opcode == opcode
+            && form.text == text
+            && form.names().any(|name| name.eq_ignore_ascii_case(mnemonic))
+    })
+}
+
 /// The form a group gives one of its operations.
 ///
 /// A group is chosen by what the source says, not by the digit: `ADD` in
@@ -92,7 +115,29 @@ pub fn forms() -> Vec<GroupForm> {
 /// operation, and the digit is the encoding.
 #[must_use]
 pub fn find(opcode: u8, mnemonic: &str) -> Option<GroupForm> {
-    forms()
+    find_for(opcode, mnemonic, None)
+}
+
+/// The group's form for an operation, preferring the one that fits.
+///
+/// A group can name the same operation more than once: the 8086's Group 1
+/// has `ADD r/m8,i8` and `ADD r/m16,i16` under the same digit. The digit
+/// is the same, so the operands say which one was meant.
+pub fn find_for(
+    opcode: u8,
+    mnemonic: &str,
+    fits: Option<&dyn Fn(&str) -> bool>,
+) -> Option<GroupForm> {
+    let candidates: Vec<GroupForm> = forms()
         .into_iter()
-        .find(|form| form.opcode == opcode && form.mnemonic() == mnemonic)
+        .filter(|form| {
+            form.opcode == opcode && form.names().any(|name| name.eq_ignore_ascii_case(mnemonic))
+        })
+        .collect();
+    if let Some(fits) = fits {
+        if let Some(form) = candidates.iter().find(|form| fits(form.operands())) {
+            return Some(form.clone());
+        }
+    }
+    candidates.into_iter().next()
 }

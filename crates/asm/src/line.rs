@@ -38,10 +38,16 @@ pub struct Line {
     pub mnemonic: String,
     /// The operands, as the source wrote them.
     pub operands: Vec<String>,
+    /// The qualifier the source wrote before its operand: `far`, `near` or
+    /// `short`. The reference's `CALL FAR es:[bx]` has one.
+    pub qualifier: Option<String>,
 }
 
 /// Take a line apart.
 pub fn parse(line: &str) -> Result<Line, Error> {
+    // The reference writes its files with Windows line endings, and the
+    // carriage return is not part of the line.
+    let line = line.strip_suffix('\r').unwrap_or(line);
     // A semicolon starts a comment, and nothing after it is code.
     let code = line.split(';').next().unwrap_or("").trim();
     if code.is_empty() {
@@ -69,7 +75,8 @@ pub fn parse(line: &str) -> Result<Line, Error> {
         prefixes.push(prefix);
         index += 1;
     }
-    // A name with a colon is a label, and the instruction follows it.
+    // A name with a colon is a label, and the instruction follows it. The
+    // colon may stand on its own, as `msg0:db 'x'`.
     let mut label = None;
     if let Some(word) = words.get(index) {
         if let Some(name) = word.strip_suffix(':') {
@@ -77,15 +84,38 @@ pub fn parse(line: &str) -> Result<Line, Error> {
                 label = Some(name.to_string());
                 index += 1;
             }
+        } else if let Some((name, tail)) = word.split_once(':') {
+            if !name.is_empty() && !tail.is_empty() {
+                // The rest of the word is the instruction, and the words
+                // after it are its operands.
+                let mut operands = Vec::new();
+                let first_operand = words[index + 1..].join(" ").trim().to_string();
+                if !first_operand.is_empty() {
+                    operands.push(first_operand);
+                }
+                operands.extend(parts.drain(1..));
+                let (qualifier, operands) = take_qualifier(operands);
+                return Ok(Line {
+                    prefixes,
+                    label: Some(name.to_string()),
+                    mnemonic: tail.to_string(),
+                    operands,
+                    qualifier,
+                });
+            }
         }
     }
-    // A line that carries nothing but a label has no instruction on it.
+    // A label with no colon, with the instruction after it: `msg0 db 'x'`.
+    // The parser does not know which names are instructions, so the caller
+    // puts the colon in; until it does, the name stands where the
+    // instruction goes.
     let Some(mnemonic) = words.get(index) else {
         return Ok(Line {
             prefixes,
             label,
             mnemonic: String::new(),
             operands: Vec::new(),
+            qualifier: None,
         });
     };
     let first_operand = words[index + 1..].join(" ").trim().to_string();
@@ -94,21 +124,65 @@ pub fn parse(line: &str) -> Result<Line, Error> {
         operands.push(first_operand);
     }
     operands.extend(parts.drain(1..));
+    let (qualifier, operands) = take_qualifier(operands);
     Ok(Line {
         prefixes,
         label,
         mnemonic: (*mnemonic).to_string(),
         operands,
+        qualifier,
     })
 }
 
-/// Split a line on the commas that are not inside brackets.
+/// Take the qualifier off the first operand.
+///
+/// The reference writes the qualifier before its operand: `CALL FAR
+/// es:[bx]`, and `JMP SHORT there`. The guide's own cells carry the same
+/// words - `JMP far`, `JMP short (intra)` - and they say which segment the
+/// jump stays in.
+fn take_qualifier(mut operands: Vec<String>) -> (Option<String>, Vec<String>) {
+    let Some(first) = operands.first_mut() else {
+        return (None, operands);
+    };
+    let trimmed = first.trim_start();
+    let Some((word, rest)) = trimmed.split_once(char::is_whitespace) else {
+        return (None, operands);
+    };
+    let upper = word.to_ascii_uppercase();
+    if !matches!(upper.as_str(), "FAR" | "NEAR" | "SHORT") {
+        return (None, operands);
+    }
+    let rest = rest.trim().to_string();
+    if rest.is_empty() {
+        operands.remove(0);
+    } else {
+        *first = rest;
+    }
+    (Some(upper), operands)
+}
+
+/// Split a line on the commas that are not inside brackets or quotes.
+///
+/// A string in quotes is one operand, commas and all: `db 'a,b'` is one
+/// value, not two.
 fn split_operands(code: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
     let mut depth = 0i32;
+    let mut quote: Option<char> = None;
     for c in code.chars() {
+        if let Some(open) = quote {
+            current.push(c);
+            if c == open {
+                quote = None;
+            }
+            continue;
+        }
         match c {
+            '\'' | '"' => {
+                quote = Some(c);
+                current.push(c);
+            }
             '[' | '(' => {
                 depth += 1;
                 current.push(c);

@@ -27,6 +27,8 @@ pub enum Kind {
     Address16,
     /// An immediate value.
     Immediate,
+    /// A jump's target: a name, and not a value.
+    Target,
 }
 
 /// The kind an operand is.
@@ -46,7 +48,7 @@ pub fn kind_of(operand: &Operand) -> Kind {
             Some(crate::modrm::Width::Word) => Kind::Address16,
             None => Kind::Address,
         },
-        Operand::Relative(_) => Kind::Immediate,
+        Operand::Relative(_) | Operand::Name(_) | Operand::Far(_, _) => Kind::Target,
     }
 }
 
@@ -62,13 +64,34 @@ pub fn check(form: &str, operands: &[Operand]) -> Result<(), Error> {
     if parts.len() != operands.len() {
         return Ok(());
     }
+    if parts.is_empty() {
+        return Ok(());
+    }
     // The first operand of a form that does not take one.
     // A form that takes an immediate, or a place to jump to, is the only
     // one whose first operand may be one.
     if !matches!(
         parts[0],
-        "i8" | "i16" | "1" | "near" | "far" | "short" | "short (intra)"
+        "i8" | "i16" | "1" | "3" | "near" | "far" | "short" | "short (intra)"
     ) && kind_of(&operands[0]) == Kind::Immediate
+    {
+        return Err("first operand cannot be an immediate value");
+    }
+    // A jump's target and a label's address are names, not values.
+    if kind_of(&operands[0]) == Kind::Target
+        && !matches!(
+            parts[0],
+            "near"
+                | "far"
+                | "short"
+                | "short (intra)"
+                | "m8"
+                | "m16"
+                | "r16/m16 (intra)"
+                | "m16 (inter)"
+                | "i8"
+                | "i16"
+        )
     {
         return Err("first operand cannot be an immediate value");
     }
@@ -117,12 +140,6 @@ pub fn check_pair(operands: &[Operand]) -> Result<(), Error> {
             return Err(ip_message(index));
         }
     }
-    // CS is the one segment that cannot be written to at all.
-    if let Some(Operand::Register(name)) = operands.first() {
-        if name == "CS" {
-            return Err("CS cannot be modified directly (use far JMP or CALL)");
-        }
-    }
     Ok(())
 }
 
@@ -134,12 +151,24 @@ pub fn check_pair(operands: &[Operand]) -> Result<(), Error> {
 fn check_part(part: &str, operand: &Operand, index: usize) -> Result<(), Error> {
     let kind = kind_of(operand);
     match part {
-        // A segment register's own form.
-        "sreg" => Ok(()),
+        // A segment register's own form. CS is the one segment that cannot
+        // be written to at all.
+        "sreg" => {
+            if index == 0 && matches!(operand, Operand::Register(name) if name == "CS") {
+                return Err("CS cannot be modified directly (use far JMP or CALL)");
+            }
+            Ok(())
+        }
         // An immediate.
         "i8" | "i16" | "1" => match kind {
             Kind::Segment => Err("cannot use segment register with an immediate value"),
             _ => Ok(()),
+        },
+        // The interrupt three is the number three.
+        "3" => match operand {
+            Operand::Immediate(3) => Ok(()),
+            Operand::Immediate(_) => Err("the interrupt three is the number three"),
+            _ => Err("the interrupt three is the number three"),
         },
         // Eight bits.
         "r8" | "r/m8" | "m8" | "AL" => match kind {
@@ -157,6 +186,7 @@ fn check_part(part: &str, operand: &Operand, index: usize) -> Result<(), Error> 
             Kind::Segment => Err(segment_message(operand, index)),
             Kind::Ip => Err(ip_message(index)),
             Kind::Immediate => Ok(()),
+            Kind::Target => Ok(()),
         },
         // Sixteen bits.
         "r16" | "r/m16" | "m16" | "AX" => match kind {
@@ -174,6 +204,7 @@ fn check_part(part: &str, operand: &Operand, index: usize) -> Result<(), Error> 
             Kind::Segment => Err(segment_message(operand, index)),
             Kind::Ip => Err(ip_message(index)),
             Kind::Immediate => Ok(()),
+            Kind::Target => Ok(()),
         },
         _ => Ok(()),
     }

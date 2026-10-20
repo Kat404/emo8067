@@ -16,6 +16,9 @@ pub struct Macro {
     pub name: String,
     /// The names of its parameters.
     pub parameters: Vec<String>,
+    /// The names that are local to one expansion, which the reference
+    /// declares with `LOCAL`.
+    pub locals: Vec<String>,
     /// Its body, as the source wrote it.
     pub body: Vec<String>,
 }
@@ -29,33 +32,60 @@ pub fn read(source: &str) -> Vec<Macro> {
     let mut macros: Vec<Macro> = Vec::new();
     let mut name: Option<String> = None;
     let mut parameters: Vec<String> = Vec::new();
+    let mut locals: Vec<String> = Vec::new();
     let mut body: Vec<String> = Vec::new();
     for raw in source.lines() {
-        let line = raw.trim();
+        let line = raw.trim_end_matches('\r').trim();
+        // A comment is not code: the reference's own examples talk about
+        // macros in their comments.
+        if line.starts_with(';') || line.starts_with('#') {
+            continue;
+        }
         if let Some(current) = &name {
             if line.eq_ignore_ascii_case("ENDM") {
                 macros.push(Macro {
                     name: current.clone(),
                     parameters: parameters.clone(),
+                    locals: locals.clone(),
                     body: body.clone(),
                 });
                 name = None;
                 parameters.clear();
+                locals.clear();
                 body.clear();
+            } else if let Some(rest) = strip_local(line) {
+                // LOCAL names the labels that belong to one expansion.
+                locals = rest
+                    .split(',')
+                    .map(|local| local.trim().to_string())
+                    .filter(|local| !local.is_empty())
+                    .collect();
             } else {
                 body.push(raw.to_string());
             }
             continue;
         }
-        let Some(rest) = strip_word(line, "MACRO") else {
+        // The reference writes the macro's name first and the word MACRO
+        // after it: `PUTC    MACRO   char`. The word may also come first,
+        // as `MACRO name params`, and both are read.
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let Some(at) = words
+            .iter()
+            .position(|word| word.eq_ignore_ascii_case("MACRO"))
+        else {
             continue;
         };
-        let words: Vec<&str> = rest.split_whitespace().collect();
-        let Some(first) = words.first() else {
+        let (name_words, parameter_words) = if at == 0 {
+            (&words[1..], &words[2..])
+        } else {
+            (&words[..at], &words[at + 1..])
+        };
+        let Some(first) = name_words.first() else {
             continue;
         };
         name = Some((*first).to_string());
-        parameters = words[1..]
+        locals.clear();
+        parameters = parameter_words
             .join(" ")
             .split(',')
             .map(|parameter| parameter.trim().to_string())
@@ -66,9 +96,21 @@ pub fn read(source: &str) -> Vec<Macro> {
     macros
 }
 
+/// The names a `LOCAL` line declares, if the line is one.
+fn strip_local(line: &str) -> Option<&str> {
+    let (head, rest) = line.split_once(char::is_whitespace)?;
+    if !head.eq_ignore_ascii_case("LOCAL") {
+        return None;
+    }
+    Some(rest.trim())
+}
+
 /// The body of a macro with the arguments in place of the parameters.
+///
+/// The `LOCAL` names are given an ending of their own, so that two
+/// expansions of the same macro do not land on the same labels.
 #[must_use]
-pub fn expand(mac: &Macro, arguments: &[String]) -> Vec<String> {
+pub fn expand(mac: &Macro, arguments: &[String], id: usize) -> Vec<String> {
     mac.body
         .iter()
         .map(|line| {
@@ -76,25 +118,12 @@ pub fn expand(mac: &Macro, arguments: &[String]) -> Vec<String> {
             for (parameter, argument) in mac.parameters.iter().zip(arguments) {
                 out = replace_word(&out, parameter, argument);
             }
+            for local in &mac.locals {
+                out = replace_word(&out, local, &format!("{local}${id}"));
+            }
             out
         })
         .collect()
-}
-
-/// The part of a line after a word, if the line starts with that word.
-fn strip_word<'a>(line: &'a str, word: &str) -> Option<&'a str> {
-    if line.len() < word.len() {
-        return None;
-    }
-    let (head, rest) = line.split_at(word.len());
-    if !head.eq_ignore_ascii_case(word) {
-        return None;
-    }
-    let rest = rest.trim_start();
-    if rest.is_empty() {
-        return None;
-    }
-    Some(rest)
 }
 
 /// Replace a whole word in a line, and not a part of a longer name.
@@ -129,22 +158,34 @@ fn is_boundary(edge: &str) -> bool {
 /// A definition is not code: it stands for the lines the calls will put in
 /// its place.
 #[must_use]
-pub fn strip(source: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
+///
+/// The number each line has in the source comes with it, so that a refusal
+/// can say where it happened.
+pub fn strip(source: &str) -> Vec<(usize, String)> {
+    let mut out: Vec<(usize, String)> = Vec::new();
     let mut inside = false;
-    for raw in source.lines() {
-        let line = raw.trim();
+    for (number, raw) in source.lines().enumerate() {
+        let line = raw.trim_end_matches('\r').trim();
+        // A comment is not code: the reference's own examples talk about
+        // macros in their comments.
+        if line.starts_with(';') || line.starts_with('#') {
+            out.push((number + 1, raw.to_string()));
+            continue;
+        }
         if inside {
             if line.eq_ignore_ascii_case("ENDM") {
                 inside = false;
             }
             continue;
         }
-        if strip_word(line, "MACRO").is_some() {
+        if line
+            .split_whitespace()
+            .any(|word| word.eq_ignore_ascii_case("MACRO"))
+        {
             inside = true;
             continue;
         }
-        out.push(raw.to_string());
+        out.push((number + 1, raw.to_string()));
     }
     out
 }

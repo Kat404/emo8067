@@ -26,14 +26,22 @@ pub enum Error {
 
 /// Read a numeric literal.
 pub fn parse(text: &str) -> Result<i64, Error> {
-    let text = text.trim();
+    let trimmed = text.trim();
     let bad = || Error::NotANumber {
-        text: text.to_string(),
+        text: trimmed.to_string(),
     };
-    // A character: `'H'`.
+    // A number may carry underscores between its digits: `0000_0110b`.
+    let cleaned: String = trimmed.chars().filter(|c| *c != '_').collect();
+    let text = cleaned.as_str();
+    // A character: `'H'`. A longer run of characters between the quotes is
+    // a string, and a string is not a number.
     if text.len() >= 3 && text.starts_with('\'') && text.ends_with('\'') {
         let inner = &text[1..text.len() - 1];
-        let ch = inner.chars().next().ok_or_else(bad)?;
+        let mut characters = inner.chars();
+        let ch = characters.next().ok_or_else(bad)?;
+        if characters.next().is_some() {
+            return Err(bad());
+        }
         return Ok(ch as i64);
     }
     // MASM's radix: the base, then the `$`, then the digits: `16$FF`.
@@ -47,6 +55,10 @@ pub fn parse(text: &str) -> Result<i64, Error> {
             return Err(bad());
         }
         return i64::from_str_radix(digits, base).map_err(|_| bad());
+    }
+    // `0xFF`, the spelling the FASM-flavoured example uses.
+    if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+        return i64::from_str_radix(hex, 16).map_err(|_| bad());
     }
     // `&HFF`.
     if let Some(hex) = text.strip_prefix('&').or_else(|| text.strip_prefix('^')) {
@@ -62,14 +74,22 @@ pub fn parse(text: &str) -> Result<i64, Error> {
         // reference wanted `0FFh` and not `FFh`.
         if hex.starts_with(|c: char| c.is_ascii_alphabetic()) {
             return Err(Error::NeedsZeroPrefix {
-                text: text.to_string(),
+                text: trimmed.to_string(),
             });
         }
         return i64::from_str_radix(hex, 16).map_err(|_| bad());
     }
+    // An octal value: `10o`.
+    if let Some(digits) = text.strip_suffix('o').or_else(|| text.strip_suffix('O')) {
+        return i64::from_str_radix(digits, 8).map_err(|_| bad());
+    }
     // A binary value: `11101100b`.
     if let Some(bits) = text.strip_suffix('b').or_else(|| text.strip_suffix('B')) {
         return i64::from_str_radix(bits, 2).map_err(|_| bad());
+    }
+    // A negative number: `-5`.
+    if let Some(rest) = text.strip_prefix('-') {
+        return rest.parse::<i64>().map(|value| -value).map_err(|_| bad());
     }
     // Decimal.
     text.parse::<i64>().map_err(|_| bad())

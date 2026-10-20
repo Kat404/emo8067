@@ -1,6 +1,6 @@
 //! The ModR/M byte, and the order the fields name the registers in.
 
-use emo8067_asm::modrm::{Mod, REG8, REG16, Width, byte_for};
+use emo8067_asm::modrm::{Mod, REG8, REG16, RM8, Width, byte_for};
 
 #[test]
 fn the_sixteen_bit_field_names_the_8086s_order() {
@@ -13,16 +13,17 @@ fn the_sixteen_bit_field_names_the_8086s_order() {
 }
 
 #[test]
-fn the_eight_bit_field_cannot_reach_the_high_registers() {
-    assert_eq!(REG8, ["AL", "CL", "DL", "BL"]);
+fn the_eight_bit_field_names_all_eight_registers() {
+    // The REG field of the 8086 names all eight byte registers, and the
+    // guide's Table 4-10 prints the R/M field's register mode the same way:
+    // AL CL DL BL AH CH DH BH. The reference's own examples use the high
+    // half there - `mov al, ah` is one of them.
+    assert_eq!(REG8, ["AL", "CL", "DL", "BL", "AH", "CH", "DH", "BH"]);
+    assert_eq!(RM8, ["AL", "CL", "DL", "BL", "AH", "CH", "DH", "BH"]);
     assert_eq!(Width::Byte.field_of("AL"), Some(0));
     assert_eq!(Width::Byte.field_of("BL"), Some(3));
-    assert_eq!(
-        Width::Byte.field_of("AH"),
-        None,
-        "the 8086's field cannot name it"
-    );
-    assert_eq!(Width::Byte.field_of("BH"), None);
+    assert_eq!(Width::Byte.field_of("AH"), Some(4));
+    assert_eq!(Width::Byte.field_of("BH"), Some(7));
 }
 
 #[test]

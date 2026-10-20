@@ -13,11 +13,13 @@ anything marked **UNRESOLVED** is a real open item, not a reminder.
 ## Where the tree stands
 
 ```
-cargo test --workspace   302 passed, 0 failed
+cargo test --workspace   343 passed, 0 failed
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-HEAD                     189c711   (signed; every commit in this session is GPG-signed)
+the examples' gate      75 of 85 assemble; the ten that do not are listed
+                         in crates/asm/tests/examples.rs with what each needs
+HEAD                     (see git log; every commit is GPG-signed)
 ```
 
 Two gates, both live, both proved to fail when broken:
@@ -261,8 +263,10 @@ wins, so a device that writes a port byte does not reach the program.
 5. **Keep growing the program corpus.** `crates/core/tests/programs.rs` has thirty programs — the two BCD ones landed with the `AAA`/`DAA` fix — and twenty-eight and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. Batches two and three added: the direction flag moving pointers backwards, `INT`/`IRET`, a far `CALL`/`RET`, a signed `XLAT` index, writing a segment register and indexing through it, `LOOP`'s counting rule, `CBW`/`CWD`, an overflowing byte multiply, a shift loop, an XOR checksum, a program reading its own instruction stream, `REP` with a zero count, nested `CALL`s, self-modifying code written through `DS` and executed through `CS`, two segments at one offset, a linear search in both outcomes, and `REPE CMPSB` over two buffers. **Two rules for every new program.** Mutate the exact rule its name claims — one of the twenty-eight proved nothing until a mutation survived it. And never write an expected value from memory: the packed-BCD program was cut rather than guessed, which is how the `AAA` masking question in "Still open" was found, and it is written now — the touches gate found four of its own expectations wrong the same way, every one of them a sentence remembered rather than computed. Hand-assembly errors so far, all caught because the emulator disagreed: `BE` for `SI`, `BB` for `BX`, `46` for `INC SI`, `5E` for `POP SI`, `disp16` byte order, `89 C6` read as a memory store when `mod=11` makes it a register move, and a program one byte short.
 6. **`T13`, the assembler.** The one large piece of construction left, and it gates `T12`. The corpus makes its value concrete: twenty-one tests had to be hand-encoded against Intel's table, which is exactly the work an assembler does once and for all.
    - **The plan is `odd/tasks/assembler.md`** — eight specs, seven tasks — and the decision it settles is that the assembler reads the *same document the emulator is checked against*: §1.3 of `documentation-guide.md`, at compile time, the way the flag contract reads §1.4. The instruction table then exists once in the project instead of twice.
-   - **Done:** the crate `crates/asm` (no dependencies), the reader of §1.3, the ModR/M byte with the 8086's register order, the matcher that turns a form plus the operands into bytes, and the three group tables. The reader also settled a question the plan had wrong: the map has one cell per opcode, not eight columns to an opcode.
-   - **Next:** the addressing modes, the literal rules, the source parser, the thirteen type checks, and the directives.
+   - **Done:** the crate `crates/asm` (no dependencies), the reader of §1.3, the ModR/M byte with the 8086's register order, the matcher that turns a form plus the operands into bytes, the three group tables, the literal rules, the source parser, the addressing modes, the sixteen type checks in the reference's own words, the directives, the macros, and the whole thread from a line to bytes.
+   - **The examples.** The gate `crates/asm/tests/examples.rs` assembles the reference's own eighty-five examples — local gold, gitignored, never committed — and **seventy-five of them assemble**. The ten that do not are listed in the gate with what each needs: a difference of two offsets, an offset with an addition, the `include` directive and the macro library it brings, and a jump or a call to a label defined later. `odd/research/examples-pending.txt` holds the same list with the line and the error.
+   - **The goldens cannot be had yet.** The reference is a PE32 Windows program and there is no wine here, so its assembler cannot be run to produce the bytes to compare against. The gate is therefore "they assemble"; the byte-for-byte comparison waits for a way to run the reference.
+   - **A finding from the captures.** The 8086's 8-bit R/M field reaches all eight byte registers — the captures show `88 F4` running `MOV AH,DL` — and the 1979 print says otherwise. The chip wins; the guide's legend is marked in `odd/tasks/assembler.md`'s log.
 7. **`T12`**: the headless runner already exists at `crates/cli` (binary `emo8067`, with `--trace` and `--dump`). The 86 examples are at `re/extracted/app/examples/`, but `.gitignore` excludes `re/extracted*/` because they are derived from a proprietary binary, so they are local gold and not repository content: they may be run and compared against, and neither they nor their golden states go into the tree.
 8. Only then the packaging and UI decisions listed in `documentation-guide.md`'s open questions (T6 and T7), which cannot be settled while the pieces they depend on do not exist.
 

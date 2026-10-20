@@ -165,9 +165,45 @@ checked against.
   word by word - a whole word, never a part of a longer name. A macro may
   call another, and one that calls itself is refused with the reference's
   own words: "recursive MACRO definition is over 64".
-- **T7** — **TODO.** The eighty-six examples, and the goldens.
+- **T7** — **IN PROGRESS.** The eighty-five examples, and the goldens.
+  **The gate.** `crates/asm/tests/examples.rs` reads the reference's own
+  examples (local gold, gitignored) and assembles every one of them. It
+  stands aside when they are not there, so the repository's own tests do not
+  depend on files that are not in it. **Seventy-five of the eighty-five
+  assemble.** The ten that do not are listed in the gate itself, each with
+  what it needs, and `odd/research/examples-pending.txt` holds the same list
+  with the line and the error. They are the reference's dialect and not the
+  guide's: a difference of two offsets (`offset msg_end - offset msg`), an
+  offset with an addition (`offset filename+2`), the `include` directive and
+  the macro library it brings (`PRINT`, `PRINTN` and their `LOCAL`
+  labels), and a jump or a call to a label that is defined later.
+  **The goldens are not possible yet.** The reference is a PE32 Windows
+  program and there is no wine here, so its assembler cannot be run to
+  produce the bytes to compare against. The gate is therefore "they
+  assemble", and the byte-for-byte comparison waits for a way to run the
+  reference.
 
 ## Log
+
+- **L4 (2026-10-20).** The dialect of the reference's own assembler, read
+  out of its 85 examples and its macro library, and the places where the
+  1979 print and the chip disagree.
+  - The reference writes a macro as `PUTC MACRO char`: the **name comes
+    first** and the word `MACRO` follows it. The guide's group tables
+    carry the operation with a slash (`SHL/SAL`), so a name has to be read
+    as a set, not as one word.
+  - A label may stand where the instruction goes, with the instruction
+    after it (`str1 db 'abc'`), and the label may be written with or
+    without a colon.
+  - `LOCAL` names the labels that belong to one expansion, and each
+    expansion needs its own.
+  - A name on its own is an address (`mov m, al` is the address of `m`),
+    and `offset <label>` asks for that address as a value.
+  - **The 8086's 8-bit R/M field reaches all eight byte registers, and the
+    1979 print says otherwise.** The captures from a real P80C86A-2 show
+    `88 F4` running `MOV AH,DL`, whose ModR/M byte has `100` in the R/M
+    field. The guide's legend still says "AH, CH, DH and BH are reachable
+    only through r8"; the print is what is wrong here, and the chip wins.
 
 - **L3 (2026-10-19).** A false alarm, caught before it cost anything: the
   guide's row `60` of §1.3 looks like a copy of its row `70`, and the

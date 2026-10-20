@@ -13,6 +13,10 @@ pub enum Operand {
     Memory(Memory),
     /// A relative jump's target, by address.
     Relative(i64),
+    /// A name the program gives a value to.
+    Name(String),
+    /// A far pointer: an offset and a segment, as `0FFFFh:0000h`.
+    Far(u16, u16),
 }
 
 /// A memory reference, in the parts the 8086's addressing needs.
@@ -20,6 +24,8 @@ pub enum Operand {
 pub struct Memory {
     /// The segment the reference is in, when the source named one.
     pub segment: Option<String>,
+    /// A name the program gives a value to, as in `num1[bx]`.
+    pub label: Option<String>,
     /// The base register, when the source named one.
     pub base: Option<String>,
     /// The index register, when the source named one.
@@ -40,6 +46,7 @@ impl Memory {
     /// The MOD, the R/M and the displacement bytes this reference needs.
     pub fn encode(&self) -> Result<(crate::modrm::Mod, u8, Vec<u8>), crate::addressing::Error> {
         let address = crate::addressing::Address {
+            label: self.label.clone(),
             base: self.base.as_deref().and_then(crate::addressing::register),
             index: self.index.as_deref().and_then(crate::addressing::register),
             displacement: self.displacement,
@@ -81,7 +88,19 @@ pub fn encode(
     operands: &[Operand],
     address: u16,
 ) -> Result<Vec<u8>, Error> {
-    encode_inner(opcode, mnemonic, form, operands, None, address)
+    encode_inner(opcode, mnemonic, form, operands, None, address, true)
+}
+
+/// The same, with the range of a short jump's displacement left unchecked.
+pub fn encode_at(
+    opcode: u8,
+    mnemonic: &str,
+    form: &str,
+    operands: &[Operand],
+    address: u16,
+    check_range: bool,
+) -> Result<Vec<u8>, Error> {
+    encode_inner(opcode, mnemonic, form, operands, None, address, check_range)
 }
 
 /// The encoding, with the REG field pinned when a group's digit chose the
@@ -93,13 +112,12 @@ fn encode_inner(
     operands: &[Operand],
     digit: Option<u8>,
     address: u16,
+    check_range: bool,
 ) -> Result<Vec<u8>, Error> {
-    if form.starts_with("Group") || form.starts_with("Shift") {
+    if let Some(group) = crate::groups::find_text(opcode, mnemonic, form) {
         // A group is chosen by the operation the source asked for: ADD in
-        // Group 1 is the digit whose cell says ADD.
-        let group = crate::groups::find(opcode, mnemonic).ok_or(Error::Unsupported {
-            form: form.to_string(),
-        })?;
+        // Group 1 is the digit whose cell says ADD. The form says which
+        // cell it is, so the digit is known.
         return encode_inner(
             opcode,
             mnemonic,
@@ -107,9 +125,23 @@ fn encode_inner(
             operands,
             Some(group.digit),
             address,
+            check_range,
         );
     }
     let parts: Vec<&str> = form.split(',').map(str::trim).collect();
+    // The guide's qualifiers count for nothing: `RET (intra)` is a return
+    // with no operand, and the `(intra)` is not one.
+    let parts: Vec<&str> = parts
+        .into_iter()
+        .filter(|part| !matches!(*part, "(intra)" | "(inter)" | "b" | "w"))
+        .collect();
+    // A cell with no form at all is an instruction with no operands:
+    // `PUSHF`, `CLD`, `HLT`.
+    let parts: Vec<&str> = if parts.len() == 1 && parts[0].is_empty() {
+        Vec::new()
+    } else {
+        parts
+    };
     if parts.len() != operands.len() {
         return Err(Error::Count {
             form: form.to_string(),
@@ -130,6 +162,8 @@ fn encode_inner(
         return Ok(out);
     }
     match parts.as_slice() {
+        // An instruction with no operands: the opcode is the whole of it.
+        [] => {}
         // A register against a register: the first is the REG field and the
         // second the R/M field.
         ["r/m8", "r8"] | ["r8", "r/m8"] | ["r/m16", "r16"] | ["r16", "r/m16"] => {
@@ -151,7 +185,7 @@ fn encode_inner(
             // memory reference brings its own MOD and its displacement.
             let (modrm, rm, displacement) = match &operands[rm_part] {
                 Operand::Register(name) => {
-                    let rm = width.field_of(name).ok_or_else(|| Error::Type {
+                    let rm = width.rm_field_of(name).ok_or_else(|| Error::Type {
                         form: form.to_string(),
                         position: rm_part,
                     })?;
@@ -186,13 +220,15 @@ fn encode_inner(
             };
             let (modrm, rm, displacement) = match &operands[0] {
                 Operand::Register(name) => {
-                    let rm = width.field_of(name).ok_or(Error::Type {
+                    // The R/M field of the 8086 reaches only four of the
+                    // eight byte registers.
+                    let rm = width.rm_field_of(name).ok_or(Error::Type {
                         form: form.to_string(),
                         position: 0,
                     })?;
                     (Mod::Register, rm, Vec::new())
                 }
-                Operand::Memory(memory) if digit.is_none() => {
+                Operand::Memory(memory) => {
                     let (modrm, rm, displacement) =
                         memory.encode().map_err(|error| Error::Addressing {
                             form: form.to_string(),
@@ -206,6 +242,9 @@ fn encode_inner(
                     });
                 }
             };
+            // The group's digit is the operation, and it goes in the REG
+            // field; the table's own `MOV m8,i8` has no digit and its REG
+            // field is zero.
             out.push(byte_for(modrm, digit.unwrap_or(0), rm));
             out.extend(displacement);
             let value = immediate(&operands[1], width)?;
@@ -225,9 +264,10 @@ fn encode_inner(
                     });
                 }
             };
+
             let end = i64::from(address) + 1 + width as i64;
             let displacement = target - end;
-            if width == 1 && !(-128..=127).contains(&displacement) {
+            if check_range && width == 1 && !(-128..=127).contains(&displacement) {
                 return Err(Error::Type {
                     form: "a displacement that fits in a byte".to_string(),
                     position: 0,
@@ -235,6 +275,17 @@ fn encode_inner(
             }
             // The opcode is already the first byte.
             out.extend_from_slice(&(displacement as i16).to_le_bytes()[..width]);
+        }
+        // A far pointer: the offset first, then the segment.
+        ["far"] => {
+            let Operand::Far(offset, segment) = operands[0] else {
+                return Err(Error::Type {
+                    form: form.to_string(),
+                    position: 0,
+                });
+            };
+            out.extend_from_slice(&offset.to_le_bytes());
+            out.extend_from_slice(&segment.to_le_bytes());
         }
         // An immediate against the accumulator.
         ["AL", "i8"] | ["AX", "i16"] => {
@@ -245,6 +296,221 @@ fn encode_inner(
             };
             let value = immediate(&operands[1], width)?;
             out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
+        }
+        // A shift: the count is one or the count register, and the
+        // operation is in the digit.
+        ["r/m8", "1"] | ["r/m16", "1"] | ["r/m8", "CL"] | ["r/m16", "CL"] => {
+            let width = if parts[0].ends_with('8') {
+                Width::Byte
+            } else {
+                Width::Word
+            };
+            let reg = digit.ok_or(Error::Unsupported {
+                form: form.to_string(),
+            })?;
+            let (modrm, rm, displacement) = match &operands[0] {
+                Operand::Register(name) => {
+                    let rm = width.rm_field_of(name).ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    })?;
+                    (Mod::Register, rm, Vec::new())
+                }
+                Operand::Memory(memory) => {
+                    let (modrm, rm, displacement) =
+                        memory.encode().map_err(|error| Error::Addressing {
+                            form: form.to_string(),
+                            reason: format!("{error:?}"),
+                        })?;
+                    (modrm, rm, displacement)
+                }
+                _ => {
+                    return Err(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    });
+                }
+            };
+            out.push(byte_for(modrm, reg, rm));
+            out.extend(displacement);
+            // The count: one, or the count register.
+            if parts[1] == "CL" {
+                out.push(
+                    0xC0 | width.field_of("CL").ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: 1,
+                    })?,
+                );
+            }
+        }
+        // A named register and an immediate: the opcode carries the
+        // register, so `MOV CL,i8` is B1h with the byte that follows.
+        [register, imm] if is_register_name(register) && (*imm == "i8" || *imm == "i16") => {
+            if !operand_names(&operands[0], register) {
+                return Err(Error::Type {
+                    form: form.to_string(),
+                    position: 0,
+                });
+            }
+            let width = if *imm == "i8" {
+                Width::Byte
+            } else {
+                Width::Word
+            };
+            let value = immediate(&operands[1], width)?;
+            out.extend_from_slice(&value.to_le_bytes()[..if width == Width::Byte { 1 } else { 2 }]);
+        }
+        // A direct address: the opcode and a word of address, with no ModR/M
+        // byte at all - the guide's `m8` and `m16`.
+        ["AL", "m8"] | ["AX", "m16"] | ["m8", "AL"] | ["m16", "AX"] => {
+            let address = direct_address(&operands[0]).ok_or(Error::Type {
+                form: form.to_string(),
+                position: 0,
+            })?;
+            out.extend_from_slice(&address.to_le_bytes());
+        }
+        // A direct address, the way the reference writes a label's address
+        // in place of a register: `mov m, al`.
+        ["r8", "m8"] | ["r16", "m16"] | ["m8", "r8"] | ["m16", "r16"] => {
+            let (address_part, other_part) = if parts[0].starts_with("m") {
+                (0, 1)
+            } else {
+                (1, 0)
+            };
+            let address = direct_address(&operands[address_part]).ok_or(Error::Type {
+                form: form.to_string(),
+                position: address_part,
+            })?;
+            let width = if parts[other_part].ends_with('8') {
+                Width::Byte
+            } else {
+                Width::Word
+            };
+            let other = match &operands[other_part] {
+                Operand::Register(name) => {
+                    let rm = width.rm_field_of(name).ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: other_part,
+                    })?;
+                    (Mod::Register, rm, Vec::<u8>::new())
+                }
+                _ => {
+                    return Err(Error::Type {
+                        form: form.to_string(),
+                        position: other_part,
+                    });
+                }
+            };
+            out.push(byte_for(other.0, 0, other.1));
+            out.extend(other.2);
+            out.extend_from_slice(&address.to_le_bytes());
+        }
+        // An immediate and a register, or a register and a port: the opcode
+        // carries both.
+        ["i8", "AL"] | ["i8", "AX"] => {
+            let value = immediate(&operands[0], Width::Byte)?;
+            out.extend_from_slice(&value.to_le_bytes()[..1]);
+        }
+        [_, _] if is_register_name(parts[0]) && is_register_name(parts[1]) => {
+            // `IN AL,DX` and `OUT DX,AL`: the opcode carries both.
+            let _ = &operands[0];
+        }
+        // A register or a segment on its own: the opcode carries it.
+        [only] if is_register_name(only) || is_segment_name(only) => {
+            if !operand_names(&operands[0], only) {
+                return Err(Error::Type {
+                    form: form.to_string(),
+                    position: 0,
+                });
+            }
+        }
+        // A return, near or far, with or without an immediate.
+        ["(intra)"] | ["(inter)"] => {}
+        ["i16 (intra)"] | ["i16 (inter)"] => {
+            let value = immediate(&operands[0], Width::Word)?;
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        // One operand in the R/M field: the group puts the operation in the
+        // REG field and the operand in the R/M field. `INC AL` is FE C0h
+        // and `MUL BL` is F6 E3h. The guide's own indirect calls and jumps
+        // are here too: `CALL m16 (inter)` is FF /3.
+        ["r/m8"]
+        | ["r/m16"]
+        | ["r16/m16"]
+        | ["MEM16"]
+        | ["r16/m16 (intra)"]
+        | ["r/m16 (intra)"]
+        | ["m16 (inter)"]
+        | ["m8"]
+        | ["m16"] => {
+            let width = if parts[0].ends_with('8') {
+                Width::Byte
+            } else {
+                Width::Word
+            };
+            let (modrm, rm, displacement) = match &operands[0] {
+                Operand::Register(name) => {
+                    let rm = width.rm_field_of(name).ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    })?;
+                    (Mod::Register, rm, Vec::new())
+                }
+                Operand::Memory(memory) => {
+                    let (modrm, rm, displacement) =
+                        memory.encode().map_err(|error| Error::Addressing {
+                            form: form.to_string(),
+                            reason: format!("{error:?}"),
+                        })?;
+                    (modrm, rm, displacement)
+                }
+                _ => {
+                    return Err(Error::Type {
+                        form: form.to_string(),
+                        position: 0,
+                    });
+                }
+            };
+            out.push(byte_for(modrm, digit.unwrap_or(0), rm));
+            out.extend(displacement);
+        }
+        // A segment register and a memory operand, either way round: the REG
+        // field carries the segment.
+        ["r/m16", "sreg"] | ["r16/m16", "sreg"] | ["sreg", "r/m16"] | ["sreg", "r16/m16"] => {
+            let (segment_part, memory_part) = if matches!(parts[0], "sreg") {
+                (0, 1)
+            } else {
+                (1, 0)
+            };
+            let segment = segment_field(&operands[segment_part]).ok_or(Error::Type {
+                form: form.to_string(),
+                position: segment_part,
+            })?;
+            let (modrm, rm, displacement) = match &operands[memory_part] {
+                Operand::Register(name) => {
+                    let rm = Width::Word.rm_field_of(name).ok_or(Error::Type {
+                        form: form.to_string(),
+                        position: memory_part,
+                    })?;
+                    (Mod::Register, rm, Vec::new())
+                }
+                Operand::Memory(memory) => {
+                    let (modrm, rm, displacement) =
+                        memory.encode().map_err(|error| Error::Addressing {
+                            form: form.to_string(),
+                            reason: format!("{error:?}"),
+                        })?;
+                    (modrm, rm, displacement)
+                }
+                _ => {
+                    return Err(Error::Type {
+                        form: form.to_string(),
+                        position: memory_part,
+                    });
+                }
+            };
+            out.push(byte_for(modrm, segment, rm));
+            out.extend(displacement);
         }
         // An immediate on its own: the accumulator forms of the ALU groups.
         ["i8"] | ["i16"] => {
@@ -287,6 +553,46 @@ fn is_register_name(word: &str) -> bool {
     )
 }
 
+/// Whether a word names a segment register.
+fn is_segment_name(word: &str) -> bool {
+    matches!(word, "ES" | "CS" | "SS" | "DS")
+}
+
+/// Whether the operand is the register or segment the form names.
+fn operand_names(operand: &Operand, name: &str) -> bool {
+    matches!(operand, Operand::Register(other) if other == name)
+}
+
+/// The field value of a segment register: `00` ES, `01` CS, `10` SS, `11` DS.
+fn segment_field(operand: &Operand) -> Option<u8> {
+    let Operand::Register(name) = operand else {
+        return None;
+    };
+    match name.as_str() {
+        "ES" => Some(0),
+        "CS" => Some(1),
+        "SS" => Some(2),
+        "DS" => Some(3),
+        _ => None,
+    }
+}
+
+/// The address of a direct reference, when the operand names one.
+fn direct_address(operand: &Operand) -> Option<u16> {
+    match operand {
+        Operand::Immediate(value) => u16::try_from(*value).ok(),
+        Operand::Memory(memory) => {
+            if memory.base.is_some() || memory.index.is_some() {
+                return None;
+            }
+            memory
+                .displacement
+                .and_then(|value| u16::try_from(value).ok())
+        }
+        _ => None,
+    }
+}
+
 /// The field value of a register operand.
 fn register(operand: &Operand, width: Width) -> Result<u8, Error> {
     match operand {
@@ -302,6 +608,9 @@ fn register(operand: &Operand, width: Width) -> Result<u8, Error> {
 }
 
 /// The bytes of an immediate operand, at the width the form asks for.
+///
+/// A negative value is two's complement: `-5` is `FBh` in a byte and
+/// `FFF3h` in a word.
 fn immediate(operand: &Operand, width: Width) -> Result<i64, Error> {
     let Operand::Immediate(value) = operand else {
         return Err(Error::Type {
@@ -309,10 +618,14 @@ fn immediate(operand: &Operand, width: Width) -> Result<i64, Error> {
             position: 0,
         });
     };
-    let limit = if width == Width::Byte { 0xFF } else { 0xFFFF };
-    if *value < 0 || *value > limit {
+    let (low, high) = if width == Width::Byte {
+        (-0x80, 0xFF)
+    } else {
+        (-0x8000, 0xFFFF)
+    };
+    if *value < low || *value > high {
         return Err(Error::Type {
-            form: format!("a value that fits in {limit:#x}"),
+            form: format!("a value that fits in {high:#x}"),
             position: 0,
         });
     }
