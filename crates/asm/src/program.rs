@@ -17,6 +17,7 @@ use crate::literals;
 use crate::macros::{self, Macro};
 use crate::operands::{Memory, Operand};
 use crate::table;
+use std::path::{Path, PathBuf};
 
 /// What went wrong.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -31,6 +32,11 @@ pub enum Error {
     UnknownName { name: String },
     /// A macro that calls itself for ever, in the reference's own words.
     RecursiveMacro { message: String },
+    /// A conditional jump that is out of range, in the reference's own words.
+    JumpOutOfRange { message: String },
+    /// An include file that cannot be brought in, in the reference's own
+    /// words.
+    Include { message: String },
     /// Something went wrong on a line of the source.
     AtLine { line: usize, error: Box<Error> },
 }
@@ -148,6 +154,98 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
         }
     }
     Ok(program)
+}
+
+/// Assemble a file, with the includes it names.
+///
+/// The include is textual and happens before the macros are read, because
+/// the library's macros must be visible to the whole program.
+pub fn assemble_file(path: &Path, include_dirs: &[PathBuf]) -> Result<Program, Error> {
+    let text = splice_includes(path, include_dirs)?;
+    assemble_program(&text)
+}
+
+/// The source of a file, with its includes spliced in.
+///
+/// The text is the one the assembler reads, so a refusal that says which
+/// line it happened on can be read against it.
+pub fn splice_includes(path: &Path, include_dirs: &[PathBuf]) -> Result<String, Error> {
+    let bytes = std::fs::read(path).map_err(|_| Error::Include {
+        message: format!("file not found: {}", path.display()),
+    })?;
+    // Some of the reference's own files are not UTF-8; the bytes that are
+    // not are in comments, and a lossy read leaves them alone.
+    let text = String::from_utf8_lossy(&bytes);
+    let directory = path.parent().unwrap_or(Path::new("."));
+    splice_text(&text, directory, include_dirs, 0)
+}
+
+/// How many includes deep the splicing goes before it gives up.
+const MAX_INCLUDE_DEPTH: usize = 16;
+
+/// The source with the includes spliced in.
+fn splice_text(
+    text: &str,
+    directory: &Path,
+    include_dirs: &[PathBuf],
+    depth: usize,
+) -> Result<String, Error> {
+    if depth > MAX_INCLUDE_DEPTH {
+        return Err(Error::Include {
+            message: "recursive include file?".to_string(),
+        });
+    }
+    let mut out = String::new();
+    for line in text.lines() {
+        let Some(name) = include_name(line) else {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        };
+        let found = find_include(name, directory, include_dirs).ok_or_else(|| Error::Include {
+            message: format!("file not found: {name}"),
+        })?;
+        let bytes = std::fs::read(&found).map_err(|_| Error::Include {
+            message: format!("file not found: {name}"),
+        })?;
+        let included = String::from_utf8_lossy(&bytes);
+        let nested = splice_text(
+            &included,
+            found.parent().unwrap_or(directory),
+            include_dirs,
+            depth + 1,
+        )?;
+        out.push_str(&nested);
+    }
+    Ok(out)
+}
+
+/// The name of the file an include line names.
+fn include_name(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    let (word, rest) = trimmed.split_once(char::is_whitespace)?;
+    if !word.eq_ignore_ascii_case("INCLUDE") {
+        return None;
+    }
+    let rest = rest.trim();
+    let quote = rest.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let rest = &rest[1..];
+    let end = rest.find(quote)?;
+    Some(&rest[..end])
+}
+
+/// The file an include names: the directory of the source first, and then the
+/// include directories the caller passes, in order. The first one there
+/// wins.
+fn find_include(name: &str, directory: &Path, include_dirs: &[PathBuf]) -> Option<PathBuf> {
+    let mut candidates = vec![directory.join(name)];
+    for include_dir in include_dirs {
+        candidates.push(include_dir.join(name));
+    }
+    candidates.into_iter().find(|path| path.is_file())
 }
 
 /// What one walk of the program found.
@@ -597,6 +695,24 @@ fn resolve(
     let trimmed = text.trim().trim_end_matches(':').trim();
     // The size the source wrote in front of the operand: `w. week`.
     let (trimmed, width) = take_size(trimmed);
+    // An expression: `len-1`, `100+w`, `($ - x1) / 2`, `offset msg_end -
+    // offset msg`. It comes before the words `offset` and `seg`, because
+    // those may be a term of an expression and not the whole of it.
+    if let Some(value) = expression(trimmed, constants, names, address) {
+        if mnemonic.eq_ignore_ascii_case("LEA") {
+            // `LEA` takes the address of what it is given, and an
+            // expression is an address.
+            return Ok(Operand::Memory(Memory {
+                label: None,
+                segment: None,
+                base: None,
+                index: None,
+                displacement: Some(value),
+                width: None,
+            }));
+        }
+        return Ok(Operand::Immediate(value));
+    }
     // `offset name`: the address of the name, as a value. The name may be
     // a reference: `offset s1[2]`.
     if let Some(rest) = strip_keyword(trimmed, "OFFSET") {
@@ -616,22 +732,6 @@ fn resolve(
     // A constant the program declared.
     if let Some(values) = constant(trimmed, constants) {
         return Ok(Operand::Immediate(values));
-    }
-    // An expression: `len-1`, `100+w`, `($ - x1) / 2`.
-    if let Some(value) = expression(trimmed, constants, names, address) {
-        if mnemonic.eq_ignore_ascii_case("LEA") {
-            // `LEA` takes the address of what it is given, and an
-            // expression is an address.
-            return Ok(Operand::Memory(Memory {
-                label: None,
-                segment: None,
-                base: None,
-                index: None,
-                displacement: Some(value),
-                width: None,
-            }));
-        }
-        return Ok(Operand::Immediate(value));
     }
     // A register or a reference.
     if is_register(trimmed)
@@ -898,6 +998,9 @@ fn bad(parsed: &line::Line, error: assemble::Error) -> Error {
         assemble::Error::UnknownInstruction { name } => Error::UnknownInstruction { name },
         assemble::Error::Type { message } => Error::BadOperand {
             text: message.to_string(),
+        },
+        assemble::Error::OutOfRange { message } => Error::JumpOutOfRange {
+            message: message.to_string(),
         },
         _ => Error::BadOperand {
             text: parsed.operands.join(", "),
@@ -1294,7 +1397,10 @@ impl Expression<'_> {
             let start = self.at;
             while self.at < self.text.len()
                 && (self.text[self.at..].starts_with(|c: char| c.is_alphanumeric())
-                    || self.text[self.at..].starts_with('_'))
+                    || self.text[self.at..].starts_with('_')
+                    // A `LOCAL` name carries the number of its expansion in
+                    // it: `s_dcl$68`.
+                    || self.text[self.at..].starts_with('$'))
             {
                 self.at += 1;
             }

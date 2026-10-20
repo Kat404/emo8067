@@ -42,7 +42,7 @@ pub fn read(source: &str) -> Vec<Macro> {
             continue;
         }
         if let Some(current) = &name {
-            if line.eq_ignore_ascii_case("ENDM") {
+            if is_endm(line) {
                 macros.push(Macro {
                     name: current.clone(),
                     parameters: parameters.clone(),
@@ -105,6 +105,16 @@ fn strip_local(line: &str) -> Option<&str> {
     Some(rest.trim())
 }
 
+/// Whether the line ends a macro.
+///
+/// The reference writes the macro's name first and the word `ENDM` after it,
+/// the same way it writes `MACRO`: `PUTC    ENDM`.
+fn is_endm(line: &str) -> bool {
+    line.split_whitespace()
+        .last()
+        .is_some_and(|word| word.eq_ignore_ascii_case("ENDM"))
+}
+
 /// The body of a macro with the arguments in place of the parameters.
 ///
 /// The `LOCAL` names are given an ending of their own, so that two
@@ -133,7 +143,7 @@ fn replace_word(line: &str, name: &str, value: &str) -> String {
     while let Some(at) = rest.find(name) {
         let before = &rest[..at];
         let after = &rest[at + name.len()..];
-        if is_boundary(before) && is_boundary(after) {
+        if is_boundary_before(before) && is_boundary_after(after) {
             out.push_str(before);
             out.push_str(value);
         } else {
@@ -145,9 +155,20 @@ fn replace_word(line: &str, name: &str, value: &str) -> String {
     out
 }
 
-/// Whether an edge of a word is a boundary and not part of a name.
-fn is_boundary(edge: &str) -> bool {
+/// Whether the edge before a word is a boundary and not part of a name.
+fn is_boundary_before(edge: &str) -> bool {
     match edge.chars().last() {
+        None => true,
+        Some(character) => !character.is_alphanumeric() && character != '_',
+    }
+}
+
+/// Whether the edge after a word is a boundary and not part of a name.
+///
+/// The edge after a word is the first character of what comes next, so a
+/// parameter followed by a comma is a whole word.
+fn is_boundary_after(edge: &str) -> bool {
+    match edge.chars().next() {
         None => true,
         Some(character) => !character.is_alphanumeric() && character != '_',
     }
@@ -173,7 +194,7 @@ pub fn strip(source: &str) -> Vec<(usize, String)> {
             continue;
         }
         if inside {
-            if line.eq_ignore_ascii_case("ENDM") {
+            if is_endm(line) {
                 inside = false;
             }
             continue;

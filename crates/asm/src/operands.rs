@@ -73,6 +73,9 @@ pub enum Error {
     Unsupported { form: String },
     /// The addressing does not work.
     Addressing { form: String, reason: String },
+    /// A conditional jump whose displacement does not fit in a byte, in the
+    /// reference's own words.
+    OutOfRange { message: &'static str },
 }
 
 /// Encode one instruction: the form from the document's table, and the
@@ -268,9 +271,9 @@ fn encode_inner(
             let end = i64::from(address) + 1 + width as i64;
             let displacement = target - end;
             if check_range && width == 1 && !(-128..=127).contains(&displacement) {
-                return Err(Error::Type {
-                    form: "a displacement that fits in a byte".to_string(),
-                    position: 0,
+                // The reference's own words for a jump that is out of range.
+                return Err(Error::OutOfRange {
+                    message: "conditional jump is out of range: allowed values are from -128 to 127",
                 });
             }
             // The opcode is already the first byte.

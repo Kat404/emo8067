@@ -169,14 +169,29 @@ checked against.
   **The gate.** `crates/asm/tests/examples.rs` reads the reference's own
   examples (local gold, gitignored) and assembles every one of them. It
   stands aside when they are not there, so the repository's own tests do not
-  depend on files that are not in it. **Seventy-five of the eighty-five
-  assemble.** The ten that do not are listed in the gate itself, each with
+  depend on files that are not in it. **Eighty-one of the eighty-five
+  assemble.** The four that do not are listed in the gate itself, each with
   what it needs, and `odd/research/examples-pending.txt` holds the same list
-  with the line and the error. They are the reference's dialect and not the
-  guide's: a difference of two offsets (`offset msg_end - offset msg`), an
-  offset with an addition (`offset filename+2`), the `include` directive and
-  the macro library it brings (`PRINT`, `PRINTN` and their `LOCAL`
-  labels), and a jump or a call to a label that is defined later.
+  with the line and the error.
+  **DONE, the four dialect defects.** They were not the dialect but four
+  bugs, each of them found by reading the reference's own examples:
+  a word's trailing edge is the **first** character of what follows it, so a
+  macro parameter followed by a comma was never substituted; the reference
+  writes a macro's end as `<name> ENDM`, the same shape as `<name> MACRO`,
+  and reading `ENDM` as a whole line dropped the entire tail of every
+  program that used the library's macros; `offset` is a **term** of an
+  expression and not a whole operand, so `offset msg_end - offset msg` and
+  `offset filename+2` are now read; and the `include` directive brings the
+  library in textually, before the macros are read, with the file's own
+  directory first and the caller's include directories after it.
+  **OPEN, the four that the reference itself rewrites.** `bin2dec.asm`,
+  `micro-os_kernel.asm`, `mouse.asm` and `writebin.asm` each hold a
+  conditional jump whose target is more than 127 bytes away. The reference
+  does not refuse those: its own changelog says that "short conditional
+  jumps are replaced with the opposite instruction and one normal jump", and
+  its tutorial 07 says the same in prose - five bytes instead of two. The
+  assembler refuses them still, with the reference's own words, and the
+  rewrite is the next unit.
   **The goldens are not possible yet.** The reference is a PE32 Windows
   program and there is no wine here, so its assembler cannot be run to
   produce the bytes to compare against. The gate is therefore "they
@@ -184,6 +199,41 @@ checked against.
   reference.
 
 ## Log
+
+- **L5 (2026-10-20).** Four bugs, not four dialects, and one wrong
+  premise of mine that the reference's own files settled.
+  **The bugs.** (1) `macros::replace_word` tested the **last** character of
+  the rest of a line where a word's trailing edge is the **first** one, so
+  a macro parameter followed by a comma was never substituted -
+  `s_dcl DB sdat, 0` kept its parameter. (2) `ENDM` was read as a whole
+  line, while the reference writes `<name> ENDM` the way it writes
+  `<name> MACRO`; every line after a macro definition was therefore dropped
+  from the program, which is why `writebin.asm` had no `clear_screen` and
+  why `string.asm` assembled to **zero bytes** while the gate called it a
+  pass. (3) `offset` is a term of an expression and not a whole operand, so
+  the whole-operand shortcut swallowed `offset msg_end - offset msg` before
+  the expression reader ever saw it. (4) There was no `include` at all; it
+  is textual, it happens before the macros are read, and it looks in the
+  file's own directory first and in the caller's include directories after.
+  **The premise.** I had read the reference's binary and found its message
+  "conditional jump is out of range: allowed values are from -128 to 127",
+  and concluded that the four examples with an out-of-range conditional jump
+  do not assemble in the reference either. The reference's own changelog
+  (`re/extracted/app/version.txt`, v4.02) says the opposite: "automatic
+  workaround for short relative jumps updated, to overcome jump limit of
+  +/-127 bytes, short conditional jumps are replaced with the opposite
+  instruction and one normal jump"; `documentation/asm_tutorial_07.html`
+  says the same in prose, "making total of 5 bytes instead of just 2"; and
+  `documentation/compiler.html` calls the error a bug of an older
+  single-pass compiler. `writebin.asm:65` says it outright: "this
+  instruction is assembled into OR CX, CX and two JMPs". The message is in
+  the binary and the binary does not use it that way. The four refusals are
+  ours, not the reference's, and the rewrite is T7's next unit.
+  **A divergence worth naming.** `PUSHA`/`POPA` are emitted as the seven
+  instructions they stand for (T6's decision: the 8086 has neither), while
+  the reference emits `60h`/`61h`; our layout is therefore twelve bytes
+  longer per expansion, which moves the distances a jump has to reach and
+  will matter when the goldens arrive.
 
 - **L4 (2026-10-20).** The dialect of the reference's own assembler, read
   out of its 85 examples and its macro library, and the places where the

@@ -21,6 +21,24 @@ fn a_macro_may_call_another() {
 }
 
 #[test]
+fn a_parameter_followed_by_a_comma_is_replaced() {
+    // The reference's own library writes `s_dcl DB sdat, 0`: the parameter
+    // is followed by a comma, and the comma is the edge of the word.
+    let program =
+        assemble_program("PRINT MACRO sdat\n  s_dcl DB sdat, 0\nENDM\nPRINT 'hi'\n").unwrap();
+    assert_eq!(program.bytes, vec![b'h', b'i', 0]);
+}
+
+#[test]
+fn a_macro_ends_with_its_own_name_and_endm() {
+    // The reference writes the macro's name first and the word ENDM after
+    // it, exactly as it writes MACRO: `PUTC    ENDM`.
+    let program =
+        assemble_program("PUTC MACRO char\n  mov al, char\nPUTC ENDM\nPUTC 'A'\n").unwrap();
+    assert_eq!(program.bytes, vec![0xB0, b'A']);
+}
+
+#[test]
 fn a_macro_that_calls_itself_is_refused() {
     let error = assemble_program("MACRO loop\n  loop\nENDM\nloop\n").unwrap_err();
     match error {

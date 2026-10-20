@@ -54,3 +54,48 @@ fn a_conditional_jump_is_the_short_form() {
     // canonical one.
     assert_eq!(program.bytes, vec![0x74, 0x01, 0x90, 0x90]);
 }
+
+#[test]
+fn an_offset_can_be_part_of_an_expression() {
+    let program = assemble_program(
+        "org 100h\nmsg db 'hello'\nmsg_end:\nmov cx, offset msg_end - offset msg\n",
+    )
+    .unwrap();
+    // The message is five bytes long, and MOV CX,5 is B9 05 00.
+    assert_eq!(
+        program.bytes,
+        vec![b'h', b'e', b'l', b'l', b'o', 0xB9, 0x05, 0x00]
+    );
+}
+
+#[test]
+fn an_offset_can_have_an_addition() {
+    let program =
+        assemble_program("org 100h\nfilename db 'ab'\nmov dx, offset filename+2\n").unwrap();
+    // The name is at 100h, and MOV DX,102h is BA 02 01.
+    assert_eq!(program.bytes, vec![b'a', b'b', 0xBA, 0x02, 0x01]);
+}
+
+#[test]
+fn a_conditional_jump_out_of_range_is_refused_in_the_reference_words() {
+    let mut source = String::from("org 0\nje there\n");
+    for _ in 0..200 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nnop\n");
+    let error = assemble_program(&source).unwrap_err();
+    // The refusal says which line it happened on.
+    let inner = match error {
+        emo8067_asm::program::Error::AtLine { error, .. } => *error,
+        other => panic!("expected the refusal, got {other:?}"),
+    };
+    match inner {
+        emo8067_asm::program::Error::JumpOutOfRange { message } => {
+            assert_eq!(
+                message,
+                "conditional jump is out of range: allowed values are from -128 to 127"
+            );
+        }
+        other => panic!("expected the refusal, got {other:?}"),
+    }
+}

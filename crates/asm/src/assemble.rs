@@ -23,6 +23,8 @@ pub enum Error {
     BadOperand { text: String },
     /// The operands are of the wrong type, in the reference's own words.
     Type { message: &'static str },
+    /// A conditional jump that is out of range, in the reference's own words.
+    OutOfRange { message: &'static str },
 }
 
 /// Assemble one line of source.
@@ -121,6 +123,7 @@ pub fn assemble_parts_at(
         operands::Error::Type { form, position } => Error::BadOperand {
             text: format!("{form}, operand {position}"),
         },
+        operands::Error::OutOfRange { message } => Error::OutOfRange { message },
         _ => Error::BadOperand {
             text: line.operands.join(", "),
         },
