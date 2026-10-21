@@ -79,6 +79,17 @@ checked against.
   `OR AX,CX`.) The `LOOP` family keeps the refusal: the reference's table
   gives their companions, but the replacement for `LOOPE` and `LOOPNE` would
   decrement `CX` twice and test the wrong condition, and no example needs it.
+- **S10** — The prefixes the source writes before the instruction are
+  emitted as the bytes the guide's map gives them, in the order they were
+  written: the repeat prefixes (`F3h` for `REP`/`REPE`/`REPZ`, `F2h` for
+  `REPNE`/`REPNZ`), `LOCK` (`F0h`), and the segment overrides (`2Eh` CS,
+  `36h` SS, `3Eh` DS, `26h` ES, which the map writes as `SEG CS:` and so
+  on). Today the prefixes are parsed and thrown away, so `rep movsb`
+  assembles to `A4h` without its `F3h`, and the gate cannot see it: it
+  compares against a base that loses them too. The bytes come from the
+  guide's own map and not from a list written out here, and the instruction
+  grows by the bytes of its prefixes, so the layout has to settle again
+  with them in it.
 
 ## Tasks
 
@@ -216,6 +227,18 @@ checked against.
   prefix (`rep movsb` parsed as the mnemonic `rep`), and a first word that
   already carried a colon was given another one, which lost the label of
   `nsp:mov [di-1], 0`. Both are fixed.
+  **DONE, the prefixes.** The prefixes the source writes are now emitted as
+  the bytes the guide's map gives them, in the order they were written: the
+  repeat prefixes, `LOCK`, and the segment overrides. `rep movsb` is `F3h
+  A4h` and not `A4h`. The bytes come out of the map - `REP/REPE/REPZ` is
+  `F3`, `REPNE/REPNZ` is `F2`, the first `LOCK` is `F0`, and the overrides
+  are the cells that say `SEG CS:` and so on - and not out of a list written
+  here. The gate could not see this defect: it compares against a base that
+  loses the prefixes too. Six examples carried one; the other seventy-nine
+  are byte-identical to the base, and the eleven prefixed instructions are
+  the eleven bytes the map gives. The dotted override (`.cs:`) was parsed
+  as a label and lost; the recovered contract names it, so it is a prefix
+  now.
   **The goldens are not possible yet.** The reference is a PE32 Windows
   program and there is no wine here, so its assembler cannot be run to
   produce the bytes to compare against. The gate is therefore "they
@@ -223,6 +246,40 @@ checked against.
   reference.
 
 ## Log
+
+- **L7 (2026-10-21).** S10, the prefixes, and the hole the gate could not
+  see.
+  **The defect.** The prefixes were parsed and thrown away: `rep movsb`
+  assembled to `A4h` without its `F3h`, and `repe cmpsb` to `A6h` without
+  its `F3h`. Six of the eighty-five examples carried a prefix - eleven
+  instructions in all - and every one of them had the wrong bytes. The gate
+  could not see it, because the gate compares against a base that loses the
+  prefixes too: the defect is invisible to a differential check against
+  itself, and only a differential check against a *correct* assembler would
+  catch it.
+  **The bytes come from the map.** `REP/REPE/REPZ` is `F3`, `REPNE/REPNZ` is
+  `F2`, the first `LOCK` is `F0` (`F1` is the same prefix a second time),
+  and the segment overrides are the cells that say `SEG CS:`, `SEG SS:`,
+  `SEG DS:` and `SEG ES:`. Nothing is written out in the assembler, which is
+  S1's promise kept a second time.
+  **A prefix moves the opcode.** So the instruction's size grows, the count
+  pass counts it for free (it takes the size from the bytes it assembles),
+  and a jump's displacement has to be measured from the **opcode's** address
+  and not from the line's - which is also where the out-of-range
+  replacement of L6 measures from now.
+  **The proof.** Seventy-nine of the eighty-five examples are byte-identical
+  to the base commit; the six that changed are exactly the six that carry a
+  prefix, and the byte-level diff shows eleven insertions - one per prefixed
+  instruction - and nothing else that is not a displacement.
+  **The layout got easier.** The worst case is now four count walks where
+  the base needed five, because a prefixed instruction is longer and pushes
+  the addresses it does not reach.
+  **Still open.** The glued form `cs:mov ax,1` - a segment override with no
+  space - is still mangled by `label_first()`, and it is mangled in the base
+  too; no example uses it, and it is a parsing change and not an emission
+  one. `PUSHA`/`POPA` carry the prefix but the reference's own expansion
+  does not (L5's divergence). The `E9h` displacement is still sixteen-bit
+  signed, and the reference past 32767 bytes is unknown.
 
 - **L6 (2026-10-21).** S9, the reference's own workaround for a jump that is
   too far, and the count pass that it forces.

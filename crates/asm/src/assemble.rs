@@ -58,6 +58,28 @@ pub fn assemble_parts_at(
     address: u16,
     check_range: bool,
 ) -> Result<Vec<u8>, Error> {
+    // The prefixes come before the instruction they cover, so the opcode is
+    // not where the line starts: a jump's displacement is measured from the
+    // end of the whole of it.
+    let prefixes = line.prefix_bytes();
+    let mut bytes = assemble_inner(
+        line,
+        operands,
+        address.wrapping_add(prefixes.len() as u16),
+        check_range,
+    )?;
+    let mut out = prefixes;
+    out.append(&mut bytes);
+    Ok(out)
+}
+
+/// The instruction itself, without the prefixes in front of it.
+fn assemble_inner(
+    line: &line::Line,
+    operands: &[Operand],
+    address: u16,
+    check_range: bool,
+) -> Result<Vec<u8>, Error> {
     // The manual has no NOP: the 8086's 90h is XCHG AX,AX, and that is what
     // a NOP is.
     if line.mnemonic.eq_ignore_ascii_case("NOP") && operands.is_empty() {

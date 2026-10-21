@@ -222,6 +222,72 @@ fn a_loop_that_is_too_far_is_refused_in_the_reference_words() {
     }
 }
 
+#[test]
+fn the_repeat_prefix_is_the_byte_the_map_gives_it() {
+    // `rep movsb` is F3h A4h: the map's row F0 gives F3 to `REP/REPE/REPZ`.
+    let program = assemble_program("rep movsb\n").unwrap();
+    assert_eq!(program.bytes, vec![0xF3, 0xA4]);
+}
+
+#[test]
+fn the_repeat_not_equal_prefix_is_the_byte_the_map_gives_it() {
+    // `repne scasb` is F2h AEh: the map gives F2 to `REPNE/REPNZ`.
+    let program = assemble_program("repne scasb\n").unwrap();
+    assert_eq!(program.bytes, vec![0xF2, 0xAE]);
+}
+
+#[test]
+fn the_lock_prefix_is_the_byte_the_map_gives_it() {
+    // `lock` is F0h: the map's row F0 gives F0 to `LOCK`, and `F1` is the
+    // same prefix a second time.
+    let program = assemble_program("lock inc ax\n").unwrap();
+    assert_eq!(program.bytes, vec![0xF0, 0x40]);
+}
+
+#[test]
+fn a_segment_override_prefix_is_the_byte_the_map_gives_it() {
+    // The map writes the segment overrides as `SEG CS:` and so on, and the
+    // bytes are the ones it gives them: CS is 2Eh, SS is 36h, DS is 3Eh
+    // and ES is 26h.
+    for (prefix, byte) in [("cs:", 0x2E), ("ss:", 0x36), ("ds:", 0x3E), ("es:", 0x26)] {
+        let program = assemble_program(&format!("{prefix} mov ax, [si]\n")).unwrap();
+        assert_eq!(program.bytes, vec![byte, 0x8B, 0x04], "{prefix}");
+    }
+}
+
+#[test]
+fn the_prefixes_come_before_the_opcode_in_the_order_they_were_written() {
+    // `cs: rep movsb` is 2Eh F3h A4h: the segment override first, then the
+    // repeat, and the opcode last.
+    let program = assemble_program("cs: rep movsb\n").unwrap();
+    assert_eq!(program.bytes, vec![0x2E, 0xF3, 0xA4]);
+}
+
+#[test]
+fn a_segment_override_prefix_may_carry_a_dot() {
+    // The reference's own list of the prefixes it accepts names the segment
+    // overrides both ways, and the byte is the same one.
+    let program = assemble_program(".cs: mov ax, [si]\n").unwrap();
+    assert_eq!(program.bytes, vec![0x2E, 0x8B, 0x04]);
+}
+
+#[test]
+fn an_instruction_grows_by_the_bytes_of_its_prefixes() {
+    let program = assemble_program("org 100h\nrep movsb\nhere:\nnop\n").unwrap();
+    // The prefix is a byte of the instruction, so the label that follows
+    // it is at 102h.
+    assert_eq!(program.names, vec![("here".to_string(), 0x102)]);
+    assert_eq!(program.bytes, vec![0xF3, 0xA4, 0x90]);
+}
+
+#[test]
+fn a_prefixed_jump_reaches_the_same_label() {
+    let program = assemble_program("org 0\nrep je there\nnop\nthere:\nnop\n").unwrap();
+    // The prefix is a byte of the jump, so the short jump ends at three and
+    // the label is at four: the displacement is one.
+    assert_eq!(program.bytes, vec![0xF3, 0x74, 0x01, 0x90, 0x90]);
+}
+
 /// The opcode the guide's table gives a short jump.
 fn opcode_of(mnemonic: &str) -> u8 {
     emo8067_asm::assemble::options_for_pub(mnemonic)

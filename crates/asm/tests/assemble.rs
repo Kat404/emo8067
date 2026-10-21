@@ -58,3 +58,12 @@ fn a_group_picks_the_opcode_the_operation_uses() {
     // ADD BX,1 is in Group 1's word column: 81 C3 01 00h.
     assert_eq!(assemble("ADD BX, 1").unwrap(), vec![0x81, 0xC3, 0x01, 0x00]);
 }
+
+#[test]
+fn a_prefix_comes_before_the_opcode() {
+    // `rep movsb` is F3h A4h: the map's row F0 gives F3 to `REP/REPE/REPZ`,
+    // and the prefix comes before the opcode it covers.
+    assert_eq!(assemble("rep movsb").unwrap(), vec![0xF3, 0xA4]);
+    // `lock inc ax` is F0h 40h: the map's row 40 gives 40 to `INC AX`.
+    assert_eq!(assemble("lock inc ax").unwrap(), vec![0xF0, 0x40]);
+}

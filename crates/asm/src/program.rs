@@ -548,15 +548,22 @@ fn effect(
             None => Effect::Nothing,
         });
     }
+    // The prefixes come before the instruction, so the opcode is not where
+    // the line starts: a jump's displacement is measured from the end of
+    // the whole of it.
+    let prefixes = swapped.prefix_bytes();
+    let opcode = address.wrapping_add(prefixes.len() as u16);
     // The reference's own examples push all the registers and pop them
     // again. The 8086 has neither instruction - the guide's row 60 is the
     // conditional jumps' own alias, and the captures from a real P80C86A-2
     // show `60h` running `JO` - and the reference's own documentation calls
     // it an 80186 instruction and gives the sequence it stands for.
     if let Some(bytes) = push_all(&swapped.mnemonic) {
+        let mut all = prefixes;
+        all.extend(bytes);
         return Ok(Effect::Bytes(
             swapped.label.clone().unwrap_or_default(),
-            bytes,
+            all,
         ));
     }
     // An instruction. Its size is what the assembler says, and a jump's
@@ -593,12 +600,15 @@ fn effect(
     // reference's own workaround, and the replacement is what the program
     // counts.
     if jump {
-        if let Some(bytes) = replacement(&swapped.mnemonic, &operands, address)? {
+        if let Some(bytes) = replacement(&swapped.mnemonic, &operands, opcode)? {
+            let size = prefixes.len() + bytes.len();
+            let mut all = prefixes;
+            all.extend(bytes);
             return Ok(Effect::Instruction(
                 swapped.label.clone().unwrap_or_default(),
                 texts,
                 address,
-                bytes.len(),
+                size,
             ));
         }
     }
@@ -634,6 +644,10 @@ fn assemble_instruction(
     names: &[(String, u16)],
     address: u16,
 ) -> Result<Vec<u8>, Error> {
+    // The prefixes come before the instruction, so the opcode is not where
+    // the line starts.
+    let prefixes = parsed.prefix_bytes();
+    let opcode = address.wrapping_add(prefixes.len() as u16);
     let jump = is_jump(&parsed.mnemonic);
     let operands = operands_of(&Context {
         texts,
@@ -649,8 +663,10 @@ fn assemble_instruction(
     // A conditional jump whose target is too far is replaced by the
     // reference's own workaround.
     if jump {
-        if let Some(bytes) = replacement(&parsed.mnemonic, &operands, address)? {
-            return Ok(bytes);
+        if let Some(bytes) = replacement(&parsed.mnemonic, &operands, opcode)? {
+            let mut all = prefixes;
+            all.extend(bytes);
+            return Ok(all);
         }
     }
     let result = assemble::assemble_parts(parsed, &operands, address);

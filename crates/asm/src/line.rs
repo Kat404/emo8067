@@ -18,6 +18,35 @@ pub enum Prefix {
     Segment(String),
 }
 
+impl Prefix {
+    /// The byte the prefix is written as, out of the guide's own map.
+    ///
+    /// The map gives the prefixes their bytes: `F3` is `REP/REPE/REPZ`,
+    /// `F2` is `REPNE/REPNZ`, `F0` is `LOCK`, and the segment overrides
+    /// are the cells that say `SEG CS:` and so on.
+    #[must_use]
+    pub fn opcode(&self) -> Option<u8> {
+        let forms = crate::table::forms();
+        let cell = match self {
+            Prefix::RepeatEqual => forms.iter().find(|form| form.mnemonic == "REP/REPE/REPZ"),
+            Prefix::RepeatNotEqual => forms.iter().find(|form| form.mnemonic == "REPNE/REPNZ"),
+            // The map has two LOCKs - `F1` is the same prefix a second
+            // time - and the first one is the byte the prefix is written as.
+            Prefix::Lock => forms
+                .iter()
+                .filter(|form| form.mnemonic == "LOCK")
+                .min_by_key(|form| form.opcode),
+            Prefix::Segment(name) => {
+                let cell = format!("{}:", name.to_ascii_uppercase());
+                forms
+                    .iter()
+                    .find(|form| form.mnemonic == "SEG" && form.operands == cell)
+            }
+        };
+        cell.map(|form| form.opcode)
+    }
+}
+
 /// What went wrong.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Error {
@@ -43,6 +72,20 @@ pub struct Line {
     pub qualifier: Option<String>,
 }
 
+impl Line {
+    /// The bytes the prefixes are written as, out of the guide's own map.
+    ///
+    /// The prefixes come before the instruction they cover, in the order
+    /// the source wrote them.
+    #[must_use]
+    pub fn prefix_bytes(&self) -> Vec<u8> {
+        self.prefixes
+            .iter()
+            .filter_map(|prefix| prefix.opcode())
+            .collect()
+    }
+}
+
 /// Take a line apart.
 pub fn parse(line: &str) -> Result<Line, Error> {
     // The reference writes its files with Windows line endings, and the
@@ -62,13 +105,18 @@ pub fn parse(line: &str) -> Result<Line, Error> {
     let mut index = 0;
     while index < words.len() {
         let bare = words[index].trim_end_matches(':');
-        let prefix = match bare.to_ascii_uppercase().as_str() {
+        let upper = bare.to_ascii_uppercase();
+        // The reference writes the segment overrides with a dot in front as
+        // well: `.cs:`.
+        let segment = upper.strip_prefix('.').unwrap_or(upper.as_str());
+        let prefix = match upper.as_str() {
             // `REP` is the same prefix as `REPE`: the reference's own
             // examples write `rep movsb`.
             "REP" | "REPE" | "REPZ" => Some(Prefix::RepeatEqual),
             "REPNE" | "REPNZ" => Some(Prefix::RepeatNotEqual),
             "LOCK" => Some(Prefix::Lock),
-            "CS" | "DS" | "ES" | "SS" => Some(Prefix::Segment(bare.to_string())),
+            "CS" | "DS" | "ES" | "SS" => Some(Prefix::Segment(segment.to_string())),
+            ".CS" | ".DS" | ".ES" | ".SS" => Some(Prefix::Segment(segment.to_string())),
             _ => None,
         };
         let Some(prefix) = prefix else {

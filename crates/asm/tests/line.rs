@@ -33,6 +33,15 @@ fn the_prefixes_come_before_the_instruction() {
 }
 
 #[test]
+fn a_segment_override_may_carry_a_dot() {
+    // The reference's own list of the prefixes it accepts names the
+    // segment overrides both ways: `cs:` and `.cs:`.
+    let line = parse(".CS: MOV AX, [SI]").unwrap();
+    assert_eq!(line.prefixes, vec![Prefix::Segment("CS".to_string())]);
+    assert_eq!(line.mnemonic, "MOV");
+}
+
+#[test]
 fn a_comment_is_not_code() {
     let line = parse("MOV AX, BX ; the whole point").unwrap();
     assert_eq!(line.operands, vec!["AX", "BX"]);
