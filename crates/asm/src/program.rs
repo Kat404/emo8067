@@ -6,8 +6,11 @@
 //!
 //! The program is walked twice. The first time the names are collected and
 //! the addresses counted; the second time the bytes are made, and by then a
-//! jump knows where it is going. A jump's size does not depend on where it
-//! goes, so the first walk can count it with a target of zero.
+//! jump knows where it is going. Most jumps keep their size wherever they
+//! go, but a short conditional jump that is too far is replaced by the
+//! reference's own workaround, and the replacement is longer: the first
+//! walk counts the replacement, and the program is walked again and again
+//! until the names stop moving.
 
 use crate::assemble;
 use crate::directives::{self, Directive};
@@ -34,6 +37,9 @@ pub enum Error {
     RecursiveMacro { message: String },
     /// A conditional jump that is out of range, in the reference's own words.
     JumpOutOfRange { message: String },
+    /// The program's addresses did not settle: the names moved on every
+    /// walk, and the layout is not known.
+    NoConvergence { message: String },
     /// An include file that cannot be brought in, in the reference's own
     /// words.
     Include { message: String },
@@ -116,14 +122,23 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
     // signed byte, and the program has to know that before it counts.
     let mut names: Vec<(String, u16)> = Vec::new();
     let mut origin = 0u16;
+    let mut settled = false;
     for _ in 0..MAX_PASSES {
         let counted = count(&lines, &mut constants, &segments, &names)?;
-        if counted.names == names {
-            origin = counted.origin;
-            break;
-        }
+        settled = counted.names == names;
         names = counted.names;
         origin = counted.origin;
+        if settled {
+            break;
+        }
+    }
+    // The names must stop moving: the layout the walk that counts settled
+    // on is the layout the walk that makes the bytes produces, and that is
+    // true only when the names are the same in two walks in a row.
+    if !settled {
+        return Err(Error::NoConvergence {
+            message: format!("the program's addresses did not settle after {MAX_PASSES} passes"),
+        });
     }
     // The second walk: the bytes, with the names known.
     let mut program = Program {
@@ -382,9 +397,14 @@ fn label_first(raw: &str, known: &[String]) -> String {
     if name.is_empty() || rest.trim().is_empty() {
         return raw.to_string();
     }
-    // The name is already a label.
-    if first.ends_with(':') {
-        return raw.to_string();
+    // The name is already a label: `start:`, or a label and the instruction
+    // that follows it on the same line, `nsp:mov [di-1], 0`. A segment
+    // override is not a label: `cs:mov ax, 1`.
+    if first.contains(':') {
+        let name = first.split(':').next().unwrap_or_default();
+        if !known.iter().any(|known| known.eq_ignore_ascii_case(name)) {
+            return raw.to_string();
+        }
     }
     if known.iter().any(|known| known.eq_ignore_ascii_case(name)) {
         return raw.to_string();
@@ -555,6 +575,33 @@ fn effect(
         jump,
         strict,
     })?;
+    // A jump whose target the program has not declared yet: the first walk
+    // cannot know how far it is, so the jump is counted as it is and read
+    // again in the next walk, when the name is known.
+    let operands: Vec<Operand> = if strict {
+        operands
+    } else {
+        operands
+            .into_iter()
+            .map(|operand| match operand {
+                Operand::Name(_) => Operand::Relative(i64::from(address)),
+                other => other,
+            })
+            .collect()
+    };
+    // A conditional jump whose target is too far is replaced by the
+    // reference's own workaround, and the replacement is what the program
+    // counts.
+    if jump {
+        if let Some(bytes) = replacement(&swapped.mnemonic, &operands, address)? {
+            return Ok(Effect::Instruction(
+                swapped.label.clone().unwrap_or_default(),
+                texts,
+                address,
+                bytes.len(),
+            ));
+        }
+    }
     // The first walk does not know where a jump goes yet, so it does not
     // check the range of its displacement.
     let bytes = match assemble::assemble_parts_at(&swapped, &operands, address, strict) {
@@ -599,6 +646,13 @@ fn assemble_instruction(
         jump,
         strict: true,
     })?;
+    // A conditional jump whose target is too far is replaced by the
+    // reference's own workaround.
+    if jump {
+        if let Some(bytes) = replacement(&parsed.mnemonic, &operands, address)? {
+            return Ok(bytes);
+        }
+    }
     let result = assemble::assemble_parts(parsed, &operands, address);
     result.map_err(|error| bad(parsed, error))
 }
@@ -806,9 +860,16 @@ fn resolve(
                     name: trimmed.to_string(),
                 });
             }
-            // The first walk does not know every name yet. The size of an
-            // instruction does not depend on the value of its operand, so
-            // a name that is not known yet is counted with a zero.
+            // The first walk does not know every name yet. A jump's size
+            // depends on how far its target is, so an unknown target is
+            // kept as the name it is: the walk counts the jump as it is
+            // and reads it again in the next walk, when the name is known.
+            if jump {
+                return Ok(Operand::Name(trimmed.to_string()));
+            }
+            // The size of an instruction does not depend on the value of
+            // its operand, so a name that is not known yet is counted with
+            // a zero.
             Ok(shape(0, index, mnemonic, qualifier, jump, byte))
         }
     }
@@ -1454,6 +1515,132 @@ fn is_jump(mnemonic: &str) -> bool {
         || upper == "LOOPNE"
         || upper == "LOOPNZ"
         || upper == "CALL"
+}
+
+/// The conditional jumps the reference replaces when their target is too
+/// far.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Conditional {
+    /// The guide's 70h-7Fh row: the opposite instruction and a big jump.
+    Short(u8),
+    /// `JCXZ`: `OR CX, CX`, `JNZ` and a big jump.
+    Jcxz,
+}
+
+/// The conditional jump a mnemonic is, when it is one the reference
+/// replaces.
+///
+/// The guide's 70h-7Fh row is the short conditional jump, and `JCXZ` is the
+/// one that tests `CX`. The `LOOP` family is not one of them: the
+/// reference's table gives it a companion too, but the replacement for
+/// `LOOPE` and `LOOPNE` would decrement `CX` twice and test the wrong
+/// condition, so it keeps the refusal.
+fn conditional(mnemonic: &str) -> Option<Conditional> {
+    let opcode = assemble::options_for_pub(mnemonic)
+        .into_iter()
+        .find(|(_, form, _)| form.eq_ignore_ascii_case("short"))
+        .map(|(opcode, _, _)| opcode)?;
+    match opcode {
+        0x70..=0x7F => Some(Conditional::Short(opcode)),
+        0xE3 => Some(Conditional::Jcxz),
+        _ => None,
+    }
+}
+
+/// The bytes of a conditional jump whose target is too far, or `None` when
+/// the jump is in reach.
+///
+/// The reference does not refuse the jump: it replaces it with the opposite
+/// instruction and a big unconditional jump, so the program keeps running.
+fn replacement(
+    mnemonic: &str,
+    operands: &[Operand],
+    address: u16,
+) -> Result<Option<Vec<u8>>, Error> {
+    let Some(kind) = conditional(mnemonic) else {
+        return Ok(None);
+    };
+    let target = match operands.first() {
+        Some(Operand::Relative(target)) | Some(Operand::Immediate(target)) => *target,
+        _ => return Ok(None),
+    };
+    // The short form is two bytes, so the displacement is measured from the
+    // end of it.
+    let displacement = target - i64::from(address) - 2;
+    if (-128..=127).contains(&displacement) {
+        return Ok(None);
+    }
+    Ok(Some(match kind {
+        Conditional::Short(opcode) => short_replacement(opcode, target, address),
+        Conditional::Jcxz => jcxz_replacement(target, address)?,
+    }))
+}
+
+/// The replacement for a short conditional jump: the opposite instruction
+/// over the big jump that follows it.
+///
+/// The reference's own words: "short conditional jumps are replaced with
+/// the opposite instruction and one normal jump", five bytes instead of
+/// two.
+fn short_replacement(opcode: u8, target: i64, address: u16) -> Vec<u8> {
+    let mut bytes = vec![opcode ^ 1, 0x03];
+    bytes.extend_from_slice(&near_jump(target, address + 2));
+    bytes
+}
+
+/// The replacement for `JCXZ`: `OR CX, CX`, `JNZ` over the big jump.
+///
+/// The reference's own words: the instruction "is assembled into OR CX, CX
+/// and two JMPs".
+fn jcxz_replacement(target: i64, address: u16) -> Result<Vec<u8>, Error> {
+    let mut bytes = or_cx_cx(address)?;
+    bytes.extend_from_slice(&jnz_over(address + 2)?);
+    bytes.extend_from_slice(&near_jump(target, address + 4));
+    Ok(bytes)
+}
+
+/// The bytes of `OR CX, CX`.
+///
+/// The guide's own table gives the form and the matcher gives the bytes,
+/// so they are the ones the guide gives and the other `OR`s in a program
+/// agree.
+fn or_cx_cx(address: u16) -> Result<Vec<u8>, Error> {
+    let line = instruction("OR", &["CX", "CX"]);
+    let operands = [
+        Operand::Register("CX".to_string()),
+        Operand::Register("CX".to_string()),
+    ];
+    assemble::assemble_parts(&line, &operands, address).map_err(|error| bad(&line, error))
+}
+
+/// The bytes of `JNZ` over the three bytes that follow it.
+///
+/// The jump is at `address`, it is two bytes long, and it skips the three
+/// bytes of the big jump that comes after it.
+fn jnz_over(address: u16) -> Result<Vec<u8>, Error> {
+    let line = instruction("JNZ", &[]);
+    let target = Operand::Relative(i64::from(address) + 5);
+    assemble::assemble_parts(&line, &[target], address).map_err(|error| bad(&line, error))
+}
+
+/// The big unconditional jump: `E9h` and the displacement, measured from
+/// the end of the jump itself.
+fn near_jump(target: i64, address: u16) -> [u8; 3] {
+    let displacement = (target - i64::from(address) - 3) as i16;
+    let mut bytes = [0xE9, 0, 0];
+    bytes[1..].copy_from_slice(&displacement.to_le_bytes());
+    bytes
+}
+
+/// A line of the assembler's own making: the mnemonic and the operands.
+fn instruction(mnemonic: &str, operands: &[&str]) -> line::Line {
+    line::Line {
+        prefixes: Vec::new(),
+        label: None,
+        mnemonic: mnemonic.to_string(),
+        operands: operands.iter().map(|operand| operand.to_string()).collect(),
+        qualifier: None,
+    }
 }
 
 /// Replace a name inside a value, as in `len dup(0)`.

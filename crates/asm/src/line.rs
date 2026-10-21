@@ -63,7 +63,9 @@ pub fn parse(line: &str) -> Result<Line, Error> {
     while index < words.len() {
         let bare = words[index].trim_end_matches(':');
         let prefix = match bare.to_ascii_uppercase().as_str() {
-            "REPE" | "REPZ" => Some(Prefix::RepeatEqual),
+            // `REP` is the same prefix as `REPE`: the reference's own
+            // examples write `rep movsb`.
+            "REP" | "REPE" | "REPZ" => Some(Prefix::RepeatEqual),
             "REPNE" | "REPNZ" => Some(Prefix::RepeatNotEqual),
             "LOCK" => Some(Prefix::Lock),
             "CS" | "DS" | "ES" | "SS" => Some(Prefix::Segment(bare.to_string())),

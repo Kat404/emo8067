@@ -27,9 +27,6 @@ fn library() -> Option<PathBuf> {
     }
 }
 
-/// The reference's own words for a conditional jump that is out of range.
-const OUT_OF_RANGE: &str = "conditional jump is out of range: allowed values are from -128 to 127";
-
 /// The refusal of a jump that is out of range, if the error is one.
 fn out_of_range(error: &Error) -> Option<&str> {
     match error {
@@ -107,36 +104,16 @@ fn the_examples_assemble() {
             failure.name, failure.line, failure.text, failure.why
         );
     }
-    // The gate is a floor for now, not a wall: these are the examples that
-    // still do not assemble, and why. When one is closed, its line goes and
-    // the floor goes up.
-    const KNOWN: [&str; 4] = [
-        "bin2dec.asm",
-        "micro-os_kernel.asm",
-        "mouse.asm",
-        "writebin.asm",
-    ];
+    // Every one of the reference's examples assembles: the conditional jump
+    // that was too far is replaced by the reference's own workaround, and
+    // the rest of the dialect is read as the reference reads it.
     let names: Vec<&str> = failures
         .iter()
         .map(|failure| failure.name.as_str())
         .collect();
-    for name in KNOWN {
-        assert!(
-            names.contains(&name),
-            "{name} assembles now; remove it from the list"
-        );
-    }
     assert_eq!(
         names.len(),
-        KNOWN.len(),
+        0,
         "the examples that do not assemble are: {names:?}"
     );
-    // Every one of them is refused with the reference's own words.
-    for failure in &failures {
-        assert_eq!(
-            failure.why, OUT_OF_RANGE,
-            "{} is refused with another reason",
-            failure.name
-        );
-    }
 }

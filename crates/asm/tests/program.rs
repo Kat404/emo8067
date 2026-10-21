@@ -77,8 +77,130 @@ fn an_offset_can_have_an_addition() {
 }
 
 #[test]
-fn a_conditional_jump_out_of_range_is_refused_in_the_reference_words() {
+fn a_conditional_jump_that_is_too_far_is_replaced_by_its_opposite() {
     let mut source = String::from("org 0\nje there\n");
+    for _ in 0..128 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nnop\n");
+    let program = assemble_program(&source).unwrap();
+    // The reference's own words: "short conditional jumps are replaced with
+    // the opposite instruction and one normal jump", five bytes instead of
+    // two. `JE` is 74h and its opposite is 75h, the JNZ that skips the big
+    // jump, and the big jump is E9h with the displacement measured from the
+    // end of itself: the label is at 133, and the jump ends at five.
+    assert_eq!(&program.bytes[..5], &[0x75, 0x03, 0xE9, 0x80, 0x00]);
+    // The label is at 133: the replacement is three bytes longer than the
+    // short form, and the nops that follow it start after that.
+    assert_eq!(program.names, vec![("there".to_string(), 133)]);
+    // The program is three bytes longer than the short form would be.
+    assert_eq!(program.bytes.len(), 134);
+}
+
+#[test]
+fn a_jcxz_that_is_too_far_is_replaced_by_or_cx_cx_and_two_jumps() {
+    let mut source = String::from("org 0\njcxz there\n");
+    for _ in 0..128 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nnop\n");
+    let program = assemble_program(&source).unwrap();
+    // The reference's own words: the instruction "is assembled into OR CX,
+    // CX and two JMPs". `OR CX, CX` is 09h C9h - the guide's R/M field
+    // names CX 001, so the byte is C9h and not C8h, which would be
+    // `OR AX, CX` - the JNZ skips the big jump, and the big jump is E9h
+    // with the displacement measured from the end of itself: the label is
+    // at 135, and the jump ends at seven.
+    assert_eq!(
+        &program.bytes[..7],
+        &[0x09, 0xC9, 0x75, 0x03, 0xE9, 0x80, 0x00]
+    );
+    assert_eq!(program.names, vec![("there".to_string(), 135)]);
+    assert_eq!(program.bytes.len(), 136);
+}
+
+#[test]
+fn the_opposite_of_every_conditional_jump_is_the_one_next_to_it() {
+    // The guide's row 70 is pairs of opposites: JO JNO, JB/JNAE JNB/JAE,
+    // JE/JZ JNE/JNZ, JBE/JNA JNBE/JA, JS JNS, JP/JPE JNP/JPO, JL/JNGE
+    // JNL/JGE, JLE/JNG JNLE/JG.
+    let pairs = [
+        ("JO", "JNO"),
+        ("JB", "JNB"),
+        ("JE", "JNZ"),
+        ("JBE", "JA"),
+        ("JS", "JNS"),
+        ("JP", "JNP"),
+        ("JL", "JNL"),
+        ("JLE", "JG"),
+    ];
+    for (jump, opposite) in pairs {
+        let mut source = format!("org 0\n{jump} there\n");
+        for _ in 0..128 {
+            source.push_str("nop\n");
+        }
+        source.push_str("there:\nnop\n");
+        let program = assemble_program(&source).unwrap();
+        // The replacement starts with the opposite instruction, and the
+        // opposite of every pair of the row is the opcode with its low bit
+        // turned over.
+        assert_eq!(program.bytes[0], opcode_of(opposite), "{jump}");
+        assert_eq!(program.bytes[0], opcode_of(jump) ^ 1, "{jump}");
+    }
+}
+
+#[test]
+fn the_count_walk_counts_a_jump_that_is_too_far_as_five_bytes() {
+    let mut source = String::from("org 0\nje there\nafter:\n");
+    for _ in 0..200 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nnop\n");
+    let program = assemble_program(&source).unwrap();
+    // The label that follows the jump is at five and not at two: the walk
+    // that counts the addresses knows the size the second walk will make.
+    assert_eq!(
+        program.names,
+        vec![("after".to_string(), 5), ("there".to_string(), 205)]
+    );
+}
+
+#[test]
+fn the_layout_settles_before_the_bytes_are_made() {
+    // The jump's own size moves the label it goes to, and the label's
+    // address is what the big jump's displacement is measured from, so the
+    // program is walked again until the names stop moving.
+    let mut source = String::from("org 0\nje there\n");
+    for _ in 0..128 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nmov ax, 1\n");
+    let program = assemble_program(&source).unwrap();
+    // The label is at 133, and the big jump's displacement is measured from
+    // the end of the jump itself, which is at five: 133 - 5 is 128.
+    assert_eq!(&program.bytes[..5], &[0x75, 0x03, 0xE9, 0x80, 0x00]);
+    // The bytes at the label's address are the ones the label names.
+    let at = program
+        .names
+        .iter()
+        .find(|(name, _)| name == "there")
+        .expect("the label")
+        .1 as usize;
+    assert_eq!(&program.bytes[at..at + 3], &[0xB8, 0x01, 0x00]);
+}
+
+#[test]
+fn a_jump_to_a_label_that_comes_later_is_counted_before_it_is_known() {
+    let program = assemble_program("org 0\njmp later\nnop\nlater:\nnop\n").unwrap();
+    // The near jump is three bytes whether the label is known or not, and
+    // the label is at four: the nop is between the jump and the label.
+    assert_eq!(program.bytes, vec![0xE9, 0x01, 0x00, 0x90, 0x90]);
+    assert_eq!(program.names, vec![("later".to_string(), 4)]);
+}
+
+#[test]
+fn a_loop_that_is_too_far_is_refused_in_the_reference_words() {
+    let mut source = String::from("org 0\nloop there\n");
     for _ in 0..200 {
         source.push_str("nop\n");
     }
@@ -98,4 +220,13 @@ fn a_conditional_jump_out_of_range_is_refused_in_the_reference_words() {
         }
         other => panic!("expected the refusal, got {other:?}"),
     }
+}
+
+/// The opcode the guide's table gives a short jump.
+fn opcode_of(mnemonic: &str) -> u8 {
+    emo8067_asm::assemble::options_for_pub(mnemonic)
+        .into_iter()
+        .find(|(_, form, _)| form.eq_ignore_ascii_case("short"))
+        .map(|(opcode, _, _)| opcode)
+        .unwrap_or_else(|| panic!("{mnemonic} is not in the table"))
 }

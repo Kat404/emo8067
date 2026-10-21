@@ -1,4 +1,5 @@
-bin2dec.asm|73|JCXZ stop_program  (conditional jump is out of range: allowed values are from -128 to 127)
-micro-os_kernel.asm|273|je      reboot_command  (conditional jump is out of range: allowed values are from -128 to 127)
-mouse.asm|92|je  hide  (conditional jump is out of range: allowed values are from -128 to 127)
-writebin.asm|65|jcxz np                    ; this instruction is assembled into OR CX, CX and two JMPs, tutorial 7 tells why.  (conditional jump is out of range: allowed values are from -128 to 127)
+# No example is pending: all eighty-five of the reference's examples assemble.
+# The four that were here - bin2dec.asm, micro-os_kernel.asm, mouse.asm and
+# writebin.asm - each held a conditional jump whose target was more than 127
+# bytes away. The reference replaces such a jump with the opposite
+# instruction and a big unconditional jump, and the assembler does that now.

@@ -63,6 +63,22 @@ checked against.
 - **S8** — The examples assemble: all eighty-six of them, and the bytes the
   assembler produces are the bytes the reference produced. The examples are
   local gold and are not committed; the goldens are.
+- **S9** — A conditional jump whose target is out of the byte's reach is not
+  refused: the reference replaces it with the opposite instruction and adds a
+  big unconditional jump. Its own words: `re/extracted/app/version.txt`
+  (v4.02) "short conditional jumps are replaced with the opposite instruction
+  and one normal jump"; `documentation/asm_tutorial_07.html` "making total of
+  5 bytes instead of just 2"; and `writebin.asm:65` "this instruction is
+  assembled into OR CX, CX and two JMPs". The `70h`-`7Fh` row becomes the
+  opposite opcode - `opcode ^ 1`, which is the opposite for every pair of
+  that row - with a displacement of `+3`, and then `E9h` and the near
+  displacement: five bytes. `JCXZ` becomes `OR CX,CX`, `JNZ` with a
+  displacement of `+3`, and `E9h` and the near displacement: seven bytes.
+  (`OR CX,CX` is `09h C9h`: the R/M field names `CX` as `001`, so the
+  ModR/M byte is `11 001 001`. It is not `09h C8h`, which would be
+  `OR AX,CX`.) The `LOOP` family keeps the refusal: the reference's table
+  gives their companions, but the replacement for `LOOPE` and `LOOPNE` would
+  decrement `CX` twice and test the wrong condition, and no example needs it.
 
 ## Tasks
 
@@ -184,14 +200,22 @@ checked against.
   `offset filename+2` are now read; and the `include` directive brings the
   library in textually, before the macros are read, with the file's own
   directory first and the caller's include directories after it.
-  **OPEN, the four that the reference itself rewrites.** `bin2dec.asm`,
+  **DONE, the four that the reference itself rewrites.** `bin2dec.asm`,
   `micro-os_kernel.asm`, `mouse.asm` and `writebin.asm` each hold a
   conditional jump whose target is more than 127 bytes away. The reference
   does not refuse those: its own changelog says that "short conditional
   jumps are replaced with the opposite instruction and one normal jump", and
   its tutorial 07 says the same in prose - five bytes instead of two. The
-  assembler refuses them still, with the reference's own words, and the
-  rewrite is the next unit.
+  assembler now rewrites them the same way: the opposite opcode and a big
+  unconditional jump for the `70h`-`7Fh` row, and `OR CX,CX` and two jumps
+  for `JCXZ`. **All eighty-five examples assemble.** The layout is a fixed
+  point reached over several walks, and the assembler refuses a program whose
+  addresses do not settle. The `LOOP` family keeps the refusal, for the
+  reason S9 gives.
+  **Two more dialect defects, found by the same four.** `REP` was not a
+  prefix (`rep movsb` parsed as the mnemonic `rep`), and a first word that
+  already carried a colon was given another one, which lost the label of
+  `nsp:mov [di-1], 0`. Both are fixed.
   **The goldens are not possible yet.** The reference is a PE32 Windows
   program and there is no wine here, so its assembler cannot be run to
   produce the bytes to compare against. The gate is therefore "they
@@ -199,6 +223,37 @@ checked against.
   reference.
 
 ## Log
+
+- **L6 (2026-10-21).** S9, the reference's own workaround for a jump that is
+  too far, and the count pass that it forces.
+  **The rule, from the reference's files.** `version.txt` (v4.02): "short
+  conditional jumps are replaced with the opposite instruction and one normal
+  jump". Tutorial 07: "making total of 5 bytes instead of just 2", and
+  `writebin.asm:65`: "this instruction is assembled into OR CX, CX and two
+  JMPs". So the `70h`-`7Fh` row becomes the opposite opcode (`opcode ^ 1`,
+  which is the opposite for every pair of that row) with a displacement of
+  `+3` and then `E9h`; and `JCXZ` becomes `OR CX,CX`, `JNZ` and `E9h`.
+  `OR CX,CX` and `JNZ` are built by the assembler's own matcher, not written
+  by hand - and that is what caught the mistake in S9's own text: `OR CX,CX`
+  is `09h C9h`, because the R/M field names `CX` as `001`, and the `09h C8h`
+  I had written would have been `OR AX,CX`.
+  **The count pass.** A jump's size now depends on how far its target is, so
+  the walk that counts the addresses has to know the size the walk that makes
+  the bytes will produce. Two things make that work: a target the program has
+  not declared yet stays a **name** in the count walk instead of becoming a
+  zero (a zero would be a guess, and the guess would go through the range
+  check), and the walks repeat until the names stop moving - five passes at
+  the most for the examples, where the base needed three, because every
+  replacement is three bytes longer and can push a later jump out of reach as
+  well. A program whose addresses do not settle is refused.
+  **The proof.** The 81 examples that already assembled are byte-identical to
+  the base commit; only the four that now assemble differ, and all nineteen
+  replacements in them land exactly on their own label.
+  **Still open.** The prefixes are parsed but never emitted: `rep movsb`
+  assembles to `A4h` without the `F3h`. It is pre-existing, and emitting the
+  prefix would change the bytes of five other examples, so it is its own
+  unit. The `E9h` displacement is sixteen-bit signed, and the reference's
+  behaviour past 32767 bytes is unknown.
 
 - **L5 (2026-10-20).** Four bugs, not four dialects, and one wrong
   premise of mine that the reference's own files settled.
