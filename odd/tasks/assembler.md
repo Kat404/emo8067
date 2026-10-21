@@ -247,6 +247,38 @@ checked against.
 
 ## Log
 
+- **L8 (2026-10-21).** An independent verification of the assembler's three
+  commits, and the correction of a number I wrote down wrong.
+  **The verdict: it holds.** No blockers. Three advisories.
+  **The method.** The gate compares the examples against a base that is wrong
+  in the same way, so the verifier wrote its own probes: it marked every
+  source-level conditional jump in a copy of every example with a label, read
+  each jump's address out of the program, and checked the encoding of all
+  **284** conditional jumps itself. Two hundred and seventy are in reach -
+  two bytes, the canonical opcode, landing on their label - and **fourteen**
+  are rewritten, each with the opposite opcode, the `+3` displacement, the
+  `E9h`, and the `E9`'s displacement landing exactly on the label it
+  replaced. A whole-byte scan found no rewrite-shaped site that was not at a
+  marked address. The differential was rebuilt from scratch at every commit:
+  the 79 examples without a prefix are byte-identical, the six with one
+  differ by the eleven prefix bytes and by the displacements that move
+  because the addresses moved, and `string.asm` went from **zero bytes** to
+  234 - the `ENDM` fix, and a program the gate had been calling a pass.
+  **The correction.** L6 said "all nineteen replacements"; the verified count
+  is **fourteen** (twelve of the five-byte form and two of the `JCXZ` form).
+  The number came from a report that had not counted the way the verifier
+  counts, and the difference matters: nineteen was a claim about the bytes
+  that nobody had checked. The verifier's probes are now the repository's
+  tests (`crates/asm/tests/prefix_bytes.rs` and
+  `crates/asm/tests/jump_rewrite_bytes.rs`), so the claim is pinned.
+  **The two advisories that are not already open.** The glued form
+  `cs:mov ax,1` is still refused - pre-existing, identical at every commit,
+  and already named in L7. And `lock lock xchg ax,bx` gives `F0h F0h`: the
+  map's second `LOCK` cell is `F1h`, so a second `LOCK` is not the same
+  byte as the first. No example writes two `LOCK`s, and S10 names `F0h`,
+  so the assembler does what the spec says; the map's `F1h` cell is a hole
+  of its own.
+
 - **L7 (2026-10-21).** S10, the prefixes, and the hole the gate could not
   see.
   **The defect.** The prefixes were parsed and thrown away: `rep movsb`
@@ -304,8 +336,9 @@ checked against.
   replacement is three bytes longer and can push a later jump out of reach as
   well. A program whose addresses do not settle is refused.
   **The proof.** The 81 examples that already assembled are byte-identical to
-  the base commit; only the four that now assemble differ, and all nineteen
-  replacements in them land exactly on their own label.
+  the base commit; only the four that now assemble differ, and their
+  fourteen rewrites (twelve of the five-byte form and two of the `JCXZ`
+  form) land exactly on their own label.
   **Still open.** The prefixes are parsed but never emitted: `rep movsb`
   assembles to `A4h` without the `F3h`. It is pre-existing, and emitting the
   prefix would change the bytes of five other examples, so it is its own
