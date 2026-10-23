@@ -75,25 +75,36 @@ be regenerated rather than trusted.
   space: 1533 cases from 233 opcodes, the group forms included. It found
   five more defects — the overflow of `INC`/`DEC` and of the rotates, the
   `POP` into a register, the unsigned index of `XLAT`, and the `/digit`
-  that `C6`/`C7` ignore. Seventy-one cases still disagree, in two
-  families, and the gate names and counts them: the rotates' carry, and
-  the port reads, where this emulator reads memory at the port and the
-  chip returns `FFh` because nothing is attached to it.
+  that `C6`/`C7` ignore. **Seventy-one cases still disagreed then, in two
+  families, and the gate named and counted them: the rotates' carry, and
+  the port reads, where this emulator read memory at the port and the chip
+  returned `FFh` because nothing is attached to it.** Both families are
+  closed now — the port reads with the I/O bus, the rotates' carry in
+  `odd/tasks/silicon-questions.md` — and the oracle holds **2689** cases
+  from **245** opcodes, the count pinned exactly.
 - **T6** — **DONE in `d9b5e96`.** The captures as the flag oracle for the `X`
   rows, and the document checked against the hardware in the other
   direction: a row that marks a flag with an em dash says the instruction
   does not touch it, and the captures say whether the chip agreed. The
   mapping from an instruction to its row comes from the captures' own
   disassembler, so this project keeps no list of its own. The check passes
-  on all 1533 cases: every flag the document calls untouched is one the
+  on all 2689 cases: every flag the document calls untouched is one the
   chip left alone, and the `X` rows are backed by the chip's numbers.
-- **T7** — **DONE, six cases short.** Three of the nine are closed: the
-  negate writes the auxiliary carry (the borrow out of the low nibble, which
-  the captures confirm in every case they cover), and a rotate by a whole
-  number of revolutions still moves the carry. Six remain, all of them the
-  carry of a rotate by more than one, where the captures agree with the rule
-  the code already had in every case they cover — so those six are
-  unexplained.
+- **T7** — **DONE, and the six cases are closed too.** Three of the nine
+  are closed: the negate writes the auxiliary carry (the borrow out of the
+  low nibble, which the captures confirm in every case they cover), and a
+  rotate by a whole number of revolutions still moves the carry. **Six
+  remained, all of them the carry of a rotate by more than one, where the
+  captures agreed with the rule the code already had in every case they
+  cover — so those six were unexplained.** They are explained now, in
+  `odd/tasks/silicon-questions.md`, which is where this plan's two open
+  questions were carried to the chip. **The chip's rule:** a rotate by more
+  than one takes its carry from the edge of the **final result** — `ROL`
+  from bit 0, `ROR` from bit 15, and `RCL`/`RCR` carry on through the
+  extra bit — and its overflow is the sign change of the final one-bit
+  step. The old "the bit that left" rule is wrong in 516 of 30687 rotate
+  cases. **The known-divergence list is empty: no hardware case disagrees
+  with the emulator any more.**
   - **One lead was tried and it is dead.** The six cases come from the
     captures whose operand lives in memory, so the first suspicion was the
     extraction: that the memory state it writes for a case is not the memory
@@ -147,3 +158,28 @@ be regenerated rather than trusted.
     The overflow is the top bit of the result against the top bit of the
     operand, and 2133 of 2133 hardware cases agree; the bit that left
     the top, which is what the code used, matches in half of them.
+
+- **L2 (2026-10-23).** This plan's two open questions are closed, and the
+  unit that closed them has its own plan: `odd/tasks/silicon-questions.md`,
+  closed in `49b9d27`.
+  - **The six cases T7 left unexplained are explained.** The emulator took
+    the rotate's carry from the bit that left. The P80C86A-2 takes it from
+    the edge of the **final result**: `ROL` from bit 0 and `ROR` from bit
+    15, and `RCL`/`RCR` carry on through the extra bit. Its overflow is
+    the sign change of the **final one-bit step**, not a comparison of the
+    original operand with the final result. The two rules part company
+    exactly when the count is a whole number of operand widths, which is
+    what the six cases were about; the old rule is wrong in 516 of 30687
+    rotate cases. A count of zero is a complete no-op, CF included.
+  - **The `8C`/`8E` question T5 and T7 both left open is closed too.** The
+    chip runs `8C` and `8E` with `MOD=01` and `MOD=10` as ordinary
+    word-memory forms: `8C` writes the selected segment as a
+    little-endian word at the effective address, `8E` reads that word into
+    the selected segment, the `reg` field's high bit is ignored, no flag
+    changes, and the displacement is consumed. The 1979 manual's
+    `(not used)` print for those two forms is an erratum.
+  - **The gate's shape.** The extraction covers the whole opcode space now
+    and selects the cases the two questions need, so the oracle holds
+    **2689** cases from **245** opcodes instead of 1533, and the gate pins
+    that count exactly. `KNOWN_DIVERGENCES` is empty: no hardware case
+    disagrees with the emulator any more.

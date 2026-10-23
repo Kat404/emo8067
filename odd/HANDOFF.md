@@ -1,8 +1,9 @@
 # Session handoff — emo8067
 
 Written 2026-10-15 at the end of a long session, and kept current since: the
-2026-10-19 work is folded into it. Everything below is a claim with a source;
-anything marked **UNRESOLVED** is a real open item, not a reminder.
+2026-10-19 work is folded into it, and the 2026-10-23 silicon unit with it.
+Everything below is a claim with a source; anything marked **UNRESOLVED** is
+a real open item, not a reminder.
 
 ## What the project is
 
@@ -13,16 +14,17 @@ anything marked **UNRESOLVED** is a real open item, not a reminder.
 ## Where the tree stands
 
 ```
-cargo test --workspace   343 passed, 0 failed
+cargo test --workspace   421 passed, 0 failed
 cargo clippy             0 warnings, 0 errors
 cargo fmt --check        exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
-the examples' gate      75 of 85 assemble; the ten that do not are listed
-                         in crates/asm/tests/examples.rs with what each needs
+the examples' gate      85 of 85 assemble; the runner's gate pins the state
+                         each of the 85 leaves behind
 HEAD                     (see git log; every commit is GPG-signed)
 ```
 
-Two gates, both live, both proved to fail when broken:
+Seven gates, all live; the first two are the ones that were proved to fail
+when broken:
 
 | Gate | Covers |
 |---|---|
@@ -31,7 +33,7 @@ Two gates, both live, both proved to fail when broken:
 | `the_word_register_field_names_the_register_intel_table_4_9_says` | all eight `B8`..`BF` encodings, plus the same field in a ModR/M byte. Written against instruction bytes, not the API, because the API is where the encoding mistake hid |
 | `every_encoding_consumes_exactly_what_the_manual_says` | 177 encodings: 55 that carry an immediate and 122 that carry a displacement, each with the length the manual's operand format implies, stated by hand. Plain instructions by where `IP` lands, relative jumps by their displacement, `INT`/far `CALL` by the pushed return address, `RET` by how far the stack moved. Phase 1 of `odd/tasks/decode-geometry-gate.md` |
 | `an_instruction_touches_only_what_it_is_documented_to_touch` | one instruction of every family, in `crates/core/tests/touched.rs`: the registers it writes, the memory it writes, and every other register, every other byte of the megabyte and every flag the guide marks `—` checked not to have changed. The flags it may change are read out of §1.4, not typed by hand |
-| `the_flags_come_out_the_way_a_real_8086_leaves_them` | 1533 cases from `SingleStepTests/8086`, a real Intel P80C86A-2: the machine state, the instruction, and the flags the chip left. The flags the chip leaves undefined are masked out of both sides, because "undefined" means the chip left whatever was there. Nine cases still disagree and the gate names and counts them |
+| `the_flags_come_out_the_way_a_real_8086_leaves_them` | 2689 cases from 245 opcodes, out of `SingleStepTests/8086`, a real Intel P80C86A-2: the machine state, the instruction, and the flags the chip left. The flags the chip leaves undefined are masked out of both sides, because "undefined" means the chip left whatever was there. The count is pinned exactly, and the known-divergence list is empty: no hardware case disagrees with the emulator |
 | `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
@@ -145,7 +147,7 @@ Three ways to stop it, in increasing order of cost and decreasing order of indep
 
 1. **Cheapest, and worth doing now: make the cell and the behaviour one commit.** Every mnemonic change edits the §1.3 cell in the same commit. It is a convention, not a check, and conventions are what this project has already broken once.
 2. **DONE — a semantic gate over the flag table.** `crates/core/tests/flag_contract.rs` reads the §1.4 rows out of the document and runs one representative instruction per row, asserting that a row marked untouched really is untouched, that `0` clears and `1` sets. Each case runs twice, all flags set and all cleared, so a write in either direction is caught. **It paid for itself on its first run: it found that `0x9E` and `0x9F` were swapped, so every `LAHF` and `SAHF` in every program was inverted, and 228 tests had missed it because the two unit tests covering those opcodes asserted the wrong opcode's behaviour.** Proved by mutation: three mutants killed (LAHF writing a flag, CLC no longer clearing CF, INC writing CF).
-3. **NOT DONE, and it is a decision rather than a task: gate against silicon.** `SingleStepTests/8086` ships per-opcode captures from a real P80C86A-2 and a per-opcode `metadata.json` naming the flags each opcode leaves undefined. A gate can assert, for every opcode, that the emulator's undefined-flag set matches the hardware's — one JSON file, 256 opcodes, no hardware, and no transcription in the loop. This also closes several questions in "Still open" below, because the same data settles flag semantics rather than just naming them. It makes §1.3 a *derived* document rather than an authority, which changes how this project works. **Deliberately not started**, because option 2 already covers the class of defect that bit us and option 3 has to be weighed against losing the manual as an independent second witness.
+3. **DONE, and it is phase 2 of the plan: gate against silicon.** `SingleStepTests/8086` ships per-opcode captures from a real P80C86A-2 and a per-opcode `metadata.json` naming the flags each opcode leaves undefined. The gate is `crates/core/tests/hardware_flags.rs`: it takes each opcode's undefined-flag mask out of `metadata.json`, runs the case, compares the flags the chip defined, and checks the document in the other direction too - a §1.4 row marked `—` must be a flag the chip left alone. 2689 cases from 245 opcodes, the count pinned exactly, the known-divergence list empty. **What was deliberately not done is the last part of the original claim:** §1.3 is still an authority and not a derived document, because the manual stays the second witness and the gate checks it instead of replacing it. That is the weighing the decision was about, and it landed on keeping the manual. `odd/tasks/hardware-capture-oracle.md`, T6.
 
 ## Three tooling hazards
 
@@ -176,10 +178,10 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | Does `DAA`'s second rule test the old `AL` or the adjusted one? | **CLOSED — the chip says the old one** | The hardware settles it: `DAA` on `AL = FAh` leaves `AL = 60h` with the carry set, which is the old value testing true. Intel's SDM writes the same (`IF ((old_AL > 99H) or (old_CF = 1))`). The 1979 manual has no rule text and the classic pseudocode says the adjusted value; the captures in `crates/core/tests/hardware_flags.rs` decide it |
 | The 16-bit `REG` field | **CLOSED — the 80186's order had been implemented** | The 8086's Table 4-9 gives `AX CX DX BX SP BP SI DI`; the 80186 moved the 16-bit registers to make room for `AH CH DH BH` in the 8-bit field, and every modern reference quotes that later table. The 1979 manual's own table and a real P80C86A-2 agree with each other: `MOV SP,AX` is `8B E0`. The core, the guide's note and every hand-assembled program had followed the later order. Fixed in `98fc6f3`, with thirty-eight hand-assembled tests re-encoded |
 | `8C` with a register destination | **CLOSED — it is an 8086 instruction** | The project refused it as an 80186 encoding, on the strength of the manual printing `(not used)`. The chip runs it: `8C DF` is `MOV DI,DS`, with the segment landing in the register. The refusal is withdrawn, and so is the guide's claim that `8C` and `8E` take `MOD=000` only — the chip runs all four `MOD` values for both |
-| `8C`/`8E` with a displacement | **open, and the captures can close it** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. `odd/tasks/hardware-capture-oracle.md`, T5 |
-| `8C`/`8E` with a displacement | **open, and left as the core has it** | The manual prints `(not used)` for `8C MOD 1--` and `8E MOD 1--`, and §1.3's note says so; the core executes every `MOD`. Refusing them would be a change on a document's print rather than on evidence about the chip, and `MOV DS,AX` is a bread-and-butter 8086 instruction. The microcode's `MOV Sreg` entry would say whether the address unit computes an effective address for them |
+| `8C`/`8E` with a displacement | **CLOSED — the chip runs both forms** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. **It answered in `49b9d27`:** the P80C86A-2 runs `8C` and `8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms. `8C` writes the selected segment as a little-endian word at the effective address, `8E` reads that word into the selected segment, the `reg` field's high bit is ignored, no flag changes, and the displacement is consumed. The 1979 print's `(not used)` is an erratum for those two forms. `odd/tasks/silicon-questions.md` |
+| `8C`/`8E` with a displacement | **CLOSED — and the core was right to run them** | The manual prints `(not used)` for `8C MOD 1--` and `8E MOD 1--`, and §1.3's note says so; the core executes every `MOD`. Refusing them would be a change on a document's print rather than on evidence about the chip, and `MOV DS,AX` is a bread-and-butter 8086 instruction. The microcode's `MOV Sreg` entry would say whether the address unit computes an effective address for them. **The captures answered it instead, in `49b9d27`: the chip runs them, the core already did, and the print is the erratum** — see `odd/tasks/silicon-questions.md` |
 | The length table's missing families | **open, and cheap** | `8F` (`POP r/m16`, legal at MOD=00/01/10 per ‡8) and `C4`/`C5` (`LES`/`LDS`, which read a four-byte pointer through the R/M field) have no rows in the length table, and `FF /2`–`FF /5` are left out because an indirect jump leaves no trace of how many bytes it read. All three are straightforward row additions |
-| The flag rows marked `X` and `U` | **open, and the phase's biggest hole** | `X` is value-dependent and `U` is undefined, so the flag contract asserts nothing for them: for `ADD`, `ADC`, `SUB`, `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS` it proves only that `D`, `I` and `T` are untouched. Two of the eight defects from the last session lived in that hole. The touches gate claims which flags *may* change, not what they become. Closing it means asserting values, which means the operand values, which means the gate has to become a specification rather than a consistency check |
+| The flag rows marked `X` and `U` | **CLOSED — the captures are the oracle now** | `X` is value-dependent and `U` is undefined, so the flag contract asserts nothing for them: for `ADD`, `ADC`, `SUB`, `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS` it proves only that `D`, `I` and `T` are untouched. Two of the eight defects from the last session lived in that hole. The touches gate claims which flags *may* change, not what they become. Closing it means asserting values, which means the operand values, which means the gate has to become a specification rather than a consistency check. **That is what phase 2 became:** the oracle gate asserts the chip's own flag values for every opcode it covers, and checks the document in the other direction. `odd/tasks/hardware-capture-oracle.md`, T6 |
 
 ## The hardware oracle
 
@@ -205,24 +207,40 @@ Ten more came out of closing the two families that were open: the shift
 group's overflow, the count of `CL` (the 8086 does not mask it to five
 bits, which is what the later processors do), and the I/O bus (a port is
 not a memory address; with nothing attached to it a read returns all
-ones). Six of the 1533 cases still disagree, all of them the carry of a
-rotate by more than one, and all of them unexplained: the captures
-agree with the rule the code already had in every other case they
-cover. The suspicion that the extraction writes the wrong memory for
-those cases was tried and is dead: an audit of the effective address
-against the chip's own bus cycles is wrong itself, since it disagrees
-with the chip in the files that pass the gate too.
+ones). **Six of the 1533 cases still disagree, all of them the carry of a
+rotate by more than one, and all of them unexplained — that was the state
+at `6e28bc8`, and it is wrong now.** The oracle holds 2689 cases from 245
+opcodes instead of 1533, and **no hardware case disagrees with the
+emulator any more**: the six cases are explained, and the chip's rule is
+the one the emulator runs. A rotate by more than one takes its carry from
+the edge of the **final result** — `ROL` from bit 0, `ROR` from bit 15,
+and `RCL`/`RCR` carry on through the extra bit — and its overflow is the
+sign change of the final one-bit step. The old "the bit that left" rule is
+wrong in 516 of 30687 rotate cases. A count of zero is a complete no-op.
+The suspicion that the extraction writes the wrong memory for those cases
+was tried and is dead: an audit of the effective address against the
+chip's own bus cycles is wrong itself, since it disagrees with the chip in
+the files that pass the gate too.
+
+**The other question the same captures closed.** The P80C86A-2 runs `8C` and
+`8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms: `8C` writes
+the selected segment as a little-endian word at the effective address,
+`8E` reads that word into the selected segment, the `reg` field's high bit
+is ignored, no flag changes, and the displacement is consumed. The 1979
+manual's `(not used)` print for those two forms is an erratum. The plan
+is `odd/tasks/silicon-questions.md`.
 
 The `X` and `U` rows of §1.4 are no longer a hole. The oracle gate
 compares every flag the chip defined, and it checks the document in the
 other direction too: a row that marks a flag with an em dash says the
 instruction does not touch it, and the captures say whether the chip
-agreed. That check passes on all 1533 cases, so every flag the document
+agreed. That check passes on all 2689 cases, so every flag the document
 calls untouched is one the chip left alone.
 
 `odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
-whole opcode space, with the gate naming and counting the two families
-that still disagree.
+whole opcode space. The two families it left open are closed in
+`odd/tasks/silicon-questions.md`, and the gate pins the count of the
+oracle exactly and names no divergence.
 
 ## The I/O bus
 
@@ -259,7 +277,7 @@ wins, so a device that writes a port byte does not reach the program.
 1. ~~Fix the string-source segment override (item 1)~~ — done in `fe16b6c`; its replacement permutation test had to be written from scratch, because the F5 verification report it referred to is in neither memory nor the repo.
 2. ~~Decide item 2 with a primary source~~ — done; microcode settles `CX = 0`, and it is not an erratum.
 3. ~~Correct the five stale briefs (item 4)~~ — done; four files carry banners, and a sixth document turned out to be wrong.
-4. ~~Decide the oracle question~~ — decided 2026-10-19: the manual stays the oracle and the hardware captures come in phase 2. See "Decisions of 2026-10-19" above. **Phase 2 is now the next unit of the plan**: replacing the document as the flag oracle with the captures, which is what would close the `X` and `U` rows.
+4. ~~Decide the oracle question~~ — decided 2026-10-19: the manual stays the oracle and the hardware captures come in phase 2. See "Decisions of 2026-10-19" above. ~~**Phase 2 is now the next unit of the plan**~~ — **phase 2 is done**: the captures are the oracle now (see "The hardware oracle" below), and the plan is `odd/tasks/hardware-capture-oracle.md`.
 5. **Keep growing the program corpus.** `crates/core/tests/programs.rs` has thirty programs — the two BCD ones landed with the `AAA`/`DAA` fix — and twenty-eight and found the REG-field defect on its first execution, which is the highest yield per line of anything in this repo. Batches two and three added: the direction flag moving pointers backwards, `INT`/`IRET`, a far `CALL`/`RET`, a signed `XLAT` index, writing a segment register and indexing through it, `LOOP`'s counting rule, `CBW`/`CWD`, an overflowing byte multiply, a shift loop, an XOR checksum, a program reading its own instruction stream, `REP` with a zero count, nested `CALL`s, self-modifying code written through `DS` and executed through `CS`, two segments at one offset, a linear search in both outcomes, and `REPE CMPSB` over two buffers. **Two rules for every new program.** Mutate the exact rule its name claims — one of the twenty-eight proved nothing until a mutation survived it. And never write an expected value from memory: the packed-BCD program was cut rather than guessed, which is how the `AAA` masking question in "Still open" was found, and it is written now — the touches gate found four of its own expectations wrong the same way, every one of them a sentence remembered rather than computed. Hand-assembly errors so far, all caught because the emulator disagreed: `BE` for `SI`, `BB` for `BX`, `46` for `INC SI`, `5E` for `POP SI`, `disp16` byte order, `89 C6` read as a memory store when `mod=11` makes it a register move, and a program one byte short.
 6. ~~**`T13`, the assembler.**~~ — **DONE and verified.** The crate `crates/asm` (no dependencies) reads §1.3 of `documentation-guide.md` at compile time, the way the flag contract reads §1.4, so the instruction table exists once in the project instead of twice. The plan is `odd/tasks/assembler.md` (ten specs, seven tasks, log L1-L8).
    - **The examples.** The gate `crates/asm/tests/examples.rs` assembles the reference's own eighty-five examples — local gold, gitignored, never committed — and **all eighty-five assemble**. What it took: four dialect defects (a word's trailing edge is the *first* character of what follows it; `ENDM` is read as a word, because the reference writes `<name> ENDM`; `offset` is a *term* of an expression; and there was no `include`), the reference's own workaround for a conditional jump that is too far (the opposite instruction and a big jump, five bytes; `JCXZ` becomes `OR CX,CX` and two jumps, seven bytes), and the emission of the prefixes the source writes (the bytes come out of the map, not out of a list).
@@ -268,7 +286,9 @@ wins, so a device that writes a port byte does not reach the program.
    - **Still open in the assembler**, all named in L7 and L8: the glued form `cs:mov ax,1` is still refused; `PUSHA`/`POPA` carry the prefix but the reference's own expansion does not; the map's second `LOCK` cell is `F1h` and the assembler writes `F0h` twice; the `E9h` displacement is sixteen-bit signed and the reference past 32767 bytes is unknown.
    - **A finding from the captures.** The 8086's 8-bit R/M field reaches all eight byte registers — the captures show `88 F4` running `MOV AH,DL` — and the 1979 print says otherwise. The chip wins; the guide's legend is marked in `odd/tasks/assembler.md`'s log.
 7. ~~**`T12`**~~ - **DONE.** The runner assembles and runs a `.asm` (the reference's own load model, from its boot template: the load segment `0000`, the load offset the program's `ORG`), and the harness runs the eighty-five local examples and pins the state each one leaves behind. The goldens live in `re/extracted/app/goldens/`, gitignored with the examples they come from.
-8. **The next unit, chosen by the maintainer on 2026-10-22: emit the prefixes.** The assembler parses a prefix and throws it away: `rep movsb` assembles to `A4h` without its `F3h`, and five of the reference's examples (`cmpsb.asm`, `cmpsw.asm`, `scasb.asm`, `scasw.asm`, and the two that also carry the far-jump rewrite, `micro-os_kernel.asm` and `writebin.asm`) have the wrong bytes because of it. The bytes are in the guide's own map - `REP/REPE/REPZ` is `F3`, `REPNE/REPNZ` is `F2`, `LOCK` is `F0` - so the fix is to read them from there and emit them before the opcode. The gate cannot see this defect: it compares against a base that loses them too.
+8. ~~**The unit chosen by the maintainer on 2026-10-22: emit the prefixes.**~~ — **DONE and closed, and it had already landed on 2026-10-21, the day before this item was written.** `0a4ae80` emits the prefix bytes out of the guide's own map — `REP/REPE/REPZ` is `F3`, `REPNE/REPNZ` is `F2`, the first `LOCK` is `F0` — before the opcode, and `fdaea50` pins the bytes of every prefix the map gives, in the order the source wrote them. **The claim that the assembler parsed a prefix and threw it away is true of 2026-10-21 and wrong now**: `rep movsb` assembles to `F3h A4h`, and six of the eighty-five examples carry a prefix, eleven instructions in all. The plan is `odd/tasks/assembler.md` (S10, L7 and L8).
+9. ~~**The unit chosen by the maintainer on 2026-10-23: the two silicon questions.**~~ — **DONE and closed in `49b9d27`**: the `8C`/`8E` displacement forms and the carry of a rotate by more than one, both settled by the P80C86A-2's own captures. The oracle holds 2689 cases from 245 opcodes, the gate pins that count exactly, and the known-divergence list is empty. The plan is `odd/tasks/silicon-questions.md`.
+10. **The next unit is not chosen.** Nothing in the tree names what comes after the two silicon questions, so the next unit is the maintainer's to pick. The open questions the tree does record are in "Still open" above.
 
 ## Files worth reading first
 
@@ -278,6 +298,6 @@ wins, so a device that writes a port byte does not reach the program.
 | `odd/tooling.md` | environment facts: Ghidra paths, what `analyzeHeadless` needs, `innoextract` |
 | `odd/research/_prompt-audit7-and-friends.md` | the research prompt template |
 | `odd/research/_prompt-microcode-closure.md` | the second use of that template; its answer over-claimed, see item 4a |
-| `SingleStepTests/8086`, `v1/metadata.json` | **not in the repo, and the most valuable source this project has not been using.** Single-step captures from a real Intel P80C86A-2, recording per opcode which flags end up undefined. Free, no hardware, and it settles flag questions a transcription cannot. See "A second cause" above |
+| `SingleStepTests/8086`, `v1/metadata.json` | **not in the repo, and the source the hardware oracle is built on.** Single-step captures from a real Intel P80C86A-2, recording per opcode which flags end up undefined. Free, no hardware, and it settles flag questions a transcription cannot. See "A second cause" above |
 | `re/FINDINGS.md` | the behavioural contract recovered from the reference implementation |
 | `odd/research/feature*`, `softonic-build-comparison.md` | feature inventory and the repack analysis |

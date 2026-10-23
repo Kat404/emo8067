@@ -67,12 +67,18 @@ specification, not a guess.
   the displacement, and the text in the reference's formats (S1, S2, S4).
   `crates/asm/src/disasm.rs`: `disassemble(bytes, address) ->
   Result<Instruction, Error>`, with `Instruction { text, length }`, plus
-  `disassemble_all` for a listing and `instruction_of(opcode)`.
+  `disassemble_all` for a listing and `instruction_of(opcode)`. Commit
+  `e927b68`.
 - **T2** — **DONE.** The x87 range for display (S3) in
   `crates/asm/src/x87.rs`, the BIOS stub (S5), and the round trip: the bytes
   the disassembler prints assemble back to the same bytes.
-- **T3** — **IN PROGRESS.** The runner learns to disassemble (S6): the
-  `disasm` command, its listing and its options.
+- **T3** — **DONE.** The runner learns to disassemble (S6): the
+  `disasm` command, its listing and its options. Commit `b84f900`:
+  `emo8067 disasm <file>` prints one instruction per line — the logical
+  address in the house style, the instruction's bytes as hex pairs, and the
+  reference's canonical text — with `--at`, `--count`, `--load` and
+  `--include` as the options; a `.asm` is assembled first by the same rule
+  `run` uses, and a `.bin` is loaded raw. The decoder it prints is `e927b68`.
 
 ## Log
 
@@ -141,4 +147,16 @@ specification, not a guess.
   data, and the data bytes are not instructions. The corpus is the guide's
   own table instead; the eighty-five examples still assemble (that gate is
   untouched).
+
+- **L3 (2026-10-23).** T3 is closed, and it is closed by the commit that
+  wrote the plan's `IN PROGRESS` next to it. `b84f900` adds the `disasm`
+  command to the runner: `emo8067 disasm <file>` prints a listing, one
+  instruction per line, in the shape the TUI's disassembly panel will draw
+  — the logical address in the house style, the instruction's bytes as hex
+  pairs, and the reference's canonical text. The options are `--at` (where
+  to start), `--count` (how many instructions), `--load` (where to load a
+  raw image) and `--include` (the include path for a `.asm`). A `.asm` is
+  assembled first, by the same rule `run` uses; a `.bin` is loaded raw. The
+  decoder under it is `e927b68`, and `run` does not change: same options,
+  same output, same exit codes.
 

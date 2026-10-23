@@ -192,14 +192,16 @@ checked against.
   word by word - a whole word, never a part of a longer name. A macro may
   call another, and one that calls itself is refused with the reference's
   own words: "recursive MACRO definition is over 64".
-- **T7** — **IN PROGRESS.** The eighty-five examples, and the goldens.
+- **T7** — **DONE for the examples; the goldens are not possible yet.** The
+  eighty-five examples, and the goldens.
   **The gate.** `crates/asm/tests/examples.rs` reads the reference's own
   examples (local gold, gitignored) and assembles every one of them. It
   stands aside when they are not there, so the repository's own tests do not
-  depend on files that are not in it. **Eighty-one of the eighty-five
-  assemble.** The four that do not are listed in the gate itself, each with
-  what it needs, and `odd/research/examples-pending.txt` holds the same list
-  with the line and the error.
+  depend on files that are not in it. **All eighty-five assemble.** They did
+  not at first: eighty-one did, and the four that did not were listed in the
+  gate itself, each with what it needed, and
+  `odd/research/examples-pending.txt` holds the same list with the line and
+  the error. `4a613a8` fixed them, and that file says so now.
   **DONE, the four dialect defects.** They were not the dialect but four
   bugs, each of them found by reading the reference's own examples:
   a word's trailing edge is the **first** character of what follows it, so a
