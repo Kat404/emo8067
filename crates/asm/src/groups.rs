@@ -28,6 +28,15 @@ impl GroupForm {
         self.text.split_once(' ').map_or(self.text, |(m, _)| m)
     }
 
+    /// The mnemonic and the operand form, in one go.
+    #[must_use]
+    pub fn mnemonic_form(&self) -> (&'static str, &'static str) {
+        match self.text.split_once(' ') {
+            Some((mnemonic, operands)) => (mnemonic, operands.trim()),
+            None => (self.text, ""),
+        }
+    }
+
     /// The names the cell answers to, when it carries more than one:
     /// `SHL/SAL` is both.
     pub fn names(&self) -> impl Iterator<Item = &str> {
@@ -116,6 +125,17 @@ pub fn find_text(opcode: u8, mnemonic: &str, text: &str) -> Option<GroupForm> {
 #[must_use]
 pub fn find(opcode: u8, mnemonic: &str) -> Option<GroupForm> {
     find_for(opcode, mnemonic, None)
+}
+
+/// The form the group's digit chooses.
+///
+/// The digit is in the ModR/M byte, so a disassembler reads the byte and
+/// asks for the form it names.
+#[must_use]
+pub fn find_digit(opcode: u8, digit: u8) -> Option<GroupForm> {
+    forms()
+        .into_iter()
+        .find(|form| form.opcode == opcode && form.digit == digit)
 }
 
 /// The group's form for an operation, preferring the one that fits.
