@@ -47,6 +47,18 @@ specification, not a guess.
 - **S5** — A BIOS stub is decoded as `BIOS DI`: the `FFFF` prefix in front of
   `CD` is the BIOS device interrupt, so `FFFFCD10` reads as interrupt `10h`
   and not as `int 0FFh`.
+- **S6** — The runner disassembles. `emo8067 disasm <file> [options]` prints
+  a listing, one instruction per line: the logical address, the bytes, and
+  the reference's canonical text — the same shape as the TUI's disassembly
+  panel (`SSSS:OOOO  BB BB  TEXT`, the shape in
+  `odd/research/features-and-ux.md` §4.4). A `.asm` is assembled first, by
+  the same rule `run` uses (the extension decides, `--include` names the
+  include path, the load model is the reference's own `.binf` model), and a
+  `.bin` is loaded raw. The options are where to start (`--at`), how many
+  instructions (`--count`) and where to load a raw image (`--load`).
+  **Why it matters.** A disassembler nobody can call is a library and not a
+  tool, and this is the first panel the TUI will draw: the listing this
+  prints is the panel the debugger will draw.
 
 ## Tasks
 
@@ -59,6 +71,8 @@ specification, not a guess.
 - **T2** — **DONE.** The x87 range for display (S3) in
   `crates/asm/src/x87.rs`, the BIOS stub (S5), and the round trip: the bytes
   the disassembler prints assemble back to the same bytes.
+- **T3** — **IN PROGRESS.** The runner learns to disassemble (S6): the
+  `disasm` command, its listing and its options.
 
 ## Log
 
