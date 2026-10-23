@@ -1,28 +1,42 @@
 //! Headless runner for the 8086 core.
 //!
-//! Loads a raw binary, runs it, and prints where it stopped. This exists so
+//! Loads a program, runs it, and prints where it stopped. This exists so
 //! the core can be exercised end to end without a UI: every instruction the
 //! emulator adds can be proven against a program that actually runs.
+//!
+//! A `.asm` file is assembled first and run where the assembler says it
+//! starts; anything else is loaded raw, as it always was.
 
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use emo8067_asm::program::{self, Error};
 use emo8067_core::flags::{AF, CF, DF, Flags, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg16, Seg};
 use emo8067_core::{Cpu, StopReason};
+
+/// The size of a page of memory, in bytes.
+const PAGE: usize = 4096;
+
+/// How many pages of memory there are.
+const PAGES: usize = (1 << 20) / PAGE;
 
 const USAGE: &str = "\
 emo8067 — headless 8086 runner
 
 USAGE:
-    emo8067 run <file.bin> [options]
+    emo8067 run <file.asm|file.bin> [options]
 
 OPTIONS:
-    --load SEG:OFF     load the file at SEG:OFF        (default 0100:0000)
-    --org SEG          set CS and IP to SEG:0000       (default 0100:0000)
-    --ss SEG           set SS                           (default 0100)
+    --load SEG:OFF     load the file at SEG:OFF        (default 0100:0000, or 0000:ORG)
+    --load-seg SEG     the segment to load the file in (default 0100, or 0000)
+    --org SEG:OFF      set CS and IP to SEG:OFF        (default 0100:0000, or 0000:ORG)
+    --ss SEG           set SS                           (default 0100, or 0000)
     --sp VALUE         set SP                           (default FFFE)
-    --ds SEG           set DS                           (default 0100)
+    --ds SEG           set DS                           (default 0100, or 0000)
     --max N            stop after N instructions       (default 100000)
+    --include DIR      look for includes in DIR        (repeatable)
+    --golden           print the memory that is not zero, page by page
     --trace            print one line per instruction
     --dump ADDR:LEN    hex dump of memory at physical ADDR
     --device-socket P serve the I/O bus on a unix socket at P
@@ -49,15 +63,18 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     }
 
     let mut path: Option<&str> = None;
-    let mut load = 0x0100u32 * 16;
-    let mut org = (0x0100u16, 0x0000u16);
-    let mut ss = 0x0100u16;
-    let mut sp = 0xFFFEu16;
-    let mut ds = 0x0100u16;
+    let mut load: Option<u32> = None;
+    let mut load_seg: Option<u16> = None;
+    let mut org: Option<(u16, u16)> = None;
+    let mut ss: Option<u16> = None;
+    let mut sp: Option<u16> = None;
+    let mut ds: Option<u16> = None;
     let mut max = 100_000u64;
     let mut trace = false;
+    let mut golden = false;
     let mut dump: Option<(u32, usize)> = None;
-    let mut device_socket: Option<std::path::PathBuf> = None;
+    let mut device_socket: Option<PathBuf> = None;
+    let mut includes: Vec<PathBuf> = Vec::new();
 
     let mut i = 1;
     while i < args.len() {
@@ -71,24 +88,28 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
             "--load" => {
                 let v = value()?;
                 let (s, o) = split_addr(v)?;
-                load = u32::from(s) * 16 + u32::from(o);
+                load = Some(u32::from(s) * 16 + u32::from(o));
+                i += 1;
+            }
+            "--load-seg" => {
+                load_seg = Some(parse_hex(value()?)?);
                 i += 1;
             }
             "--org" => {
                 let v = value()?;
-                org = parse_addr(v)?;
+                org = Some(parse_addr(v)?);
                 i += 1;
             }
             "--ss" => {
-                ss = parse_hex(value()?)?;
+                ss = Some(parse_hex(value()?)?);
                 i += 1;
             }
             "--sp" => {
-                sp = parse_hex(value()?)?;
+                sp = Some(parse_hex(value()?)?);
                 i += 1;
             }
             "--ds" => {
-                ds = parse_hex(value()?)?;
+                ds = Some(parse_hex(value()?)?);
                 i += 1;
             }
             "--max" => {
@@ -101,6 +122,12 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 i += 1;
             }
             "--trace" => trace = true,
+            "--golden" => golden = true,
+            "--include" => {
+                let v = value()?;
+                includes.push(PathBuf::from(v));
+                i += 1;
+            }
             "--dump" => {
                 let v = value()?;
                 let (a, l) = v.split_once(':').ok_or("--dump wants ADDR:LEN")?;
@@ -114,7 +141,38 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     }
 
     let path = path.ok_or_else(|| "no input file".to_string())?;
-    let image = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+    let file = Path::new(path);
+
+    // A `.asm` is assembled; anything else is loaded raw, as it always was.
+    let (image, origin) = if file
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("asm"))
+    {
+        let program = program::assemble_file(file, &includes)
+            .map_err(|error| assembly_error(path, &error))?;
+        (program.bytes, Some(program.origin))
+    } else {
+        (
+            std::fs::read(file).map_err(|e| format!("{path}: {e}"))?,
+            None,
+        )
+    };
+
+    // The load segment and the load offset. The reference's own model is
+    // in its boot template: "load segment: 0000, load offset: 7c00, same
+    // values are set to CS and IP registers accordingly", so a program is
+    // loaded at its ORG in the segment 0000 and the segments follow it.
+    // A raw image keeps the old defaults.
+    let (default_seg, default_off) = match origin {
+        Some(origin) => (0x0000u16, origin),
+        None => (0x0100u16, 0x0000u16),
+    };
+    let load_seg = load_seg.unwrap_or(default_seg);
+    let load = load.unwrap_or(u32::from(load_seg) * 16 + u32::from(default_off));
+    let (cs, ip) = org.unwrap_or((load_seg, default_off));
+    let ss = ss.unwrap_or(load_seg);
+    let sp = sp.unwrap_or(0xFFFE);
+    let ds = ds.unwrap_or(load_seg);
 
     let mut cpu = Cpu::new();
     cpu.mem.load_at(load, &image).map_err(|_a| {
@@ -124,8 +182,8 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
         )
     })?;
 
-    cpu.regs.set_segment(Seg::Cs, org.0);
-    cpu.regs.ip = org.1;
+    cpu.regs.set_segment(Seg::Cs, cs);
+    cpu.regs.ip = ip;
     cpu.regs.set_segment(Seg::Ss, ss);
     cpu.regs.set_word(Reg16::Sp, sp);
     cpu.regs.set_segment(Seg::Ds, ds);
@@ -170,8 +228,13 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                     break;
                 }
                 if let StopReason::Interrupt(n) = cpu.stop_reason {
-                    failure = Some(format!("took INT {n:#04x}"));
-                    break;
+                    // The interrupt was taken. If the table has no handler
+                    // for it, the program asked for a service the emulator
+                    // does not have, and the run ends there.
+                    if !handler_installed(&cpu, n) {
+                        failure = Some(format!("took INT {n:#04x}"));
+                        break;
+                    }
                 }
             }
             Err(e) => {
@@ -185,6 +248,9 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     }
 
     print_state(&cpu, executed, max, &failure);
+    if golden {
+        pages(&cpu);
+    }
     if let Some((addr, len)) = dump {
         hexdump(&cpu, addr, len);
     }
@@ -193,6 +259,33 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// Whether the interrupt table holds a handler for the vector.
+///
+/// The table is four bytes per vector at `0000:0000`: the offset at `n*4`
+/// and the segment at `n*4+2`. A vector of zeros is no handler at all.
+fn handler_installed(cpu: &Cpu, n: u8) -> bool {
+    let at = u16::from(n) * 4;
+    cpu.mem.read_u16(0x0000, at) != 0 || cpu.mem.read_u16(0x0000, at + 2) != 0
+}
+
+/// The assembler's refusal, in its own words.
+fn assembly_error(path: &str, error: &Error) -> String {
+    fn message(error: &Error) -> String {
+        match error {
+            Error::AtLine { line, error } => format!("line {line}: {}", message(error)),
+            Error::Include { message }
+            | Error::RecursiveMacro { message }
+            | Error::JumpOutOfRange { message }
+            | Error::NoConvergence { message } => message.clone(),
+            Error::UnknownInstruction { name } => format!("unknown instruction `{name}`"),
+            Error::BadOperand { text } => format!("bad operand `{text}`"),
+            Error::UnknownName { name } => format!("unknown name `{name}`"),
+            Error::Empty => "the line has no instruction on it".to_string(),
+        }
+    }
+    format!("{path}: {}", message(error))
 }
 
 fn parse_hex(s: &str) -> Result<u16, String> {
@@ -269,6 +362,29 @@ fn flag_line(f: &Flags) -> String {
         .map(|(n, _)| n)
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The memory that is not zero, page by page, as hex.
+///
+/// This is the other half of the golden text: the state says what the
+/// processor holds, and this says what the program wrote.
+fn pages(cpu: &Cpu) {
+    println!("--- memory ---");
+    for page in 0..PAGES {
+        let base = page * PAGE;
+        let bytes = cpu.mem.slice(base as u32, PAGE);
+        if bytes.iter().all(|byte| *byte == 0) {
+            continue;
+        }
+        println!("page {base:05X}");
+        for (row, chunk) in bytes.chunks(16).enumerate() {
+            if chunk.iter().all(|byte| *byte == 0) {
+                continue;
+            }
+            let hex: Vec<String> = chunk.iter().map(|byte| format!("{byte:02X}")).collect();
+            println!("{:05X}  {}", base + row * 16, hex.join(" "));
+        }
+    }
 }
 
 fn hexdump(cpu: &Cpu, addr: u32, len: usize) {

@@ -10,6 +10,7 @@ version = "0.1.0"
 name = "emo8067-cli"
 version = "0.1.0"
 dependencies = [
+ "emo8067-asm",
  "emo8067-core",
 ]
 

@@ -11,6 +11,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+emo8067-asm = { path = "../asm" }
 emo8067-core = { path = "../core" }
 
 [[bin]]
