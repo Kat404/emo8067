@@ -166,6 +166,30 @@ fn the_count_walk_counts_a_jump_that_is_too_far_as_five_bytes() {
 }
 
 #[test]
+fn a_jump_whose_target_is_not_known_yet_is_counted_as_two_bytes() {
+    // The count walk does not know the name yet, and a name that is not
+    // known is kept as a name: the jump is counted as the two bytes it
+    // is. A jump that guessed the target was zero would be counted as
+    // five bytes here - the zero is out of the reach of a jump at this
+    // address - and the label would land three bytes further on.
+    let mut source = String::from("org 0\n");
+    for _ in 0..127 {
+        source.push_str("nop\n");
+    }
+    source.push_str("je there\n");
+    for _ in 0..127 {
+        source.push_str("nop\n");
+    }
+    source.push_str("there:\nnop\n");
+    let program = assemble_program(&source).unwrap();
+    // The jump is at 127 and the label at 256: the jump is two bytes and
+    // the nops that follow it take the rest.
+    assert_eq!(program.names, vec![("there".to_string(), 256)]);
+    // And the jump is still two bytes: 74h and the displacement of 127.
+    assert_eq!(&program.bytes[127..129], &[0x74, 0x7F]);
+}
+
+#[test]
 fn the_layout_settles_before_the_bytes_are_made() {
     // The jump's own size moves the label it goes to, and the label's
     // address is what the big jump's displacement is measured from, so the
@@ -219,6 +243,37 @@ fn a_loop_that_is_too_far_is_refused_in_the_reference_words() {
             );
         }
         other => panic!("expected the refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn the_whole_loop_family_keeps_the_refusal() {
+    // The reference's table gives the LOOP family a companion too, but the
+    // replacement for LOOPE and LOOPNE would decrement CX twice and test
+    // the wrong condition, so the family keeps the refusal.
+    for jump in ["loope", "loopz", "loopne", "loopnz"] {
+        let mut source = String::from("org 0\n");
+        source.push_str(jump);
+        source.push_str(" there\n");
+        for _ in 0..200 {
+            source.push_str("nop\n");
+        }
+        source.push_str("there:\nnop\n");
+        let error = assemble_program(&source).unwrap_err();
+        let inner = match error {
+            emo8067_asm::program::Error::AtLine { error, .. } => *error,
+            other => panic!("expected the refusal, got {other:?}"),
+        };
+        match inner {
+            emo8067_asm::program::Error::JumpOutOfRange { message } => {
+                assert_eq!(
+                    message,
+                    "conditional jump is out of range: allowed values are from -128 to 127",
+                    "{jump}"
+                );
+            }
+            other => panic!("expected the refusal, got {other:?}"),
+        }
     }
 }
 

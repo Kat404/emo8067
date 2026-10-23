@@ -246,6 +246,46 @@ checked against.
   reference.
 
 ## Log
+- **L9 (2026-10-21).** S9 verified against the reference's own words, and
+  the one rule that had no test.
+  **The rewrite was already in the tree** - it is commit `474aac2` - and the
+  plan's L6 already records it. This round checked it against the reference
+  rather than against itself: `version.txt` v4.02 ("short conditional jumps
+  are replaced with the opposite instruction and one normal jump"), tutorial
+  07 ("making total of 5 bytes instead of just 2"), and `writebin.asm:65`
+  ("assembled into OR CX, CX and two JMPs") all match the implementation
+  byte for byte.
+  **The bytes.** The five-byte form at `A`: the opposite opcode (`opcode ^ 1`
+  - the row's pairs are adjacent), `03h` (the opposite skips the three bytes
+  below), `E9h`, and the `rel16` measured from the end of the `E9h`, which
+  is five bytes after the jump began. The seven-byte form for `JCXZ`:
+  `09h C9h` (`OR CX,CX`, out of the matcher - the R/M field names `CX` as
+  `001`), `75h 03h` (`JNZ` over the big jump), `E9h` and its `rel16` from
+  the end of the `E9h`.
+  **The count pass.** The count walk calls the *same* `replacement()` the
+  byte walk calls, so a jump whose target is known and out of reach counts
+  five (or seven) bytes - not two. A target that is not known yet stays a
+  **name** and is mapped to the instruction's own address, so the
+  displacement is `-2` and in reach. That is load-bearing, and the
+  counterfactual proves it: with a zero instead, `int21.asm` comes out
+  three bytes longer and grows a rewrite the reference never makes, and the
+  jump is rewritten (`75 03 E9 ...`) where it belongs as `74 7F`. The walks
+  repeat until the names stop moving; the worst example needs four count
+  walks (`MAX_PASSES` is 8), and a program that does not settle is refused.
+  **The proof.** The byte walk rewrites exactly **fourteen** conditional
+  jumps across the eighty-five examples - twelve of the five-byte form and
+  two of the `JCXZ` form - and every one lands on the label its source
+  jump names. A trap for the next reader: an instrumented count that does
+  not separate the count walk from the byte walk reports **nineteen** sites,
+  because the count walk sees a jump at a shifted address after an earlier
+  rewrite moved it.
+  **Still open** (all named before, none new): the `E9h` displacement is
+  sixteen-bit signed and the reference past 32767 bytes is unknown; the
+  glued form `cs:mov ax,1` is still refused; `PUSHA`/`POPA` diverge from
+  the reference and move the distances a jump has to reach; and the goldens
+  are still not possible, so the gate remains "they assemble" and not "the
+  same bytes".
+
 
 - **L8 (2026-10-21).** An independent verification of the assembler's three
   commits, and the correction of a number I wrote down wrong.
