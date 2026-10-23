@@ -1067,18 +1067,22 @@ fn loop_op(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 
 /// Group 2, `0xD0..=0xD3`: the seven shifts and rotates, by one or by `CL`.
 ///
-/// `D0`/`D1` shift by one; `D2`/`D3` take the count from `CL`. The count is
-/// masked to five bits on an 8086, so a shift of 32 is a shift of zero.
+/// `D0`/`D1` shift by one; `D2`/`D3` take the count from `CL`. The captures
+/// from this part show the count is the whole of `CL`: it is not masked to
+/// five bits, which is what the 1979 manual's print says an 8086 does.
+/// Silicon wins for this part, so that print is marked.
 fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     let bits: u8 = if opcode & 1 != 0 { 16 } else { 8 };
     let from_cl = opcode >= 0xD2;
     let m = decode_from(cpu)?;
     let op = m.reg & 0b111;
 
-    // The count is the whole of CL: the 8086 does not mask it, and the
-    // later processors that do (masking to five bits) are a different chip.
-    // The captures from a real P80C86A-2 show shifts by more than 31, and
-    // their own harness masks CL to six bits only to keep the runs short.
+    // The count is the whole of CL. The captures from a real P80C86A-2 show
+    // shifts by more than 31, so this part does not mask the count to five
+    // bits; the 1979 manual's print says an 8086 does, and that print is
+    // marked against this part's evidence. The captures' own harness masks
+    // CL to six bits only to keep the runs short, so no capture covers a
+    // count above 62.
     let count = if from_cl {
         u16::from(cpu.regs.byte(Reg8::Cl))
     } else {
@@ -1087,18 +1091,20 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
 
     let value = read_operand(&cpu.mem, &cpu.regs, m.rm, bits);
     let carry_in = cpu.regs.flags.get(CF);
-    let result = match op {
-        // ROL and ROR never touch the carry; it only comes out.
-        0x0 => rotate_left(value, count, bits),
-        0x1 => rotate_right(value, count, bits),
-        // RCL and RCR rotate the carry *through* the operand, so the bit
-        // count is one more than the operand is wide and a count above zero
-        // can wind CF around and back.
-        0x2 => rotate_through_carry(value, count, bits, carry_in, true),
-        0x3 => rotate_through_carry(value, count, bits, carry_in, false),
+    let (result, cf, rotate_overflow) = match op {
+        // The P80C86A-2 gives ROL its carry from bit 0 of the result and ROR
+        // from bit 15 of it.  The old "bit that left" rule differs when the
+        // count is a whole number of operand widths.
+        0x0..=0x3 => rotate(value, count, bits, carry_in, op),
         // 0b100 SHL, 0b101 SHR, 0b111 SAR.
-        0x4 => shift_left(value, count, bits),
-        0x5 => shift_right(value, count, bits, false),
+        0x4 => {
+            let (result, cf) = shift_left(value, count, bits);
+            (result, cf, false)
+        }
+        0x5 => {
+            let (result, cf) = shift_right(value, count, bits, false);
+            (result, cf, false)
+        }
         // 0b110 is SETMO, not a shift. Table 4-13 prints `(not used)` for this
         // digit, but the Group Decode ROM latches the second byte's bits 5-3
         // into the ALU's X register, and operation 6 selects SETMO: "simply
@@ -1109,19 +1115,23 @@ fn shift_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         //
         // A count of zero still does nothing: the `CL` microcode loops `CL`
         // times, so with `CL = 0` the ALU is never selected at all.
-        0x6 => (if count == 0 { value } else { width(bits) }, false),
-        _ => shift_right(value, count, bits, true),
+        0x6 => (if count == 0 { value } else { width(bits) }, false, false),
+        _ => {
+            let (result, cf) = shift_right(value, count, bits, true);
+            (result, cf, false)
+        }
     };
 
-    let (result, cf) = result;
     let f = &mut cpu.regs.flags;
     // A count of zero changes nothing, and on an 8086 that includes CF. A
     // rotate by a whole number of revolutions is not that: the bits do go
-    // round, and the carry that comes out is the bit that left last.
+    // round, and the carry and overflow still come from the chip's rule.
     let rotates = matches!(op, 0x0..=0x3);
     if count != 0 {
         f.set(CF, cf);
-        if count == 1 {
+        if rotates {
+            f.set(OF, rotate_overflow);
+        } else if count == 1 {
             f.set(OF, signed_overflow_shift(value, result, op, bits, cf));
         }
         // The shifts update ZF, SF and PF from the result. Table 2-21 marks
@@ -1198,60 +1208,58 @@ fn shift_right(value: u16, count: u16, bits: u8, arithmetic: bool) -> (u16, bool
     (r, cf)
 }
 
-fn rotate_left(value: u16, count: u16, bits: u8) -> (u16, bool) {
-    let n = bits as u16;
+/// Rotate an operand one bit at a time, as the P80C86A-2 does.
+///
+/// `op` is the shift group's `/digit`: 0 ROL, 1 ROR, 2 RCL and 3 RCR.  The
+/// chip's multi-bit rules are visible only here:
+///
+/// * ROL's final CF is bit 0 of the result, and ROR's is bit 15 of it.
+/// * OF is the sign change in the final one-bit step, not a comparison of
+///   the original operand with the final result.
+///
+/// The captures prove both rules.  `D2 C0` with AX=E461h and CL=8
+/// leaves CF=1 and OF=1; `D3 C8` with AX=289Ch and CL=40 leaves CF=1 from
+/// the result's high bit.  RCL and RCR keep the carry in the extra bit of
+/// their one-wider working value.
+fn rotate(value: u16, count: u16, bits: u8, carry_in: bool, op: u8) -> (u16, bool, bool) {
     let mask = width(bits);
-    let v = value & mask;
-    let k = count % n;
-    if k == 0 {
-        // A rotate of zero leaves everything alone. Returning early also
-        // avoids shifting a u16 by its own width, which panics in debug.
-        return (v, v & msb(bits) != 0);
-    }
-    let r = ((v << k) | (v >> (n - k))) & mask;
-    (r, v & (1u16 << (n - k)) != 0) // bit n-k is the one that left the top
-}
-
-fn rotate_right(value: u16, count: u16, bits: u8) -> (u16, bool) {
-    let n = bits as u16;
-    let mask = width(bits);
-    let v = value & mask;
-    let k = count % n;
-    if k == 0 {
-        return (v, v & lsb(bits) != 0);
-    }
-    let r = ((v >> k) | (v << (n - k))) & mask;
-    (r, v & (1u16 << (k - 1)) != 0) // bit k-1 is the one that left the bottom
-}
-
-/// `RCL` and `RCR` rotate the carry through the operand, so the working
-/// value is one bit wider than the register. The count is masked to five
-/// bits on an 8086, which means a count of 17 and a count of 1 are the same
-/// for a byte operand, and not the same for a word one.
-fn rotate_through_carry(
-    value: u16,
-    count: u16,
-    bits: u8,
-    carry_in: bool,
-    left: bool,
-) -> (u16, bool) {
-    let mask = width(bits);
+    let top = msb(bits);
     let mut v = value & mask;
-    let mut c = carry_in;
+    let mut carry = carry_in;
+    let mut overflow = false;
+
     for _ in 0..count {
-        let new_cf = if left {
-            v & msb(bits) != 0
-        } else {
-            v & lsb(bits) != 0
-        };
-        v = if left {
-            ((v << 1) | u16::from(c)) & mask
-        } else {
-            (v >> 1) | if c { msb(bits) } else { 0 }
-        };
-        c = new_cf;
+        let before = v;
+        match op {
+            0 => {
+                carry = before & top != 0;
+                v = ((before << 1) & mask) | if carry { 1 } else { 0 };
+            }
+            1 => {
+                carry = before & 1 != 0;
+                v = (before >> 1) | if carry { top } else { 0 };
+            }
+            2 => {
+                let next = before & top != 0;
+                v = ((before << 1) & mask) | if carry { 1 } else { 0 };
+                carry = next;
+            }
+            3 => {
+                let next = before & 1 != 0;
+                v = (before >> 1) | if carry { top } else { 0 };
+                carry = next;
+            }
+            _ => unreachable!(),
+        }
+        overflow = sign_bit(before, bits) != sign_bit(v, bits);
     }
-    (v, c)
+
+    let cf = match op {
+        0 => v & 1 != 0,
+        1 => v & top != 0,
+        _ => carry,
+    };
+    (v, cf, overflow)
 }
 
 /// `DAA` and `DAS` share a shape and differ only in the direction.

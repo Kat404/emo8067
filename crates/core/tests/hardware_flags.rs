@@ -87,6 +87,8 @@ impl Reg {
 struct Case {
     /// The opcode, and its /digit when the instruction has one: `F6.0`.
     opcode: String,
+    /// The instruction bytes, including a prefix when the capture had one.
+    bytes: Vec<u8>,
     /// The §1.4 rows the chip's own names put this instruction in: `ADD`.
     /// The names come from the captures' disassembler, so the mapping needs
     /// no list of this project's own.
@@ -133,6 +135,7 @@ fn parse(oracle: &str) -> Vec<Case> {
             }
             current = Some(Case {
                 opcode: opcode.clone(),
+                bytes: Vec::new(),
                 rows: rows.clone(),
                 mask,
                 regs: Vec::new(),
@@ -146,7 +149,12 @@ fn parse(oracle: &str) -> Vec<Case> {
         let Some(case) = current.as_mut() else {
             continue;
         };
-        if let Some(rest) = line.strip_prefix("regs ") {
+        if let Some(rest) = line.strip_prefix("bytes ") {
+            case.bytes = rest
+                .split_whitespace()
+                .map(|byte| u8::from_str_radix(byte, 16).expect("an instruction byte"))
+                .collect();
+        } else if let Some(rest) = line.strip_prefix("regs ") {
             for pair in rest.split_whitespace() {
                 let (name, value) = pair.split_once('=').expect("a name=value pair");
                 case.regs.push((
@@ -374,38 +382,95 @@ fn reg_name(reg: Reg) -> &'static str {
     }
 }
 
+/// The ModR/M byte of a case, after any prefix byte.
+fn modrm(case: &Case) -> u8 {
+    let base = case.opcode.split('.').next().unwrap();
+    let opcode = u8::from_str_radix(base, 16).unwrap();
+    let at = case
+        .bytes
+        .iter()
+        .position(|byte| *byte == opcode)
+        .expect("the opcode byte is in the case");
+    case.bytes[at + 1]
+}
+
+/// The rotate count in CL, when the case has one.
+fn count(case: &Case) -> u8 {
+    case.regs
+        .iter()
+        .find(|(reg, _)| *reg == Reg::Cx)
+        .map(|(_, value)| *value as u8)
+        .unwrap_or(0)
+}
+
+/// The oracle must contain the forms the two silicon questions need.
+///
+/// The displacement forms of `8C`/`8E` are the S1 evidence, and a rotate
+/// whose count is above one is the S2 evidence.  Keeping these explicit in
+/// the gate stops a future change to the extraction from quietly removing
+/// the cases that answer the questions.
+#[test]
+fn the_oracle_keeps_the_cases_the_silicon_questions_need() {
+    let cases = parse(ORACLE);
+
+    for opcode in ["8C", "8E"] {
+        for mode in [1u8, 2] {
+            assert!(
+                cases
+                    .iter()
+                    .any(|case| { case.opcode == opcode && modrm(case) >> 6 == mode }),
+                "the oracle needs {opcode} with MOD={mode:02b}"
+            );
+        }
+    }
+
+    for opcode in [
+        "D2.0", "D2.1", "D2.2", "D2.3", "D3.0", "D3.1", "D3.2", "D3.3",
+    ] {
+        assert!(
+            cases
+                .iter()
+                .any(|case| case.opcode == opcode && count(case) > 1),
+            "the oracle needs {opcode} with a count above one"
+        );
+    }
+}
+
+/// A missing flat file is not a missing capture when the opcode has a
+/// `/digit` form.  The generated header has to say which gaps are real.
+#[test]
+fn the_oracle_header_distinguishes_a_missing_flat_file_from_no_capture() {
+    let no_flat = ORACLE
+        .lines()
+        .find(|line| line.starts_with("# opcodes with no flat capture file"))
+        .expect("the generated header names the missing flat files");
+    let no_capture = ORACLE
+        .lines()
+        .find(|line| line.starts_with("# opcodes with no captures in any form"))
+        .expect("the generated header names the opcodes with no capture");
+
+    for opcode in ["80", "D0", "D1", "D2", "D3", "F6", "F7", "FE", "FF"] {
+        assert!(
+            no_flat.contains(opcode),
+            "{opcode} has no flat file but does have dotted captures"
+        );
+        assert!(
+            !no_capture.contains(opcode),
+            "{opcode} does have dotted captures"
+        );
+    }
+}
+
 /// The families the chip and this emulator still disagree about, and why.
 ///
-/// Each entry is a finding rather than an excuse: the count of cases that
-/// fall in these families is pinned below, so a list that grows or shrinks
-/// is a failure, and a disagreement anywhere else fails the gate outright.
-const KNOWN_DIVERGENCES: &[(&str, &str)] = &[
-    ("D0", "the rotate's carry and overflow"),
-    ("D1", "the rotate's carry and overflow"),
-    ("D2", "the rotate's carry and overflow"),
-    ("D3", "the rotate's carry and overflow"),
-    (
-        "E4",
-        "the port read: this emulator reads memory at the port, the chip returns FFh",
-    ),
-    (
-        "E5",
-        "the port read: this emulator reads memory at the port, the chip returns FFh",
-    ),
-    (
-        "EC",
-        "the port read: this emulator reads memory at the port, the chip returns FFh",
-    ),
-    (
-        "ED",
-        "the port read: this emulator reads memory at the port, the chip returns FFh",
-    ),
-];
+/// There are none left. The rotate's carry and overflow now follow the
+/// P80C86A-2, and the port reads already follow the empty I/O bus. A future
+/// disagreement must either fix the emulator or enter this list with the
+/// chip's rule as its reason.
+const KNOWN_DIVERGENCES: &[(&str, &str)] = &[];
 
-/// How many cases are allowed to land in the families above. The number was
-/// read off the gate's own output and pinned, so a family that grows is a
-/// failure rather than a quieter gate.
-const KNOWN_DIVERGENCE_COUNT: usize = 6;
+/// How many cases are allowed to land in the families above.
+const KNOWN_DIVERGENCE_COUNT: usize = 0;
 
 #[test]
 fn the_flags_come_out_the_way_a_real_8086_leaves_them() {
@@ -415,7 +480,7 @@ fn the_flags_come_out_the_way_a_real_8086_leaves_them() {
     // gate quietly is exactly what this project keeps paying for.
     assert_eq!(
         cases.len(),
-        1533,
+        2689,
         "the oracle must hold every case the extraction writes"
     );
     let mut failures = Vec::new();

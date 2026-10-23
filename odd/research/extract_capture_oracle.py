@@ -33,7 +33,7 @@ of the files rather than assumed:
   gives the mask to clear them. Undefined means the chip left whatever was
   there, so there is nothing to compare.
 
-Run:  python3 odd/research/extract_capture_oracle.py --opcodes 00-3D
+Run:  python3 odd/research/extract_capture_oracle.py
 """
 
 import argparse
@@ -85,6 +85,24 @@ REGISTERS = [
     "ss",
     "ip",
 ]
+
+# The capture set stores these opcodes only in their `/digit` forms.  The
+# metadata also has per-digit entries for a few flat opcodes, so the file
+# layout has to be named rather than inferred from the metadata alone.
+GROUP_OPCODES = {
+    "80",
+    "81",
+    "82",
+    "83",
+    "D0",
+    "D1",
+    "D2",
+    "D3",
+    "F6",
+    "F7",
+    "FE",
+    "FF",
+}
 
 
 def is_gzip(path: Path) -> bool:
@@ -223,14 +241,18 @@ def is_divide_error(test: dict) -> bool:
     return test["final"]["regs"].get("ip") == 0x0400
 
 
-def select(tests: list[dict], keep: int) -> list[dict]:
-    """The tests worth keeping: the first few, plus the ones that exercise a
-    flag's value in both directions.
+def select(tests: list[dict], keep: int, opcode: str) -> list[dict]:
+    """The tests worth keeping for one opcode or `/digit` form.
 
     The captures are randomised, so the first few tests of an opcode rarely
     produce a carry, an overflow or a zero result. One test for each
     direction of each defined flag is what turns the captures into an
     oracle about flag *values* rather than about flag *presence*.
+
+    The two open silicon questions need cases the random sample does not
+    guarantee: both displacement forms of `8C`/`8E`, and rotates whose count
+    is above one. Those are selected explicitly, so the answer cannot vanish
+    because the first few cases happened not to contain it.
     """
     chosen = []
     seen = set()
@@ -256,6 +278,49 @@ def select(tests: list[dict], keep: int) -> list[dict]:
                 if bool(flags & bit) is wanted:
                     take(test)
                     break
+
+    if opcode in ("8C", "8E"):
+        opcode_byte = int(opcode, 16)
+        modes = set()
+        for test in tests:
+            if is_divide_error(test):
+                continue
+            at = test["bytes"].index(opcode_byte)
+            mode = test["bytes"][at + 1] >> 6
+            if mode not in modes:
+                modes.add(mode)
+                take(test)
+
+    rotate_labels = {
+        "D2.0",
+        "D2.1",
+        "D2.2",
+        "D2.3",
+        "D3.0",
+        "D3.1",
+        "D3.2",
+        "D3.3",
+    }
+    if opcode in rotate_labels:
+        for test in tests:
+            if is_divide_error(test):
+                continue
+            if test["initial"]["regs"]["cx"] & 0xFF > 1:
+                take(test)
+                break
+
+        # ROL and ROR expose the chip's carry rule when the count is a whole
+        # number of operand widths. Keep one such case for each width.
+        if opcode in {"D2.0", "D2.1", "D3.0", "D3.1"}:
+            width = 16 if opcode.startswith("D3") else 8
+            for test in tests:
+                if is_divide_error(test):
+                    continue
+                count = test["initial"]["regs"]["cx"] & 0xFF
+                if count > 1 and count % width == 0:
+                    take(test)
+                    break
+
     return chosen
 
 
@@ -314,7 +379,7 @@ def opcode_list(spec: str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--opcodes", default="00-3D", help="e.g. 00-3D, 00,04")
+    parser.add_argument("--opcodes", default="all", help="e.g. all, 00-3D, 00,04")
     parser.add_argument("--keep", type=int, default=8, help="tests kept per opcode")
     parser.add_argument("--out", default=str(HERE / "capture_oracle.txt"))
     args = parser.parse_args()
@@ -337,23 +402,29 @@ def main() -> int:
         "",
     ]
     total = 0
-    skipped = []
-    written = 0
-    for opcode in opcode_list(args.opcodes):
-        # A group opcode has one file per /digit, and the digit is part of
-        # the instruction, so it is part of the oracle's name too.
-        names = [f"{opcode}.json.gz"] + [f"{opcode}.{d}.json.gz" for d in range(8)]
-        found = False
+    no_flat = []
+    no_capture = []
+    captured = set()
+    opcodes = opcode_list(args.opcodes)
+    for opcode in opcodes:
+        if opcode in GROUP_OPCODES:
+            # A group opcode has one file per /digit, and the digit is part
+            # of the instruction, so it is part of the oracle's name too.
+            names = [f"{opcode}.{d}.json.gz" for d in range(8)]
+            no_flat.append(opcode)
+        else:
+            names = [f"{opcode}.json.gz"]
+
         for name in names:
             raw = fetch(f"v1/{name}", CACHE / "v1" / name)
             if raw is None:
                 if name == f"{opcode}.json.gz":
-                    skipped.append(opcode)
+                    no_flat.append(opcode)
                 continue
-            found = True
+            captured.add(opcode)
             label = name.removesuffix(".json.gz")
             tests = json.loads(gzip.decompress(raw))
-            kept = select(tests, args.keep)
+            kept = select(tests, args.keep, label)
             out.append(f"op {label}")
             out.append(f"  mask {flag_mask(metadata, label):04X}")
             rows = sorted({row_name(t) for t in kept if row_name(t)})
@@ -363,19 +434,28 @@ def main() -> int:
                 emit_case(out, test, memory)
                 total += 1
             out.append("")
-            written += 1
-    del found
 
-    if skipped:
-        out.insert(9, f"# opcodes with no captures: {' '.join(skipped)}")
-        out.insert(10, "")
+    no_capture = [opcode for opcode in opcodes if opcode not in captured]
+    gap_lines = []
+    if no_flat:
+        gap_lines.append(
+            "# opcodes with no flat capture file "
+            "(dotted /digit files may still exist): " + " ".join(no_flat)
+        )
+    if no_capture:
+        gap_lines.append(
+            f"# opcodes with no captures in any form: {' '.join(no_capture)}"
+        )
+    if gap_lines:
+        out[9:9] = gap_lines + [""]
     Path(args.out).write_text("\n".join(out) + "\n", encoding="utf-8")
     print(
-        f"wrote {total} cases from {len(opcode_list(args.opcodes)) - len(skipped)} "
-        f"opcodes to {args.out}"
+        f"wrote {total} cases from {len(captured)} opcodes to {args.out}"
     )
-    if skipped:
-        print(f"no captures for: {' '.join(skipped)}")
+    if no_flat:
+        print(f"no flat capture file for: {' '.join(no_flat)}")
+    if no_capture:
+        print(f"no captures for: {' '.join(no_capture)}")
     return 0
 
 

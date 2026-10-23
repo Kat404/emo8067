@@ -307,6 +307,79 @@ fn mov_segment_to_a_register_is_an_8086_instruction() {
     );
 }
 
+/// `8C` and `8E` accept both displacement forms on the P80C86A-2.
+///
+/// The 1979 Table 4-13 print calls the non-zero `MOD` forms `(not used)`.
+/// The captures say otherwise: `26 8C 70 3B` (MOD=01) writes SS to
+/// `FEFF4h`, `3E 8C 89 78 E4` (MOD=10) writes CS to `213A8h`,
+/// `3E 8E 63 64` reads `D5EAh` into ES, and `8E 83 EC 87` reads `6363h`
+/// into ES. Both instructions consume the displacement, write one word,
+/// and leave FLAGS alone.
+#[test]
+fn segment_moves_with_a_displacement_match_the_p80c86a2() {
+    const ES: u16 = 0x4321;
+
+    // MOD=01: [BX+disp8]. 8C writes the selected segment; 8E reads a word
+    // into it.  The byte after the word is a decoy: the instruction touches
+    // exactly the two bytes of its operand.
+    let mut c = cpu(&[0x8C, 0x47, 0x20]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Es, ES);
+    c.regs.set_word(Reg16::Bx, 0x0100);
+    c.mem.write_u16(0x2000, 0x0120, 0x1111);
+    c.mem.write_u8(0x2000, 0x0122, 0xA5);
+    c.regs.flags.set(CF, true);
+    let flags = c.regs.flags.0;
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 3, "opcode + ModR/M + disp8");
+    assert_eq!(c.mem.read_u16(0x2000, 0x0120), ES);
+    assert_eq!(
+        c.mem.read_u8(0x2000, 0x0122),
+        0xA5,
+        "no neighbouring byte moved"
+    );
+    assert_eq!(c.regs.flags.0, flags, "MOV writes no flag");
+
+    let mut c = cpu(&[0x8E, 0x47, 0x20]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_word(Reg16::Bx, 0x0100);
+    c.mem.write_u16(0x2000, 0x0120, 0x8765);
+    c.regs.flags.set(OF, true);
+    let flags = c.regs.flags.0;
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 3, "opcode + ModR/M + disp8");
+    assert_eq!(c.regs.segment(Seg::Es), 0x8765);
+    assert_eq!(
+        c.mem.read_u16(0x2000, 0x0120),
+        0x8765,
+        "the source is unchanged"
+    );
+    assert_eq!(c.regs.flags.0, flags, "MOV writes no flag");
+
+    // MOD=10: [BX+disp16].
+    let mut c = cpu(&[0x8C, 0x87, 0x34, 0x12]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Es, ES);
+    c.regs.set_word(Reg16::Bx, 0x0100);
+    c.mem.write_u16(0x2000, 0x1334, 0x1111);
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 4, "opcode + ModR/M + disp16");
+    assert_eq!(c.mem.read_u16(0x2000, 0x1334), ES);
+
+    // The segment override names the source of the 8E read.  DS holds a
+    // decoy, so a decoder that ignored the prefix would load the wrong word.
+    let mut c = cpu(&[0x26, 0x8E, 0x87, 0x34, 0x12]);
+    c.regs.set_segment(Seg::Ds, 0x2000);
+    c.regs.set_segment(Seg::Es, 0x3000);
+    c.regs.set_word(Reg16::Bx, 0x0100);
+    c.mem.write_u16(0x2000, 0x1334, 0x1111);
+    c.mem.write_u16(0x3000, 0x1334, 0x2222);
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 5, "prefix + opcode + ModR/M + disp16");
+    assert_eq!(c.regs.segment(Seg::Es), 0x2222, "the word came through ES");
+    assert_eq!(c.mem.read_u16(0x2000, 0x1334), 0x1111, "DS was not read");
+}
+
 /// `LEA` computes an address and must never read the segment into the
 /// result, even when the operand carries one.
 #[test]
@@ -410,6 +483,47 @@ fn rcl_honours_a_count_above_one() {
     assert!(!c.regs.flags.get(CF));
 }
 
+/// A multi-bit rotate takes its carry and overflow from the chip's rules.
+///
+/// These are exact P80C86A-2 captures.  `D2 C0` with AX=E461h and CL=8
+/// leaves AX=E461h, CF=1 and OF=1 (F497h -> FC97h).  `D3 C8` with AX=289Ch
+/// and CL=40 leaves AX=9C28h and CF=1 (F006h -> F807h).  `D2 D0` with
+/// AX=068Bh and CL=28 leaves AX=0617h and OF=1 (F003h -> F803h).
+#[test]
+fn a_multi_bit_rotate_takes_its_carry_and_overflow_from_the_chip() {
+    // ROL AL, 8: the result's low bit is the carry, and OF describes the
+    // sign change in the final one-bit step.
+    let mut c = cpu(&[0xD2, 0xC0]);
+    c.regs.set_word(Reg16::Ax, 0xE461);
+    c.regs.set_byte(Reg8::Cl, 8);
+    c.regs.flags.0 = 0xF497;
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 2);
+    assert_eq!(c.regs.word(Reg16::Ax), 0xE461);
+    assert_eq!(c.regs.flags.0, 0xFC97);
+
+    // ROR AX, 40: the result's high bit is the carry.
+    let mut c = cpu(&[0xD3, 0xC8]);
+    c.regs.set_word(Reg16::Ax, 0x289C);
+    c.regs.set_byte(Reg8::Cl, 40);
+    c.regs.flags.0 = 0xF006;
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 2);
+    assert_eq!(c.regs.word(Reg16::Ax), 0x9C28);
+    assert_eq!(c.regs.flags.0, 0xF807);
+
+    // RCL AL, 28: the carry still goes through the operand, while OF is
+    // the sign change in the last one-bit step.
+    let mut c = cpu(&[0xD2, 0xD0]);
+    c.regs.set_word(Reg16::Ax, 0x068B);
+    c.regs.set_byte(Reg8::Cl, 28);
+    c.regs.flags.0 = 0xF003;
+    let info = c.step().unwrap();
+    assert_eq!(info.next_ip, 2);
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0617);
+    assert_eq!(c.regs.flags.0, 0xF803);
+}
+
 /// RCR brings the carry in at the top and pushes the bottom bit out.
 #[test]
 fn rcr_rolls_the_old_carry_into_the_top() {
@@ -452,13 +566,15 @@ fn rotating_by_zero_is_a_no_op_and_does_not_panic() {
     assert_eq!(c.regs.word(Reg16::Ax), 0x1234, "the value comes back");
     assert!(
         !c.regs.flags.get(CF),
-        "and the carry is the bit that left, which was clear"
+        "and the carry is the result's low bit, which is clear"
     );
 }
 
-/// CF reports the bit that left, which is bit n-k for ROL and bit k-1 for ROR.
+/// A rotate whose count is below the operand's width reports the bit that
+/// left, which is the same bit the chip's result-edge rule names. The two
+/// rules part company only when the count is a whole number of widths.
 #[test]
-fn rotate_reports_the_bit_that_left() {
+fn a_rotate_below_a_whole_width_reports_the_bit_that_left() {
     // ROL AL, 3 (D0 /0 with a count needs CL, so use D2). 0000_1000 rol 3.
     let mut c = cpu(&[0xB9, 0x03, 0x00, 0xD2, 0xC0]);
     c.regs.set_byte(Reg8::Al, 0x08);
