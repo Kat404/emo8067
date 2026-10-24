@@ -14,6 +14,16 @@ the 2026-10-15 session lived in that hole.
 
 So the oracle stops being a document. It is a real Intel P80C86A-2.
 
+**Update, 2026-10-23 — this plan now has a companion.** T5, T6 and
+T7 below describe the committed sample as it stood before the full-capture
+unit. This plan still owns that sample: T5 covers the whole opcode space,
+T6 makes the captures the flag oracle and checks §1.4 against them, and T7
+closes the rotate carry. `odd/tasks/full-capture-gate.md` owns the
+final-memory comparison, the research gate over all **646000** captures,
+and the three families still open (`DAA`/`DAS`, zero-immediate `AAD` and
+`IDIV r/m8`). The specs, tasks and log below stay as the record of what
+was believed when this unit ran; the stale claims are marked in place.
+
 ## Why this and not more tests
 
 The captures exist, they are free, and they are the only source this project
@@ -25,8 +35,9 @@ than a table transcribed by a tired agent at the end of a long session.
 
 The catch is size: 160 MB of gzipped JSON, and no dependencies allowed in the
 crate. So the captures are not vendored. They are taken apart by a script
-into a small text file, and the script is in the repository so the file can
-be regenerated rather than trusted.
+into text files: a small committed sample and a generated file for every
+capture. The script is in the repository so both can be regenerated rather
+than trusted.
 
 ## Specs
 
@@ -44,10 +55,14 @@ be regenerated rather than trusted.
   sides: "undefined" means the chip left whatever was there, and there is
   nothing to compare.
 - **S4** — The gate must be shown to fail. A gate nobody has seen die is
-  decoration, and this one is a gate over 400 real cases.
-- **S5** — The megabyte of memory is not part of the comparison. A case
-  carries the bytes the instruction touched, recovered from the bus cycles,
-  and nothing else.
+  decoration, and this one is a gate over 400 real cases. **That was the
+  shape when this unit ran; the committed gate now holds 2689 cases, and
+  the companion research gate covers all 646000.**
+- **S5 — STALE as of the full-capture unit.** The megabyte of memory is not
+  part of the comparison. A case carries the bytes the instruction touched,
+  recovered from the bus cycles, and nothing else. **The committed gate now
+  compares the chip's final memory as well, through the oracle's `finalmem`
+  line. The companion plan owns that shape.**
 - **S6** — The coverage is counted and pinned, so a slice that quietly
   shrinks is a failure rather than a smaller green run.
 
@@ -81,7 +96,9 @@ be regenerated rather than trusted.
   returned `FFh` because nothing is attached to it.** Both families are
   closed now — the port reads with the I/O bus, the rotates' carry in
   `odd/tasks/silicon-questions.md` — and the oracle holds **2689** cases
-  from **245** opcodes, the count pinned exactly.
+  from **245** opcodes, the count pinned exactly. **This task still covers
+  the committed sample.** The generated oracle over every capture, and the
+  research gate that runs it, belong to `odd/tasks/full-capture-gate.md`.
 - **T6** — **DONE in `d9b5e96`.** The captures as the flag oracle for the `X`
   rows, and the document checked against the hardware in the other
   direction: a row that marks a flag with an em dash says the instruction
@@ -90,6 +107,9 @@ be regenerated rather than trusted.
   disassembler, so this project keeps no list of its own. The check passes
   on all 2689 cases: every flag the document calls untouched is one the
   chip left alone, and the `X` rows are backed by the chip's numbers.
+  **This task still covers the committed sample.** Its comparison now
+  includes the chip's final memory; the all-capture research gate is in
+  `odd/tasks/full-capture-gate.md`.
 - **T7** — **DONE, and the six cases are closed too.** Three of the nine
   are closed: the negate writes the auxiliary carry (the borrow out of the
   low nibble, which the captures confirm in every case they cover), and a
@@ -116,6 +136,14 @@ be regenerated rather than trusted.
     the chip and not the emulator. **The next session should not repeat it**:
     the address computation in that script is wrong, and the memory the
     extraction writes agrees with the chip's own RAM list.
+  - **Update, 2026-10-23 — the extraction conclusion above was too
+    broad.** The audit was wrong, but the old recovery was wrong too: a
+    byte at an odd address sits in the upper half of the sixteen-lane bus
+    field, and a write carries the value the chip wrote rather than the
+    value that was there before. The corrected recovery matches every
+    capture's own `ram` list. `odd/research/test_extraction_contract.py`
+    pins both rules, and `odd/tasks/full-capture-gate.md` records the
+    correction and the full set's remaining findings.
 
 ## Log
 

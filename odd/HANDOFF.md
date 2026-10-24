@@ -1,7 +1,8 @@
 # Session handoff — emo8067
 
 Written 2026-10-15 at the end of a long session, and kept current since: the
-2026-10-19 work is folded into it, and the 2026-10-23 silicon unit with it.
+2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
+units with it.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
 
@@ -14,17 +15,18 @@ a real open item, not a reminder.
 ## Where the tree stands
 
 ```
-cargo test --workspace   421 passed, 0 failed
-cargo clippy             0 warnings, 0 errors
-cargo fmt --check        exit 0
+cargo test --workspace                  430 passed, 0 failed
+cargo clippy --workspace --all-targets   0 warnings, 0 errors
+cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
                          each of the 85 leaves behind
 HEAD                     (see git log; every commit is GPG-signed)
 ```
 
-Seven gates, all live; the first two are the ones that were proved to fail
-when broken:
+Eight gates. Seven run in the everyday tree; the eighth is the research gate
+over every capture, and it stands aside when its generated oracle is absent.
+The first two are the ones that were proved to fail when broken:
 
 | Gate | Covers |
 |---|---|
@@ -33,7 +35,8 @@ when broken:
 | `the_word_register_field_names_the_register_intel_table_4_9_says` | all eight `B8`..`BF` encodings, plus the same field in a ModR/M byte. Written against instruction bytes, not the API, because the API is where the encoding mistake hid |
 | `every_encoding_consumes_exactly_what_the_manual_says` | 177 encodings: 55 that carry an immediate and 122 that carry a displacement, each with the length the manual's operand format implies, stated by hand. Plain instructions by where `IP` lands, relative jumps by their displacement, `INT`/far `CALL` by the pushed return address, `RET` by how far the stack moved. Phase 1 of `odd/tasks/decode-geometry-gate.md` |
 | `an_instruction_touches_only_what_it_is_documented_to_touch` | one instruction of every family, in `crates/core/tests/touched.rs`: the registers it writes, the memory it writes, and every other register, every other byte of the megabyte and every flag the guide marks `—` checked not to have changed. The flags it may change are read out of §1.4, not typed by hand |
-| `the_flags_come_out_the_way_a_real_8086_leaves_them` | 2689 cases from 245 opcodes, out of `SingleStepTests/8086`, a real Intel P80C86A-2: the machine state, the instruction, and the flags the chip left. The flags the chip leaves undefined are masked out of both sides, because "undefined" means the chip left whatever was there. The count is pinned exactly, and the known-divergence list is empty: no hardware case disagrees with the emulator |
+| `the_flags_come_out_the_way_a_real_8086_leaves_them` | 2689 cases from 245 opcodes, out of `SingleStepTests/8086`, a real Intel P80C86A-2: the machine state, the instruction, the memory the chip left, and the flags the chip left. Every address in the oracle's `finalmem` line is compared, so both the bytes the chip wrote and the bytes it left alone have to hold the chip's values. The one exception is the undefined flags word a divide fault pushes. The flags the chip leaves undefined are masked out of both sides, because "undefined" means the chip left whatever was there; the flags of a divide fault are not compared — the cause is the divide, not the interrupt — while `INT 0` keeps its defined flags and is compared. The count is pinned exactly, and the known-divergence list is empty: no case in this committed sample disagrees with the emulator |
+| `every_capture_comes_out_the_way_the_chip_leaves_it` | every one of the 646000 captures, from the generated 214 MB `capture_oracle_full.txt`: the memory, the registers and the flags. It is a research gate, not a unit test: it stands aside when the generated file is absent, so `cargo test --workspace` never depends on a file outside the repository. The 36 disagreements are pinned in three families, and a divergence outside those families fails the gate |
 | `every_flag_the_guide_says_is_untouched_really_is` | one representative instruction per §1.4 row, run with all nine flags set and again cleared; asserts `—` stays, `0` clears, `1` sets. Expectations read out of the document at compile time, so code and oracle cannot drift apart silently. Found the `LAHF`/`SAHF` transposition on its first run |
 
 Plus `python3 odd/research/verify_opcodes.py`, which guards the transcription of the manual into `documentation-guide.md` §1.3 and §1.4: exactly sixteen cells per opcode row, every flag cell inside the Table 2-18 legend. Verified by mutation, not just by passing. **It cannot check whether a cell says the right thing** — see "A second cause" below.
@@ -176,6 +179,10 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | `SHL`/`SHR`: does silicon update S, Z, P or preserve them? | **CLOSED — silicon updates them** | The captures show the shifts writing the arithmetic flags from the result, and the project had already believed the manual's prose over the table. The captures' `metadata.json` records the *undefined* flags, and the per-opcode files carry the initial and final state, which is what settled it |
 | `AAA`/`DAA` against the manual's pseudocode | **CLOSED — the core was wrong twice** | The manual (Oct 1979, page 2-35) says `AAA` zeroes the high-order half-byte of `AL`, and Intel's SDM (Vol 2A, page 3-19) writes the mask as its own step, outside the branch. The core masked only inside the branch, and `DAA`/`DAS` never wrote `AF` at all, although Table 2-21 gives both an `X` in that column. Both fixed in `8dcc9da`, with the mutants shown to fail |
 | Does `DAA`'s second rule test the old `AL` or the adjusted one? | **CLOSED — the chip says the old one** | The hardware settles it: `DAA` on `AL = FAh` leaves `AL = 60h` with the carry set, which is the old value testing true. Intel's SDM writes the same (`IF ((old_AL > 99H) or (old_CF = 1))`). The 1979 manual has no rule text and the classic pseudocode says the adjusted value; the captures in `crates/core/tests/hardware_flags.rs` decide it |
+| `PUSH SP` | **CLOSED — the chip pushes the stack pointer it had already decremented** | The 1979 manual says to push the pointer before the push; the P80C86A-2 pushes the decremented pointer. `push sp` with `SS:SP = A291:6068` leaves `6066h` at physical `A8976h`. The print is an erratum against the silicon. Fixed in `f3a216f`, in both the `50h`-`57h` dispatch and the `FF /6`/`FF /7` push |
+| `DAA`/`DAS` tens correction | **OPEN — 28 cases.** The chip applies the tens correction when the carry was set or the old `AL` was over `99h`; with the `AF` flag set the old `AL` has to be over `9Fh`. The emulator applies it when the old `AL` was over `99h`, whatever `AF` says | Change `daa()` in `crates/core/src/exec.rs` to the chip's rule, then let the full gate decide |
+| `AAD` with a zero immediate | **OPEN — 6 cases.** The chip does not fault on a zero divisor: it computes the result and leaves `AH` clear. The emulator faults | Change `aad()` in `crates/core/src/exec.rs` so a zero immediate follows the chip, then let the full gate decide |
+| `IDIV r/m8` | **OPEN — 2 cases.** The chip faults when the quotient does not fit in seven bits, and `-128h` does not fit. The emulator computes it | Change the signed divide in `mul_group()` in `crates/core/src/exec.rs` so the quotient has to fit in seven bits, then let the full gate decide |
 | The 16-bit `REG` field | **CLOSED — the 80186's order had been implemented** | The 8086's Table 4-9 gives `AX CX DX BX SP BP SI DI`; the 80186 moved the 16-bit registers to make room for `AH CH DH BH` in the 8-bit field, and every modern reference quotes that later table. The 1979 manual's own table and a real P80C86A-2 agree with each other: `MOV SP,AX` is `8B E0`. The core, the guide's note and every hand-assembled program had followed the later order. Fixed in `98fc6f3`, with thirty-eight hand-assembled tests re-encoded |
 | `8C` with a register destination | **CLOSED — it is an 8086 instruction** | The project refused it as an 80186 encoding, on the strength of the manual printing `(not used)`. The chip runs it: `8C DF` is `MOV DI,DS`, with the segment landing in the register. The refusal is withdrawn, and so is the guide's claim that `8C` and `8E` take `MOD=000` only — the chip runs all four `MOD` values for both |
 | `8C`/`8E` with a displacement | **CLOSED — the chip runs both forms** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. **It answered in `49b9d27`:** the P80C86A-2 runs `8C` and `8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms. `8C` writes the selected segment as a little-endian word at the effective address, `8E` reads that word into the selected segment, the `reg` field's high bit is ignored, no flag changes, and the displacement is consumed. The 1979 print's `(not used)` is an erratum for those two forms. `odd/tasks/silicon-questions.md` |
@@ -188,12 +195,20 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 `SingleStepTests/8086` — Daniel Balsom's hardware-generated suite for the
 Intel P80C86A-2 — is now the project's oracle for what a flag *becomes*. It
 is 160 MB of gzipped JSON, so it is not vendored: a script in
-`odd/research/extract_capture_oracle.py` takes it apart into a small text
-file, and `crates/core/tests/hardware_flags.rs` runs the cases against the
-emulator. The first slice is the eight ALU groups: 400 cases, 58 opcodes.
+`odd/research/extract_capture_oracle.py` takes it apart into text files.
+The committed oracle, `odd/research/capture_oracle.txt`, holds **2689** cases
+from **245** opcodes, and `crates/core/tests/hardware_flags.rs` runs that
+sample against the emulator. The full capture set is a separate generated
+oracle, `odd/research/capture_oracle_full.txt`, with **646000** cases:
+`python3 odd/research/extract_capture_oracle.py --all` writes it, it is
+**214 MB**, and it is gitignored rather than committed.
+`crates/core/tests/hardware_full.rs` is the research gate over it. It
+stands aside when the generated file is absent, so the everyday test run
+never depends on a file outside the repository. The first slice was the
+eight ALU groups: 400 cases, 58 opcodes.
 
-It has already paid for itself seven times, and every one of them by
-disagreeing with this project:
+By the end of the silicon unit it had already paid for itself seven times,
+and every one of them by disagreeing with this project:
 
 - the 16-bit `REG` field was the 80186's order, not the 8086's;
 - `DAA`'s second rule tests the old `AL`, not the adjusted one;
@@ -209,18 +224,29 @@ bits, which is what the later processors do), and the I/O bus (a port is
 not a memory address; with nothing attached to it a read returns all
 ones). **Six of the 1533 cases still disagree, all of them the carry of a
 rotate by more than one, and all of them unexplained — that was the state
-at `6e28bc8`, and it is wrong now.** The oracle holds 2689 cases from 245
-opcodes instead of 1533, and **no hardware case disagrees with the
-emulator any more**: the six cases are explained, and the chip's rule is
+at `6e28bc8`, and it is wrong now.** The committed sample holds 2689 cases
+from 245 opcodes instead of 1533, and **no case in that sample disagrees
+with the emulator any more**: the six cases are explained, and the chip's rule is
 the one the emulator runs. A rotate by more than one takes its carry from
 the edge of the **final result** — `ROL` from bit 0, `ROR` from bit 15,
 and `RCL`/`RCR` carry on through the extra bit — and its overflow is the
 sign change of the final one-bit step. The old "the bit that left" rule is
 wrong in 516 of 30687 rotate cases. A count of zero is a complete no-op.
 The suspicion that the extraction writes the wrong memory for those cases
-was tried and is dead: an audit of the effective address against the
-chip's own bus cycles is wrong itself, since it disagrees with the chip in
-the files that pass the gate too.
+was tried, and **the audit is dead**: an audit of the effective address
+against the chip's own bus cycles is wrong itself, since it disagrees with
+the chip in the files that pass the gate too. **The stronger conclusion
+that the extraction's memory agrees with the chip's own RAM list was
+wrong, though.** The old recovery read a byte at an odd address from the
+low half of the sixteen-lane bus field and put it one address too high,
+and it recovered a write-only byte as if it had been read. A write carries
+the value the chip wrote, not the value that was there before it, so that
+byte must not be handed to the emulator as the answer. The corrected
+recovery matches every capture's own `ram` list; against it, the old
+recovery differed in **118778** of the **646000** initial-memory cases and
+in **55796** of the final-memory ones.
+`odd/research/test_extraction_contract.py` pins both rules. The plan is
+`odd/tasks/full-capture-gate.md`.
 
 **The other question the same captures closed.** The P80C86A-2 runs `8C` and
 `8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms: `8C` writes
@@ -237,10 +263,15 @@ instruction does not touch it, and the captures say whether the chip
 agreed. That check passes on all 2689 cases, so every flag the document
 calls untouched is one the chip left alone.
 
-`odd/tasks/hardware-capture-oracle.md` is the plan. T5 is done: the
-whole opcode space. The two families it left open are closed in
-`odd/tasks/silicon-questions.md`, and the gate pins the count of the
-oracle exactly and names no divergence.
+`odd/tasks/hardware-capture-oracle.md` is the plan for the committed sample:
+T5 covers the whole opcode space, T6 makes the captures the flag oracle and
+checks the guide against them, and T7 closes the rotate carry. The gate
+pins the sample's count exactly and names no divergence.
+`odd/tasks/full-capture-gate.md` is its companion: it owns the final-memory
+comparison, the research gate over all **646000** captures, and the findings
+that gate leaves. The full set disagrees with the emulator in **36** cases,
+in three families listed in "Still open" above; a divergence outside those
+families fails the research gate.
 
 ## The I/O bus
 
@@ -288,7 +319,8 @@ wins, so a device that writes a port byte does not reach the program.
 7. ~~**`T12`**~~ - **DONE.** The runner assembles and runs a `.asm` (the reference's own load model, from its boot template: the load segment `0000`, the load offset the program's `ORG`), and the harness runs the eighty-five local examples and pins the state each one leaves behind. The goldens live in `re/extracted/app/goldens/`, gitignored with the examples they come from.
 8. ~~**The unit chosen by the maintainer on 2026-10-22: emit the prefixes.**~~ — **DONE and closed, and it had already landed on 2026-10-21, the day before this item was written.** `0a4ae80` emits the prefix bytes out of the guide's own map — `REP/REPE/REPZ` is `F3`, `REPNE/REPNZ` is `F2`, the first `LOCK` is `F0` — before the opcode, and `fdaea50` pins the bytes of every prefix the map gives, in the order the source wrote them. **The claim that the assembler parsed a prefix and threw it away is true of 2026-10-21 and wrong now**: `rep movsb` assembles to `F3h A4h`, and six of the eighty-five examples carry a prefix, eleven instructions in all. The plan is `odd/tasks/assembler.md` (S10, L7 and L8).
 9. ~~**The unit chosen by the maintainer on 2026-10-23: the two silicon questions.**~~ — **DONE and closed in `49b9d27`**: the `8C`/`8E` displacement forms and the carry of a rotate by more than one, both settled by the P80C86A-2's own captures. The oracle holds 2689 cases from 245 opcodes, the gate pins that count exactly, and the known-divergence list is empty. The plan is `odd/tasks/silicon-questions.md`.
-10. **The next unit is not chosen.** Nothing in the tree names what comes after the two silicon questions, so the next unit is the maintainer's to pick. The open questions the tree does record are in "Still open" above.
+10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
+11. **The next unit is not chosen.** Nothing in the tree chooses which of those families comes next, so the next unit is the maintainer's to pick. The three hardware families the full gate left are in "Still open" above; each is a behaviour change in shared core code and needs its own unit and verification.
 
 ## Files worth reading first
 
