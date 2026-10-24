@@ -6,6 +6,33 @@ units with it.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
 
+## Where the 2026-10-23 work is
+
+Two units landed, both routed through a worker and an independent verifier,
+and both decided by the captures of a real P80C86A-2:
+
+- **The two silicon questions** — `odd/tasks/silicon-questions.md`, closed in
+  `49b9d27`. The `8C`/`8E` forms with a displacement, which the chip runs as
+  ordinary word-memory forms, and the carry of a rotate by more than one,
+  which the chip takes from the edge of the final result. The oracle grew to
+  2689 cases and the known-divergence list is empty.
+- **The gate over every capture** — `odd/tasks/full-capture-gate.md`, closed in
+  `f3a216f`. The gate compares the chip's **memory** as well as its registers
+  and flags, and a research gate runs all 646 000 captures. It found
+  `PUSH SP` pushing the wrong value — the chip pushes the pointer it had
+  already decremented — and it left **36** disagreements in three families,
+  which are in "Still open" below with the chip's rule for each.
+
+The verification was in two rounds and it earned its keep: the first round
+found a family that was misclassified and a silicon rule that was simply
+false, both written with total confidence by the implementer.
+
+**The four commits of 2026-10-23 are not pushed.** `main` is four commits
+ahead of `origin/main`, and the push is the maintainer's decision.
+
+**The next unit is not chosen.** The open work is in "Still open" below and in
+the two plans above.
+
 ## What the project is
 
 `emo8067` — a clean-room, free-software Intel 8086/8088 emulator, assembler and debugger in Rust, intended for Linux/macOS/Windows. Licence: The Unlicense. Pure-Rust core with no dependencies and `#![forbid(unsafe_code)]`.
@@ -21,7 +48,9 @@ cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
                          each of the 85 leaves behind
-HEAD                     (see git log; every commit is GPG-signed)
+HEAD                     d40dc28 (docs), f3a216f (the gate and PUSH SP),
+                         25cef28 (docs), 49b9d27 (the rotate and the 8C/8E);
+                         every commit is GPG-signed and none is pushed
 ```
 
 Eight gates. Seven run in the everyday tree; the eighth is the research gate
