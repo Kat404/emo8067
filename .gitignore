@@ -20,3 +20,9 @@
 
 # The hardware captures are fetched by odd/research/extract_capture_oracle.py, not vendored
 odd/research/.captures/
+
+# The full capture oracle is written by the same script and is not vendored
+odd/research/capture_oracle_full.txt
+
+# Python bytecode cache
+__pycache__/

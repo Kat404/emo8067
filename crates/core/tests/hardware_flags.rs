@@ -31,10 +31,12 @@
 //! kind of evidence from the document the rest of the suite checks against:
 //! it is evidence from the hardware.
 
+#[path = "common/mod.rs"]
 mod common;
 
 use emo8067_core::Cpu;
 use emo8067_core::flags::Flags;
+use emo8067_core::memory::Memory;
 use emo8067_core::regs::{Reg16, Seg};
 
 use common::{COLUMNS, GUIDE, Mark, find_row_marks};
@@ -84,9 +86,9 @@ impl Reg {
 
 /// One hardware test: the machine before the instruction, and what the chip
 /// left behind.
-struct Case {
+pub(crate) struct Case {
     /// The opcode, and its /digit when the instruction has one: `F6.0`.
-    opcode: String,
+    pub(crate) opcode: String,
     /// The instruction bytes, including a prefix when the capture had one.
     bytes: Vec<u8>,
     /// The §1.4 rows the chip's own names put this instruction in: `ADD`.
@@ -98,12 +100,15 @@ struct Case {
     regs: Vec<(Reg, u16)>,
     flags: u16,
     mem: Vec<(u32, u8)>,
+    /// The memory the chip left behind: every address the oracle names, with
+    /// the value the chip holds there.
+    final_mem: Vec<(u32, u8)>,
     final_flags: u16,
     final_regs: Vec<(Reg, u16)>,
 }
 
 /// Parse the generated oracle.
-fn parse(oracle: &str) -> Vec<Case> {
+pub(crate) fn parse(oracle: &str) -> Vec<Case> {
     let mut cases = Vec::new();
     let mut opcode = String::new();
     let mut mask = 0u16;
@@ -141,6 +146,7 @@ fn parse(oracle: &str) -> Vec<Case> {
                 regs: Vec::new(),
                 flags: 0,
                 mem: Vec::new(),
+                final_mem: Vec::new(),
                 final_flags: 0,
                 final_regs: Vec::new(),
             });
@@ -168,6 +174,14 @@ fn parse(oracle: &str) -> Vec<Case> {
             for pair in rest.split_whitespace() {
                 let (address, value) = pair.split_once('=').expect("an address=value pair");
                 case.mem.push((
+                    u32::from_str_radix(address, 16).expect("a physical address"),
+                    u8::from_str_radix(value, 16).expect("a memory byte"),
+                ));
+            }
+        } else if let Some(rest) = line.strip_prefix("finalmem ") {
+            for pair in rest.split_whitespace() {
+                let (address, value) = pair.split_once('=').expect("an address=value pair");
+                case.final_mem.push((
                     u32::from_str_radix(address, 16).expect("a physical address"),
                     u8::from_str_radix(value, 16).expect("a memory byte"),
                 ));
@@ -232,7 +246,7 @@ fn get_reg(cpu: &Cpu, reg: Reg) -> u16 {
 }
 
 /// Run one hardware test against the emulator.
-fn run(case: &Case) -> Result<(), String> {
+pub(crate) fn run(case: &Case) -> Result<(), String> {
     let mut cpu = Cpu::new();
     for (address, value) in &case.mem {
         cpu.mem
@@ -251,9 +265,16 @@ fn run(case: &Case) -> Result<(), String> {
         .map_err(|err| format!("the instruction faulted: {err:?}"))?;
     let _ = info;
 
+    // The chip took the type 0 interrupt, which is what a divide that
+    // overflowed or divided by zero does. The flags are undefined after a
+    // divide error, so neither the flags the chip left in the register nor
+    // the word it pushed onto the stack are compared: there is nothing in
+    // them to compare.
+    let fault = divide_fault(case);
+
     let want = case.final_flags & case.mask;
     let got = cpu.regs.flags.0 & case.mask;
-    if want != got {
+    if fault.is_none() && want != got {
         return Err(format!(
             "flags {got:#06x} are not the {want:#06x} the chip left [{}]",
             describe(case),
@@ -310,7 +331,97 @@ fn run(case: &Case) -> Result<(), String> {
             }
         }
     }
+    // The memory the chip left behind. Every address the oracle names has
+    // to hold the chip's value: the bytes the chip wrote, and the bytes it
+    // left alone.
+    for (address, want) in &case.final_mem {
+        if let Some(word) = fault {
+            if *address == word || *address == word.wrapping_add(1) {
+                // The word the chip pushed is the flags word, and the
+                // flags are undefined after a divide error.
+                continue;
+            }
+        }
+        let got = read_physical(&cpu, *address);
+        if got != *want {
+            return Err(format!(
+                "the chip's memory at {address:05X} is {want:02X} and the emulator's is {got:02X} [{}]",
+                describe(case)
+            ));
+        }
+    }
     Ok(())
+}
+
+/// Read one byte at a physical address, the way the capture names it.
+///
+/// The capture names a physical address and the memory takes a
+/// `segment:offset` pair, so the address is split the same way the setup
+/// above writes it: the segment is the address above its low nibble and
+/// the offset is the low nibble.
+fn read_physical(cpu: &Cpu, address: u32) -> u8 {
+    cpu.mem
+        .read_u8((address >> 4) as u16, (address & 0x0F) as u16)
+}
+
+/// The opcodes whose divide can take the type 0 interrupt.
+///
+/// What makes the flags undefined is the **divide error**, and only a
+/// divide can raise one. `INT 0` reaches the same vector with the same
+/// stack frame, and the flags it leaves are defined, so they are compared
+/// like any other instruction's.
+const DIVIDE_OPCODES: &[&str] = &["D4", "D5", "F6.6", "F6.7", "F7.6", "F7.7"];
+
+/// The address of the flags word the chip pushed onto the stack, when the
+/// chip took the type 0 interrupt because a divide faulted.
+///
+/// A divide that overflows or divides by zero takes it. The interrupt
+/// pushes the flags, the code segment and the instruction pointer, so the
+/// flags word sits at the stack pointer the machine started with, less
+/// two. The chip left `IP` at the vector the harness pointed the interrupt
+/// table at, `0400h`, `CS` at `0000h`, and the stack pointer six bytes
+/// below where it started, because the interrupt pushed three words.
+///
+/// `None` for every other case, and for a case where the chip did not take
+/// the interrupt at all.
+fn divide_fault(case: &Case) -> Option<u32> {
+    // The cause first: a case whose opcode cannot raise a divide error has
+    // defined flags, whatever the interrupt did.
+    if !DIVIDE_OPCODES.contains(&case.opcode.as_str()) {
+        return None;
+    }
+    // The final state lists only what changed, so a register that is not in
+    // it is the one the machine started with.
+    let final_reg = |reg: Reg| {
+        case.final_regs
+            .iter()
+            .find(|(r, _)| *r == reg)
+            .map(|(_, value)| *value)
+            .or_else(|| {
+                case.regs
+                    .iter()
+                    .find(|(r, _)| *r == reg)
+                    .map(|(_, value)| *value)
+            })
+    };
+    if final_reg(Reg::Ip) != Some(0x0400) || final_reg(Reg::Cs) != Some(0x0000) {
+        return None;
+    }
+    let start = case
+        .regs
+        .iter()
+        .find(|(r, _)| *r == Reg::Sp)
+        .map(|(_, v)| *v)?;
+    // The interrupt pushed three words, so the stack pointer moved down six.
+    if final_reg(Reg::Sp) != Some(start.wrapping_sub(6)) {
+        return None;
+    }
+    let ss = case
+        .regs
+        .iter()
+        .find(|(r, _)| *r == Reg::Ss)
+        .map(|(_, v)| *v)?;
+    Some(Memory::physical(ss, start.wrapping_sub(2)))
 }
 
 /// The §1.4 column order, for a failure message.

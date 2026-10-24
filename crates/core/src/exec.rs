@@ -97,6 +97,26 @@ fn push_byte(mem: &mut Memory, regs: &mut crate::regs::Registers, value: u8) {
     regs.set_word(Reg16::Sp, new_sp);
 }
 
+/// The value a `PUSH` puts on the stack when the operand is a register.
+///
+/// `PUSH SP` is the one register the chip treats differently. The 1979
+/// manual says the stack pointer *before* the push goes on the stack, and
+/// every x86 since does that. The P80C86A-2 does not: it pushes the
+/// pointer it has already decremented. The captures from a real chip show
+/// it — `push sp` with `SS:SP = A291:6068` leaves the word `6066h` at
+/// physical `A8976h` and the stack pointer at `6066h`.
+///
+/// The manual's print is an erratum against the silicon, and the silicon
+/// wins. The rule is the same in the `50h`-`57h` dispatch and in the
+/// `FF /6` and `FF /7` push, which reach the same microcode.
+fn pushed_register(regs: &crate::regs::Registers, reg: Reg16) -> u16 {
+    if reg == Reg16::Sp {
+        regs.word(Reg16::Sp).wrapping_sub(2)
+    } else {
+        regs.word(reg)
+    }
+}
+
 fn pop(mem: &Memory, regs: &mut crate::regs::Registers) -> u16 {
     // The mirror of `push`: unconditional increment, never direction-aware.
     let sp = regs.word(Reg16::Sp);
@@ -439,7 +459,7 @@ fn dispatch(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         }
         0x50..=0x57 => {
             let reg = Reg16::from_bits(opcode & 0b111);
-            let value = cpu.regs.word(reg);
+            let value = pushed_register(&cpu.regs, reg);
             push(&mut cpu.mem, &mut cpu.regs, value);
         }
         0x58..=0x5F => {
@@ -1623,7 +1643,15 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
         // 2-0 of the opcode, so `FF /7` becomes `FF` with the `110` selection
         // and runs the same PUSH microcode (Shirriff, "The hole in group 2").
         0x6 | 0x7 => {
-            let value = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
+            // `PUSH SP` reaches this microcode too, with the stack pointer
+            // as the register operand, and the chip pushes the pointer it
+            // has already decremented: see `pushed_register`.
+            let value = match m.rm {
+                Operand::Reg(rm) if Reg16::from_bits(rm) == Reg16::Sp => {
+                    pushed_register(&cpu.regs, Reg16::Sp)
+                }
+                _ => read_operand(&cpu.mem, &cpu.regs, m.rm, 16),
+            };
             push(&mut cpu.mem, &mut cpu.regs, value);
         }
         0x2 => {

@@ -18,6 +18,19 @@ slow to fetch from a test. So this script takes them apart and writes a
 small text file: a handful of tests per opcode, with the machine state the
 instruction needs, the bytes it read and wrote, and the flags the chip left.
 
+Two files come out of it, and both are generated:
+
+    python3 odd/research/extract_capture_oracle.py
+        -> odd/research/capture_oracle.txt       the sample, committed
+
+    python3 odd/research/extract_capture_oracle.py --all
+        -> odd/research/capture_oracle_full.txt   every capture
+
+The full file is the whole capture set, 646 000 cases, and it is gitignored
+beside the sample: `crates/core/tests/hardware_full.rs` is the gate over it
+and stands aside when the file is not there, so `cargo test --workspace`
+never depends on a file that is not in the repository.
+
 Three things are worth knowing about the format, and all three are read out
 of the files rather than assumed:
 
@@ -28,7 +41,14 @@ of the files rather than assumed:
 * The `ram` list in a test holds the code window and some of the memory, but
   not all of it: a test whose operand lives elsewhere lists only the code.
   The missing bytes are recovered from the cycles, which carry the value the
-  chip read.
+  chip read. A write is not recovered: the bus carries the value the chip
+  wrote, not the value that was there before it, and handing the emulator
+  the value it is meant to work out would make the memory comparison say
+  nothing.
+* The bus has sixteen lanes and a byte sits in the lane its address
+  selects: the low lanes for an even address, the high lanes for an odd
+  one. A word transfer has both lanes at once, so its low byte is at the
+  address and its high byte at the next one.
 * `metadata.json` says which flags are undefined after each opcode, and
   gives the mask to clear them. Undefined means the chip left whatever was
   there, so there is nothing to compare.
@@ -159,11 +179,16 @@ def fetch(path: str, cache: Path) -> bytes | None:
     return cache.read_bytes()
 
 
-def transfers(test: dict) -> list[tuple[int, int, int]]:
-    """The memory transfers a test made: (address, bytes, value).
+def transfers(test: dict) -> list[tuple[int, int, str]]:
+    """The bytes a test moved over the bus: (address, value, bus status).
 
     The address comes from the T1 cycle and the value from the data bus on
     the T3 cycle, because that is where the chip puts the byte.
+
+    The bus carries sixteen lanes and the byte sits in the lane its address
+    selects: the low lanes for an even address, the high lanes for an odd
+    one. A word transfer has both lanes at once, so the word's low byte is
+    at the address and its high byte at the next one.
     """
     out = []
     cycles = test.get("cycles", [])
@@ -171,22 +196,22 @@ def transfers(test: dict) -> list[tuple[int, int, int]]:
         if cycle[7] not in ("MEMR", "MEMW") or cycle[8] != "T1":
             continue
         address = cycle[1]
-        # The data bus carries the byte on the T3 cycle of the *same* bus
-        # cycle, and the byte it carries may well be zero: a zero on the bus
-        # is a zero, not the absence of a byte. Reading the first non-zero
-        # value on the bus instead took the written-back byte for the
-        # operand whenever the operand was zero, which is a memory state
-        # the chip never had.
         value = 0
-        width = 1
+        # BHE is active low: clear means the high lanes are in use too, and
+        # with an even address that is a word.
+        bhe = 1
         for later in cycles[index + 1 : index + 4]:
             if later[8] == "T3":
                 value = later[6]
-                # BHE is active low: clear means the high byte goes too, and
-                # the transfer is a word.
-                width = 2 if later[5] == 0 else 1
+                bhe = later[5]
                 break
-        out.append((address, width, value))
+        if bhe == 0 and address % 2 == 0:
+            out.append((address, value & 0xFF, cycle[7]))
+            out.append((address + 1, (value >> 8) & 0xFF, cycle[7]))
+        elif address % 2 == 1:
+            out.append((address, (value >> 8) & 0xFF, cycle[7]))
+        else:
+            out.append((address, value & 0xFF, cycle[7]))
     return out
 
 
@@ -195,13 +220,14 @@ def memory_state(test: dict) -> dict[int, int]:
 
     The `ram` list gives what the chip started with, and the cycles give
     what it read: a byte the test did not list is recovered from the value
-    the bus carried.
+    the bus carried. A byte the chip only wrote is left out, because the
+    value on the bus is the one the chip wrote and not the one that was
+    there before: the emulator has to work the write out itself.
     """
     memory = {address: value for address, value in test["initial"]["ram"]}
-    for address, width, value in transfers(test):
-        for offset in range(width):
-            byte = (value >> (8 * offset)) & 0xFF
-            memory.setdefault((address + offset) & 0xFFFFF, byte)
+    for address, value, bus in transfers(test):
+        if bus == "MEMR":
+            memory.setdefault(address, value)
     return memory
 
 
@@ -352,6 +378,15 @@ def emit_case(out: list[str], test: dict, memory: dict[int, int]) -> None:
             f"{address:05X}={value:02X}" for address, value in sorted(memory.items())
         )
     )
+    # The memory the chip left behind: the initial list plus the bytes it
+    # wrote. The gate compares every address this line names.
+    out.append(
+        "    finalmem "
+        + " ".join(
+            f"{address:05X}={value:02X}"
+            for address, value in sorted(final_memory(test, memory).items())
+        )
+    )
     final = test["final"]["regs"]
     changed = [name for name in REGISTERS if name in final]
     # The final state lists only what changed, so a missing `flags` means the
@@ -378,14 +413,31 @@ def opcode_list(spec: str) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--opcodes", default="all", help="e.g. all, 00-3D, 00,04")
     parser.add_argument("--keep", type=int, default=8, help="tests kept per opcode")
-    parser.add_argument("--out", default=str(HERE / "capture_oracle.txt"))
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="write every capture, not the sample, to odd/research/capture_oracle_full.txt",
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="the file to write (default: capture_oracle.txt, or capture_oracle_full.txt with --all)",
+    )
     args = parser.parse_args()
+    out_path = Path(
+        args.out
+        if args.out
+        else HERE / ("capture_oracle_full.txt" if args.all else "capture_oracle.txt")
+    )
 
     metadata = json.loads(fetch("v1/metadata.json", CACHE / "metadata.json"))
-    out = [
+    header = [
         "# The 8086 hardware flag oracle, generated from SingleStepTests/8086.",
         "#",
         "# Generated by odd/research/extract_capture_oracle.py. Do not edit by hand:",
@@ -396,12 +448,15 @@ def main() -> int:
         f"# cpu: {metadata['cpu_detail']}",
         "#",
         "# Each case is one instruction: the machine before it, the bytes it",
-        "# touched, and the flags the chip left. The flag mask that goes with an",
-        "# opcode clears the flags the chip leaves undefined, so those are not",
-        "# compared.",
+        "# touched, the memory it left behind, and the flags the chip left. The",
+        "# flag mask that goes with an opcode clears the flags the chip leaves",
+        "# undefined, so those are not compared.",
         "",
     ]
-    total = 0
+
+    # The captures are fetched first: the header names the gaps, so which
+    # files are there has to be known before the first case is written.
+    captures = []
     no_flat = []
     no_capture = []
     captured = set()
@@ -422,18 +477,7 @@ def main() -> int:
                     no_flat.append(opcode)
                 continue
             captured.add(opcode)
-            label = name.removesuffix(".json.gz")
-            tests = json.loads(gzip.decompress(raw))
-            kept = select(tests, args.keep, label)
-            out.append(f"op {label}")
-            out.append(f"  mask {flag_mask(metadata, label):04X}")
-            rows = sorted({row_name(t) for t in kept if row_name(t)})
-            out.append("  rows " + " ".join(rows))
-            for test in kept:
-                memory = memory_state(test)
-                emit_case(out, test, memory)
-                total += 1
-            out.append("")
+            captures.append((name.removesuffix(".json.gz"), raw))
 
     no_capture = [opcode for opcode in opcodes if opcode not in captured]
     gap_lines = []
@@ -446,12 +490,29 @@ def main() -> int:
         gap_lines.append(
             f"# opcodes with no captures in any form: {' '.join(no_capture)}"
         )
-    if gap_lines:
-        out[9:9] = gap_lines + [""]
-    Path(args.out).write_text("\n".join(out) + "\n", encoding="utf-8")
-    print(
-        f"wrote {total} cases from {len(captured)} opcodes to {args.out}"
-    )
+
+    total = 0
+    with out_path.open("w", encoding="utf-8") as handle:
+        handle.write("\n".join(header[:9]) + "\n")
+        if gap_lines:
+            handle.write("\n".join(gap_lines) + "\n\n")
+        handle.write("\n".join(header[9:]) + "\n")
+        for label, raw in captures:
+            tests = json.loads(gzip.decompress(raw))
+            # The sample keeps a handful of cases per opcode; the full file
+            # keeps every capture there is.
+            kept = tests if args.all else select(tests, args.keep, label)
+            block = [f"op {label}", f"  mask {flag_mask(metadata, label):04X}"]
+            block.append(
+                "  rows " + " ".join(sorted({row_name(t) for t in kept if row_name(t)}))
+            )
+            for test in kept:
+                memory = memory_state(test)
+                emit_case(block, test, memory)
+                total += 1
+            handle.write("\n".join(block) + "\n\n")
+
+    print(f"wrote {total} cases from {len(captured)} opcodes to {out_path}")
     if no_flat:
         print(f"no flat capture file for: {' '.join(no_flat)}")
     if no_capture:

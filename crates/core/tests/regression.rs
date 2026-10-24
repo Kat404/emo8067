@@ -3210,3 +3210,58 @@ fn a_reped_step_reports_the_covered_string_opcode() {
     assert_eq!(info.opcode, 0xA4, "the MOVSB, not the F3 in front of it");
     assert_eq!(info.next_ip, 2, "both bytes are consumed");
 }
+
+/// `PUSH SP` pushes the stack pointer the chip has already decremented.
+///
+/// The 1979 manual says the value of `SP` *before* the push goes on the
+/// stack, and every x86 since does that. The P80C86A-2 does not. The
+/// capture in `SingleStepTests/8086` for `push sp` with
+/// `SS:SP = A291:6068` (test hash `6ec781f6807e8d4`) leaves the word
+/// `6066h` at physical `A8976h` and the stack pointer at `6066h`: the
+/// pointer after the decrement, not the one the instruction started with.
+///
+/// The manual's print is an erratum against the silicon, and the silicon
+/// wins.
+#[test]
+fn push_sp_pushes_the_decremented_stack_pointer() {
+    let mut c = cpu(&[0x54]);
+    c.regs.set_segment(Seg::Ss, 0xA291);
+    c.regs.set_word(Reg16::Sp, 0x6068);
+    run(&mut c, 1);
+
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x6066,
+        "the stack pointer moved down two"
+    );
+    assert_eq!(
+        c.mem.read_u16(0xA291, 0x6066),
+        0x6066,
+        "the chip pushed the pointer it had already decremented, not 6068h"
+    );
+}
+
+/// The same rule reaches the `FF /6` push, where the stack pointer is the
+/// register operand: `FF F4` is `PUSH SP` in the `FF` group.
+///
+/// The capture for it (`SS:SP = 217B:BF13`, test hash `de690721c931f14`)
+/// leaves the word `BF11h` at physical `2D6C1h` and the stack pointer at
+/// `BF11h`.
+#[test]
+fn ff_six_pushes_the_decremented_stack_pointer() {
+    let mut c = cpu(&[0xFF, 0xF4]);
+    c.regs.set_segment(Seg::Ss, 0x217B);
+    c.regs.set_word(Reg16::Sp, 0xBF13);
+    run(&mut c, 1);
+
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0xBF11,
+        "the stack pointer moved down two"
+    );
+    assert_eq!(
+        c.mem.read_u16(0x217B, 0xBF11),
+        0xBF11,
+        "the chip pushed the pointer it had already decremented, not BF13h"
+    );
+}
