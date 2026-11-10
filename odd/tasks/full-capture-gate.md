@@ -276,3 +276,46 @@ initial list plus the bytes the chip wrote. Nothing has to be inferred.
   final one does not name it. Thirteen captures start with `CS = 0000h`,
   and none of them reaches `IP = 0400h`, so the fallback creates no false
   exemption today — a latent path, not a live defect.
+- **L17 (2026-11-10) The three families are closed, and the full set has no
+  disagreement left.** The maintainer chose the three families the gate left
+  as one unit, and all three are the chip's rule now. The gate over all
+  646 000 captures is green with **zero** divergences, and the three family
+  pins are at **zero**, so a family that grows again fails the gate the way
+  the count it had did.
+  - **`DAA` (`27h`) and `DAS` (`2Fh`)** — the chip applies the tens
+    correction when the carry was set, or when the old `AL` was over `99h`
+    **and** the `AF` flag was clear or the old `AL` was over `9Fh`. The
+    rule was derived from the captures and not from the manual: the 4000
+    `DAA`/`DAS` captures cover every one of the 256 values of `AL` with the
+    flag set and with it clear, and this rule fits all 4000 of them, with
+    the registers **and** the flags, with no mismatch. The manual's prose
+    ("over `99h`", with no condition on `AF`) is looser than the chip, and
+    the silicon wins. The place changed is `daa()` in
+    `crates/core/src/exec.rs`.
+  - **`AAD` (`D5h`) with a zero immediate** — the chip does **not** fault: it
+    computes the result, leaves `AH` clear and the low byte untouched, and
+    clears `CF` and `AF`. All six `aad 00h` captures show `AH` clear, no
+    interrupt, and `CF` and `AF` clear; the three flags the capture set
+    defines for `AAD` (`SF`, `ZF`, `PF`) come out of the low byte as they do
+    on the ordinary path. `AAM` (`D4h`) with a zero immediate is **not** in
+    this family: the chip faults there, as the emulator does. The place
+    changed is `aad()` in `crates/core/src/exec.rs`.
+  - **`F6 /7` (`IDIV r/m8`)** — the quotient has to fit in **seven** bits, so
+    a quotient of `-128h` takes the type 0 interrupt even though it fits in
+    the signed byte the quotient goes to. The manual's wording is "larger
+    than 7 bits" and the chip agrees; the guide's own paraphrase ("whose
+    quotient does not fit in the destination") is an erratum for the byte
+    form, and `odd/research/documentation-guide.md` §2 now says so. The
+    place changed is the signed divide in `mul_group()` in
+    `crates/core/src/exec.rs`.
+  - **What is still open.** The **word** form is not covered: no capture in
+    the set has a dividend that can produce a quotient of `-32768h` (no
+    `F7.7` capture has `DX = FFFFh` at all), so `IDIV r/m16` still follows
+    the guide's print and still allows `-32768h`. Nothing in the capture set
+    can decide it, and the guide's print is what the emulator follows.
+  - **The evidence, and where it is pinned.** Eight capture-backed tests in
+    `crates/core/tests/regression.rs` (the three rules, and the previous
+    behaviour of each of the three functions where the chip agrees with the
+    old rule), the three family pins in
+    `crates/core/tests/hardware_full.rs`, and the gate's own output: 36
+    divergences before, 0 after.

@@ -2,9 +2,35 @@
 
 Written 2026-10-15 at the end of a long session, and kept current since: the
 2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
-units with it.
+units with it, and the 2026-11-10 unit that closed the three families the
+full-capture gate left.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-10 work is
+
+The three families the full gate left are **closed**, and the gate over every
+capture is green with **no disagreement at all**:
+
+- **The tens correction of `DAA` and `DAS`** — the chip applies it when the
+  carry was set, or when the old `AL` was over `99h` **and** the `AF` flag
+  was clear or the old `AL` was over `9Fh`. The 4000 `DAA`/`DAS` captures
+  cover every one of the 256 values of `AL` with the flag set and with it
+  clear, and the rule fits all 4000 of them with no mismatch. The manual's
+  prose is looser than the chip, and the chip wins.
+- **`AAD` with a zero immediate** — the chip does **not** fault: it computes
+  the result, leaves `AH` clear and the low byte untouched, and clears `CF`
+  and `AF`. `AAM` with a zero immediate still faults, as the manual says.
+- **`IDIV r/m8`** — the quotient has to fit in **seven** bits, so a quotient
+  of `-128h` takes the type 0 interrupt. The guide's print ("does not fit in
+  the destination") is an erratum for the byte form, and the guide now says
+  so. **The word form is not covered by any capture**: no capture in the set
+  has a dividend that can produce a quotient of `-32768h`, so `IDIV r/m16`
+  still follows the print.
+
+The gate's three family pins are at **zero**, so a family that grows again
+fails the gate the way the count it had did. The push is still the
+maintainer's decision.
 
 ## Where the 2026-10-23 work is
 
@@ -42,7 +68,7 @@ the two plans above.
 ## Where the tree stands
 
 ```
-cargo test --workspace                  430 passed, 0 failed
+cargo test --workspace                  438 passed, 0 failed
 cargo clippy --workspace --all-targets   0 warnings, 0 errors
 cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
@@ -209,9 +235,9 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | `AAA`/`DAA` against the manual's pseudocode | **CLOSED — the core was wrong twice** | The manual (Oct 1979, page 2-35) says `AAA` zeroes the high-order half-byte of `AL`, and Intel's SDM (Vol 2A, page 3-19) writes the mask as its own step, outside the branch. The core masked only inside the branch, and `DAA`/`DAS` never wrote `AF` at all, although Table 2-21 gives both an `X` in that column. Both fixed in `8dcc9da`, with the mutants shown to fail |
 | Does `DAA`'s second rule test the old `AL` or the adjusted one? | **CLOSED — the chip says the old one** | The hardware settles it: `DAA` on `AL = FAh` leaves `AL = 60h` with the carry set, which is the old value testing true. Intel's SDM writes the same (`IF ((old_AL > 99H) or (old_CF = 1))`). The 1979 manual has no rule text and the classic pseudocode says the adjusted value; the captures in `crates/core/tests/hardware_flags.rs` decide it |
 | `PUSH SP` | **CLOSED — the chip pushes the stack pointer it had already decremented** | The 1979 manual says to push the pointer before the push; the P80C86A-2 pushes the decremented pointer. `push sp` with `SS:SP = A291:6068` leaves `6066h` at physical `A8976h`. The print is an erratum against the silicon. Fixed in `f3a216f`, in both the `50h`-`57h` dispatch and the `FF /6`/`FF /7` push |
-| `DAA`/`DAS` tens correction | **OPEN — 28 cases.** The chip applies the tens correction when the carry was set or the old `AL` was over `99h`; with the `AF` flag set the old `AL` has to be over `9Fh`. The emulator applies it when the old `AL` was over `99h`, whatever `AF` says | Change `daa()` in `crates/core/src/exec.rs` to the chip's rule, then let the full gate decide |
-| `AAD` with a zero immediate | **OPEN — 6 cases.** The chip does not fault on a zero divisor: it computes the result and leaves `AH` clear. The emulator faults | Change `aad()` in `crates/core/src/exec.rs` so a zero immediate follows the chip, then let the full gate decide |
-| `IDIV r/m8` | **OPEN — 2 cases.** The chip faults when the quotient does not fit in seven bits, and `-128h` does not fit. The emulator computes it | Change the signed divide in `mul_group()` in `crates/core/src/exec.rs` so the quotient has to fit in seven bits, then let the full gate decide |
+| `DAA`/`DAS` tens correction | **CLOSED — the chip's rule, and it is stricter than the manual's** | The chip applies the tens correction when the carry was set, or when the old `AL` was over `99h` **and** the `AF` flag was clear or the old `AL` was over `9Fh`. The 4000 `DAA`/`DAS` captures cover every one of the 256 values of `AL` with the flag set and with it clear, and this rule fits all 4000 with no mismatch. `daa()` in `crates/core/src/exec.rs` runs it, and the family pin is at zero |
+| `AAD` with a zero immediate | **CLOSED — the chip does not fault** | It computes the result, leaves `AH` clear and the low byte untouched, and clears `CF` and `AF`. `AAM` with a zero immediate still faults, as the manual says. `aad()` in `crates/core/src/exec.rs` runs it, and the family pin is at zero |
+| `IDIV r/m8` | **CLOSED — the quotient has to fit in seven bits** | A quotient of `-128h` takes the type 0 interrupt, although it fits in the signed byte the quotient goes to. The guide's "does not fit in the destination" is an erratum for the byte form. **The word form is unproven**: no capture has a dividend that can produce `-32768h`, so `IDIV r/m16` still follows the print |
 | The 16-bit `REG` field | **CLOSED — the 80186's order had been implemented** | The 8086's Table 4-9 gives `AX CX DX BX SP BP SI DI`; the 80186 moved the 16-bit registers to make room for `AH CH DH BH` in the 8-bit field, and every modern reference quotes that later table. The 1979 manual's own table and a real P80C86A-2 agree with each other: `MOV SP,AX` is `8B E0`. The core, the guide's note and every hand-assembled program had followed the later order. Fixed in `98fc6f3`, with thirty-eight hand-assembled tests re-encoded |
 | `8C` with a register destination | **CLOSED — it is an 8086 instruction** | The project refused it as an 80186 encoding, on the strength of the manual printing `(not used)`. The chip runs it: `8C DF` is `MOV DI,DS`, with the segment landing in the register. The refusal is withdrawn, and so is the guide's claim that `8C` and `8E` take `MOD=000` only — the chip runs all four `MOD` values for both |
 | `8C`/`8E` with a displacement | **CLOSED — the chip runs both forms** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. **It answered in `49b9d27`:** the P80C86A-2 runs `8C` and `8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms. `8C` writes the selected segment as a little-endian word at the effective address, `8E` reads that word into the selected segment, the `reg` field's high bit is ignored, no flag changes, and the displacement is consumed. The 1979 print's `(not used)` is an erratum for those two forms. `odd/tasks/silicon-questions.md` |
@@ -298,9 +324,9 @@ checks the guide against them, and T7 closes the rotate carry. The gate
 pins the sample's count exactly and names no divergence.
 `odd/tasks/full-capture-gate.md` is its companion: it owns the final-memory
 comparison, the research gate over all **646000** captures, and the findings
-that gate leaves. The full set disagrees with the emulator in **36** cases,
-in three families listed in "Still open" above; a divergence outside those
-families fails the research gate.
+that gate leaves. **The full set agrees with the emulator in every case**: the
+36 disagreements the three families held are closed, and a divergence outside
+those families still fails the research gate.
 
 ## The I/O bus
 
@@ -349,7 +375,8 @@ wins, so a device that writes a port byte does not reach the program.
 8. ~~**The unit chosen by the maintainer on 2026-10-22: emit the prefixes.**~~ — **DONE and closed, and it had already landed on 2026-10-21, the day before this item was written.** `0a4ae80` emits the prefix bytes out of the guide's own map — `REP/REPE/REPZ` is `F3`, `REPNE/REPNZ` is `F2`, the first `LOCK` is `F0` — before the opcode, and `fdaea50` pins the bytes of every prefix the map gives, in the order the source wrote them. **The claim that the assembler parsed a prefix and threw it away is true of 2026-10-21 and wrong now**: `rep movsb` assembles to `F3h A4h`, and six of the eighty-five examples carry a prefix, eleven instructions in all. The plan is `odd/tasks/assembler.md` (S10, L7 and L8).
 9. ~~**The unit chosen by the maintainer on 2026-10-23: the two silicon questions.**~~ — **DONE and closed in `49b9d27`**: the `8C`/`8E` displacement forms and the carry of a rotate by more than one, both settled by the P80C86A-2's own captures. The oracle holds 2689 cases from 245 opcodes, the gate pins that count exactly, and the known-divergence list is empty. The plan is `odd/tasks/silicon-questions.md`.
 10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
-11. **The next unit is not chosen.** Nothing in the tree chooses which of those families comes next, so the next unit is the maintainer's to pick. The three hardware families the full gate left are in "Still open" above; each is a behaviour change in shared core code and needs its own unit and verification.
+11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
+12. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; the length table's missing families (`8F`, `C4`/`C5`, `FF /2`-`FF /5`), which are cheap row additions; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's debt (the glued form `cs:mov ax,1`, `PUSHA`/`POPA`, the second `LOCK` `F1h`, the `#cs=` directives); and T16 (the TUI) and T17 (packaging and CI).
 
 ## Files worth reading first
 
