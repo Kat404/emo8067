@@ -104,7 +104,9 @@ pub fn load(program: &emo8067_asm::program::Program) -> Result<Cpu, String> {
     cpu.regs.set_segment(Seg::Ds, ds);
     cpu.regs.set_segment(Seg::Es, es);
     cpu.regs.set_word(Reg16::Sp, sp);
-    // The eight byte registers, which the reference's initialisers name too.
+    // The registers the reference's initialisers name besides the segments:
+    // the eight byte registers, and the three index registers. Its `.binf`
+    // file lists them all: "EF12 ; SI", "3456 ; DI", "7890 ; BP".
     for (register, value) in &program.initial {
         let byte = *value as u8;
         match register {
@@ -116,6 +118,9 @@ pub fn load(program: &emo8067_asm::program::Program) -> Result<Cpu, String> {
             Register::Ch => cpu.regs.set_byte(Reg8::Ch, byte),
             Register::Dl => cpu.regs.set_byte(Reg8::Dl, byte),
             Register::Dh => cpu.regs.set_byte(Reg8::Dh, byte),
+            Register::Si => cpu.regs.set_word(Reg16::Si, *value),
+            Register::Di => cpu.regs.set_word(Reg16::Di, *value),
+            Register::Bp => cpu.regs.set_word(Reg16::Bp, *value),
             _ => {}
         }
     }

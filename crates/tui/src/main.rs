@@ -8,7 +8,7 @@ fn main() -> std::process::ExitCode {
         Ok(app) => app,
         Err(message) => {
             eprintln!("emo8067-tui: {message}");
-            return std::process::ExitCode::FAILURE;
+            return std::process::ExitCode::from(2);
         }
     };
     // A terminal that cannot be had is a refusal, not a panic: the TUI is
@@ -17,7 +17,7 @@ fn main() -> std::process::ExitCode {
         Ok(terminal) => terminal,
         Err(error) => {
             eprintln!("emo8067-tui: the terminal could not be had: {error}");
-            return std::process::ExitCode::FAILURE;
+            return std::process::ExitCode::from(2);
         }
     };
     let result = app.run(&mut terminal);
@@ -26,7 +26,7 @@ fn main() -> std::process::ExitCode {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("emo8067-tui: {error}");
-            std::process::ExitCode::FAILURE
+            std::process::ExitCode::from(2)
         }
     }
 }

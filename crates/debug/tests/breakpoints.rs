@@ -184,3 +184,17 @@ fn a_program_without_a_state_starts_in_the_boot_templates_default() {
     assert_eq!(cpu.regs.ip, 0x0100);
     assert_eq!(cpu.regs.word(Reg16::Sp), 0xFFFE);
 }
+
+#[test]
+fn the_loader_honours_the_index_registers_too() {
+    // The reference's `.binf` file lists them beside the byte registers:
+    // "EF12 ; SI", "3456 ; DI", "7890 ; BP".
+    let program = emo8067_asm::program::assemble_program(
+        "#si=1234#\n#di=5678#\n#bp=9abc#\norg 0010h\nmov ax, 1\n",
+    )
+    .unwrap();
+    let cpu = emo8067_debug::machine::load(&program).unwrap();
+    assert_eq!(cpu.regs.word(Reg16::Si), 0x1234);
+    assert_eq!(cpu.regs.word(Reg16::Di), 0x5678);
+    assert_eq!(cpu.regs.word(Reg16::Bp), 0x9ABC);
+}

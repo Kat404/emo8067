@@ -88,3 +88,15 @@ red is a watchpoint.
       flags on top, and the loader's - live in different crates, and they
       agree today because the loader was written from the runner's rules.
       They should be one.
+  - **L3 (2026-11-10).** The recheck of L2 found the same blocker still
+    half-open, and one thing I had claimed without measuring.
+    - **The loader still dropped `SI`, `DI` and `BP`.** The reference's
+      `.binf` file lists them beside the byte registers — "EF12 ; SI",
+      "3456 ; DI", "7890 ; BP" — and a program that declares them ran under
+      a different machine in the TUI than in the runner: the same store
+      landed at a different physical address. The loader honours the three
+      index registers now, and a test holds them down.
+    - **The exit code was 1, not the 2 that was claimed.**
+      `ExitCode::FAILURE` is 1; the runner's is 2, and the TUI's is 2 now.
+    - **Still open.** `#MEM=` — the memory the reference's `.binf` file can
+      carry — is ignored by both frontends.
