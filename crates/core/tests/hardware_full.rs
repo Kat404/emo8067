@@ -23,6 +23,8 @@
 //! count is pinned exactly, and a divergence outside those families fails
 //! the gate. A family whose count grows or shrinks is a failure too: it
 //! means the emulator and the chip disagree about something else as well.
+//! **All three families are fixed**, so every count is pinned at zero and
+//! the full set has no disagreement left with the emulator.
 //!
 //! **What this gate is not.** It is not a proof that the emulator matches
 //! silicon in general, and it is not a unit test. It is a research gate:
@@ -70,29 +72,30 @@ struct Family {
 
 /// The families the full set found.
 ///
-/// Each one is a defect in the emulator that this unit does not fix: a
-/// behaviour change in shared core code is its own unit with its own
-/// verification. The plan's log names the case that shows each one, the
-/// chip's rule and the place in the code to change.
+/// Each one was a defect in the emulator, and each one is now fixed: the
+/// count is pinned at **zero**, so a family that grows again fails the gate
+/// the way the count it had did. The chip's rule stays in the comment,
+/// because it is the reason the fix is what it is, and the plan's log names
+/// the case that shows it.
 const FAMILIES: &[Family] = &[
     Family {
         name: "DAA and DAS",
         rule: "the chip applies the tens correction when the carry was set or the \
                old AL was over 99h; with the AF flag set the old AL has to be \
                over 9Fh",
-        opcodes: &[("27", 17), ("2F", 11)],
+        opcodes: &[("27", 0), ("2F", 0)],
     },
     Family {
         name: "AAD with a zero immediate",
         rule: "the chip does not fault on a zero divisor: it computes the result \
                and leaves AH clear",
-        opcodes: &[("D5", 6)],
+        opcodes: &[("D5", 0)],
     },
     Family {
         name: "IDIV r/m8",
         rule: "the chip faults when the quotient does not fit in seven bits, and \
                -128h does not",
-        opcodes: &[("F6.7", 2)],
+        opcodes: &[("F6.7", 0)],
     },
 ];
 

@@ -1320,7 +1320,18 @@ fn daa(cpu: &mut crate::Cpu, add: bool) {
     cpu.regs.flags.set(AF, low);
 
     let mut cf = old_cf;
-    if old_al > 0x99 || old_cf {
+    // The tens correction follows the chip and not the manual's prose. The
+    // manual says it fires when the old `AL` was over `99h` or the carry was
+    // set; the chip fires it when the carry was set, or when the old `AL` was
+    // over `99h` **and** the `AF` flag was clear or the old `AL` was already
+    // over `9Fh`. The captures from a real P80C86A-2 cover every one of the
+    // 256 values of `AL` with the flag set and with it clear, and this is the
+    // rule that fits all 4000 of them: `daa` on `AL = 9Ah` with `AF` set
+    // leaves `AL = A0h` with the carry clear (test hash
+    // `3e4193b17b79244f`), where the manual's rule gives `AL = 00h` with the
+    // carry set.
+    let tens = old_cf || (old_al > 0x99 && (!old_af || old_al >= 0xA0));
+    if tens {
         cf = true;
         al = if add {
             al.wrapping_add(0x60)
@@ -1600,11 +1611,23 @@ fn aam(cpu: &mut crate::Cpu) {
 }
 
 /// `D5 ib` is `AAD`: AH folds into AL and the 16-bit sum leaves AH clear.
-/// Same undefined flags and same divide-by-zero fault as [`aam`].
+///
+/// Same undefined flags as [`aam`], but **not** the same divide-by-zero
+/// fault: the chip does not fault on a zero divisor. It computes the result,
+/// leaves `AH` clear and the low byte untouched, and clears `CF` and `AF`.
+/// The capture for `aad 00h` with `AX = 909Eh` (test hash
+/// `1998a8307e10fd0b`) leaves `AX = 009Eh` and no interrupt, and all six
+/// `aad 00h` captures in the set leave `CF` and `AF` clear. `AAM` with a zero
+/// immediate does fault, as the manual says it does.
 fn aad(cpu: &mut crate::Cpu) {
     let base = fetch_u8(&cpu.mem, &mut cpu.regs);
+    let al = cpu.regs.byte(Reg8::Al);
     if base == 0 {
-        divide_error(cpu);
+        cpu.regs.set_byte(Reg8::Ah, 0);
+        let f = &mut cpu.regs.flags;
+        f.set(CF, false);
+        f.set(AF, false);
+        set_result_flags(u16::from(al), 8, f);
         return;
     }
     // The sum is an 8-bit result: AH clears even when the arithmetic ran past
@@ -1819,7 +1842,14 @@ fn mul_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 return Ok(());
             }
             let quotient = (ax as i16) / i16::from(divisor);
-            if !(-128..=127).contains(&quotient) {
+            // The quotient has to fit in **seven** bits, not eight. The manual
+            // says "larger than 7 bits" and the chip agrees: `idiv` with
+            // `AX = 3354h` and a divisor of `9Ah` (-102) gives `-128h`, and the
+            // chip takes the type 0 interrupt instead of writing it (test hash
+            // `2bf85c12cc23051f`). A quotient of `-128h` fits in a signed
+            // byte, so the range that rejects it is the manual's, not the
+            // destination's.
+            if !(-127..=127).contains(&quotient) {
                 divide_error(cpu);
                 return Ok(());
             }
@@ -3735,7 +3765,7 @@ mod tests {
     }
 
     /// `D5 ib` is `AAD`: AH folds into AL and is then cleared. Same undefined
-    /// flags and same divide-by-zero fault as AAM.
+    /// flags as AAM, but **not** the same divide-by-zero fault.
     #[test]
     fn aad_folds_ah_into_al_and_clears_ah() {
         // D5 0A = AAD 10 on the BCD number 093Ch: 09h * 10 + 3Ch = 0096h.
@@ -3776,17 +3806,19 @@ mod tests {
             "FFh * 2 + 1h is 01FFh, and only its low byte survives"
         );
 
+        // A zero divisor is **not** a divide error here: the chip computes the
+        // result, leaves AH clear and the low byte untouched, and clears CF
+        // and AF. The capture for `aad 00h` with AX = 909Eh (test hash
+        // 1998a8307e10fd0b) leaves AX = 009Eh and no interrupt.
         let mut cpu = cpu_at(&[0xD5, 0x00]);
-        cpu.regs.set_segment(Seg::Ss, 0x2000);
-        cpu.regs.set_word(Reg16::Sp, 0x0100);
-        install_vector(&mut cpu, 0, 0x4000, 0x0600);
+        cpu.regs.set_word(Reg16::Ax, 0x909E);
+        cpu.regs.flags.set(AF, true);
+        cpu.regs.flags.set(CF, true);
         cpu.step().unwrap();
-        assert_eq!(cpu.regs.ip, 0x0600, "a zero divisor is the divide error");
-        assert_eq!(
-            cpu.mem.read_u16(0x2000, 0x00FA),
-            2,
-            "both bytes were fetched"
-        );
+        assert_eq!(cpu.regs.word(Reg16::Ax), 0x009E, "AH clear, AL untouched");
+        assert_eq!(cpu.regs.ip, 2, "the instruction ran and did not fault");
+        let f = cpu.regs.flags;
+        assert!(!f.get(CF) && !f.get(AF), "the chip clears both");
     }
 
     /// `D7` is `XLAT`: AL takes DS:[BX + AL] with the index read as a signed

@@ -3241,6 +3241,145 @@ fn push_sp_pushes_the_decremented_stack_pointer() {
     );
 }
 
+/// `DAA` takes the tens correction only when the chip takes it.
+///
+/// The manual's prose says the correction fires when the old `AL` was over
+/// `99h` or the carry was set. The chip is stricter: with the `AF` flag set,
+/// the old `AL` has to be over `9Fh`, because the low correction has already
+/// carried into the high nibble. The capture in `SingleStepTests/8086` for
+/// `daa` with `AL = 9Ah`, `AF = 1` and `CF = 0` (test hash
+/// `3e4193b17b79244f`) leaves `AL = A0h` with the carry clear, where the
+/// manual's rule gives `AL = 00h` with the carry set.
+#[test]
+fn daa_takes_the_tens_correction_only_when_the_chip_takes_it() {
+    let mut c = cpu(&[0x27]);
+    c.regs.set_byte(Reg8::Al, 0x9A);
+    c.regs.flags.set(AF, true);
+    c.step().unwrap();
+
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0xA0,
+        "the low correction, and no tens"
+    );
+    assert!(!c.regs.flags.get(CF), "the tens correction did not fire");
+    assert!(c.regs.flags.get(AF), "the low correction is what writes AF");
+}
+
+/// The other side of the same rule: with `AF` set and the old `AL` over
+/// `9Fh`, the chip does take the tens correction. The capture for `daa` with
+/// `AL = E9h` and `AF = 1` (test hash `011e9e119370e084`) leaves `AL = 4Fh`
+/// with the carry set.
+#[test]
+fn daa_takes_the_tens_correction_when_the_old_al_is_over_9fh() {
+    let mut c = cpu(&[0x27]);
+    c.regs.set_byte(Reg8::Al, 0xE9);
+    c.regs.flags.set(AF, true);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Al), 0x4F);
+    assert!(c.regs.flags.get(CF));
+}
+
+/// `DAS` takes the same correction, in the other direction. The capture for
+/// `das` with `AL = C4h` and `AF = 1` (test hash `1220e712d95eee40`) leaves
+/// `AL = 5Eh` with the carry set.
+#[test]
+fn das_takes_the_tens_correction_when_the_old_al_is_over_9fh() {
+    let mut c = cpu(&[0x2F]);
+    c.regs.set_byte(Reg8::Al, 0xC4);
+    c.regs.flags.set(AF, true);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Al), 0x5E);
+    assert!(c.regs.flags.get(CF));
+}
+
+/// With the `AF` flag clear the chip takes the manual's rule, and so does the
+/// emulator: the correction fires when the old `AL` was over `99h`. The
+/// capture for `daa` with `AL = 9Fh` and `AF = 0` (test hash
+/// `f207f82766ca9064`) leaves `AL = 05h` with the carry set.
+#[test]
+fn daa_takes_the_tens_correction_when_the_af_flag_is_clear() {
+    let mut c = cpu(&[0x27]);
+    c.regs.set_byte(Reg8::Al, 0x9F);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Al), 0x05);
+    assert!(c.regs.flags.get(CF));
+}
+
+/// `AAD` with a zero immediate does not fault.
+///
+/// The chip computes the result and leaves `AH` clear. The capture in
+/// `SingleStepTests/8086` for `aad 00h` with `AX = 909Eh` (test hash
+/// `1998a8307e10fd0b`) leaves `AX = 009Eh` — the high byte clear, the low byte
+/// untouched — and no interrupt. `AAM` with a zero immediate *does* fault,
+/// and that one is not this family.
+#[test]
+fn aad_with_a_zero_immediate_does_not_fault() {
+    let mut c = cpu(&[0xD5, 0x00]);
+    c.regs.set_word(Reg16::Ax, 0x909E);
+    c.regs.flags.set(AF, true);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Ax), 0x009E, "AH clear, AL untouched");
+    assert_ne!(
+        c.stop_reason,
+        StopReason::Interrupt(0),
+        "the chip does not fault on a zero divisor"
+    );
+    assert!(!c.regs.flags.get(CF));
+    assert!(!c.regs.flags.get(AF));
+    assert_eq!(c.regs.ip, 2, "the instruction ran");
+}
+
+/// The ordinary path is untouched: `AH` folds into `AL` and the high byte
+/// clears.
+#[test]
+fn aad_still_folds_ah_into_al() {
+    let mut c = cpu(&[0xD5, 0x0A]);
+    c.regs.set_word(Reg16::Ax, 0x0305);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.word(Reg16::Ax), 0x0023, "03h*0Ah+05h = 23h");
+}
+
+/// The quotient of `IDIV r/m8` has to fit in seven bits.
+///
+/// The manual says "larger than 7 bits" and the chip agrees: `idiv` with
+/// `AX = 3354h` and a divisor of `9Ah` (-102) gives a quotient of `-128h`,
+/// which does not fit in seven bits, and the chip takes the type 0 interrupt
+/// instead of writing it.
+#[test]
+fn idiv_r_m8_takes_the_divide_error_when_the_quotient_does_not_fit_in_seven_bits() {
+    let mut c = cpu(&[0xF6, 0xF9]); // IDIV CL
+    stack_grows_down(&c);
+    c.regs.flags.set(IF, true);
+    c.mem.write_u16(0x0000, 0x0000, 0x0400);
+    c.mem.write_u16(0x0000, 0x0002, 0x0500);
+    c.regs.set_word(Reg16::Ax, 0x3354);
+    c.regs.set_byte(Reg8::Cl, 0x9A);
+    c.step().unwrap();
+
+    assert_eq!(c.stop_reason, StopReason::Interrupt(0));
+    assert_eq!(c.regs.segment(Seg::Cs), 0x0500);
+    assert_eq!(c.regs.ip, 0x0400);
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100 - 6, "FLAGS, CS, IP pushed");
+}
+
+/// A quotient that fits still comes out, with the remainder in `AH`.
+#[test]
+fn idiv_r_m8_still_computes_a_quotient_that_fits() {
+    let mut c = cpu(&[0xF6, 0xF9]);
+    c.regs.set_word(Reg16::Ax, 0x0014);
+    c.regs.set_byte(Reg8::Cl, 0x05);
+    c.step().unwrap();
+
+    assert_eq!(c.regs.byte(Reg8::Al), 0x04, "20 / 5");
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x00, "and no remainder");
+}
+
 /// The same rule reaches the `FF /6` push, where the stack pointer is the
 /// register operand: `FF F4` is `PUSH SP` in the `FF` group.
 ///
