@@ -150,6 +150,23 @@ pub struct Program {
     pub initial: Vec<(Register, u16)>,
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Empty => f.write_str("the line has no instruction on it"),
+            Error::UnknownInstruction { name } => write!(f, "unknown instruction `{name}`"),
+            Error::BadOperand { text } => write!(f, "bad operand `{text}`"),
+            Error::UnknownName { name } => write!(f, "unknown name `{name}`"),
+            Error::RecursiveMacro { message }
+            | Error::JumpOutOfRange { message }
+            | Error::NoConvergence { message }
+            | Error::Include { message } => f.write_str(message),
+            Error::BadInitialiser { name, message } => write!(f, "`{name}`: {message}"),
+            Error::AtLine { line, error } => write!(f, "line {line}: {error}"),
+        }
+    }
+}
+
 /// What a line does to the program.
 enum Effect {
     /// Nothing at all.

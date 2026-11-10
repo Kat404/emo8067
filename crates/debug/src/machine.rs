@@ -4,6 +4,7 @@
 //! is the bridge: the debugger's own words, over the core's own state.
 
 use crate::expr::{Context, Value};
+use emo8067_asm::program::Register;
 use emo8067_core::Cpu;
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 
@@ -61,17 +62,62 @@ impl Context for Machine<'_> {
 /// offset: 7c00, same values are set to CS and IP registers accordingly".
 /// So a program is loaded at its origin in the segment 0000, and the
 /// segments follow it.
+///
+/// **And what the program declares wins over the template.** The
+/// reference's `.binf` file gives the load segment and the load offset
+/// their own lines, apart from `CS` and `IP`, and each falls back to the
+/// other when the other is not given: "if LOAD_SEGMENT and LOAD_OFFSET are
+/// not defined, then CS and IP values are used and vice-versa". The
+/// register initialisers the program writes - `#cs=`, `#ss=`, `#sp=` and the
+/// rest - say the same thing, and a program that declares them starts in
+/// that state.
 pub fn load(program: &emo8067_asm::program::Program) -> Result<Cpu, String> {
+    let declared = |register: Register| {
+        program
+            .initial
+            .iter()
+            .rev()
+            .find(|(named, _)| *named == register)
+            .map(|(_, value)| *value)
+    };
+    let load_segment = declared(Register::LoadSegment)
+        .or_else(|| declared(Register::Cs))
+        .unwrap_or(0x0000);
+    let load_offset = declared(Register::LoadOffset)
+        .or_else(|| declared(Register::Ip))
+        .unwrap_or(program.origin);
+    let cs = declared(Register::Cs).unwrap_or(load_segment);
+    let ip = declared(Register::Ip).unwrap_or(load_offset);
+    let ss = declared(Register::Ss).unwrap_or(load_segment);
+    let sp = declared(Register::Sp).unwrap_or(0xFFFE);
+    let ds = declared(Register::Ds).unwrap_or(load_segment);
+    let es = declared(Register::Es).unwrap_or(ds);
+
     let mut cpu = Cpu::new();
-    let physical = u32::from(program.origin);
+    let physical = u32::from(load_segment) * 16 + u32::from(load_offset);
     cpu.mem
         .load_at(physical, &program.bytes)
         .map_err(|offset| format!("the image does not fit: {offset:#x}"))?;
-    cpu.regs.set_segment(Seg::Cs, 0x0000);
-    cpu.regs.ip = program.origin;
-    cpu.regs.set_segment(Seg::Ss, 0x0000);
-    cpu.regs.set_segment(Seg::Ds, 0x0000);
-    cpu.regs.set_segment(Seg::Es, 0x0000);
-    cpu.regs.set_word(Reg16::Sp, 0xFFFE);
+    cpu.regs.set_segment(Seg::Cs, cs);
+    cpu.regs.ip = ip;
+    cpu.regs.set_segment(Seg::Ss, ss);
+    cpu.regs.set_segment(Seg::Ds, ds);
+    cpu.regs.set_segment(Seg::Es, es);
+    cpu.regs.set_word(Reg16::Sp, sp);
+    // The eight byte registers, which the reference's initialisers name too.
+    for (register, value) in &program.initial {
+        let byte = *value as u8;
+        match register {
+            Register::Al => cpu.regs.set_byte(Reg8::Al, byte),
+            Register::Ah => cpu.regs.set_byte(Reg8::Ah, byte),
+            Register::Bl => cpu.regs.set_byte(Reg8::Bl, byte),
+            Register::Bh => cpu.regs.set_byte(Reg8::Bh, byte),
+            Register::Cl => cpu.regs.set_byte(Reg8::Cl, byte),
+            Register::Ch => cpu.regs.set_byte(Reg8::Ch, byte),
+            Register::Dl => cpu.regs.set_byte(Reg8::Dl, byte),
+            Register::Dh => cpu.regs.set_byte(Reg8::Dh, byte),
+            _ => {}
+        }
+    }
     Ok(cpu)
 }

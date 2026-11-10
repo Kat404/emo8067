@@ -151,3 +151,36 @@ fn an_expression_reads_the_machine_it_is_given() {
     let value = expr::evaluate("AX", &Machine::new(&cpu)).unwrap();
     assert_eq!(value, 0x1234);
 }
+
+#[test]
+fn the_loader_starts_the_program_where_it_says() {
+    // The reference's `.binf` model: the load segment and the load offset
+    // have their own lines, apart from `CS` and `IP`, and each falls back to
+    // the other when the other is not given. A program that declares its
+    // state starts in that state.
+    let program = emo8067_asm::program::assemble_program(
+        "#cs=2000#\n#ip=0010#\n#ss=3000#\n#sp=0100#\n#ds=4000#\n#es=5000#\n#al=99#\n\
+         org 0010h\nmov ax, 1\n",
+    )
+    .unwrap();
+    let cpu = emo8067_debug::machine::load(&program).unwrap();
+
+    assert_eq!(cpu.regs.segment(Seg::Cs), 0x2000);
+    assert_eq!(cpu.regs.ip, 0x0010);
+    assert_eq!(cpu.regs.segment(Seg::Ss), 0x3000);
+    assert_eq!(cpu.regs.word(Reg16::Sp), 0x0100);
+    assert_eq!(cpu.regs.segment(Seg::Ds), 0x4000);
+    assert_eq!(cpu.regs.segment(Seg::Es), 0x5000);
+    assert_eq!(cpu.regs.byte(emo8067_core::regs::Reg8::Al), 0x99);
+    // And the image is where the load address says.
+    assert_eq!(cpu.mem.read_u8(0x2000, 0x0010), 0xB8, "the MOV is there");
+}
+
+#[test]
+fn a_program_without_a_state_starts_in_the_boot_templates_default() {
+    let program = emo8067_asm::program::assemble_program("org 100h\nmov ax, 1\n").unwrap();
+    let cpu = emo8067_debug::machine::load(&program).unwrap();
+    assert_eq!(cpu.regs.segment(Seg::Cs), 0x0000);
+    assert_eq!(cpu.regs.ip, 0x0100);
+    assert_eq!(cpu.regs.word(Reg16::Sp), 0xFFFE);
+}

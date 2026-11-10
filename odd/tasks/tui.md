@@ -63,3 +63,28 @@ red is a watchpoint.
     reference has and the core does not; the mouse; the `g`/`b`/`w`/`e`
     prompts; and the guest's screen, which the research says has to be
     planned from the start because the TUI is genuinely weak there.
+  - **L2 (2026-11-10).** The verification of L1, and what it changed.
+    - **A blocker: the TUI loaded programs differently from the runner.**
+      The loader in the debugger's crate kept only the boot template's
+      defaults and ignored what the program declares, so a program with
+      `#cs=2000#` or `#ss=500#` — the reference's own `robot.asm` has one —
+      ran under a **different machine** in the TUI than in the headless
+      runner. The loader now follows the reference's `.binf` model: the load
+      segment and the load offset have their own lines, apart from `CS` and
+      `IP`, each falls back to the other when the other is not given, and
+      the register initialisers say the same thing. Two tests hold it down.
+    - **The step count is the count of steps**, not the count of distinct
+      addresses: the research's status line reads `STEP 1 243`.
+    - **The cursor never leaves the listing**, and `F9` on a line that is
+      not there sets nothing.
+    - **The refusals are in the assembler's own words.** The assembler
+      gained a `Display` for its errors, so the TUI says "file not found: …"
+      where it used to say the debug dump of the error.
+    - **A failure is a failure.** A missing file and a terminal that cannot
+      be had both exit with 2, where they exited with 0.
+    - **The budget is reported.** `F5` that runs out of its hundred
+      thousand instructions says so in the status line.
+    - **Still open.** The two load models - the headless runner's, with its
+      flags on top, and the loader's - live in different crates, and they
+      agree today because the loader was written from the runner's rules.
+      They should be one.

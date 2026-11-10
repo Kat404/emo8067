@@ -102,7 +102,7 @@ fn status(app: &App, frame: &mut Frame, area: ratatui::layout::Rect) {
         None => format!(
             "IP {:04X}  ·  STEP {}  ·  BREAK {}  ·  WATCH {}  ·  q quits · ? helps",
             app.cpu.regs.ip,
-            app.executed.len(),
+            app.steps,
             app.breakpoints.breakpoints().len(),
             app.breakpoints.watchpoints().len(),
         ),

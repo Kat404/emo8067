@@ -23,6 +23,8 @@ pub struct App {
     pub breakpoints: Breakpoints,
     /// The addresses the machine has been at, in order.
     pub executed: Vec<u16>,
+    /// How many instructions have run.
+    pub steps: u64,
     /// Which line of the listing the cursor is on.
     pub cursor: usize,
     /// The UI's state, which the panels are drawn from.
@@ -48,6 +50,7 @@ impl App {
             name: "no program".to_string(),
             breakpoints: Breakpoints::new(),
             executed: Vec::new(),
+            steps: 0,
             cursor: 0,
             ui: Ui::default(),
             help: false,
@@ -60,7 +63,7 @@ impl App {
         };
         let file = PathBuf::from(&path);
         let program = emo8067_asm::program::assemble_file(&file, &[])
-            .map_err(|error| format!("{path}: {error:?}"))?;
+            .map_err(|error| format!("{path}: {error}"))?;
         app.name = file
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
@@ -115,6 +118,13 @@ impl App {
             KeyCode::Down => self.cursor += 1,
             _ => {}
         }
+        // The cursor never leaves the listing.
+        let lines = self.panels().disassembly.len();
+        if lines == 0 {
+            self.cursor = 0;
+        } else {
+            self.cursor = self.cursor.min(lines - 1);
+        }
     }
 
     /// One instruction.
@@ -125,6 +135,7 @@ impl App {
         let at = self.cpu.regs.ip;
         match self.cpu.step() {
             Ok(info) => {
+                self.steps += 1;
                 if !self.executed.contains(&at) {
                     self.executed.push(at);
                 }
@@ -142,7 +153,7 @@ impl App {
 
     /// Run until a breakpoint, a halt or the end of the budget.
     fn run_to_the_next_breakpoint(&mut self) {
-        let budget = 100_000u32;
+        let budget = 100_000u64;
         for _ in 0..budget {
             let at = self.cpu.regs.ip;
             if self.breakpoints.stops_at(
@@ -158,6 +169,7 @@ impl App {
                 return;
             }
         }
+        self.status = Some(format!("the budget of {budget} instructions ran out"));
     }
 
     /// Set a breakpoint at the cursor, or take it away.

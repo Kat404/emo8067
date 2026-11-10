@@ -2,13 +2,13 @@
 
 use emo8067_tui::app;
 
-fn main() -> std::io::Result<()> {
+fn main() -> std::process::ExitCode {
     let path = std::env::args().nth(1);
     let mut app = match app::App::new(path) {
         Ok(app) => app,
         Err(message) => {
             eprintln!("emo8067-tui: {message}");
-            return Ok(());
+            return std::process::ExitCode::FAILURE;
         }
     };
     // A terminal that cannot be had is a refusal, not a panic: the TUI is
@@ -17,10 +17,16 @@ fn main() -> std::io::Result<()> {
         Ok(terminal) => terminal,
         Err(error) => {
             eprintln!("emo8067-tui: the terminal could not be had: {error}");
-            return Ok(());
+            return std::process::ExitCode::FAILURE;
         }
     };
     let result = app.run(&mut terminal);
     ratatui::restore();
-    result
+    match result {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("emo8067-tui: {error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
 }
