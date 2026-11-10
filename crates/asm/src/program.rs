@@ -93,9 +93,11 @@ pub enum Register {
     Di,
     /// `BP`.
     Bp,
-    /// `CS`, which is also the load segment.
+    /// `CS`. The load segment falls back to it, and it falls back to the
+    /// load segment: the reference's `.binf` file gives each its own line.
     Cs,
-    /// `IP`, which is also the load offset.
+    /// `IP`, which the load offset falls back to, and which falls back to
+    /// the load offset.
     Ip,
     /// `SS`.
     Ss,
@@ -1686,10 +1688,12 @@ impl Expression<'_> {
 ///
 /// The word the `SP` push leaves is the pointer the chip had **already
 /// decremented** - the rule the captures settled for `PUSH SP` - and not the
-/// original pointer the document's own sentence names. No 8086 sequence
-/// that leaves the flags alone can do better: every other way of getting the
-/// original pointer onto the stack is an addition or a subtraction, and
-/// those write the flags.
+/// original pointer the document's own sentence names. The document's
+/// algorithm block does not reach the original pointer either: `PUSH SP` is
+/// the only push of the stack pointer an 8086 has, and it pushes the
+/// decremented one. Reaching the original would take a scratch word in
+/// memory - `MOV [scratch],SP` and `PUSH [scratch]` leave the flags alone -
+/// and an assembler has no scratch word to spend.
 ///
 /// The earlier seven words were one short in each direction: the `SP` was
 /// missing, and a `POPA` on its own left the stack two bytes off.
