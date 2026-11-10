@@ -268,6 +268,9 @@ fn sub_overflow(a: u16, b: u16, result: u16, bits: u8) -> bool {
 
 /// Execute one instruction.
 pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
+    // The last write belongs to the step that made it: a watchpoint asks
+    // the memory, and the write of the step before is not this step's.
+    cpu.mem.last_write = None;
     let at = cpu.regs.ip;
     let mut opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
 

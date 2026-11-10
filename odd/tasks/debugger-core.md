@@ -123,3 +123,14 @@ refusals are in that DLL's strings (`re/out/diasm/strings.tsv`):
       two drive-by clippy fixes (the CLI's image type and the decode
       geometry's offset arithmetic), which are behaviour-neutral and belong
       to the baseline's last two warnings.
+  - **L3 (2026-11-10).** The second recheck found one more thing, and it
+    was mine: the rule that lets a hexadecimal value start with a letter
+    (`FFh`) sent the 8086's four high-byte registers to the number parser,
+    because `AH` ends in a `H` and `BH` in a `B`. The register table is
+    consulted first now, and the four registers read as themselves.
+    The prose about the word at the top of a segment was wrong by one byte:
+    a word at `FFFFh` writes `FFFFh` and `0000h`, not the byte before it and
+    the byte at the bottom. The code was right; the text is not.
+    And the clearing of the memory's last write moved into `exec::step`,
+    where the instruction runs, so that the public `exec::step` cannot
+    bypass it.

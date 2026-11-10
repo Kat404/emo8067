@@ -87,7 +87,7 @@ fn a_watchpoint_on_a_write_does_not_fire_on_a_read_and_says_why() {
 #[test]
 fn a_word_stored_at_the_top_of_a_segment_does_not_overflow_the_watchpoint() {
     // The offset wraps inside the segment, exactly as it does on the chip:
-    // a word at `FFFFh` writes the byte before it and the byte at the bottom.
+    // a word at `FFFFh` writes `FFFFh` and `0000h`.
     let mut breakpoints = Breakpoints::new();
     breakpoints.watch(0x0100, 0xFFFE, Access::Write);
     breakpoints.watch(0x0100, 0xFFFF, Access::Write);

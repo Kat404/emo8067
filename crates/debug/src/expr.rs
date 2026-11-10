@@ -207,6 +207,13 @@ impl<'a, 'c> Parser<'a, 'c> {
                 }
                 return Err(Error::BadSyntax);
             }
+            let upper = word.to_ascii_uppercase();
+            // A register comes first: `AH` ends in a `H` and `BH` in a `B`,
+            // and the 8086 has both.
+            if let Some(name) = REGISTERS.iter().find(|known| **known == upper) {
+                self.at += word.len();
+                return Ok(Some(Token::Register(name)));
+            }
             // A number: decimal, `101b` or `34h`. The `h` suffix is what
             // tells a hexadecimal value from a decimal one, and the reference
             // asks for it: "h suffix must be added to any a hexadecimal
@@ -221,11 +228,6 @@ impl<'a, 'c> Parser<'a, 'c> {
                 let (token, taken) = self.number(rest)?;
                 self.at += taken;
                 return Ok(Some(token));
-            }
-            let upper = word.to_ascii_uppercase();
-            if let Some(name) = REGISTERS.iter().find(|known| **known == upper) {
-                self.at += word.len();
-                return Ok(Some(Token::Register(name)));
             }
             return Err(Error::BadExpression);
         }

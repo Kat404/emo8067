@@ -89,6 +89,21 @@ fn the_arithmetic_is_signed_as_the_reference_s_is() {
 }
 
 #[test]
+fn the_high_byte_registers_are_registers_and_not_hexadecimal_literals() {
+    // `AH` ends in a `H` and `BH` in a `B`, and the 8086 has both.
+    let mut machine = Machine::new();
+    machine
+        .with_register("AH", 0xAB)
+        .with_register("BH", 0xCD)
+        .with_register("CH", 0xEF)
+        .with_register("DH", 0x10);
+    assert_eq!(evaluate("AH", &machine).unwrap(), 0xAB);
+    assert_eq!(evaluate("BH", &machine).unwrap(), 0xCD);
+    assert_eq!(evaluate("CH", &machine).unwrap(), 0xEF);
+    assert_eq!(evaluate("DH", &machine).unwrap(), 0x10);
+}
+
+#[test]
 fn a_hexadecimal_value_may_start_with_a_letter() {
     let machine = Machine::new();
     assert_eq!(evaluate("FFh", &machine).unwrap(), 0xFF);

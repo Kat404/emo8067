@@ -200,8 +200,8 @@ impl Breakpoints {
         let mut report = Report::empty();
         for watchpoint in &self.watchpoints {
             // The offset wraps inside the segment, exactly as it does on
-            // the chip: a word stored at the top of a segment writes the
-            // byte before it and the byte at the bottom.
+            // the chip: a word stored at `FFFFh` writes `FFFFh` and
+            // `0000h`.
             let covered = watchpoint.segment == segment
                 && (0..u16::from(width)).any(|byte| watchpoint.offset == offset.wrapping_add(byte));
             if !covered {

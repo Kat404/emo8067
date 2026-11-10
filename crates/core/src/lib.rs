@@ -146,10 +146,6 @@ impl Cpu {
     pub fn step(&mut self) -> Result<StepInfo, exec::ExecError> {
         self.stop_reason = StopReason::None;
         self.halted = false;
-        // The last write belongs to the step that made it: a watchpoint
-        // asks the memory, and a write of the step before is not this
-        // step's.
-        self.mem.last_write = None;
         exec::step(self)
     }
 }
