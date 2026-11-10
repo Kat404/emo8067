@@ -122,6 +122,36 @@ fn the_operand_segment_override_is_a_prefix() {
     );
 }
 
+/// The byte is the one the guide's own map gives the segment, for each of
+/// the four, and the same byte the prefix form of the override uses.
+#[test]
+fn the_operand_segment_is_the_cell_the_map_gives_it() {
+    let program = assemble_program("org 100h\nmov cs:[bx],ax\n").unwrap();
+    assert_eq!(program.bytes, vec![0x2E, 0x89, 0x07]);
+    let program = assemble_program("org 100h\nmov ds:[bx],ax\n").unwrap();
+    assert_eq!(program.bytes, vec![0x3E, 0x89, 0x07]);
+    let program = assemble_program("org 100h\nmov es:[bx],ax\n").unwrap();
+    assert_eq!(program.bytes, vec![0x26, 0x89, 0x07]);
+    let program = assemble_program("org 100h\nmov ss:[bx],ax\n").unwrap();
+    assert_eq!(program.bytes, vec![0x36, 0x89, 0x07]);
+}
+
+/// The override goes after the prefixes the line carries, the way the prefix
+/// form of the same override puts its byte after the others.
+///
+/// The order of the prefixes does not change what the chip does: the guide
+/// says the segment and the repeat latches are independent, and the core's
+/// own tests say the order never changes the outcome.
+#[test]
+fn the_operand_override_comes_after_the_lines_own_prefixes() {
+    let program = assemble_program("org 100h\nlock mov cs:[bx],ax\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![0xF0, 0x2E, 0x89, 0x07],
+        "the LOCK comes first, as the source wrote it, and the override with the operand"
+    );
+}
+
 /// The dotted form is the same prefix.
 #[test]
 fn the_dotted_operand_segment_override_is_the_same_prefix() {

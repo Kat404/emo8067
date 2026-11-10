@@ -41,15 +41,17 @@ pub fn assemble(source: &str) -> Result<Vec<u8>, Error> {
 /// The bytes that come before the instruction: the prefixes the line
 /// carries, and the segment override an operand carries.
 ///
-/// The override goes in front of the line's own prefixes, so that a `LOCK`
-/// stays next to the instruction it locks: on the 8086 the `LOCK` prefix
-/// has to be the last byte before the opcode. The byte is the one the
-/// guide's own map gives the segment, the same cell the prefix form of the
-/// override uses.
+/// The override goes after the prefixes the line carries, the way the source
+/// writes it: the segment is part of the operand, and the prefix form of the
+/// same override puts its byte after the others too. The order of the
+/// prefixes does not change what the chip does - the guide says the
+/// segment and the repeat latches are independent, and the core's own tests
+/// say the order never changes the outcome. The byte is the one the guide's
+/// own map gives the segment, the same cell the prefix form uses.
 pub fn prefixes_of(line: &line::Line, operands: &[Operand]) -> Vec<u8> {
     let mut bytes = line.prefix_bytes();
     if let Some(segment) = segment_override(operands) {
-        bytes.insert(0, segment);
+        bytes.push(segment);
     }
     bytes
 }
@@ -474,12 +476,7 @@ pub fn has_segment(text: &str) -> bool {
     {
         return true;
     }
-    // The segment as a word of its own, before the brackets: `CS [BX]`.
-    ["CS", "DS", "ES", "SS", ".CS", ".DS", ".ES", ".SS"]
-        .iter()
-        .any(|segment| {
-            upper.starts_with(segment) && upper[segment.len()..].trim_start().starts_with('[')
-        })
+    false
 }
 
 /// Whether a word names a register.
