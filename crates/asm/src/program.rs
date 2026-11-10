@@ -43,8 +43,95 @@ pub enum Error {
     /// An include file that cannot be brought in, in the reference's own
     /// words.
     Include { message: String },
+    /// A register initialiser that is not a number, in the reference's own
+    /// words.
+    BadInitialiser { name: String, message: String },
     /// Something went wrong on a line of the source.
     AtLine { line: usize, error: Box<Error> },
+}
+
+/// A register the program asks to start in, and the two words that say
+/// where it is loaded.
+///
+/// The reference writes them as `#cs=1234#` and the rest, and writes them
+/// into the `.binf` file beside the binary. That file's line names the load
+/// segment, the load offset and then these registers: `AL AH BL BH CL CH
+/// DL DH`, `DS ES SI DI BP`, `CS IP SS SP`.
+///
+/// The load segment and the load offset are `CS` and `IP` in the other
+/// direction: the reference's own words are "if LOAD_SEGMENT and LOAD_OFFSET
+/// are not defined, then CS and IP values are used and vice-versa".
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Register {
+    /// The segment the program is loaded in.
+    LoadSegment,
+    /// The offset the program is loaded at.
+    LoadOffset,
+    /// `AL`.
+    Al,
+    /// `AH`.
+    Ah,
+    /// `BL`.
+    Bl,
+    /// `BH`.
+    Bh,
+    /// `CL`.
+    Cl,
+    /// `CH`.
+    Ch,
+    /// `DL`.
+    Dl,
+    /// `DH`.
+    Dh,
+    /// `DS`.
+    Ds,
+    /// `ES`.
+    Es,
+    /// `SI`.
+    Si,
+    /// `DI`.
+    Di,
+    /// `BP`.
+    Bp,
+    /// `CS`, which is also the load segment.
+    Cs,
+    /// `IP`, which is also the load offset.
+    Ip,
+    /// `SS`.
+    Ss,
+    /// `SP`.
+    Sp,
+}
+
+impl Register {
+    /// The register a source name names, if it names one.
+    ///
+    /// The reference writes the names in lower case, between two `#`.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Register> {
+        Some(match name.trim().to_ascii_lowercase().as_str() {
+            "load_segment" => Register::LoadSegment,
+            "load_offset" => Register::LoadOffset,
+            "al" => Register::Al,
+            "ah" => Register::Ah,
+            "bl" => Register::Bl,
+            "bh" => Register::Bh,
+            "cl" => Register::Cl,
+            "ch" => Register::Ch,
+            "dl" => Register::Dl,
+            "dh" => Register::Dh,
+            "ds" => Register::Ds,
+            "es" => Register::Es,
+            "si" => Register::Si,
+            "di" => Register::Di,
+            "bp" => Register::Bp,
+            "cs" => Register::Cs,
+            "ip" => Register::Ip,
+            "ss" => Register::Ss,
+            "sp" => Register::Sp,
+            _ => return None,
+        })
+    }
 }
 
 /// A program, assembled.
@@ -56,6 +143,9 @@ pub struct Program {
     pub bytes: Vec<u8>,
     /// The names and the address they are at.
     pub names: Vec<(String, u16)>,
+    /// The state the program asks to start in, by the reference's own
+    /// register initialisers.
+    pub initial: Vec<(Register, u16)>,
 }
 
 /// What a line does to the program.
@@ -89,6 +179,10 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
         .filter(|(_, raw)| !raw.trim().is_empty())
         .collect();
     let source_lines = expand_macros(source_lines, &macros)?;
+    // The register initialisers are not code - they are the state the
+    // program asks to start in - and they are read before the lines that
+    // are not code are dropped.
+    let initial = initial_of(&source_lines)?;
     // The labels come after the macros are expanded: the body of a macro
     // carries labels of its own, and the reference's own examples write
     // them without a colon.
@@ -145,6 +239,7 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
         origin,
         bytes: Vec::new(),
         names: names.clone(),
+        initial,
     };
     let mut address = origin;
     for (number, parsed) in &lines {
@@ -373,6 +468,49 @@ fn known_names(macros: &[Macro]) -> Vec<String> {
         names.push(mac.name.clone());
     }
     names
+}
+
+/// The state the program's own directives ask for.
+///
+/// The reference writes the register initialisers as `#cs=1234#` and the
+/// rest, and it writes them into the `.binf` file beside the binary. The
+/// values are hex: that file's own words are all hex, and the reference's
+/// own example writes `#cs=1234#` with no suffix at all.
+///
+/// The other directives the reference writes - `#make_bin#`, `#mem=...#`
+/// and the rest - say nothing about the registers, and they say nothing
+/// here either: they are the build directives, and this assembler does not
+/// build files yet.
+fn initial_of(lines: &[(usize, String)]) -> Result<Vec<(Register, u16)>, Error> {
+    let mut out = Vec::new();
+    for (number, raw) in lines {
+        let code = raw.trim();
+        if !code.starts_with('#') {
+            continue;
+        }
+        let Some((name, value)) = code[1..].split_once('=') else {
+            continue;
+        };
+        let Some(register) = Register::from_name(name) else {
+            continue;
+        };
+        // The value ends at the `#` that closes the directive, and a
+        // comment may follow it: the reference's own `robot.asm` writes
+        // `#ss = 500#    ; stack`.
+        let text = value.split(['#', ';']).next().unwrap_or("").trim();
+        let hex = text.trim_end_matches(['h', 'H']);
+        let Ok(value) = u16::from_str_radix(hex, 16) else {
+            return Err(Error::AtLine {
+                line: *number,
+                error: Box::new(Error::BadInitialiser {
+                    name: name.trim().to_string(),
+                    message: format!("cannot convert to 16 bit value: {text}"),
+                }),
+            });
+        };
+        out.push((register, value));
+    }
+    Ok(out)
 }
 
 /// Give a leading name a colon, when the name is a label and not an

@@ -17,7 +17,7 @@ use std::process::ExitCode;
 use emo8067_asm::disasm;
 use emo8067_asm::program::{self, Error};
 use emo8067_core::flags::{AF, CF, DF, Flags, IF, OF, PF, SF, TF, ZF};
-use emo8067_core::regs::{Reg16, Seg};
+use emo8067_core::regs::{Reg8, Reg16, Seg};
 use emo8067_core::{Cpu, StopReason};
 
 /// The size of a page of memory, in bytes.
@@ -158,23 +158,34 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     }
 
     let path = path.ok_or_else(|| "no input file".to_string())?;
-    let (image, origin) = image_of(path, &includes)?;
+    let (image, origin, initial) = image_of(path, &includes)?;
 
     // The load segment and the load offset. The reference's own model is
     // in its boot template: "load segment: 0000, load offset: 7c00, same
     // values are set to CS and IP registers accordingly", so a program is
     // loaded at its ORG in the segment 0000 and the segments follow it.
     // A raw image keeps the old defaults.
+    //
+    // The program's own register initialisers say where it wants to be
+    // loaded: `CS` and `IP` are the load segment and the load offset, which
+    // is how the reference's `.binf` file reads them.
     let (default_seg, default_off) = match origin {
         Some(origin) => (0x0000u16, origin),
         None => (0x0100u16, 0x0000u16),
     };
+    let default_seg = declared(&initial, program::Register::LoadSegment)
+        .or_else(|| declared(&initial, program::Register::Cs))
+        .unwrap_or(default_seg);
+    let default_off = declared(&initial, program::Register::LoadOffset)
+        .or_else(|| declared(&initial, program::Register::Ip))
+        .unwrap_or(default_off);
     let load_seg = load_seg.unwrap_or(default_seg);
     let load = load.unwrap_or(u32::from(load_seg) * 16 + u32::from(default_off));
     let (cs, ip) = org.unwrap_or((load_seg, default_off));
-    let ss = ss.unwrap_or(load_seg);
-    let sp = sp.unwrap_or(0xFFFE);
-    let ds = ds.unwrap_or(load_seg);
+    let ss = ss.unwrap_or_else(|| declared(&initial, program::Register::Ss).unwrap_or(load_seg));
+    let sp = sp.unwrap_or_else(|| declared(&initial, program::Register::Sp).unwrap_or(0xFFFE));
+    let ds = ds.unwrap_or_else(|| declared(&initial, program::Register::Ds).unwrap_or(load_seg));
+    let es = declared(&initial, program::Register::Es).unwrap_or(ds);
 
     let mut cpu = Cpu::new();
     cpu.mem.load_at(load, &image).map_err(|_a| {
@@ -189,7 +200,34 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     cpu.regs.set_segment(Seg::Ss, ss);
     cpu.regs.set_word(Reg16::Sp, sp);
     cpu.regs.set_segment(Seg::Ds, ds);
-    cpu.regs.set_segment(Seg::Es, ds);
+    cpu.regs.set_segment(Seg::Es, es);
+
+    // The registers the flags above do not name: the eight byte registers,
+    // and the three index registers.
+    for (register, value) in &initial {
+        match register {
+            program::Register::Al => cpu.regs.set_byte(Reg8::Al, *value as u8),
+            program::Register::Ah => cpu.regs.set_byte(Reg8::Ah, *value as u8),
+            program::Register::Bl => cpu.regs.set_byte(Reg8::Bl, *value as u8),
+            program::Register::Bh => cpu.regs.set_byte(Reg8::Bh, *value as u8),
+            program::Register::Cl => cpu.regs.set_byte(Reg8::Cl, *value as u8),
+            program::Register::Ch => cpu.regs.set_byte(Reg8::Ch, *value as u8),
+            program::Register::Dl => cpu.regs.set_byte(Reg8::Dl, *value as u8),
+            program::Register::Dh => cpu.regs.set_byte(Reg8::Dh, *value as u8),
+            program::Register::Si => cpu.regs.set_word(Reg16::Si, *value),
+            program::Register::Di => cpu.regs.set_word(Reg16::Di, *value),
+            program::Register::Bp => cpu.regs.set_word(Reg16::Bp, *value),
+            // The ones the flags name are already set, and the flag wins.
+            program::Register::Cs
+            | program::Register::Ip
+            | program::Register::Ss
+            | program::Register::Sp
+            | program::Register::Ds
+            | program::Register::Es
+            | program::Register::LoadSegment
+            | program::Register::LoadOffset => {}
+        }
+    }
 
     // The device server: a device connects to the socket and its reads and
     // writes go to the bus. It is served between instructions, from this
@@ -304,7 +342,7 @@ fn disasm_command(args: &[String]) -> Result<ExitCode, String> {
     }
 
     let path = path.ok_or_else(|| "no input file".to_string())?;
-    let (image, origin) = image_of(path, &includes)?;
+    let (image, origin, _initial) = image_of(path, &includes)?;
     let (segment, offset) = load_address(origin, load);
 
     // The listing starts where it is told to, and that is inside the image:
@@ -396,7 +434,23 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// The image of a file: a `.asm` is assembled, anything else is loaded raw.
-fn image_of(path: &str, includes: &[PathBuf]) -> Result<(Vec<u8>, Option<u16>), String> {
+/// The value a program asks a register to hold, if it asks.
+///
+/// The last one wins: the reference's `.binf` file holds one value per
+/// register, so a later initialiser replaces an earlier one.
+fn declared(initial: &[(program::Register, u16)], register: program::Register) -> Option<u16> {
+    initial
+        .iter()
+        .rev()
+        .find(|(named, _)| *named == register)
+        .map(|(_, value)| *value)
+}
+
+/// The image of a file, where it starts, and the state it asks to start in.
+fn image_of(
+    path: &str,
+    includes: &[PathBuf],
+) -> Result<(Vec<u8>, Option<u16>, Vec<(program::Register, u16)>), String> {
     let file = Path::new(path);
     // A `.asm` is assembled; anything else is loaded raw, as it always was.
     if file
@@ -405,11 +459,12 @@ fn image_of(path: &str, includes: &[PathBuf]) -> Result<(Vec<u8>, Option<u16>), 
     {
         let program =
             program::assemble_file(file, includes).map_err(|error| assembly_error(path, &error))?;
-        Ok((program.bytes, Some(program.origin)))
+        Ok((program.bytes, Some(program.origin), program.initial))
     } else {
         Ok((
             std::fs::read(file).map_err(|e| format!("{path}: {e}"))?,
             None,
+            Vec::new(),
         ))
     }
 }
@@ -444,6 +499,9 @@ fn assembly_error(path: &str, error: &Error) -> String {
             | Error::JumpOutOfRange { message }
             | Error::NoConvergence { message } => message.clone(),
             Error::UnknownInstruction { name } => format!("unknown instruction `{name}`"),
+            Error::BadInitialiser { name, message } => {
+                format!("`{name}`: {message}")
+            }
             Error::BadOperand { text } => format!("bad operand `{text}`"),
             Error::UnknownName { name } => format!("unknown name `{name}`"),
             Error::Empty => "the line has no instruction on it".to_string(),

@@ -1,6 +1,6 @@
 //! A program, assembled.
 
-use emo8067_asm::program::assemble_program;
+use emo8067_asm::program::{Error, Register, assemble_program};
 
 #[test]
 fn a_program_knows_where_it_starts_and_what_it_holds() {
@@ -36,6 +36,58 @@ fn pusha_and_popa_are_the_sequences_the_reference_documents() {
 fn a_program_that_pushes_and_pops_all_keeps_its_stack() {
     let program = assemble_program("pusha\npopa\n").unwrap();
     assert_eq!(program.bytes.len(), 16, "eight words each way");
+}
+
+/// The register initialisers are read, and they are the state the program
+/// asks to start in.
+///
+/// The reference writes them as `#cs=1234#` and the rest, and its own
+/// example writes `#load_segment=1234#` and `#load_offset=0000#` too. The
+/// values are hex - the `.binf` file's own words are all hex, and the
+/// reference's example writes `#cs=1234#` with no suffix at all.
+///
+/// Before this they were dropped as if they were comments, and the
+/// reference's own two examples that use them ran in the wrong state.
+#[test]
+fn the_register_initialisers_are_read() {
+    let program = assemble_program(
+        "#load_segment=1234#\n#load_offset=0000#\n#cs=1234#\n#ip=0000#\n\
+         #ss=3000#\n#sp=ffff#\n#ds=ddee#\n#es=abcd#\n#si=aaaa#\n#di=cccc#\n\
+         #bp=dddd#\n#dl=f0#\n#al=12#\n#ah=34#\nnop\n",
+    )
+    .unwrap();
+    assert_eq!(
+        program.initial,
+        vec![
+            (Register::LoadSegment, 0x1234),
+            (Register::LoadOffset, 0x0000),
+            (Register::Cs, 0x1234),
+            (Register::Ip, 0x0000),
+            (Register::Ss, 0x3000),
+            (Register::Sp, 0xFFFF),
+            (Register::Ds, 0xDDEE),
+            (Register::Es, 0xABCD),
+            (Register::Si, 0xAAAA),
+            (Register::Di, 0xCCCC),
+            (Register::Bp, 0xDDDD),
+            (Register::Dl, 0x00F0),
+            (Register::Al, 0x0012),
+            (Register::Ah, 0x0034),
+        ]
+    );
+    assert_eq!(program.bytes, vec![0x90], "the initialisers are not code");
+}
+
+/// A value that is not a number is a refusal, not a state that is quietly
+/// lost.
+#[test]
+fn an_initialiser_that_is_not_a_number_is_refused() {
+    let error = assemble_program("#cs=zzzz#\nnop\n").unwrap_err();
+    let Error::AtLine { line, error } = error else {
+        panic!("the refusal names the line: {error:?}");
+    };
+    assert_eq!(line, 1);
+    assert!(matches!(*error, Error::BadInitialiser { .. }), "{error:?}");
 }
 
 #[test]

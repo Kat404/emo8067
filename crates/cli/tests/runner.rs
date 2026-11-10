@@ -65,6 +65,66 @@ fn pusha_and_popa_leave_the_stack_where_it_was() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// The program's own register initialisers are the state it starts in.
+///
+/// The reference writes them as `#cs=1234#` and the rest, and the load
+/// segment and the load offset are the first two words of the `.binf` file
+/// it writes them into. Before this they were dropped as if they were
+/// comments, and the program ran somewhere else.
+#[test]
+fn a_program_runs_where_its_own_initialisers_say() {
+    let dir = scratch("initialisers");
+    let source = dir.join("program.asm");
+    std::fs::write(
+        &source,
+        "#cs=1234#\n#ip=0010#\n#ss=3000#\n#sp=fff0#\n#ds=4000#\n#es=5000#\n\
+         #si=0100#\n#di=0200#\n#bp=0300#\n#dl=f0#\norg 0010h\nmov al, dl\nhlt\n",
+    )
+    .unwrap();
+
+    let (out, err, code) = run(&["run", source.to_str().unwrap()]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    // The program ran and halted, so `IP` is past the `HLT`; the segment
+    // and the load address are what the initialisers said.
+    assert!(out.contains("CS:IP  1234:"), "{out}");
+    assert!(out.contains("SS:SP  3000:FFF0"), "{out}");
+    assert!(out.contains("DS 4000  ES 5000"), "{out}");
+    assert!(out.contains("AX 00F0"), "DL went into AL: {out}");
+    assert!(out.contains("SI 0100  DI 0200  BP 0300"), "{out}");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// The flags win over the program's own initialisers: they are what the
+/// person running it asked for.
+#[test]
+fn the_flags_win_over_the_programmes_initialisers() {
+    let dir = scratch("initialisers-flag");
+    let source = dir.join("program.asm");
+    std::fs::write(&source, "#cs=1234#\n#ip=0010#\norg 0010h\nhlt\n").unwrap();
+
+    let (out, err, code) = run(&[
+        "run",
+        source.to_str().unwrap(),
+        "--org",
+        "5000:0020",
+        "--ss",
+        "6000",
+        "--sp",
+        "0100",
+        "--ds",
+        "7000",
+    ]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(out.contains("CS:IP  5000:"), "{out}");
+    assert!(out.contains("SS:SP  6000:0100"), "{out}");
+    assert!(out.contains("DS 7000"), "{out}");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 #[test]
 fn a_program_starts_where_its_origin_says() {
     let dir = scratch("origin");
