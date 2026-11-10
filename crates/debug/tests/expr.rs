@@ -64,8 +64,8 @@ fn the_reference_s_own_examples_compute() {
 #[test]
 fn the_operators_are_the_reference_s_own() {
     let machine = Machine::new();
-    assert_eq!(evaluate("~0", &machine).unwrap(), u32::MAX);
-    assert_eq!(evaluate("-1", &machine).unwrap(), u32::MAX);
+    assert_eq!(evaluate("~0", &machine).unwrap(), -1);
+    assert_eq!(evaluate("-1", &machine).unwrap(), -1);
     assert_eq!(evaluate("6 * 7", &machine).unwrap(), 42);
     assert_eq!(evaluate("43 / 5", &machine).unwrap(), 8);
     assert_eq!(evaluate("43 % 5", &machine).unwrap(), 3);
@@ -79,13 +79,29 @@ fn the_operators_are_the_reference_s_own() {
 }
 
 #[test]
+fn the_arithmetic_is_signed_as_the_reference_s_is() {
+    // The reference's operator stack holds signed `int`, so its division,
+    // its modulus and its right shift are the signed ones.
+    let machine = Machine::new();
+    assert_eq!(evaluate("-7 / 2", &machine).unwrap(), -3);
+    assert_eq!(evaluate("-7 % 2", &machine).unwrap(), -1);
+    assert_eq!(evaluate("-1 >> 1", &machine).unwrap(), -1);
+}
+
+#[test]
+fn a_hexadecimal_value_may_start_with_a_letter() {
+    let machine = Machine::new();
+    assert_eq!(evaluate("FFh", &machine).unwrap(), 0xFF);
+}
+
+#[test]
 fn the_shift_count_is_masked_to_five_bits() {
     // The reference masks its shift count to five bits, and so does the
     // 8086: a count of 32 is a count of zero.
     let machine = Machine::new();
     assert_eq!(evaluate("1 << 32", &machine).unwrap(), 1);
     assert_eq!(evaluate("256 >> 32", &machine).unwrap(), 256);
-    assert_eq!(evaluate("1 << 31", &machine).unwrap(), 0x8000_0000);
+    assert_eq!(evaluate("1 << 31", &machine).unwrap(), i32::MIN);
 }
 
 #[test]

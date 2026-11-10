@@ -68,6 +68,8 @@ pub enum Missed {
     NotAWrite,
     /// The watchpoint watches reads, and the access was a write.
     NotARead,
+    /// The access was somewhere else altogether.
+    NotTheAddress,
 }
 
 /// What an access did, and what the watchpoints said about it.
@@ -197,10 +199,16 @@ impl Breakpoints {
         };
         let mut report = Report::empty();
         for watchpoint in &self.watchpoints {
+            // The offset wraps inside the segment, exactly as it does on
+            // the chip: a word stored at the top of a segment writes the
+            // byte before it and the byte at the bottom.
             let covered = watchpoint.segment == segment
-                && watchpoint.offset >= offset
-                && watchpoint.offset < offset + u16::from(width);
-            if covered && watchpoint.access.writes() {
+                && (0..u16::from(width)).any(|byte| watchpoint.offset == offset.wrapping_add(byte));
+            if !covered {
+                report
+                    .missed
+                    .push((watchpoint.offset, Missed::NotTheAddress));
+            } else if watchpoint.access.writes() {
                 report.hit.push(watchpoint.offset);
             } else {
                 report.missed.push((watchpoint.offset, Missed::NotARead));
@@ -217,7 +225,11 @@ impl Breakpoints {
         let mut report = Report::empty();
         for watchpoint in &self.watchpoints {
             let covered = watchpoint.segment == segment && watchpoint.offset == offset;
-            if covered && watchpoint.access.reads() {
+            if !covered {
+                report
+                    .missed
+                    .push((watchpoint.offset, Missed::NotTheAddress));
+            } else if watchpoint.access.reads() {
                 report.hit.push(watchpoint.offset);
             } else {
                 report.missed.push((watchpoint.offset, Missed::NotAWrite));

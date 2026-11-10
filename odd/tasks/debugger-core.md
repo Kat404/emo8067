@@ -90,3 +90,36 @@ refusals are in that DLL's strings (`re/out/diasm/strings.tsv`):
     registers and the memory of the machine it is attached to, and so does
     this one; what it does with a value it cannot read is the reference's
     business and is not recovered.
+  - **L2 (2026-11-10).** The independent verification, and what it changed.
+    - **A blocker: the watchpoint's arithmetic.** The coverage test added the
+      write's width to the write's offset in a `u16`, and a word stored at
+      the top of a segment overflowed it — a panic, and the release profile
+      aborts. The 8086 wraps the offset inside the segment, so the test
+      wraps it too: a word at `FFFFh` writes the byte before it and the byte
+      at the bottom.
+    - **The values are signed.** The reference's operator stack holds `int`,
+      and its division, its modulus and its right shift are the signed ones.
+      A `u32` diverged on a negative intermediate (`-1 >> 1` came out
+      positive), so the values are `i32` now. The registers and the memory
+      still reach them zero-extended from their 16 bits, so a register is
+      never negative; only an expression can make one.
+    - **A hexadecimal value may start with a letter.** `FFh` is a number, and
+      the suffix is what tells a number from a register.
+    - **A watchpoint the access did not touch says so**, with a third
+      reason of its own instead of a kind of access it never saw.
+    - **The write belongs to the step that made it.** The core clears the
+      memory's last write when a step starts, so a watchpoint is not told
+      about the step before.
+    - **The reference's own reader parses a plain literal as octal.**
+      `diasm.dll`'s operand reader calls `sscanf("%o")` on the digits, so
+      `0777` is 511 there — and its own documentation says the literals are
+      decimal, binary or hexadecimal. **This project follows the
+      documentation**: the reference's octal reading is a contradiction
+      inside the reference, and the documentation is the contract its users
+      were given.
+    - **Two things left out, and said so.** The reference's documentation
+      speaks of "memory byte / word", and only the word is read here: the
+      byte form's syntax is not recovered anywhere. And the commit carries
+      two drive-by clippy fixes (the CLI's image type and the decode
+      geometry's offset arithmetic), which are behaviour-neutral and belong
+      to the baseline's last two warnings.

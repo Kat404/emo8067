@@ -47,9 +47,12 @@ use std::fmt;
 
 /// A value the evaluator computes with.
 ///
-/// The reference's evaluator works in 32-bit words: its registers and its
-/// memory are 16-bit and reach it zero-extended.
-pub type Value = u32;
+/// The reference's evaluator works in 32-bit **signed** words: its own
+/// operator stack holds `int`, and its division, its modulus and its right
+/// shift are the signed ones. Its registers and its memory are 16-bit and
+/// reach it zero-extended, so a register is never negative - only an
+/// expression can make a negative one.
+pub type Value = i32;
 
 /// What the evaluator reads while it computes.
 ///
@@ -207,8 +210,14 @@ impl<'a, 'c> Parser<'a, 'c> {
             // A number: decimal, `101b` or `34h`. The `h` suffix is what
             // tells a hexadecimal value from a decimal one, and the reference
             // asks for it: "h suffix must be added to any a hexadecimal
-            // values".
-            if first.is_ascii_digit() {
+            // values". A hexadecimal value may start with a letter, so the
+            // suffix is what tells a number from a register.
+            if first.is_ascii_digit()
+                || matches!(
+                    word.chars().last(),
+                    Some('h') | Some('H') | Some('b') | Some('B')
+                )
+            {
                 let (token, taken) = self.number(rest)?;
                 self.at += taken;
                 return Ok(Some(token));
@@ -353,7 +362,9 @@ impl<'a, 'c> Parser<'a, 'c> {
     /// `<`, `>`, `<=` and `>=`
     fn comparison(&mut self) -> Result<Value, Error> {
         let mut left = self.bit_or()?;
-        while let Some(op @ (Op::Less | Op::Greater | Op::LessEqual | Op::GreaterEqual)) = self.peek_operator()? {
+        while let Some(op @ (Op::Less | Op::Greater | Op::LessEqual | Op::GreaterEqual)) =
+            self.peek_operator()?
+        {
             self.token()?;
             let right = self.bit_or()?;
             left = apply(op, left, right);
@@ -486,19 +497,19 @@ fn apply(op: Op, left: Value, right: Value) -> Value {
         Op::Mod => left.checked_rem(right).unwrap_or(0),
         Op::Add => left.wrapping_add(right),
         Op::Minus => left.wrapping_sub(right),
-        Op::Shl => left.wrapping_shl(right & 0x1F),
-        Op::Shr => left.wrapping_shr(right & 0x1F),
+        Op::Shl => left.wrapping_shl((right & 0x1F) as u32),
+        Op::Shr => left.wrapping_shr((right & 0x1F) as u32),
         Op::And => left & right,
         Op::Xor => left ^ right,
         Op::Or => left | right,
-        Op::Equal => u32::from(left == right),
-        Op::NotEqual => u32::from(left != right),
-        Op::Less => u32::from(left < right),
-        Op::Greater => u32::from(left > right),
-        Op::LessEqual => u32::from(left <= right),
-        Op::GreaterEqual => u32::from(left >= right),
-        Op::AndAnd => u32::from(left != 0 && right != 0),
-        Op::OrOr => u32::from(left != 0 || right != 0),
+        Op::Equal => i32::from(left == right),
+        Op::NotEqual => i32::from(left != right),
+        Op::Less => i32::from(left < right),
+        Op::Greater => i32::from(left > right),
+        Op::LessEqual => i32::from(left <= right),
+        Op::GreaterEqual => i32::from(left >= right),
+        Op::AndAnd => i32::from(left != 0 && right != 0),
+        Op::OrOr => i32::from(left != 0 || right != 0),
     }
 }
 

@@ -85,6 +85,27 @@ fn a_watchpoint_on_a_write_does_not_fire_on_a_read_and_says_why() {
 }
 
 #[test]
+fn a_word_stored_at_the_top_of_a_segment_does_not_overflow_the_watchpoint() {
+    // The offset wraps inside the segment, exactly as it does on the chip:
+    // a word at `FFFFh` writes the byte before it and the byte at the bottom.
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.watch(0x0100, 0xFFFE, Access::Write);
+    breakpoints.watch(0x0100, 0xFFFF, Access::Write);
+
+    let report = breakpoints.written(Some((0x0100, 0xFFFE, 2)));
+    assert_eq!(report.hit, vec![0xFFFE, 0xFFFF]);
+}
+
+#[test]
+fn a_watchpoint_the_access_did_not_touch_says_so() {
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.watch(0x0100, 0x0004, Access::Write);
+    let report = breakpoints.written(Some((0x0100, 0x0008, 1)));
+    assert!(report.hit.is_empty());
+    assert_eq!(report.missed, vec![(0x0004, Missed::NotTheAddress)]);
+}
+
+#[test]
 fn the_memory_says_where_its_last_write_landed() {
     // A watchpoint asks the memory, because a write of the value that was
     // already there is still a write.
