@@ -1507,15 +1507,51 @@ impl Expression<'_> {
 
 /// The bytes of `PUSHA` and `POPA`.
 ///
-/// The reference's own documentation gives the sequence: push AX, CX, DX,
-/// BX, BP, SI and DI, and pop them the other way round. The stack the
-/// reference's `PUSHA` leaves behind has the original SP in it as well,
-/// which no sequence of pushes can give, so the sequence is what this
-/// assembler writes.
+/// The 8086 has neither instruction - the guide's row 60 is the conditional
+/// jumps' own alias, and the captures from a real P80C86A-2 show `60h`
+/// running `JO` - and the reference's own documentation gives the sequence
+/// it stands for:
+///
+/// ```text
+/// Push all general purpose registers AX, CX, DX, BX, SP, BP, SI, DI in the stack.
+/// Original value of SP register (before PUSHA) is used.
+/// Algorithm:
+///  PUSH AX
+///  PUSH CX
+///  PUSH DX
+///  PUSH BX
+///  PUSH SP
+///  PUSH BP
+///  PUSH SI
+///  PUSH DI
+/// ```
+///
+/// (`re/docs-txt/8086_instruction_set.txt`.) `POPA` pops them the other way
+/// round, and the `SP` it pops in the fourth place is ignored:
+///
+/// ```text
+///  POP DI
+///  POP SI
+///  POP BP
+///  POP xx (SP value ignored)
+///  POP BX
+///  POP DX
+///  POP CX
+///  POP AX
+/// ```
+///
+/// Eight words each way, so the stack comes back where it was. The word the
+/// fourth pop discards has to land somewhere, and `AX` is the one register
+/// that is written last: the word it holds in between is the one that pop
+/// put there, and the last pop puts `AX` back. `POP` writes no flag, so the
+/// flags come out as they went in.
+///
+/// The earlier seven words were one short in each direction: the `SP` was
+/// missing, and the stack was two bytes off after a `POPA`.
 fn push_all(mnemonic: &str) -> Option<Vec<u8>> {
     match mnemonic.to_ascii_uppercase().as_str() {
-        "PUSHA" => Some(vec![0x50, 0x51, 0x52, 0x53, 0x55, 0x56, 0x57]),
-        "POPA" => Some(vec![0x5F, 0x5E, 0x5D, 0x5B, 0x5A, 0x59, 0x58]),
+        "PUSHA" => Some(vec![0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57]),
+        "POPA" => Some(vec![0x5F, 0x5E, 0x5D, 0x58, 0x5B, 0x5A, 0x59, 0x58]),
         _ => None,
     }
 }

@@ -9,6 +9,35 @@ fn a_program_knows_where_it_starts_and_what_it_holds() {
     assert_eq!(program.bytes, vec![0xB8, 0x03, 0x00, b'H', 0x00]);
 }
 
+/// `PUSHA` and `POPA` are the sequences the reference's own documentation
+/// gives, eight words each.
+///
+/// The 8086 has neither instruction - `60h` runs `JO` on the chip - and the
+/// reference's algorithm is the record of what it stands for. The word
+/// `POPA` pops in the fourth place is the `SP` the reference ignores, and
+/// it has to land somewhere: `AX` is the register that is written last, so
+/// the last pop puts `AX` back.
+#[test]
+fn pusha_and_popa_are_the_sequences_the_reference_documents() {
+    let program = assemble_program("pusha\npopa\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![
+            // PUSH AX, CX, DX, BX, SP, BP, SI, DI
+            0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, //
+            // POP DI, SI, BP, the SP word into AX, BX, DX, CX, AX
+            0x5F, 0x5E, 0x5D, 0x58, 0x5B, 0x5A, 0x59, 0x58, //
+        ]
+    );
+}
+
+/// The stack comes back where it was, because both sides are eight words.
+#[test]
+fn a_program_that_pushes_and_pops_all_keeps_its_stack() {
+    let program = assemble_program("pusha\npopa\n").unwrap();
+    assert_eq!(program.bytes.len(), 16, "eight words each way");
+}
+
 #[test]
 fn a_word_is_two_bytes_little_endian() {
     let program = assemble_program("dw 1234h\ndd 1\n").unwrap();

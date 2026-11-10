@@ -42,6 +42,29 @@ fn an_asm_program_is_assembled_and_run() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// `PUSHA` pushes eight words and `POPA` pops eight, so the stack comes back
+/// where it was.
+///
+/// The word in the middle is the `SP` the reference pops and ignores, and it
+/// has to land somewhere: the register that is written last takes it, and
+/// the last pop puts the register back.
+#[test]
+fn pusha_and_popa_leave_the_stack_where_it_was() {
+    let dir = scratch("pusha");
+    let source = dir.join("program.asm");
+    std::fs::write(&source, "org 100h\npusha\npopa\nhlt\n").unwrap();
+
+    let (out, err, code) = run(&["run", source.to_str().unwrap()]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(
+        out.contains("SS:SP  0000:FFFE"),
+        "the stack is where it started: {out}"
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 #[test]
 fn a_program_starts_where_its_origin_says() {
     let dir = scratch("origin");
