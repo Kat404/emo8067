@@ -497,13 +497,15 @@ checked against.
     `PUSH SP` puts a word on the stack, but the chip pushes the pointer it
     has **already decremented** (the rule `f3a216f` settled), so the word
     is `SP-2` and not the original pointer the document's own sentence
-    names. No 8086 sequence that leaves the flags alone can do better —
-    every other way of getting the original pointer onto the stack is an
-    addition or a subtraction, and those write the flags. The document's
-    algorithm block is reachable, and that is what this writes. The word the fourth
-    pop discards lands in `AX`, which is the register written last, so
-    the last pop puts `AX` back — and `POP` writes no flag, as the
-    document says.
+    names. The document's algorithm block does not reach the original
+    pointer either: `PUSH SP` is the only push of the stack pointer an
+    8086 has, and it pushes the decremented one. Reaching the original
+    would take a scratch word in memory — `MOV [scratch],SP` and
+    `PUSH [scratch]` leave the flags alone — and an assembler has no
+    scratch word to spend. The document's algorithm block is reachable,
+    and that is what this writes. The word the fourth pop discards lands
+    in `AX`, which is the register written last, so the last pop puts
+    `AX` back — and `POP` writes no flag, as the document says.
   - **The second `LOCK` needed no code: the reference's own string
     decides it.** The map has two `LOCK` cells (`F0h` and `F1h`, the
     latter being "a second LOCK" in the guide's footnote), and the plan
