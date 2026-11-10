@@ -50,6 +50,36 @@ fn the_segment_overrides_are_the_cells_that_read_seg() {
     );
 }
 
+/// The segment override with no space after the colon is the same prefix.
+///
+/// The reference accepts `cs:mov ax,1`, and the plan's log named the glued
+/// form as still refused. A refused line is the lucky case: the single-line
+/// assembler used to drop the prefix instead, and a program that reads `DS:`
+/// where it wrote `CS:` is wrong in a way nothing else would see.
+#[test]
+fn the_glued_segment_override_is_the_same_prefix() {
+    assert_eq!(
+        bytes_of("org 100h\ncs:mov ax,1\n"),
+        vec![0x2E, 0xB8, 0x01, 0x00]
+    );
+    assert_eq!(
+        bytes_of("org 100h\nds:mov ax,1\n"),
+        vec![0x3E, 0xB8, 0x01, 0x00]
+    );
+    assert_eq!(
+        bytes_of("org 100h\nes:mov ax,1\n"),
+        vec![0x26, 0xB8, 0x01, 0x00]
+    );
+    assert_eq!(
+        bytes_of("org 100h\nss:mov ax,1\n"),
+        vec![0x36, 0xB8, 0x01, 0x00]
+    );
+    assert_eq!(
+        bytes_of("org 100h\n.cs:mov ax,1\n"),
+        vec![0x2E, 0xB8, 0x01, 0x00]
+    );
+}
+
 #[test]
 fn the_dotted_override_is_the_same_prefix() {
     assert_eq!(

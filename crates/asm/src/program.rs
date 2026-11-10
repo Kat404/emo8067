@@ -397,14 +397,13 @@ fn label_first(raw: &str, known: &[String]) -> String {
     if name.is_empty() || rest.trim().is_empty() {
         return raw.to_string();
     }
-    // The name is already a label: `start:`, or a label and the instruction
-    // that follows it on the same line, `nsp:mov [di-1], 0`. A segment
-    // override is not a label: `cs:mov ax, 1`.
+    // A word that already carries a colon does not need one: it is a label
+    // with its instruction (`nsp:mov [di-1], 0`) or a prefix glued to it
+    // (`cs:mov ax,1`), and the parser takes both apart. Adding a colon here
+    // would give the first of them two labels and the second one a label
+    // named `cs:mov`.
     if first.contains(':') {
-        let name = first.split(':').next().unwrap_or_default();
-        if !known.iter().any(|known| known.eq_ignore_ascii_case(name)) {
-            return raw.to_string();
-        }
+        return raw.to_string();
     }
     if known.iter().any(|known| known.eq_ignore_ascii_case(name)) {
         return raw.to_string();

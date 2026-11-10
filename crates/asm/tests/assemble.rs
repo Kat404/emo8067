@@ -10,6 +10,22 @@ fn a_register_against_a_register() {
 }
 
 #[test]
+fn a_glued_segment_override_keeps_its_prefix() {
+    // `cs:mov ax,1` is the reference's glued form: the colon is inside the
+    // word. Left alone it reads as a label named `cs`, and the override is
+    // lost - which is worse than a refusal, because the bytes come out
+    // wrong and nothing says so.
+    assert_eq!(
+        assemble("cs:mov ax,1").unwrap(),
+        vec![0x2E, 0xB8, 0x01, 0x00]
+    );
+    assert_eq!(
+        assemble("ds:mov ax,1").unwrap(),
+        vec![0x3E, 0xB8, 0x01, 0x00]
+    );
+}
+
+#[test]
 fn an_immediate_against_the_accumulator() {
     // ADD AL,5 is 04 05h.
     assert_eq!(assemble("ADD AL, 5").unwrap(), vec![0x04, 0x05]);

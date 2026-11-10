@@ -98,13 +98,26 @@ pub fn parse(line: &str) -> Result<Line, Error> {
     }
     let mut parts = split_operands(code);
     let head = parts.first().cloned().unwrap_or_default();
-    let words: Vec<&str> = head.split_whitespace().collect();
+    let mut words: Vec<&str> = head.split_whitespace().collect();
     // The prefixes come before the instruction, and each of them may be
     // followed by a colon, as the segment overrides are.
     let mut prefixes = Vec::new();
     let mut index = 0;
     while index < words.len() {
-        let bare = words[index].trim_end_matches(':');
+        let word = words[index];
+        // The reference also accepts the override with **no space** after the
+        // colon: `cs:mov ax,1`. The colon is then inside the word, and the
+        // part before it is the prefix. Left alone, `cs:mov` reads as a label
+        // named `cs` with the instruction `mov`, and the override is lost.
+        //
+        // Only the word in the prefix's own place is taken apart: the same
+        // colon appears inside the *operand* of the reference's own examples
+        // (`mov cs:temp1, si`), and that one is the operand's own segment.
+        let (head, glued) = match word.split_once(':') {
+            Some((left, right)) if !right.is_empty() && is_prefix(left) => (left, Some(right)),
+            _ => (word, None),
+        };
+        let bare = head.trim_end_matches(':');
         let upper = bare.to_ascii_uppercase();
         // The reference writes the segment overrides with a dot in front as
         // well: `.cs:`.
@@ -123,6 +136,12 @@ pub fn parse(line: &str) -> Result<Line, Error> {
             break;
         };
         prefixes.push(prefix);
+        if let Some(tail) = glued {
+            // The rest of the word is the instruction, and it takes this
+            // word's place: the loop looks at it next.
+            words[index] = tail;
+            continue;
+        }
         index += 1;
     }
     // A name with a colon is a label, and the instruction follows it. The
@@ -182,6 +201,19 @@ pub fn parse(line: &str) -> Result<Line, Error> {
         operands,
         qualifier,
     })
+}
+
+/// Whether a word is one of the prefixes, written before the colon.
+///
+/// The reference writes the segment overrides with a dot in front as well
+/// (`.cs:`), and the glued form carries the same names.
+fn is_prefix(word: &str) -> bool {
+    let upper = word.trim_end_matches(':').to_ascii_uppercase();
+    let bare = upper.strip_prefix('.').unwrap_or(upper.as_str());
+    matches!(
+        bare,
+        "CS" | "DS" | "ES" | "SS" | "REP" | "REPE" | "REPZ" | "REPNE" | "REPNZ" | "LOCK"
+    )
 }
 
 /// Take the qualifier off the first operand.
