@@ -491,9 +491,16 @@ checked against.
     (`re/docs-txt/8086_instruction_set.txt`): eight pushes — `AX CX DX BX
     SP BP SI DI` — and eight pops, with the `SP` popped in the fourth
     place and ignored. This assembler wrote seven of each, so the `SP` was
-    never on the stack and the stack was two bytes off after a `POPA`. The
-    comment that said no sequence of pushes can leave the original `SP` on
-    the stack was wrong: `PUSH SP` is that sequence. The word the fourth
+    never on the stack, and a `POPA` on its own left the stack two bytes
+    off. The comment that said no sequence of pushes can leave the original
+    `SP` on the stack was half right, and the correction is in the code:
+    `PUSH SP` puts a word on the stack, but the chip pushes the pointer it
+    has **already decremented** (the rule `f3a216f` settled), so the word
+    is `SP-2` and not the original pointer the document's own sentence
+    names. No 8086 sequence that leaves the flags alone can do better —
+    every other way of getting the original pointer onto the stack is an
+    addition or a subtraction, and those write the flags. The document's
+    algorithm block is reachable, and that is what this writes. The word the fourth
     pop discards lands in `AX`, which is the register written last, so
     the last pop puts `AX` back — and `POP` writes no flag, as the
     document says.
@@ -526,4 +533,15 @@ checked against.
     reference past 32767 bytes is unknown; the goldens are still not
     possible, so the gate remains "they assemble" and not "the same
     bytes"; and the build directives — `#make_bin#`, `#make_com#`,
-    `#mem=...#` and the `.binf` file itself — are not written yet.
+    `#mem=...#` and the `.binf` file itself — are not written yet. **Two
+    more the verification found, both outside this unit's scope:**
+    - **The operand's own segment override is parsed and dropped.**
+      `crates/asm/src/addressing.rs` reads the segment of a memory operand
+      and throws it away: `mov cs:temp1, si` assembles to `89 36 00 01h`,
+      with no `2Eh` in front. The reference's own documentation says the
+      manual attachment of the segment is "required by emu8086 when data is
+      in segment other then DS", and three of its examples write it. The
+      bytes are wrong: the program reads and writes `DS:` where it wrote
+      `CS:`. It was wrong before this unit too.
+    - **An unknown `#directive=` is ignored in silence.** The reference
+      refuses one with "wrong assembler directive:".

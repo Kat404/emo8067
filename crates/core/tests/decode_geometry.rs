@@ -141,9 +141,14 @@ enum Ip {
     /// with it when the pointer is a far one.
     ///
     /// The length of an indirect jump is not in `IP`: the jump goes where it
-    /// goes. It is in **where the pointer was read from**, and that is what
-    /// these rows set up: a decoder that consumed one byte too few would
-    /// read the pointer from the wrong address and land somewhere else.
+    /// goes. It shows in **the address the pointer was read from**, and that
+    /// is what these rows set up: a decoder that read the displacement at
+    /// the wrong width or the wrong value reads the pointer from another
+    /// address and lands somewhere else. What they do not catch is a
+    /// decoder that consumes one byte too many and reads the same value:
+    /// the pointer is where it was, and the jump lands where it should.
+    /// The `CALL` rows catch that one, through the return address they
+    /// push.
     JumpsTo(u16, Option<u16>),
 }
 
@@ -1892,10 +1897,12 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
                     );
                 }
                 // The length of an indirect jump is not in `IP`, which is
-                // where the jump went. It is in the address the pointer was
-                // read from: the row put the pointer at `BX + displacement`,
-                // so a decoder that consumed the wrong number of bytes read
-                // it from the wrong address and landed somewhere else.
+                // where the jump went. It shows in the address the pointer
+                // was read from: the row put the pointer at
+                // `BX + displacement`, so a decoder that read the
+                // displacement at the wrong width or the wrong value read
+                // the pointer from another address and landed somewhere
+                // else.
                 continue;
             }
         };

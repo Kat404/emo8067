@@ -96,6 +96,34 @@ fn a_program_runs_where_its_own_initialisers_say() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// The load address and the state the program starts in are two things.
+///
+/// The reference's `.binf` file has a line for the load segment and the
+/// load offset and a line for `CS` and `IP`, and each falls back to the
+/// other only when the other is not given: "if LOAD_SEGMENT and LOAD_OFFSET
+/// are not defined, then CS and IP values are used and vice-versa". A
+/// program that declares both keeps both.
+#[test]
+fn the_load_address_and_the_starting_state_are_two_things() {
+    let dir = scratch("load-and-state");
+    let source = dir.join("program.asm");
+    std::fs::write(
+        &source,
+        "#load_segment=1000#\n#load_offset=0000#\n#cs=2000#\n#ip=0010#\norg 0010h\nhlt\n",
+    )
+    .unwrap();
+
+    let (out, err, _) = run(&["run", source.to_str().unwrap()]);
+    assert!(err.is_empty(), "{err}");
+    assert!(out.contains("CS:IP  2000:"), "{out}");
+
+    // And the image is where the load address says.
+    let (golden, _, _) = run(&["run", source.to_str().unwrap(), "--golden"]);
+    assert!(golden.contains("page 10000"), "{golden}");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// The flags win over the program's own initialisers: they are what the
 /// person running it asked for.
 #[test]

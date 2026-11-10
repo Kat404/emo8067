@@ -165,23 +165,31 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     // values are set to CS and IP registers accordingly", so a program is
     // loaded at its ORG in the segment 0000 and the segments follow it.
     // A raw image keeps the old defaults.
-    //
-    // The program's own register initialisers say where it wants to be
-    // loaded: `CS` and `IP` are the load segment and the load offset, which
-    // is how the reference's `.binf` file reads them.
     let (default_seg, default_off) = match origin {
         Some(origin) => (0x0000u16, origin),
         None => (0x0100u16, 0x0000u16),
     };
-    let default_seg = declared(&initial, program::Register::LoadSegment)
-        .or_else(|| declared(&initial, program::Register::Cs))
-        .unwrap_or(default_seg);
-    let default_off = declared(&initial, program::Register::LoadOffset)
+    // The load address and the state the program starts in are two things.
+    // The reference's `.binf` file has a line for the load segment and the
+    // load offset and a line for `CS` and `IP`, and each falls back to the
+    // other only when the other is not given: "if LOAD_SEGMENT and
+    // LOAD_OFFSET are not defined, then CS and IP values are used and
+    // vice-versa".
+    let load_seg = load_seg.unwrap_or_else(|| {
+        declared(&initial, program::Register::LoadSegment)
+            .or_else(|| declared(&initial, program::Register::Cs))
+            .unwrap_or(default_seg)
+    });
+    let load_off = declared(&initial, program::Register::LoadOffset)
         .or_else(|| declared(&initial, program::Register::Ip))
         .unwrap_or(default_off);
-    let load_seg = load_seg.unwrap_or(default_seg);
-    let load = load.unwrap_or(u32::from(load_seg) * 16 + u32::from(default_off));
-    let (cs, ip) = org.unwrap_or((load_seg, default_off));
+    let load = load.unwrap_or(u32::from(load_seg) * 16 + u32::from(load_off));
+    let cs = org
+        .map(|(segment, _)| segment)
+        .unwrap_or_else(|| declared(&initial, program::Register::Cs).unwrap_or(load_seg));
+    let ip = org
+        .map(|(_, offset)| offset)
+        .unwrap_or_else(|| declared(&initial, program::Register::Ip).unwrap_or(load_off));
     let ss = ss.unwrap_or_else(|| declared(&initial, program::Register::Ss).unwrap_or(load_seg));
     let sp = sp.unwrap_or_else(|| declared(&initial, program::Register::Sp).unwrap_or(0xFFFE));
     let ds = ds.unwrap_or_else(|| declared(&initial, program::Register::Ds).unwrap_or(load_seg));

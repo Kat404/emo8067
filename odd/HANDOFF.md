@@ -42,7 +42,8 @@ three families it was missing:
   silently, so the program read `DS:` where it wrote `CS:`.
 - **`PUSHA` and `POPA`** are the eight-word sequences the reference's own
   documentation gives. They were seven words each way, so the `SP` was
-  never on the stack and the stack was two bytes off after a `POPA`.
+  never on the stack, and a `POPA` on its own left the stack two bytes
+  off.
 - **The second `LOCK`** needed no code: the reference's own binary carries
   the string `LOCK-OPCODE:F0`, so its assembler writes `F0h` twice over,
   exactly as this one does.
@@ -397,7 +398,7 @@ wins, so a device that writes a port byte does not reach the program.
 10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
 12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
-13. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; and T16 (the TUI), T17 (packaging and CI) and T18 (the GUI, the last stage).
+13. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; **the operand's own segment override, which the assembler parses and drops** (`mov cs:temp1, si` comes out without its `2Eh`, and the reference's own documentation says the manual attachment is required when the data is not in `DS` — the bytes are wrong, and three of the reference's examples write it); an unknown `#directive=`, which the reference refuses and this ignores; and T16 (the TUI), T17 (packaging and CI) and T18 (the GUI, the last stage).
 
 ## Files worth reading first
 

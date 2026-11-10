@@ -1684,8 +1684,15 @@ impl Expression<'_> {
 /// put there, and the last pop puts `AX` back. `POP` writes no flag, so the
 /// flags come out as they went in.
 ///
+/// The word the `SP` push leaves is the pointer the chip had **already
+/// decremented** - the rule the captures settled for `PUSH SP` - and not the
+/// original pointer the document's own sentence names. No 8086 sequence
+/// that leaves the flags alone can do better: every other way of getting the
+/// original pointer onto the stack is an addition or a subtraction, and
+/// those write the flags.
+///
 /// The earlier seven words were one short in each direction: the `SP` was
-/// missing, and the stack was two bytes off after a `POPA`.
+/// missing, and a `POPA` on its own left the stack two bytes off.
 fn push_all(mnemonic: &str) -> Option<Vec<u8>> {
     match mnemonic.to_ascii_uppercase().as_str() {
         "PUSHA" => Some(vec![0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57]),
