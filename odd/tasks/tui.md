@@ -63,6 +63,15 @@ red is a watchpoint.
     reference has and the core does not; the mouse; the `g`/`b`/`w`/`e`
     prompts; and the guest's screen, which the research says has to be
     planned from the start because the TUI is genuinely weak there.
+  - **L4 (2026-11-10).** The next slice is chosen: **the panels the TUI
+    still lacks** — the registers panel with its editing in place, the
+    memory window scrolling over 1 MiB, the stack and the source strip. The
+    model is in `emo8067-debug`; the work is drawing it and making it
+    navigable. Two things the research settles for it: the memory panel is
+    a **window** and not a buffer — it owns a cursor address and renders
+    `rows × 16` bytes around it, and there is no `Vec<u8>` of a megabyte
+    anywhere in the UI — and the panels are jumped to, not scrolled: `g
+    0100` centres the window, and there is no scrollbar over a megabyte.
   - **L2 (2026-11-10).** The verification of L1, and what it changed.
     - **A blocker: the TUI loaded programs differently from the runner.**
       The loader in the debugger's crate kept only the boot template's
