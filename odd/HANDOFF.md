@@ -32,6 +32,26 @@ The gate's three family pins are at **zero**, so a family that grows again
 fails the gate the way the count it had did. The push is still the
 maintainer's decision.
 
+## Where the 2026-11-10 assembler work is
+
+The debt the assembler plan left is closed, and the length table has the
+three families it was missing:
+
+- **The glued segment override** (`cs:mov ax,1`) keeps its prefix. It was
+  worse than refused: the single-line assembler dropped the override
+  silently, so the program read `DS:` where it wrote `CS:`.
+- **`PUSHA` and `POPA`** are the eight-word sequences the reference's own
+  documentation gives. They were seven words each way, so the `SP` was
+  never on the stack and the stack was two bytes off after a `POPA`.
+- **The second `LOCK`** needed no code: the reference's own binary carries
+  the string `LOCK-OPCODE:F0`, so its assembler writes `F0h` twice over,
+  exactly as this one does.
+- **The register initialisers** (`#cs=1234#` and the rest) are read, and
+  the program starts where it says. Three of the reference's own examples
+  declare one, and they were running in the wrong state.
+- **The length table** has `8F`, `C4`/`C5` and `FF /2`–`FF /5`: fourteen
+  rows, 191 encodings in all.
+
 ## Where the 2026-10-23 work is
 
 Two units landed, both routed through a worker and an independent verifier,
@@ -242,7 +262,7 @@ Subagent discipline that worked: brief by file path, allowed edit surfaces enume
 | `8C` with a register destination | **CLOSED — it is an 8086 instruction** | The project refused it as an 80186 encoding, on the strength of the manual printing `(not used)`. The chip runs it: `8C DF` is `MOV DI,DS`, with the segment landing in the register. The refusal is withdrawn, and so is the guide's claim that `8C` and `8E` take `MOD=000` only — the chip runs all four `MOD` values for both |
 | `8C`/`8E` with a displacement | **CLOSED — the chip runs both forms** | The manual prints `(not used)` and §1.3's note says so; the core executes every `MOD`. The captures have `8C` and `8E`, and the set's README says the `reg` field's high bit is ignored — the `mod` field is another question, and the hardware can answer it. **It answered in `49b9d27`:** the P80C86A-2 runs `8C` and `8E` with `MOD=01` and `MOD=10` as ordinary word-memory forms. `8C` writes the selected segment as a little-endian word at the effective address, `8E` reads that word into the selected segment, the `reg` field's high bit is ignored, no flag changes, and the displacement is consumed. The 1979 print's `(not used)` is an erratum for those two forms. `odd/tasks/silicon-questions.md` |
 | `8C`/`8E` with a displacement | **CLOSED — and the core was right to run them** | The manual prints `(not used)` for `8C MOD 1--` and `8E MOD 1--`, and §1.3's note says so; the core executes every `MOD`. Refusing them would be a change on a document's print rather than on evidence about the chip, and `MOV DS,AX` is a bread-and-butter 8086 instruction. The microcode's `MOV Sreg` entry would say whether the address unit computes an effective address for them. **The captures answered it instead, in `49b9d27`: the chip runs them, the core already did, and the print is the erratum** — see `odd/tasks/silicon-questions.md` |
-| The length table's missing families | **open, and cheap** | `8F` (`POP r/m16`, legal at MOD=00/01/10 per ‡8) and `C4`/`C5` (`LES`/`LDS`, which read a four-byte pointer through the R/M field) have no rows in the length table, and `FF /2`–`FF /5` are left out because an indirect jump leaves no trace of how many bytes it read. All three are straightforward row additions |
+| The length table's missing families | **CLOSED — fourteen rows, 191 encodings** | `8F` (`POP r/m16`), `C4`/`C5` (`LES`/`LDS`, which read a far pointer through the R/M field) and `FF /2`–`FF /5` (the indirect calls and jumps) are in the gate's table now. The indirect ones needed what the gate did not have: their length is not in `IP`, which is where they went — the near call is measured through the return address it pushes, and the jumps through the address the pointer was read from. `9e2252b` |
 | The flag rows marked `X` and `U` | **CLOSED — the captures are the oracle now** | `X` is value-dependent and `U` is undefined, so the flag contract asserts nothing for them: for `ADD`, `ADC`, `SUB`, `SBB`, `CMP`, `DAA`, `DAS`, `CMPS` and `SCAS` it proves only that `D`, `I` and `T` are untouched. Two of the eight defects from the last session lived in that hole. The touches gate claims which flags *may* change, not what they become. Closing it means asserting values, which means the operand values, which means the gate has to become a specification rather than a consistency check. **That is what phase 2 became:** the oracle gate asserts the chip's own flag values for every opcode it covers, and checks the document in the other direction. `odd/tasks/hardware-capture-oracle.md`, T6 |
 
 ## The hardware oracle
@@ -376,7 +396,8 @@ wins, so a device that writes a port byte does not reach the program.
 9. ~~**The unit chosen by the maintainer on 2026-10-23: the two silicon questions.**~~ — **DONE and closed in `49b9d27`**: the `8C`/`8E` displacement forms and the carry of a rotate by more than one, both settled by the P80C86A-2's own captures. The oracle holds 2689 cases from 245 opcodes, the gate pins that count exactly, and the known-divergence list is empty. The plan is `odd/tasks/silicon-questions.md`.
 10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
-12. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; the length table's missing families (`8F`, `C4`/`C5`, `FF /2`-`FF /5`), which are cheap row additions; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's debt (the glued form `cs:mov ax,1`, `PUSHA`/`POPA`, the second `LOCK` `F1h`, the `#cs=` directives); and T16 (the TUI) and T17 (packaging and CI).
+12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
+13. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; and T16 (the TUI), T17 (packaging and CI) and T18 (the GUI, the last stage).
 
 ## Files worth reading first
 

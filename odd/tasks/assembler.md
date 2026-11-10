@@ -471,3 +471,59 @@ checked against.
   exists once in the project instead of twice. The cost is a parser for
   the table's prose, and the benefit is that an assembler bug and a
   transcription bug cannot both be true and cancel out.
+
+- **L9 (2026-11-10).** The debt this plan left, closed — and one of the
+  four items closed by evidence instead of by code.
+  - **The glued form `cs:mov ax,1` was worse than refused.** The plan said
+    it was "mangled by `label_first()`", and the single-line assembler
+    turned it into `B8h 01h 00h` — the segment override **silently
+    dropped**, so the program read `DS:` where it wrote `CS:`. The program
+    assembler refused the line instead. The cause was two-fold: the parser
+    read `cs:mov` as a label named `cs` with the instruction `mov`, and
+    `label_first` added a **second** colon to it, because `CS` is in the
+    list of names a line may begin with. Both are fixed (`21099ac`): the
+    word is taken apart in the prefix's own place, and a word that
+    already carries a colon is left alone. The same colon appears inside
+    the *operand* of the reference's own examples (`mov cs:temp1, si`),
+    and that one is the operand's own segment: it is left alone.
+  - **`PUSHA` and `POPA` were a word short each way** (`d7c1cd8`). The
+    reference's own documentation gives the algorithm
+    (`re/docs-txt/8086_instruction_set.txt`): eight pushes — `AX CX DX BX
+    SP BP SI DI` — and eight pops, with the `SP` popped in the fourth
+    place and ignored. This assembler wrote seven of each, so the `SP` was
+    never on the stack and the stack was two bytes off after a `POPA`. The
+    comment that said no sequence of pushes can leave the original `SP` on
+    the stack was wrong: `PUSH SP` is that sequence. The word the fourth
+    pop discards lands in `AX`, which is the register written last, so
+    the last pop puts `AX` back — and `POP` writes no flag, as the
+    document says.
+  - **The second `LOCK` needed no code: the reference's own string
+    decides it.** The map has two `LOCK` cells (`F0h` and `F1h`, the
+    latter being "a second LOCK" in the guide's footnote), and the plan
+    said the assembler writing `F0h` twice was "a hole of its own". The
+    reference's binary carries the string **`LOCK-OPCODE:F0`**
+    (`re/FINDINGS.md`), so its own assembler writes `F0h` for a `LOCK`,
+    twice over, exactly as this one does. The item is closed by evidence.
+  - **The register initialisers were dropped as if they were comments**
+    (`ed2e4b6`). The reference writes the state a program starts in as
+    `#cs=1234#` and the rest, and writes them into the `.binf` file
+    beside the binary; three of its own examples declare one. A line that
+    starts with `#` is not code, so they were thrown away and the programs
+    ran in the wrong state. They are read now, and the runner starts the
+    machine there. The load segment and the load offset are `CS` and `IP`
+    in the other direction, in the reference's own words: "if
+    LOAD_SEGMENT and LOAD_OFFSET are not defined, then CS and IP values
+    are used and vice-versa". The values are hex, as the `.binf` file's
+    own words are, and a value that is not a number is a refusal rather
+    than a state that is quietly lost.
+  - **And the length table got the three families it was missing**
+    (`9e2252b`): `8F`, `C4`/`C5` and `FF /2`–`FF /5`, fourteen rows, 191
+    encodings in all. The indirect calls and jumps needed what the gate
+    did not have: their length is not in `IP`, which is where they went.
+    The near call is measured through the return address it pushes, and
+    the jumps through the address the pointer was read from.
+  - **Still open.** The `E9h` displacement is sixteen-bit signed and the
+    reference past 32767 bytes is unknown; the goldens are still not
+    possible, so the gate remains "they assemble" and not "the same
+    bytes"; and the build directives — `#make_bin#`, `#make_com#`,
+    `#mem=...#` and the `.binf` file itself — are not written yet.
