@@ -1,0 +1,21 @@
+[package]
+name = "emo8067-tui"
+description = "The terminal debugger: the TUI that draws the debugger's panel model."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+emo8067-asm = { path = "../asm" }
+emo8067-core = { path = "../core" }
+emo8067-debug = { path = "../debug" }
+ratatui = "0.30.2"
+
+[[bin]]
+name = "emo8067-tui"
+path = "src/main.rs"

@@ -54,3 +54,24 @@ impl Context for Machine<'_> {
         Some(i32::from(self.cpu.mem.read_u16(segment, offset)))
     }
 }
+
+/// Load a program into a machine, the way the reference's own model does.
+///
+/// The reference's boot template is the record: "load segment: 0000, load
+/// offset: 7c00, same values are set to CS and IP registers accordingly".
+/// So a program is loaded at its origin in the segment 0000, and the
+/// segments follow it.
+pub fn load(program: &emo8067_asm::program::Program) -> Result<Cpu, String> {
+    let mut cpu = Cpu::new();
+    let physical = u32::from(program.origin);
+    cpu.mem
+        .load_at(physical, &program.bytes)
+        .map_err(|offset| format!("the image does not fit: {offset:#x}"))?;
+    cpu.regs.set_segment(Seg::Cs, 0x0000);
+    cpu.regs.ip = program.origin;
+    cpu.regs.set_segment(Seg::Ss, 0x0000);
+    cpu.regs.set_segment(Seg::Ds, 0x0000);
+    cpu.regs.set_segment(Seg::Es, 0x0000);
+    cpu.regs.set_word(Reg16::Sp, 0xFFFE);
+    Ok(cpu)
+}
