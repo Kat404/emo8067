@@ -137,7 +137,75 @@ enum Ip {
     /// its width: the width is what `length` already claims, and a return
     /// exposes the value where a forward instruction exposes the width.
     PopsReturn(u16),
+    /// An indirect `JMP`: `IP` lands where the pointer says, and the segment
+    /// with it when the pointer is a far one.
+    ///
+    /// The length of an indirect jump is not in `IP`: the jump goes where it
+    /// goes. It is in **where the pointer was read from**, and that is what
+    /// these rows set up: a decoder that consumed one byte too few would
+    /// read the pointer from the wrong address and land somewhere else.
+    JumpsTo(u16, Option<u16>),
 }
+
+/// What an encoding reads out of memory, for the rows whose operand is a
+/// pointer.
+///
+/// The base is `BX` and the pointer is at `BX + displacement`, so the
+/// address the pointer is read from is what says how many bytes the
+/// instruction consumed.
+#[derive(Clone, Copy)]
+enum Pointer {
+    /// A word: the target of an indirect call or jump.
+    Word {
+        /// The displacement the operand carries, and so the offset the
+        /// pointer is read from.
+        disp: u16,
+        /// What the word holds.
+        value: u16,
+    },
+    /// A far pointer: the offset first and the segment second.
+    Far {
+        /// The displacement the operand carries, and so the offset the
+        /// pointer is read from.
+        disp: u16,
+        /// The offset the pointer holds.
+        offset: u16,
+        /// The segment the pointer holds.
+        segment: u16,
+    },
+}
+
+impl Pointer {
+    /// The address the pointer is read from.
+    fn at(&self) -> u16 {
+        let disp = match self {
+            Pointer::Word { disp, .. } | Pointer::Far { disp, .. } => *disp,
+        };
+        BASE + u16::from(disp)
+    }
+
+    /// Write the pointer where the instruction will look for it.
+    fn write(&self, c: &mut Cpu) {
+        // The base the displacement is taken from.
+        c.regs.set_word(Reg16::Bx, BASE);
+        let at = self.at();
+        match self {
+            Pointer::Word { value, .. } => c.mem.write_u16(SEGMENT, at, *value),
+            Pointer::Far {
+                offset, segment, ..
+            } => {
+                c.mem.write_u16(SEGMENT, at, *offset);
+                c.mem.write_u16(SEGMENT, at.wrapping_add(2), *segment);
+            }
+        }
+    }
+}
+
+/// The segment the pointers are read through.
+const SEGMENT: u16 = 0x1000;
+
+/// The base the displacements are taken from.
+const BASE: u16 = 0x0200;
 
 /// One encoding: the bytes to feed it, the parts it is made of, and the length
 /// the manual says that is.
@@ -152,6 +220,9 @@ struct Encoding {
     length: u8,
     /// How this instruction moves `IP`.
     ip: Ip,
+    /// What the instruction reads out of memory, for the rows whose operand
+    /// is a pointer.
+    operand: Option<Pointer>,
 }
 
 /// Every encoding that carries an immediate and no displacement, taken from the
@@ -604,11 +675,12 @@ const ENCODINGS: &[Encoding] = &[
 /// both, the source in the first and the destination in the second, and the
 /// rows use `reg = 000` — `AL` or `AX` — for both.
 ///
-/// `FF /2` through `FF /5` are deliberately absent. An indirect `CALL` or
-/// `JMP` leaves no trace of how many bytes it read, exactly like `EA`, which
-/// the table above excludes for the same reason. The near `CALL` could be
-/// measured through the return address it pushes, but that needs a per-row
-/// memory setup this file does not have yet.
+/// `FF /2` through `FF /5` are here now, and they needed what they needed:
+/// an indirect `CALL` or `JMP` leaves no trace of how many bytes it read in
+/// `IP`, which is where it went. The near `CALL` is measured through the
+/// return address it pushes, and the jumps through the address the pointer
+/// was read from - so each of those rows says where the pointer is and what
+/// it holds.
 const DISPLACEMENT_ENCODINGS: &[Encoding] = &[
     // ---- the eight ALU groups, each in its two memory forms
     Encoding::new(
@@ -1477,6 +1549,152 @@ const DISPLACEMENT_ENCODINGS: &[Encoding] = &[
         3,
         Ip::Next,
     ),
+    // ---- `8F /0` is `POP r/m16`. The guide marks it with a footnote: `MOD
+    // 011` is not defined for it, and neither is any non-zero `/digit`. The
+    // chip disagrees about the first of those - the captures show `8F` with
+    // `MOD=011` popping into the register - and the register form is not a
+    // memory form, so it has no row here.
+    Encoding::new(
+        "8F /0 POP r/m16 [BX+disp8]",
+        &[0x8F, 0x47, 0x40],
+        Components::modrm_disp(0x8F, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "8F /0 POP r/m16 [BX+disp16]",
+        &[0x8F, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0x8F, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- `C4` and `C5` read a far pointer through the R/M field: the
+    // offset and the segment come out of memory, and the instruction itself
+    // is the opcode, the ModR/M byte and the displacement.
+    Encoding::new(
+        "C4 /0 LES r16,r/m16 [BX+disp8]",
+        &[0xC4, 0x47, 0x40],
+        Components::modrm_disp(0xC4, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C4 /0 LES r16,r/m16 [BX+disp16]",
+        &[0xC4, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0xC4, 2),
+        4,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C5 /0 LDS r16,r/m16 [BX+disp8]",
+        &[0xC5, 0x47, 0x40],
+        Components::modrm_disp(0xC5, 1),
+        3,
+        Ip::Next,
+    ),
+    Encoding::new(
+        "C5 /0 LDS r16,r/m16 [BX+disp16]",
+        &[0xC5, 0x87, 0x34, 0x12],
+        Components::modrm_disp(0xC5, 2),
+        4,
+        Ip::Next,
+    ),
+    // ---- `FF /2` to `FF /5` are the indirect calls and jumps: the near ones
+    // read a word and the far ones a far pointer. Their length is in the
+    // address the pointer is read from, so each row says where the pointer
+    // is and what it holds.
+    Encoding::new(
+        "FF /2 CALL r/m16 [BX+disp8]",
+        &[0xFF, 0x57, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::PushesReturn(0x4321, None),
+    )
+    .reading(Pointer::Word {
+        disp: 0x40,
+        value: 0x4321,
+    }),
+    Encoding::new(
+        "FF /2 CALL r/m16 [BX+disp16]",
+        &[0xFF, 0x97, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::PushesReturn(0x4321, None),
+    )
+    .reading(Pointer::Word {
+        disp: 0x1234,
+        value: 0x4321,
+    }),
+    Encoding::new(
+        "FF /3 CALL m16:16 [BX+disp8]",
+        &[0xFF, 0x5F, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::PushesReturn(0x4321, Some(0x8765)),
+    )
+    .reading(Pointer::Far {
+        disp: 0x40,
+        offset: 0x4321,
+        segment: 0x8765,
+    }),
+    Encoding::new(
+        "FF /3 CALL m16:16 [BX+disp16]",
+        &[0xFF, 0x9F, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::PushesReturn(0x4321, Some(0x8765)),
+    )
+    .reading(Pointer::Far {
+        disp: 0x1234,
+        offset: 0x4321,
+        segment: 0x8765,
+    }),
+    Encoding::new(
+        "FF /4 JMP r/m16 [BX+disp8]",
+        &[0xFF, 0x67, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::JumpsTo(0x4321, None),
+    )
+    .reading(Pointer::Word {
+        disp: 0x40,
+        value: 0x4321,
+    }),
+    Encoding::new(
+        "FF /4 JMP r/m16 [BX+disp16]",
+        &[0xFF, 0xA7, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::JumpsTo(0x4321, None),
+    )
+    .reading(Pointer::Word {
+        disp: 0x1234,
+        value: 0x4321,
+    }),
+    Encoding::new(
+        "FF /5 JMP m16:16 [BX+disp8]",
+        &[0xFF, 0x6F, 0x40],
+        Components::modrm_disp(0xFF, 1),
+        3,
+        Ip::JumpsTo(0x4321, Some(0x8765)),
+    )
+    .reading(Pointer::Far {
+        disp: 0x40,
+        offset: 0x4321,
+        segment: 0x8765,
+    }),
+    Encoding::new(
+        "FF /5 JMP m16:16 [BX+disp16]",
+        &[0xFF, 0xAF, 0x34, 0x12],
+        Components::modrm_disp(0xFF, 2),
+        4,
+        Ip::JumpsTo(0x4321, Some(0x8765)),
+    )
+    .reading(Pointer::Far {
+        disp: 0x1234,
+        offset: 0x4321,
+        segment: 0x8765,
+    }),
 ];
 
 impl Encoding {
@@ -1493,7 +1711,14 @@ impl Encoding {
             parts,
             length,
             ip,
+            operand: None,
         }
+    }
+
+    /// The row reads a pointer out of memory.
+    const fn reading(mut self, operand: Pointer) -> Self {
+        self.operand = Some(operand);
+        self
     }
 }
 
@@ -1530,12 +1755,12 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
     );
     assert_eq!(
         DISPLACEMENT_ENCODINGS.len(),
-        122,
+        136,
         "a deleted row means the record is now wrong, and the gate must say so"
     );
     assert_eq!(
         ENCODINGS.len() + DISPLACEMENT_ENCODINGS.len(),
-        177,
+        191,
         "the two tables together are the record of what exists"
     );
     // And every row must be findable by its label, or a failure names nothing.
@@ -1560,6 +1785,11 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
         );
 
         let mut c = machine(encoding.code);
+        // The rows whose operand is a pointer need it in memory, at the
+        // address the displacement says.
+        if let Some(operand) = &encoding.operand {
+            operand.write(&mut c);
+        }
         if matches!(encoding.ip, Ip::PushesReturn(..)) {
             // INT and far CALL read their vector, so the table needs one. The
             // expected destination in each row is stated against it.
@@ -1630,6 +1860,9 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
                 let words = match encoding.code[0] {
                     0xCD => 3,
                     0x9A => 2,
+                    // `FF /3` is the far call: it pushes the segment and the
+                    // offset, like `9A` does.
+                    0xFF if encoding.code[1] & 0b0011_1000 == 0b0001_1000 => 2,
                     _ => 1,
                 };
                 let low = stack_before.wrapping_sub(2 * words);
@@ -1644,6 +1877,25 @@ fn every_encoding_consumes_exactly_what_the_manual_says() {
                 // the table with itself. The pushed address is the whole
                 // measurement, and it is what a decoder that read the wrong
                 // number of bytes gets wrong.
+                continue;
+            }
+            Ip::JumpsTo(expected_ip, expected_cs) => {
+                assert_eq!(
+                    info.next_ip, expected_ip,
+                    "{label}: it must land where the pointer says"
+                );
+                if let Some(expected) = expected_cs {
+                    assert_eq!(
+                        c.regs.segment(Seg::Cs),
+                        expected,
+                        "{label}: and into the segment the pointer names"
+                    );
+                }
+                // The length of an indirect jump is not in `IP`, which is
+                // where the jump went. It is in the address the pointer was
+                // read from: the row put the pointer at `BX + displacement`,
+                // so a decoder that consumed the wrong number of bytes read
+                // it from the wrong address and landed somewhere else.
                 continue;
             }
         };
