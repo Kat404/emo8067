@@ -564,14 +564,27 @@ checked against.
   it, and its library's macros need it.
   **The fix.** The segment is carried from the parser to the operand, and
   the byte is the one the guide's own map gives it — the same cell the
-  prefix form of the override uses. The override goes in front of the
-  line's own prefixes, so that a `LOCK` stays next to the instruction it
-  locks: on the 8086 `LOCK` has to be the last byte before the opcode.
-  The dotted form (`.cs:`) is read against an operand as well, and the
-  segment as a word of its own (`CS [BX]`) is no longer unreachable.
+  prefix form of the override uses. The dotted form (`.cs:`) is read
+  against an operand as well.
+  **Where the byte goes.** After the prefixes the line carries, the way
+  the source writes it: the segment is part of the operand, and the prefix
+  form of the same override puts its byte after the others too. An earlier
+  version of this entry said the override goes in front, so that a `LOCK`
+  would stay next to the instruction it locks; that justification is not
+  evidenced in this repository — the guide says the segment and the repeat
+  latches are independent, and the core's own tests say the order of the
+  prefixes never changes the outcome.
+  **A claim of this entry that was wrong, and is withdrawn.** It also said
+  that the segment as a word of its own (`CS [BX]`) was no longer
+  unreachable. It is: `addressing::parse` reads the "name and index" form
+  (`num1[bx]`) before it reads the segment, so `CS [BX]` is a label named
+  `CS` and never an override. The word form is not in the reference's
+  dialect either — its own documentation writes the segment with its colon
+  (`CS:[BX]`) — so nothing is changed for it; the claim is what was wrong.
   **The proof.** A differential against the base, example by example: 82 of
   the 85 finish in exactly the same state, and the three that do not are
   the ones whose result depends on the segment — the `far_call` example's
-  own `call far es:[bx]`, and the two that go through the library's
-  `CS:[SI]`. Their behaviour changed because the override is honoured
-  now, which is what the reference does.
+  own `call far es:[bx]`, `sort.asm`'s own `CS:make_minus` and `CS:ten`,
+  and `self_modifying_code.asm`'s own `es:[40h]`, whose patched address
+  moves by the extra byte. Their behaviour changed because the override is
+  honoured now, which is what the reference does.
