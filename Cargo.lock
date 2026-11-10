@@ -17,3 +17,11 @@ dependencies = [
 [[package]]
 name = "emo8067-core"
 version = "0.1.0"
+
+[[package]]
+name = "emo8067-debug"
+version = "0.1.0"
+dependencies = [
+ "emo8067-asm",
+ "emo8067-core",
+]

@@ -26,7 +26,7 @@ Branch: `main` (not a git repo yet — see T0). Delivery: `ask-on-risk`. Test ru
 - **T4** `S2` Language + toolchain decision. Route: user decision. Status: **done** 2026-10-15 → **Rust** (core + ratatui + egui), **The Unlicense**, wine isolated in **Podman** for golden tests.
 - **T5** `S2,S3` Core CPU: fetch/decode/execute, all 8086 opcodes, FLAGS semantics, segment/offset rules, memory map. Route: inline or delegated. Status: **done** — the core covers the whole 8086 instruction set with no holes; see L23.
 - **T6** `S2` Assembler + disassembler round-trip. Route: inline or delegated. Status: **done** — the assembler (`crates/asm`) is finished and independently verified, and the disassembler (T14) has landed since; see L23.
-- **T7** `S2` Debugger, step/breakpoints/registers/memory UI parity with S3 inventory. Route: pending.
+- **T7** `S2` Debugger, step/breakpoints/registers/memory UI parity with S3 inventory. Route: pending. **The core is done (2026-11-10):** the expression evaluator, the panel model and the breakpoints are a library (`crates/debug`), and the TUI and the GUI are two renderers of it. The plan is `odd/tasks/debugger-core.md`.
 - **T8** `S2` Multiplatform packaging + CI. Route: pending.
 
 - **T9** `S1` Three parallel research tracks, then unify. Route: delegated (2 background + 1 foreground), unified by parent with mini verifications.

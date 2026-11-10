@@ -455,10 +455,13 @@ fn declared(initial: &[(program::Register, u16)], register: program::Register) -
 }
 
 /// The image of a file, where it starts, and the state it asks to start in.
-fn image_of(
-    path: &str,
-    includes: &[PathBuf],
-) -> Result<(Vec<u8>, Option<u16>, Vec<(program::Register, u16)>), String> {
+///
+/// The state is the program's own register initialisers, in the order it
+/// wrote them.
+type Image = (Vec<u8>, Option<u16>, Vec<(program::Register, u16)>);
+
+/// The image of a file, where it starts, and the state it asks to start in.
+fn image_of(path: &str, includes: &[PathBuf]) -> Result<Image, String> {
     let file = Path::new(path);
     // A `.asm` is assembled; anything else is loaded raw, as it always was.
     if file

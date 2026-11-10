@@ -186,7 +186,7 @@ impl Pointer {
         let disp = match self {
             Pointer::Word { disp, .. } | Pointer::Far { disp, .. } => *disp,
         };
-        BASE + u16::from(disp)
+        BASE + disp
     }
 
     /// Write the pointer where the instruction will look for it.

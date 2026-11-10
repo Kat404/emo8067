@@ -32,6 +32,25 @@ The gate's three family pins are at **zero**, so a family that grows again
 fails the gate the way the count it had did. The push is still the
 maintainer's decision.
 
+## Where the 2026-11-10 debugger work is
+
+The debugger's core — the part that is not a picture — is a library now,
+`crates/debug` (`emo8067-debug`):
+
+- **The expression evaluator** is the reference's own language: a literal in
+  decimal, in binary (`101b`) or in hexadecimal with its `h` suffix (`34h`),
+  the registers of the 8086, a word of memory written `SSSS:OOOO`, and the
+  operators `~ - * / % + - << >> & ^ |`. Its five refusals are the
+  reference's words, out of `diasm.dll`.
+- **The panel model** is a pure function of the machine's state and of a UI
+  state struct: the disassembly, the registers with their flags, the memory
+  as hex and characters, and the stack. The TUI and the GUI are two
+  renderers of it.
+- **The breakpoints** take an expression (`b AX==0x1234 && CS==0x0200`) and
+  the watchpoints fire on a write; the memory says where its last write
+  landed, because a write of the value that was already there is still a
+  write.
+
 ## Where the 2026-11-10 assembler work is
 
 The debt the assembler plan left is closed, and the length table has the
@@ -423,7 +442,7 @@ wins, so a device that writes a port byte does not reach the program.
 10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
 12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
-13. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; and T16 (the TUI), T17 (packaging and CI) and T18 (the GUI, the last stage).
+13. **The next unit is not chosen.** What is left is in "Still open" above: `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; and **T16 (the TUI)**, which now has its model to draw, then T17 (packaging and CI) and T18 (the GUI, the last stage).
 
 ## Files worth reading first
 

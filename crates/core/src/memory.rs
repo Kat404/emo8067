@@ -15,6 +15,13 @@ const BUS_MASK: u32 = (ADDR_SPACE as u32) - 1;
 #[derive(Clone)]
 pub struct Memory {
     bytes: Box<[u8; ADDR_SPACE]>,
+    /// Where the last write landed: the segment, the offset and how many
+    /// bytes it took.
+    ///
+    /// A watchpoint asks the memory what was written to it, because a write
+    /// of the value that was already there is still a write, and comparing
+    /// the memory before and after would not see it.
+    pub last_write: Option<(u16, u16, u8)>,
 }
 
 impl std::fmt::Debug for Memory {
@@ -37,6 +44,7 @@ impl Memory {
     pub fn new() -> Self {
         Self {
             bytes: Box::new([0; ADDR_SPACE]),
+            last_write: None,
         }
     }
 
@@ -58,6 +66,7 @@ impl Memory {
     /// Write one byte through a `segment:offset` pair.
     pub fn write_u8(&mut self, segment: u16, offset: u16, value: u8) {
         self.bytes[Self::physical(segment, offset) as usize] = value;
+        self.last_write = Some((segment, offset, 1));
     }
 
     /// Read a little-endian word through a `segment:offset` pair.
@@ -83,6 +92,7 @@ impl Memory {
         let [lo, hi] = value.to_le_bytes();
         self.bytes[low as usize] = lo;
         self.bytes[high as usize] = hi;
+        self.last_write = Some((segment, offset, 2));
     }
 
     /// Bulk load, honouring the same wrap as [`Memory::physical`].
