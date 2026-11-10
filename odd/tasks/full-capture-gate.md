@@ -300,9 +300,9 @@ initial list plus the bytes the chip wrote. Nothing has to be inferred.
     on the ordinary path. `AAM` (`D4h`) with a zero immediate is **not** in
     this family: the chip faults there, as the emulator does. The place
     changed is `aad()` in `crates/core/src/exec.rs`.
-  - **`F6 /7` (`IDIV r/m8`)** — the quotient has to fit in **seven** bits, so
-    a quotient of `-128h` takes the type 0 interrupt even though it fits in
-    the signed byte the quotient goes to. The manual's wording is "larger
+  - **`F6 /7` (`IDIV r/m8`)** — the **magnitude** of the quotient has to fit
+    in seven bits, so a quotient of `-128h` takes the type 0 interrupt even
+    though it fits in the signed byte the quotient goes to. The manual's wording is "larger
     than 7 bits" and the chip agrees; the guide's own paraphrase ("whose
     quotient does not fit in the destination") is an erratum for the byte
     form, and `odd/research/documentation-guide.md` §2 now says so. The

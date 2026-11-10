@@ -665,9 +665,9 @@ page or segment boundary either.
 - `INTO` generates a **type 4** interrupt if and only if OF is set [1].
 - The CPU generates a **type 0** interrupt immediately after a `DIV` or `IDIV`
   whose quotient does not fit in the destination [1]. **For `IDIV r/m8` the
-  chip is stricter than that print**: the quotient has to fit in **seven**
-  bits, so a quotient of `-128h` takes the interrupt even though it fits in
-  the signed byte the quotient goes to. The captures from a real P80C86A-2
+  chip is stricter than that print**: the **magnitude** of the quotient
+  has to fit in seven bits, so a quotient of `-128h` takes the interrupt even
+  though it fits in the signed byte the quotient goes to. The captures from a real P80C86A-2
   decide it — `idiv` with `AX = 3354h` and a divisor of `9Ah` (-102) gives
   `-128h` and the chip faults (test hash `2bf85c12cc23051f`) — and the print
   is an erratum for the byte form. **The word form is not covered by any
