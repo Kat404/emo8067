@@ -547,3 +547,31 @@ checked against.
       `CS:`. It was wrong before this unit too.
     - **An unknown `#directive=` is ignored in silence.** The reference
       refuses one with "wrong assembler directive:".
+
+- **L10 (2026-11-10).** The operand's own segment override — the defect
+  the verification of L9 found, and one this plan had not named.
+  **The defect.** `crates/asm/src/addressing.rs` read the segment of a
+  memory operand and threw it away — `let _ = segment;` — and the
+  assembler's operand put `segment: None` in its place. The bytes came out
+  without the prefix: `mov cs:temp1, si` assembled to `89 36 00 01h`, with
+  no `2Eh` in front, and the program read and wrote `DS:` where the source
+  wrote `CS:`. Three of the reference's own examples write it (`mov
+  cs:temp1, si`, `MOV CS:make_minus, 0`, `call far es:[bx]`), and the
+  reference's own library does three times over (`MOV AL, CS:[SI]`).
+  **Why the reference emits it.** Its own documentation says the manual
+  attachment of the segment is "required by emu8086 when data is in segment
+  other then DS" (`re/docs-txt/compatibility.txt`): the reference honours
+  it, and its library's macros need it.
+  **The fix.** The segment is carried from the parser to the operand, and
+  the byte is the one the guide's own map gives it — the same cell the
+  prefix form of the override uses. The override goes in front of the
+  line's own prefixes, so that a `LOCK` stays next to the instruction it
+  locks: on the 8086 `LOCK` has to be the last byte before the opcode.
+  The dotted form (`.cs:`) is read against an operand as well, and the
+  segment as a word of its own (`CS [BX]`) is no longer unreachable.
+  **The proof.** A differential against the base, example by example: 82 of
+  the 85 finish in exactly the same state, and the three that do not are
+  the ones whose result depends on the segment — the `far_call` example's
+  own `call far es:[bx]`, and the two that go through the library's
+  `CS:[SI]`. Their behaviour changed because the override is honoured
+  now, which is what the reference does.

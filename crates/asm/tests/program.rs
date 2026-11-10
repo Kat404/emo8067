@@ -90,6 +90,48 @@ fn an_initialiser_that_is_not_a_number_is_refused() {
     assert!(matches!(*error, Error::BadInitialiser { .. }), "{error:?}");
 }
 
+/// The segment override the source writes against the operand is a prefix.
+///
+/// The reference's own examples write it - `mov cs:temp1, si`,
+/// `MOV CS:make_minus, 0`, `call far es:[bx]` - and its own documentation
+/// says the manual attachment of the segment is "required by emu8086 when
+/// data is in segment other then DS". The bytes were wrong: the segment
+/// was parsed and thrown away, so the program read and wrote `DS:` where
+/// it wrote `CS:`.
+#[test]
+fn the_operand_segment_override_is_a_prefix() {
+    let program = assemble_program("org 100h\ntemp1 dw 0\nmov cs:temp1, si\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![0x00, 0x00, 0x2E, 0x89, 0x36, 0x00, 0x01],
+        "the 2Eh goes in front of the MOV"
+    );
+
+    let program = assemble_program("org 100h\nmake_minus db 0\nmov cs:make_minus, 0\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![0x00, 0x2E, 0xC6, 0x06, 0x00, 0x01, 0x00],
+        "and in front of the store"
+    );
+
+    let program = assemble_program("org 100h\ncall far es:[bx]\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![0x26, 0xFF, 0x1F],
+        "the far call reads its pointer through ES"
+    );
+}
+
+/// The dotted form is the same prefix.
+#[test]
+fn the_dotted_operand_segment_override_is_the_same_prefix() {
+    let program = assemble_program("org 100h\ntemp1 dw 0\nmov .cs:temp1, si\n").unwrap();
+    assert_eq!(
+        program.bytes,
+        vec![0x00, 0x00, 0x2E, 0x89, 0x36, 0x00, 0x01]
+    );
+}
+
 #[test]
 fn a_word_is_two_bytes_little_endian() {
     let program = assemble_program("dw 1234h\ndd 1\n").unwrap();

@@ -38,6 +38,33 @@ pub fn assemble(source: &str) -> Result<Vec<u8>, Error> {
     assemble_parts(&line, &operands, 0)
 }
 
+/// The bytes that come before the instruction: the prefixes the line
+/// carries, and the segment override an operand carries.
+///
+/// The override goes in front of the line's own prefixes, so that a `LOCK`
+/// stays next to the instruction it locks: on the 8086 the `LOCK` prefix
+/// has to be the last byte before the opcode. The byte is the one the
+/// guide's own map gives the segment, the same cell the prefix form of the
+/// override uses.
+pub fn prefixes_of(line: &line::Line, operands: &[Operand]) -> Vec<u8> {
+    let mut bytes = line.prefix_bytes();
+    if let Some(segment) = segment_override(operands) {
+        bytes.insert(0, segment);
+    }
+    bytes
+}
+
+/// The segment an operand overrides, and the byte the map gives it.
+fn segment_override(operands: &[Operand]) -> Option<u8> {
+    operands.iter().find_map(|operand| match operand {
+        Operand::Memory(memory) => memory
+            .segment
+            .as_ref()
+            .and_then(|name| crate::line::Prefix::Segment(name.clone()).opcode()),
+        _ => None,
+    })
+}
+
 /// Assemble a line that has already been taken apart.
 pub fn assemble_parts(
     line: &line::Line,
@@ -61,7 +88,7 @@ pub fn assemble_parts_at(
     // The prefixes come before the instruction they cover, so the opcode is
     // not where the line starts: a jump's displacement is measured from the
     // end of the whole of it.
-    let prefixes = line.prefix_bytes();
+    let prefixes = prefixes_of(line, operands);
     let mut bytes = assemble_inner(
         line,
         operands,
@@ -398,7 +425,7 @@ pub fn operand(text: &str) -> Result<Operand, Error> {
         })?;
         return Ok(Operand::Memory(Memory {
             label: reference.address.label.clone(),
-            segment: None,
+            segment: reference.segment.clone(),
             base: reference.address.base.map(|reg| reg.name().to_string()),
             index: reference.address.index.map(|reg| reg.name().to_string()),
             displacement: reference.address.displacement,
@@ -439,9 +466,20 @@ pub fn is_name(text: &str) -> bool {
 #[must_use]
 pub fn has_segment(text: &str) -> bool {
     let upper = text.trim().to_ascii_uppercase();
-    ["CS:", "DS:", "ES:", "SS:"]
+    // The segment with its colon: `CS:[BX]`, and with a dot in front of it:
+    // `.cs:[BX]`.
+    if ["CS:", "DS:", "ES:", "SS:", ".CS:", ".DS:", ".ES:", ".SS:"]
         .iter()
         .any(|segment| upper.starts_with(segment))
+    {
+        return true;
+    }
+    // The segment as a word of its own, before the brackets: `CS [BX]`.
+    ["CS", "DS", "ES", "SS", ".CS", ".DS", ".ES", ".SS"]
+        .iter()
+        .any(|segment| {
+            upper.starts_with(segment) && upper[segment.len()..].trim_start().starts_with('[')
+        })
 }
 
 /// Whether a word names a register.

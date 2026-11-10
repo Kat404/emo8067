@@ -75,6 +75,12 @@ pub struct Reference {
     pub address: Address,
     /// The width the source asked for, when it said: `BYTE PTR` or `WORD PTR`.
     pub width: Option<crate::modrm::Width>,
+    /// The segment the source put against the reference, when it put one:
+    /// `CS:[BX]`, `CS temp1`, `CS [BX]`.
+    ///
+    /// The segment is a prefix in the bytes, not part of the address: the
+    /// 8086 reaches the operand through the segment the override names.
+    pub segment: Option<String>,
 }
 
 /// Read a memory reference: `[BX+SI+4]`, `WORD PTR [1234h]`, `BYTE PTR DS:[BX]`.
@@ -127,19 +133,22 @@ pub fn parse(text: &str) -> Result<Reference, Error> {
                     rest = tail;
                 }
             }
-            "CS" | "DS" | "ES" | "SS" => {
-                segment = Some(word.to_string());
+            "CS" | "DS" | "ES" | "SS" | ".CS" | ".DS" | ".ES" | ".SS" => {
+                // The reference writes the segment with a dot in front as
+                // well: `.cs:`.
+                segment = Some(word.trim_start_matches('.').to_string());
                 rest = tail;
             }
             _ => break,
         }
     }
-    let _ = segment;
-    // A segment override may sit right against the bracket: `DS:[BX]`.
-    for name in ["CS", "DS", "ES", "SS"] {
+    // A segment override may sit right against the bracket: `DS:[BX]`, and
+    // against a name with no brackets at all: `CS:temp1`.
+    for name in ["CS", "DS", "ES", "SS", ".CS", ".DS", ".ES", ".SS"] {
         if rest.len() > name.len() && rest[..name.len()].eq_ignore_ascii_case(name) {
             let tail = &rest[name.len()..];
             if let Some(tail) = tail.strip_prefix(':') {
+                segment = Some(name.trim_start_matches('.').to_string());
                 rest = tail;
             }
         }
@@ -167,7 +176,11 @@ pub fn parse(text: &str) -> Result<Reference, Error> {
             });
         }
         address.label = Some(name.to_string());
-        return Ok(Reference { address, width });
+        return Ok(Reference {
+            address,
+            width,
+            segment,
+        });
     }
     for group in groups {
         // The terms are separated by a sign, and a sign in front of a
@@ -211,7 +224,11 @@ pub fn parse(text: &str) -> Result<Reference, Error> {
             rest = tail;
         }
     }
-    Ok(Reference { address, width })
+    Ok(Reference {
+        address,
+        width,
+        segment,
+    })
 }
 
 /// Take a word off the front of the text, whatever case it is written in.

@@ -687,18 +687,16 @@ fn effect(
             None => Effect::Nothing,
         });
     }
-    // The prefixes come before the instruction, so the opcode is not where
-    // the line starts: a jump's displacement is measured from the end of
-    // the whole of it.
-    let prefixes = swapped.prefix_bytes();
-    let opcode = address.wrapping_add(prefixes.len() as u16);
     // The reference's own examples push all the registers and pop them
     // again. The 8086 has neither instruction - the guide's row 60 is the
     // conditional jumps' own alias, and the captures from a real P80C86A-2
     // show `60h` running `JO` - and the reference's own documentation calls
     // it an 80186 instruction and gives the sequence it stands for.
+    //
+    // The two instructions take no operand, so the prefixes are the line's
+    // own.
     if let Some(bytes) = push_all(&swapped.mnemonic) {
-        let mut all = prefixes;
+        let mut all = swapped.prefix_bytes();
         all.extend(bytes);
         return Ok(Effect::Bytes(
             swapped.label.clone().unwrap_or_default(),
@@ -721,6 +719,12 @@ fn effect(
         jump,
         strict,
     })?;
+    // The prefixes come before the instruction, so the opcode is not where
+    // the line starts: a jump's displacement is measured from the end of
+    // the whole of it. A segment override written against the operand is a
+    // prefix too, and it is counted here with the rest.
+    let prefixes = assemble::prefixes_of(&swapped, &operands);
+    let opcode = address.wrapping_add(prefixes.len() as u16);
     // A jump whose target the program has not declared yet: the first walk
     // cannot know how far it is, so the jump is counted as it is and read
     // again in the next walk, when the name is known.
