@@ -20,4 +20,4 @@ pub mod panels;
 pub use breakpoints::{Access, Breakpoints, Missed, Report, Watchpoint};
 pub use expr::{Context, Error, Value, evaluate};
 pub use machine::Machine;
-pub use panels::{MemoryView, Panels, Registers, StackView, Ui};
+pub use panels::{Cell, Flag, MemoryView, Panels, Register, Registers, StackView, Ui};

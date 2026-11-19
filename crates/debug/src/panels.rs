@@ -11,6 +11,7 @@
 //! stack.
 
 use emo8067_core::Cpu;
+use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg16, Seg};
 
 /// What the panels show, besides the machine's own state.
@@ -87,6 +88,186 @@ pub struct Registers {
     pub ip: u16,
     /// The flags word, as the machine holds it.
     pub flags: u16,
+}
+
+/// The registers the panel shows, in the order it shows them.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Register {
+    /// One of the eight general registers.
+    Word(Reg16),
+    /// One of the four segment registers.
+    Segment(Seg),
+    /// The instruction pointer.
+    Ip,
+}
+
+impl Register {
+    /// Every register, in the order the panel shows them.
+    pub const ALL: [Register; 13] = [
+        Register::Word(Reg16::Ax),
+        Register::Word(Reg16::Bx),
+        Register::Word(Reg16::Cx),
+        Register::Word(Reg16::Dx),
+        Register::Word(Reg16::Si),
+        Register::Word(Reg16::Di),
+        Register::Word(Reg16::Bp),
+        Register::Word(Reg16::Sp),
+        Register::Segment(Seg::Cs),
+        Register::Segment(Seg::Ds),
+        Register::Segment(Seg::Es),
+        Register::Segment(Seg::Ss),
+        Register::Ip,
+    ];
+
+    /// The name the panel shows.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Register::Word(Reg16::Ax) => "AX",
+            Register::Word(Reg16::Bx) => "BX",
+            Register::Word(Reg16::Cx) => "CX",
+            Register::Word(Reg16::Dx) => "DX",
+            Register::Word(Reg16::Si) => "SI",
+            Register::Word(Reg16::Di) => "DI",
+            Register::Word(Reg16::Bp) => "BP",
+            Register::Word(Reg16::Sp) => "SP",
+            Register::Segment(Seg::Cs) => "CS",
+            Register::Segment(Seg::Ds) => "DS",
+            Register::Segment(Seg::Es) => "ES",
+            Register::Segment(Seg::Ss) => "SS",
+            Register::Ip => "IP",
+        }
+    }
+}
+
+impl Register {
+    /// Write a value into this register.
+    ///
+    /// The other side of the panel's door: the model reads the machine, and
+    /// this writes it.
+    pub fn write(self, cpu: &mut Cpu, value: u16) {
+        match self {
+            Register::Word(reg) => cpu.regs.set_word(reg, value),
+            Register::Segment(seg) => cpu.regs.set_segment(seg, value),
+            Register::Ip => cpu.regs.ip = value,
+        }
+    }
+}
+
+/// One register of the panel: which one it is, and what it holds.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Cell {
+    /// Which register it is.
+    pub register: Register,
+    /// The value the machine holds in it.
+    pub value: u16,
+}
+
+impl Cell {
+    /// A cell of the panel.
+    #[must_use]
+    pub const fn new(register: Register, value: u16) -> Cell {
+        Cell { register, value }
+    }
+}
+
+/// The nine flags of the 8086.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Flag {
+    /// Carry.
+    Cf,
+    /// Parity.
+    Pf,
+    /// Auxiliary carry.
+    Af,
+    /// Zero.
+    Zf,
+    /// Sign.
+    Sf,
+    /// Trap.
+    Tf,
+    /// Overflow.
+    Of,
+    /// Interrupt enable — the manual's `IF`.
+    If,
+    /// Direction.
+    Df,
+}
+
+impl Flag {
+    /// Every flag, in the order the panel shows them.
+    pub const ALL: [Flag; 9] = [
+        Flag::Cf,
+        Flag::Pf,
+        Flag::Af,
+        Flag::Zf,
+        Flag::Sf,
+        Flag::Tf,
+        Flag::Of,
+        Flag::If,
+        Flag::Df,
+    ];
+
+    /// The name the manual prints.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Flag::Cf => "CF",
+            Flag::Pf => "PF",
+            Flag::Af => "AF",
+            Flag::Zf => "ZF",
+            Flag::Sf => "SF",
+            Flag::Tf => "TF",
+            Flag::Of => "OF",
+            Flag::If => "IF",
+            Flag::Df => "DF",
+        }
+    }
+
+    /// The bit the flag occupies in the flags word.
+    #[must_use]
+    pub fn mask(self) -> u16 {
+        match self {
+            Flag::Cf => CF,
+            Flag::Pf => PF,
+            Flag::Af => AF,
+            Flag::Zf => ZF,
+            Flag::Sf => SF,
+            Flag::Tf => TF,
+            Flag::Of => OF,
+            Flag::If => IF,
+            Flag::Df => DF,
+        }
+    }
+}
+
+impl Registers {
+    /// The registers, in the order the panel shows them: which one each is,
+    /// and what the machine holds in it.
+    #[must_use]
+    pub fn cells(&self) -> [Cell; 13] {
+        [
+            Cell::new(Register::Word(Reg16::Ax), self.ax),
+            Cell::new(Register::Word(Reg16::Bx), self.bx),
+            Cell::new(Register::Word(Reg16::Cx), self.cx),
+            Cell::new(Register::Word(Reg16::Dx), self.dx),
+            Cell::new(Register::Word(Reg16::Si), self.si),
+            Cell::new(Register::Word(Reg16::Di), self.di),
+            Cell::new(Register::Word(Reg16::Bp), self.bp),
+            Cell::new(Register::Word(Reg16::Sp), self.sp),
+            Cell::new(Register::Segment(Seg::Cs), self.cs),
+            Cell::new(Register::Segment(Seg::Ds), self.ds),
+            Cell::new(Register::Segment(Seg::Es), self.es),
+            Cell::new(Register::Segment(Seg::Ss), self.ss),
+            Cell::new(Register::Ip, self.ip),
+        ]
+    }
+
+    /// The value of one of the nine flags.
+    #[must_use]
+    pub fn flag(&self, flag: Flag) -> bool {
+        self.flags & flag.mask() != 0
+    }
 }
 
 /// The memory panel: the bytes, and the same bytes as characters.

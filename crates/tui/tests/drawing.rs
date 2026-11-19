@@ -6,7 +6,8 @@
 
 use std::path::PathBuf;
 
-use emo8067_tui::app::App;
+use emo8067_core::regs::Reg16;
+use emo8067_tui::app::{App, Focus};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -25,21 +26,40 @@ fn app(name: &str) -> App {
     App::new(Some(program(name).to_string_lossy().to_string())).expect("the program loads")
 }
 
-#[test]
-fn the_disassembly_shows_the_program_and_the_cursor() {
-    let app = app("drawing");
-    let backend = TestBackend::new(80, 20);
+/// The screen the app draws, as text.
+fn screen(app: &App, width: u16, height: u16) -> String {
+    let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).expect("the backend");
     terminal
-        .draw(|frame| emo8067_tui::ui::draw(&app, frame))
+        .draw(|frame| emo8067_tui::ui::draw(app, frame))
         .expect("the drawing");
-
-    let buffer = terminal.backend().buffer().clone();
-    let text = buffer
+    terminal
+        .backend()
+        .buffer()
         .content()
         .iter()
         .map(|cell| cell.symbol())
-        .collect::<String>();
+        .collect()
+}
+
+/// The keys, one at a time.
+fn press(app: &mut App, keys: &[KeyCode]) {
+    for key in keys {
+        app.key(KeyEvent::new(*key, KeyModifiers::NONE));
+    }
+}
+
+/// The keys of a text, one at a time.
+fn type_text(app: &mut App, text: &str) {
+    for character in text.chars() {
+        press(app, &[KeyCode::Char(character)]);
+    }
+}
+
+#[test]
+fn the_disassembly_shows_the_program_and_the_cursor() {
+    let app = app("drawing");
+    let text = screen(&app, 80, 20);
     assert!(text.contains("disassembly"), "the panel is named: {text}");
     assert!(text.contains("program.asm"), "the program is named: {text}");
     assert!(text.contains("MOV"), "the listing is the program's: {text}");
@@ -68,6 +88,97 @@ fn a_breakpoint_is_set_at_the_cursor_and_taken_away_again() {
     let key = KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE);
     app.key(key);
     assert_eq!(app.breakpoints.breakpoints().len(), 1);
-    app.key(KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE));
+    app.key(key);
     assert_eq!(app.breakpoints.breakpoints().len(), 0);
+}
+
+#[test]
+fn the_registers_panel_shows_the_machine() {
+    let mut app = app("registers");
+    press(&mut app, &[KeyCode::F(8)]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("registers"), "the panel is named: {text}");
+    assert!(
+        text.contains("AX 1234"),
+        "the value is the machine's: {text}"
+    );
+    assert!(
+        text.contains("SP FFFE"),
+        "and so is the stack pointer: {text}"
+    );
+}
+
+#[test]
+fn the_flags_panel_shows_the_flags() {
+    let app = app("flags");
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("flags"), "the panel is named: {text}");
+    assert!(text.contains("CF 0"), "a clear flag reads as zero: {text}");
+    assert!(text.contains("IF 1"), "interrupts start enabled: {text}");
+}
+
+#[test]
+fn a_register_can_be_edited_in_place() {
+    let mut app = app("edit");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Char('e')]);
+    type_text(&mut app, "beefh");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(
+        app.cpu.regs.word(Reg16::Ax),
+        0xBEEF,
+        "the value was written"
+    );
+    assert!(app.edit.is_none(), "and the edit is over");
+}
+
+#[test]
+fn an_edit_that_cannot_be_read_leaves_the_register_alone() {
+    let mut app = app("refuse");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Char('e')]);
+    type_text(&mut app, "zz");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.cpu.regs.word(Reg16::Ax), 0, "the register is as it was");
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("bad expression"),
+        "the refusal is its own: {status}"
+    );
+}
+
+#[test]
+fn a_value_that_does_not_fit_in_a_register_is_refused() {
+    let mut app = app("range");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Char('e')]);
+    type_text(&mut app, "12345h");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.cpu.regs.word(Reg16::Ax), 0, "the register is as it was");
+    let status = app.status.clone().unwrap_or_default();
+    assert!(status.contains("out of range"), "and it says why: {status}");
+}
+
+#[test]
+fn the_focus_moves_between_the_panes() {
+    let mut app = app("focus");
+    assert_eq!(app.focus, Focus::Disassembly);
+    press(&mut app, &[KeyCode::Tab]);
+    assert_eq!(app.focus, Focus::Registers);
+    press(&mut app, &[KeyCode::Char('1')]);
+    assert_eq!(app.focus, Focus::Disassembly);
+}
+
+#[test]
+fn the_arrows_still_move_the_disassembly_cursor() {
+    let mut app = app("arrows");
+    press(&mut app, &[KeyCode::Down]);
+    assert_eq!(app.cursor, 1, "the cursor moved down the listing");
+    press(&mut app, &[KeyCode::Up]);
+    assert_eq!(app.cursor, 0, "and back up again");
+}
+
+#[test]
+fn the_arrows_move_the_cursor_of_the_pane_that_has_it() {
+    let mut app = app("register-arrows");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Down]);
+    assert_eq!(app.register_cursor, 2, "one row down the panel");
+    assert_eq!(app.cursor, 0, "and the listing did not move");
 }

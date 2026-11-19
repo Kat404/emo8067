@@ -7,6 +7,27 @@ full-capture gate left.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
 
+## Where the 2026-11-19 work is
+
+The TUI has a **registers panel and a flags panel**, and the register under
+the cursor is **editable in place**:
+
+- **The model grew and the renderer did not.** `panels::Register` names the
+  thirteen registers the panel shows and `panels::Flag` the nine flags;
+  `Registers::cells` is the ordered list the renderer draws, and
+  `Registers::flag` reads the flags word. The write is `Register::write`,
+  the other side of the same door.
+- **The value is typed in the reference's own language**: `1234h`, `4660`
+  and `101b` are the same value, `BX+1` is an expression, and a value that
+  does not fit in sixteen bits is refused with "value out of range" — a
+  truncation would be a lie about what the register holds.
+- **The focus**: `Tab` moves it, `1` and `2` take the disassembly and the
+  registers, and the arrows move the cursor of the pane that has it.
+- **The suite**: 491 passed, 0 failed. The only clippy warning in the tree
+  is pre-existing and lives in `crates/asm`.
+
+The plan is `odd/tasks/tui.md` (L5, L6).
+
 ## Where the 2026-11-10 work is
 
 The three families the full gate left are **closed**, and the gate over every
@@ -47,10 +68,10 @@ It draws the panel model and holds nothing of its own:
 - **The loader** lives in the debugger's crate: a program is loaded at its
   origin in the segment 0000, the reference's own boot template.
 
-The plan is `odd/tasks/tui.md` (L1). **Still open**: the other panels (the
-registers, the memory window, the stack, the source strip), the guest's
-screen, the debug console and the reference's command vocabulary, the
-prompts (`g`, `b`, `w`, `e`), and the step-back and step-over.
+The plan is `odd/tasks/tui.md` (L1). **Still open**: the memory window, the
+stack, the source strip, the guest's screen, the debug console and the
+reference's command vocabulary, the prompts (`g`, `b`, `w`, `e`), and the
+step-back and step-over.
 
 ## Where the 2026-11-10 debugger work is
 
@@ -153,8 +174,9 @@ the two plans above.
 ## Where the tree stands
 
 ```
-cargo test --workspace                  438 passed, 0 failed
-cargo clippy --workspace --all-targets   0 warnings, 0 errors
+cargo test --workspace                  491 passed, 0 failed
+cargo clippy --workspace --all-targets   1 warning, 0 errors (the warning is
+                                         pre-existing, in `crates/asm`)
 cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
@@ -462,7 +484,14 @@ wins, so a device that writes a port byte does not reach the program.
 10. ~~**The unit chosen by the maintainer on 2026-10-23: the gate over every capture.**~~ — **DONE and closed in `f3a216f`.** The oracle now carries the chip's final memory and the gate compares it; the corrected extraction recovery matches every capture's own `ram` list; and `crates/core/tests/hardware_full.rs` runs all **646000** captures. The same commit fixes `PUSH SP`: the chip pushes the stack pointer it had already decremented, so the 1979 manual's print is an erratum against the silicon. The full gate leaves **36** disagreements in three families — `DAA`/`DAS` (**28**), zero-immediate `AAD` (**6**) and `IDIV r/m8` (**2**) — all named in "Still open" above. The plan is `odd/tasks/full-capture-gate.md`.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
 12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
-13. **The next unit is chosen (2026-11-10): the panels the TUI still lacks** — the registers panel with its editing in place, the memory window scrolling over 1 MiB, the stack and the source strip. The model is already in `crates/debug`; the slice is drawing it and making it navigable. It is the next thing in the plan (`odd/tasks/tui.md`), and after it come the stop-on-condition window, the debug console, the guest's screen, T17 (packaging and CI) and T18 (the GUI, the last stage).
+13. ~~**The unit chosen by the maintainer on 2026-11-10: the panels the TUI
+    still lacks**~~ — **the first of them is DONE** (2026-11-19): the
+    registers panel with its editing in place, and the flags. The plan is
+    `odd/tasks/tui.md` (L5, L6). **The next unit is not chosen.** What is
+    left of that slice is the memory window, the stack and the source
+    strip; after it come the stop-on-condition window, the debug console,
+    the guest's screen, T17 (packaging and CI) and T18 (the GUI, the last
+    stage).
 14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
 
 ## Files worth reading first
