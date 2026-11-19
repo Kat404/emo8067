@@ -67,10 +67,10 @@ red is a watchpoint.
   the keys `F5`, `F8`, `F9`, the arrows, `?` and `q`. L1, with its
   verification in L2 and L3.
 - **T2** — **DONE.** The registers panel and the flags, with the register
-  under the cursor editable in place. S5-S8. **RED**: the eleven new tests
-  did not compile, because neither the model nor the TUI's state existed.
-  **GREEN**: 491 passed, 0 failed; the clippy run is clean for the two
-  crates that changed.
+  under the cursor editable in place. S5-S8. Commit `a3a2a48`. **RED**:
+  the eleven new tests did not compile, because neither the model nor the
+  TUI's state existed. **GREEN**: 491 passed, 0 failed; the clippy run is
+  clean for the two crates that changed.
 
 ## Log
 
@@ -97,6 +97,16 @@ red is a watchpoint.
   - **The middle of the band is empty on purpose.** The research's layout
     puts the memory window between the registers and the flags, so the
     window lands there without moving anything.
+  - **Risk: none.** The change names no high-risk item. It writes the
+    machine's registers when the user says so, which is the debugger's
+    whole job, and the two crates it touches are the TUI and the panel
+    model, whose shapes are unchanged: `Ui` and `Registers` keep every
+    field they had, and the new types are additions.
+  - **The native assessment of the commit**: `medium`, and `under_budget` —
+    so no review is due, and the boundary stays pending until a later
+    commit reaches the budget. The change names no high-risk item, so it
+    gets no independent verifier either: the focused test and the suite
+    are the whole of its verification.
   - **Still open.** The memory window, the stack and the source strip; the
     flags' own editing; the `g`/`b`/`w` prompts; the step-back (`F6`) and
     the step-over (`F7`); and the guest's screen, which the research says
