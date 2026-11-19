@@ -123,10 +123,10 @@ red is a watchpoint.
 
   - **The model grows the two things the renderer needs**, and the renderer
     grows nothing: the panel model is the product, so the registers come
-    out of it as an ordered list of cells (the name, the register, the
-    value) and the flags come out of it as their nine names and their
+    out of it as an ordered list of cells (the register, and the value it
+    holds) and the flags come out of it as their nine names and their
     values. The write is the other side of the same door, in the debugger's
-    crate: `machine::write_register`.
+    crate: `Register::write`.
   - **The value is typed in the reference's own language.** The evaluator
     that already reads the breakpoint conditions reads this one too, so
     `1234h`, `4660` and `101b` are the same value and `BX+1` is an
