@@ -26,7 +26,9 @@ the cursor on a byte and a goto to jump to an address.
 - **The address is hexadecimal**, the way the reference types a memory
   address: `0100` and `100h` are the same address, and a text that cannot
   be read is refused with "bad syntax" — the evaluator's own word.
-- **The plan** is `odd/tasks/tui.md` (L7, T3).
+- **The commit is `2fd4731`**, and the plan is `odd/tasks/tui.md` (L7, T3).
+  The tree is **499 passed, 0 failed** and the clippy run is clean in
+  every crate.
 
 ## Where the 2026-11-19 work is
 

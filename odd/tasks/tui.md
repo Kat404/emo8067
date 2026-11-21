@@ -99,10 +99,11 @@ red is a watchpoint.
 - **T3** — The memory window and the goto: the panel with its gutter and
   its printable side, the cursor over the bytes, the focus (`3`), the
   navigation (the arrows and the pages) and the goto prompt. S9-S11.
-  **RED**: the seven new tests did not compile, because `Focus::Memory`
-  did not exist and the model had no window. **GREEN**: the drawing test is
-  18 passed, 0 failed; the model's is 4 passed, 0 failed; the clippy run is
-  clean for the two crates that changed.
+  Commit `2fd4731`. **RED**: the seven new tests did not compile, because
+  `Focus::Memory` did not exist and the model had no window. **GREEN**: the
+  drawing test is 18 passed, 0 failed; the model's is 4 passed, 0 failed;
+  the whole tree is **499 passed, 0 failed**, and the clippy run is clean
+  in every crate.
 
 ## Log
 
