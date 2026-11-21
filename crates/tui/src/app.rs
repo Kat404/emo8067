@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use emo8067_core::Cpu;
+use emo8067_core::regs::Seg;
 use emo8067_debug::breakpoints::Breakpoints;
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
@@ -21,6 +22,8 @@ pub enum Focus {
     Disassembly,
     /// The registers.
     Registers,
+    /// The memory window.
+    Memory,
 }
 
 /// What is being edited, in place.
@@ -31,6 +34,19 @@ pub struct Edit {
     /// What has been typed so far.
     pub text: String,
 }
+
+/// The address the memory window is jumped to.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Goto {
+    /// What has been typed so far.
+    pub text: String,
+}
+
+/// The bytes a row of the memory window holds.
+const ROW: i32 = 16;
+
+/// The bytes a page of the memory window holds.
+const PAGE: i32 = 0x100;
 
 /// What the TUI knows.
 #[derive(Debug)]
@@ -53,6 +69,8 @@ pub struct App {
     pub register_cursor: usize,
     /// What is being edited, in place.
     pub edit: Option<Edit>,
+    /// The address the memory window is being jumped to.
+    pub goto: Option<Goto>,
     /// The UI's state, which the panels are drawn from.
     pub ui: Ui,
     /// Whether the help overlay is up.
@@ -81,6 +99,7 @@ impl App {
             focus: Focus::Disassembly,
             register_cursor: 0,
             edit: None,
+            goto: None,
             ui: Ui::default(),
             help: false,
             finished: false,
@@ -107,6 +126,8 @@ impl App {
         // The listing follows `CS:IP`, and the research says it is never
         // asked to disassemble a range.
         ui.disassembly_at = self.cpu.regs.ip;
+        // The memory window looks through the data segment.
+        ui.memory_segment = self.cpu.regs.segment(Seg::Ds);
         Panels::of(&self.cpu, &ui)
     }
 
@@ -141,17 +162,26 @@ impl App {
             self.edit_key(key);
             return;
         }
+        // The goto takes every key too, while it is open.
+        if self.goto.is_some() {
+            self.goto_key(key);
+            return;
+        }
         match key.code {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.help = true,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => self.quit = true,
             KeyCode::Char('1') => self.focus = Focus::Disassembly,
             KeyCode::Char('2') => self.focus = Focus::Registers,
+            KeyCode::Char('3') => self.focus = Focus::Memory,
             KeyCode::Char('e') => self.open_edit(),
+            KeyCode::Char('g') => self.open_goto(),
             KeyCode::Tab => self.focus = self.other_focus(),
             KeyCode::F(8) => self.step(),
             KeyCode::F(5) => self.run_to_the_next_breakpoint(),
             KeyCode::F(9) => self.toggle_breakpoint(),
+            KeyCode::PageUp if self.focus == Focus::Memory => self.move_memory_page(-1),
+            KeyCode::PageDown if self.focus == Focus::Memory => self.move_memory_page(1),
             KeyCode::Up => self.move_cursor(0, -1),
             KeyCode::Down => self.move_cursor(0, 1),
             KeyCode::Left => self.move_cursor(-1, 0),
@@ -171,7 +201,8 @@ impl App {
     fn other_focus(&self) -> Focus {
         match self.focus {
             Focus::Disassembly => Focus::Registers,
-            Focus::Registers => Focus::Disassembly,
+            Focus::Registers => Focus::Memory,
+            Focus::Memory => Focus::Disassembly,
         }
     }
 
@@ -180,6 +211,7 @@ impl App {
         match self.focus {
             Focus::Disassembly => self.move_listing_cursor(vertical),
             Focus::Registers => self.move_register_cursor(horizontal, vertical),
+            Focus::Memory => self.move_memory_cursor(horizontal, vertical),
         }
     }
 
@@ -201,6 +233,18 @@ impl App {
             return;
         }
         self.register_cursor = ((row * 2 + column) as usize).min(last);
+    }
+
+    /// The memory window's cursor: a byte at a time, or a row of sixteen.
+    fn move_memory_cursor(&mut self, horizontal: i32, vertical: i32) {
+        let at = i32::from(self.ui.memory_at) + horizontal + vertical * ROW;
+        self.ui.memory_at = at.clamp(0, 0xFFFF) as u16;
+    }
+
+    /// The memory window's cursor, a page at a time.
+    fn move_memory_page(&mut self, pages: i32) {
+        let at = i32::from(self.ui.memory_at) + pages * PAGE;
+        self.ui.memory_at = at.clamp(0, 0xFFFF) as u16;
     }
 
     /// Open the register under the cursor for editing.
@@ -273,6 +317,67 @@ impl App {
         self.status = None;
     }
 
+    /// Open the goto, to jump the memory window to an address.
+    fn open_goto(&mut self) {
+        if self.focus != Focus::Memory {
+            return;
+        }
+        self.goto = Some(Goto {
+            text: String::new(),
+        });
+        self.status = None;
+    }
+
+    /// A key, while the goto is open.
+    fn goto_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.goto = None;
+                self.status = None;
+            }
+            KeyCode::Enter => self.commit_goto(),
+            KeyCode::Backspace => {
+                if let Some(goto) = &mut self.goto {
+                    goto.text.pop();
+                }
+            }
+            KeyCode::Char(character) => {
+                if let Some(goto) = &mut self.goto {
+                    goto.text.push(character);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Jump the memory window to the address that was typed.
+    ///
+    /// The address is hexadecimal, the way the reference types a memory
+    /// address: `0100` is the same address as `100h`. A text that cannot
+    /// be read is refused in the evaluator's own words, the prompt stays
+    /// open, and the window does not move.
+    fn commit_goto(&mut self) {
+        let Some(goto) = self.goto.clone() else {
+            return;
+        };
+        let text = goto.text.trim();
+        if text.is_empty() {
+            self.goto = None;
+            self.status = None;
+            return;
+        }
+        match address_of(text) {
+            Ok(address) => {
+                self.ui.memory_at = address;
+                self.goto = None;
+                self.status = None;
+            }
+            Err(error) => {
+                self.status = Some(error);
+            }
+        }
+    }
+
     /// One instruction.
     pub fn step(&mut self) {
         if self.finished {
@@ -331,4 +436,15 @@ impl App {
         }
         let _ = self.breakpoints.add(segment, address, None);
     }
+}
+
+/// Read an address, the way the reference types one.
+///
+/// The reference types a memory address in hexadecimal and needs no suffix
+/// for it: `SSSS:OOOO`. The evaluator's own `h` suffix is read too, so
+/// `100h` is the same address as `0100`. A text that cannot be read is
+/// refused in the evaluator's own words.
+fn address_of(text: &str) -> Result<u16, String> {
+    let digits = text.strip_suffix(['h', 'H']).unwrap_or(text);
+    u16::from_str_radix(digits, 16).map_err(|_| expr::Error::BadSyntax.to_string())
 }

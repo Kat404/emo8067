@@ -3,9 +3,30 @@
 Written 2026-10-15 at the end of a long session, and kept current since: the
 2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
 units with it, and the 2026-11-10 unit that closed the three families the
-full-capture gate left.
+full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
+window.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-21 work is
+
+The TUI has a **memory window**: a window over the machine's memory, with
+the cursor on a byte and a goto to jump to an address.
+
+- **The model grew.** `Ui.memory_at` is the address the memory panel's
+  cursor is at, `Ui.memory_len` is how many bytes the window holds (256),
+  and `MemoryView` carries `window_at` and `cursor`. The window is built
+  around the cursor, so the UI holds no megabyte of memory.
+- **The pane** is the middle column of the bottom band, between the
+  registers and the flags: the row address in the gutter, the bytes as
+  hex, and the printable side beside them when the panel is wide enough.
+- **The keys.** `3` takes the pane, `Tab` cycles the three, the arrows move
+  the cursor a byte and a row at a time, `PageUp` and `PageDown` move a
+  page, and `g` opens the goto.
+- **The address is hexadecimal**, the way the reference types a memory
+  address: `0100` and `100h` are the same address, and a text that cannot
+  be read is refused with "bad syntax" — the evaluator's own word.
+- **The plan** is `odd/tasks/tui.md` (L7, T3).
 
 ## Where the 2026-11-19 work is
 
@@ -464,13 +485,13 @@ wins, so a device that writes a port byte does not reach the program.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
 12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
 13. ~~**The unit chosen by the maintainer on 2026-11-10: the panels the TUI
-    still lacks**~~ — **the first of them is DONE** (2026-11-19): the
-    registers panel with its editing in place, and the flags. The plan is
-    `odd/tasks/tui.md` (L5, L6). **The next unit is not chosen.** What is
-    left of that slice is the memory window, the stack and the source
-    strip; after it come the stop-on-condition window, the debug console,
-    the guest's screen, T17 (packaging and CI) and T18 (the GUI, the last
-    stage).
+    still lacks**~~ — **two of them are DONE**: the registers panel with its
+    editing in place and the flags (2026-11-19), and the memory window with
+    its goto (2026-11-21). The plan is `odd/tasks/tui.md` (L5, L6, L7).
+    **The next unit is not chosen.** What is left of that slice is the
+    stack and the source strip; after it come the stop-on-condition window,
+    the debug console, the guest's screen, T17 (packaging and CI) and T18
+    (the GUI, the last stage).
 14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
 
 ## Files worth reading first

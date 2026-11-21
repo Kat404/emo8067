@@ -49,12 +49,37 @@ red is a watchpoint.
 - **S8** — The panes have a focus: `Tab` moves it, `1` takes the
   disassembly and `2` the registers, and the arrows move the cursor in the
   pane that has it. The keys that were there before still do what they did.
+- **S9** — The memory panel is a **window**, not a buffer: it holds the
+  bytes around one address and nothing else, so there is no `Vec<u8>` of a
+  megabyte anywhere in the UI. It comes from the model (`Panels::of`), like
+  every other panel, and the TUI holds no copy of the memory. It looks
+  through `DS`, the data segment, and its title carries the segment and
+  the address the cursor is at. The bytes are drawn as hex with the
+  printable side beside them when the panel is wide enough for both, and
+  the row address is in the gutter, so a byte is still identifiable after
+  it scrolls off.
+- **S10** — The memory pane has the focus: `3` takes it, `Tab` cycles the
+  three persistent panes, the arrows move the memory cursor a byte at a
+  time and a row at a time, and `PageUp` and `PageDown` move it a page.
+  The keys that were there before still do what they did.
+- **S11** — The memory pane is **jumped to, not scrolled**: `g` opens the
+  goto prompt, the address is typed in hexadecimal — the way the reference
+  types a memory address (`0100`) — and `Enter` centres the window on it.
+  `Esc` leaves the address as it was, and an address that cannot be read is
+  refused in the reference's own words (`bad syntax`) and the window does
+  not move.
 
 ## Out of scope
 
-- **The panels that are not the disassembly and the registers**: the memory
-  window, the stack, the source strip and the guest's screen. Each is its
-  own slice.
+- **The panels that are not the disassembly, the registers and the memory**:
+  the stack, the source strip and the guest's screen. Each is its own
+  slice.
+- **The memory's own editing**: `e` writes a register in this slice, and a
+  byte of memory is the next one.
+- **The segment the memory pane looks through**: `DS` is the one it looks
+  through, and picking another is the segment picker's slice.
+- **The labels in the goto**: the reference's goto takes a label too, and
+  this project has no symbol table yet.
 - **Editing the flags**: the flags are drawn, and this slice writes
   registers only.
 - **The debug console** and the reference's command vocabulary.
@@ -71,9 +96,30 @@ red is a watchpoint.
   the eleven new tests did not compile, because neither the model nor the
   TUI's state existed. **GREEN**: 491 passed, 0 failed; the clippy run is
   clean for the two crates that changed.
+- **T3** — The memory window and the goto: the panel with its gutter and
+  its printable side, the cursor over the bytes, the focus (`3`), the
+  navigation (the arrows and the pages) and the goto prompt. S9-S11.
+  **RED**: the seven new tests did not compile, because `Focus::Memory`
+  did not exist and the model had no window. **GREEN**: the drawing test is
+  18 passed, 0 failed; the model's is 4 passed, 0 failed; the clippy run is
+  clean for the two crates that changed.
 
 ## Log
 
+- **L7 (2026-11-21).** The third slice, chosen by the maintainer through the
+  question tool: **the TUI's memory window and its goto**.
+  - **The choice.** "TUI: ventana de memoria + goto", and for the cleanup
+    that went with it: "En la misma unidad, commit propio".
+  - **The cleanup went first, in its own commit** (`8115bb7`): the clippy
+    warning in `crates/asm/src/assemble.rs` is gone, `assembler.md` counts
+    the examples correctly (`eighty-five`), `HANDOFF.md` has one heading
+    for the assembler's work instead of two, and `emu8067-foss.md` says
+    that `AUDIT-1-old` is closed, because the code settled it and the row
+    was left open.
+  - **Still open.** The stack, the source strip and the guest's screen;
+    the memory's own editing; the segment the memory pane looks through;
+    and the labels in the goto, which need a symbol table this project
+    does not have yet.
 - **L6 (2026-11-19).** The second slice is built: the registers panel, the
   flags, and the register under the cursor editable in place.
   - **The model grew and the renderer did not.** `panels::Register` names

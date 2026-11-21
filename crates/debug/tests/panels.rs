@@ -67,3 +67,24 @@ fn a_register_can_be_written() {
     Register::Ip.write(&mut cpu, 0x0100);
     assert_eq!(cpu.regs.ip, 0x0100);
 }
+
+#[test]
+fn the_memory_panel_is_a_window_around_the_cursor() {
+    let mut cpu = Cpu::new();
+    cpu.mem.load_at(0x02010, &[0xAB]).unwrap();
+    let ui = Ui {
+        memory_at: 0x0010,
+        memory_segment: 0x0200,
+        memory_len: 16,
+        ..Ui::default()
+    };
+
+    let panels = Panels::of(&cpu, &ui);
+    let memory = &panels.memory;
+
+    assert_eq!(memory.at, 0x0010, "the cursor is at the address");
+    assert_eq!(memory.window_at, 0x0008, "the window starts before it");
+    assert_eq!(memory.cursor, 8, "and the cursor is in the window");
+    assert_eq!(memory.bytes.len(), 16, "the window holds what it says");
+    assert_eq!(memory.bytes[8], 0xAB, "and the byte under the cursor is there");
+}

@@ -26,6 +26,21 @@ fn app(name: &str) -> App {
     App::new(Some(program(name).to_string_lossy().to_string())).expect("the program loads")
 }
 
+/// A program of the test's own words, written where the test can keep it.
+fn program_of(name: &str, source: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("emo8067-tui-{name}"));
+    std::fs::create_dir_all(&dir).expect("the directory");
+    let path = dir.join("program.asm");
+    std::fs::write(&path, source).expect("the program");
+    path
+}
+
+/// The app, with that program of the test's own words open.
+fn app_of(name: &str, source: &str) -> App {
+    App::new(Some(program_of(name, source).to_string_lossy().to_string()))
+        .expect("the program loads")
+}
+
 /// The screen the app draws, as text.
 fn screen(app: &App, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
@@ -181,4 +196,93 @@ fn the_arrows_move_the_cursor_of_the_pane_that_has_it() {
     press(&mut app, &[KeyCode::Char('2'), KeyCode::Down]);
     assert_eq!(app.register_cursor, 2, "one row down the panel");
     assert_eq!(app.cursor, 0, "and the listing did not move");
+}
+
+#[test]
+fn the_focus_cycles_the_three_panes() {
+    let mut app = app("focus-three");
+    assert_eq!(app.focus, Focus::Disassembly);
+    press(&mut app, &[KeyCode::Tab]);
+    assert_eq!(app.focus, Focus::Registers);
+    press(&mut app, &[KeyCode::Tab]);
+    assert_eq!(app.focus, Focus::Memory, "the memory pane is the third");
+    press(&mut app, &[KeyCode::Tab]);
+    assert_eq!(app.focus, Focus::Disassembly, "and the cycle closes");
+}
+
+#[test]
+fn the_memory_panel_shows_the_bytes_around_the_address() {
+    let mut app = app("memory");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0100");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0x0100, "the window is at the address");
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("memory"), "the panel is named: {text}");
+    assert!(
+        text.contains("0100 B8 34 12 F4"),
+        "the bytes are the program's, and the gutter has the address: {text}"
+    );
+}
+
+#[test]
+fn the_memory_panel_shows_the_printable_side_when_there_is_room() {
+    let mut app = app_of("memory-ascii", "org 100h\ndb 'Hello'\nhlt\n");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0100");
+    press(&mut app, &[KeyCode::Enter]);
+    let text = screen(&app, 120, 24);
+    assert!(
+        text.contains("0100 48 65 6C 6C 6F F4"),
+        "the bytes are the program's: {text}"
+    );
+    assert!(
+        text.contains("Hello."),
+        "and the printable side is beside them: {text}"
+    );
+}
+
+#[test]
+fn the_memory_cursor_moves_a_byte_and_a_row_at_a_time() {
+    let mut app = app("memory-cursor");
+    press(&mut app, &[KeyCode::Char('3')]);
+    assert_eq!(app.ui.memory_at, 0, "the cursor is at the start");
+    press(&mut app, &[KeyCode::Right]);
+    assert_eq!(app.ui.memory_at, 1, "one byte to the right");
+    press(&mut app, &[KeyCode::Down]);
+    assert_eq!(app.ui.memory_at, 17, "and one row down");
+    press(&mut app, &[KeyCode::Up]);
+    assert_eq!(app.ui.memory_at, 1, "and back up again");
+    press(&mut app, &[KeyCode::Left]);
+    assert_eq!(app.ui.memory_at, 0, "and back to the start");
+}
+
+#[test]
+fn a_page_moves_the_memory_cursor_by_a_window() {
+    let mut app = app("memory-page");
+    press(&mut app, &[KeyCode::Char('3')]);
+    press(&mut app, &[KeyCode::PageDown]);
+    assert_eq!(app.ui.memory_at, 0x0100, "a page is a window");
+    press(&mut app, &[KeyCode::PageUp]);
+    assert_eq!(app.ui.memory_at, 0, "and back again");
+}
+
+#[test]
+fn a_goto_that_cannot_be_read_leaves_the_address_alone() {
+    let mut app = app("memory-refuse");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "zz");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0, "the address is as it was");
+    let status = app.status.clone().unwrap_or_default();
+    assert!(status.contains("bad syntax"), "and it says why: {status}");
+}
+
+#[test]
+fn the_goto_prompt_can_be_left_without_moving() {
+    let mut app = app("memory-esc");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0100");
+    press(&mut app, &[KeyCode::Esc]);
+    assert_eq!(app.ui.memory_at, 0, "the address is as it was");
 }

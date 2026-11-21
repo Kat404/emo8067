@@ -17,11 +17,15 @@ use emo8067_core::regs::{Reg16, Seg};
 /// What the panels show, besides the machine's own state.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ui {
-    /// Where the memory panel looks.
+    /// Where the memory panel's cursor is.
+    ///
+    /// The panel is a window around this address and not a buffer from it:
+    /// the bytes it holds are the ones around it, and the cursor is in the
+    /// middle of them.
     pub memory_at: u16,
     /// The segment the memory panel looks through.
     pub memory_segment: u16,
-    /// How many bytes the memory panel shows.
+    /// How many bytes the memory panel's window holds.
     pub memory_len: usize,
     /// Where the disassembly starts.
     pub disassembly_at: u16,
@@ -36,7 +40,7 @@ impl Default for Ui {
         Ui {
             memory_at: 0,
             memory_segment: 0x1000,
-            memory_len: 16,
+            memory_len: 256,
             disassembly_at: 0,
             disassembly_len: 16,
             stack_len: 8,
@@ -270,13 +274,21 @@ impl Registers {
     }
 }
 
-/// The memory panel: the bytes, and the same bytes as characters.
+/// The memory panel: the bytes around the cursor, and the same bytes as
+/// characters.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MemoryView {
     /// The segment the bytes are read through.
     pub segment: u16,
-    /// The offset the view starts at.
+    /// The address the cursor is at.
     pub at: u16,
+    /// The address the window starts at.
+    ///
+    /// The window begins before the cursor, so the bytes around it are
+    /// there to be looked at.
+    pub window_at: u16,
+    /// Where the cursor is in the window: an index into the bytes.
+    pub cursor: usize,
     /// The bytes.
     pub bytes: Vec<u8>,
     /// The same bytes as characters: the printable ones, and a dot for the
@@ -369,12 +381,19 @@ fn disassembly_of(cpu: &Cpu, ui: &Ui) -> Vec<Line> {
     out
 }
 
-/// The memory panel: the bytes from where the UI says.
+/// The memory panel: the bytes around the cursor.
+///
+/// The window is a window and not a buffer: it holds the bytes around one
+/// address, so there is no megabyte of memory in the UI anywhere.
 fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
-    let bytes = (0..ui.memory_len)
+    let count = ui.memory_len.max(1);
+    // The cursor sits in the middle of the window, so there are as many
+    // bytes before it as there are after it.
+    let window_at = ui.memory_at.saturating_sub((count / 2) as u16);
+    let bytes = (0..count)
         .map(|offset| {
             cpu.mem
-                .read_u8(ui.memory_segment, ui.memory_at.wrapping_add(offset as u16))
+                .read_u8(ui.memory_segment, window_at.wrapping_add(offset as u16))
         })
         .collect::<Vec<u8>>();
     let ascii = bytes
@@ -390,6 +409,8 @@ fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
     MemoryView {
         segment: ui.memory_segment,
         at: ui.memory_at,
+        window_at,
+        cursor: usize::from(ui.memory_at.wrapping_sub(window_at)),
         bytes,
         ascii,
     }

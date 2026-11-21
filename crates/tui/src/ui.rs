@@ -17,6 +17,13 @@ use crate::app::{App, Focus};
 /// The registers panel's grid: two columns.
 const COLUMNS: usize = 2;
 
+/// The bytes a row of the memory window holds.
+const ROW_BYTES: usize = 16;
+
+/// The width of the memory window's gutter: the address, and the space
+/// after it.
+const GUTTER: usize = 5;
+
 /// Draw the whole screen.
 pub fn draw(app: &App, frame: &mut Frame) {
     let panels = app.panels();
@@ -46,6 +53,7 @@ pub fn draw(app: &App, frame: &mut Frame) {
         ])
         .split(rows[2]);
     registers(&panels, app, frame, sides[0]);
+    memory(&panels, app, frame, sides[1]);
     flags(&panels, frame, sides[2]);
     status(app, frame, rows[3]);
 }
@@ -148,6 +156,56 @@ fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(list, area);
 }
 
+/// The memory window: the bytes around the cursor, and the printable side
+/// beside them.
+///
+/// The window is a window: the model hands over the bytes it holds and
+/// where the cursor is in them, and the rows shown are the ones around the
+/// cursor.
+fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
+    let view = &panels.memory;
+    let inner = usize::from(area.width.saturating_sub(2));
+    // What fits in the panel: the gutter, the bytes as hex, and — when
+    // there is room for it — the printable side.
+    let bytes_per_row = ROW_BYTES.min(inner.saturating_sub(GUTTER) / 3).max(1);
+    let printable = inner >= GUTTER + bytes_per_row * 3 + bytes_per_row;
+    let rows = usize::from(area.height.saturating_sub(2));
+    // The window follows the cursor: the cursor's row is in the middle of
+    // what is shown, and the window is never left behind.
+    let first_row = (view.cursor / bytes_per_row).saturating_sub(rows / 2);
+    let mut lines = Vec::new();
+    for row in 0..rows {
+        let index = (first_row + row) * bytes_per_row;
+        if index >= view.bytes.len() {
+            break;
+        }
+        let address = view.window_at.wrapping_add(index as u16);
+        let mut spans = vec![Span::raw(format!("{address:04X} "))];
+        for column in 0..bytes_per_row {
+            let Some(byte) = view.bytes.get(index + column) else {
+                break;
+            };
+            if column > 0 {
+                spans.push(Span::raw(" "));
+            }
+            let style = if index + column == view.cursor && app.focus == Focus::Memory {
+                Style::default().add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+            spans.push(Span::styled(format!("{byte:02X}"), style));
+        }
+        if printable {
+            let characters: String = view.ascii.chars().skip(index).take(bytes_per_row).collect();
+            spans.push(Span::raw(format!(" {characters}")));
+        }
+        lines.push(Line::from(spans));
+    }
+    let title = format!(" memory · {:04X}:{:04X} ", view.segment, view.at);
+    let list = List::new(lines).block(Block::default().borders(Borders::ALL).title(title));
+    frame.render_widget(list, area);
+}
+
 /// The flags panel: the nine flags and their values.
 fn flags(panels: &Panels, frame: &mut Frame, area: Rect) {
     let mut lines = Vec::new();
@@ -172,10 +230,11 @@ fn flags(panels: &Panels, frame: &mut Frame, area: Rect) {
 
 /// The status line: where the machine is, and what is set.
 fn status(app: &App, frame: &mut Frame, area: Rect) {
-    let text = match (&app.status, &app.edit) {
-        (Some(status), _) => status.clone(),
-        (None, Some(edit)) => format!("{} = {}", edit.register.name(), edit.text),
-        (None, None) => format!(
+    let text = match (&app.status, &app.edit, &app.goto) {
+        (Some(status), _, _) => status.clone(),
+        (None, Some(edit), _) => format!("{} = {}", edit.register.name(), edit.text),
+        (None, None, Some(goto)) => format!("goto: {}", goto.text),
+        (None, None, None) => format!(
             "IP {:04X}  ·  STEP {}  ·  BREAK {}  ·  WATCH {}  ·  q quits · ? helps",
             app.cpu.regs.ip,
             app.steps,
@@ -195,9 +254,12 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("Tab  the next pane"),
         Line::from("1    the disassembly"),
         Line::from("2    the registers"),
+        Line::from("3    the memory"),
         Line::from("e    edit the register under the cursor"),
+        Line::from("g    jump the memory to an address"),
         Line::from("↑ ↓  move the cursor"),
         Line::from("← →  move the cursor (registers)"),
+        Line::from("PgUp PgDn  a page of memory"),
         Line::from("Enter commit the edit"),
         Line::from("Esc  cancel the edit"),
         Line::from("?    close this"),
