@@ -100,27 +100,6 @@ three families it was missing:
 - **The glued segment override** (`cs:mov ax,1`) keeps its prefix. It was
   worse than refused: the single-line assembler dropped the override
   silently, so the program read `DS:` where it wrote `CS:`.
-- **`PUSHA` and `POPA`** are the eight-word sequences the reference's own
-  documentation gives. They were seven words each way, so the `SP` was
-  never on the stack, and a `POPA` on its own left the stack two bytes
-  off.
-- **The second `LOCK`** needed no code: the reference's own binary carries
-  the string `LOCK-OPCODE:F0`, so its assembler writes `F0h` twice over,
-  exactly as this one does.
-- **The register initialisers** (`#cs=1234#` and the rest) are read, and
-  the program starts where it says. Three of the reference's own examples
-  declare one, and they were running in the wrong state.
-- **The length table** has `8F`, `C4`/`C5` and `FF /2`–`FF /5`: fourteen
-  rows, 191 encodings in all.
-
-## Where the 2026-11-10 assembler work is
-
-The debt the assembler plan left is closed, and the length table has the
-three families it was missing:
-
-- **The glued segment override** (`cs:mov ax,1`) keeps its prefix. It was
-  worse than refused: the single-line assembler dropped the override
-  silently, so the program read `DS:` where it wrote `CS:`.
 - **The operand's own segment override** (`mov cs:temp1, si`) is a prefix
   too. It was parsed and thrown away, and the bytes came out without the
   `2Eh` — the reference's own documentation says the manual attachment is

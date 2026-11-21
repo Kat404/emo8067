@@ -3,7 +3,7 @@
 Objective: an assembler that takes the reference's MASM-style source and
 produces the bytes. Branch: `main`. Delivery: one commit per task, each
 leaving the tree green. Test runner: `cargo test --workspace`, plus the
-examples in `re/extracted/app/examples/` (eighty-six of them, local gold, never
+examples in `re/extracted/app/examples/` (eighty-five of them, local gold, never
 committed).
 
 Written 2026-10-19, after the device bus closed. This is the one large piece
@@ -60,7 +60,7 @@ checked against.
   `second operand cannot be AL`, `segment registers cannot go together!`,
   `mem to mem`, `memory to memory is not allowed for 8086:`. A message that
   says which line and which instruction is worth more than one that does not.
-- **S8** — The examples assemble: all eighty-six of them, and the bytes the
+- **S8** — The examples assemble: all eighty-five of them, and the bytes the
   assembler produces are the bytes the reference produced. The examples are
   local gold and are not committed; the goldens are.
 - **S9** — A conditional jump whose target is out of the byte's reach is not

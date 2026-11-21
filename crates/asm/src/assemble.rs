@@ -470,13 +470,9 @@ pub fn has_segment(text: &str) -> bool {
     let upper = text.trim().to_ascii_uppercase();
     // The segment with its colon: `CS:[BX]`, and with a dot in front of it:
     // `.cs:[BX]`.
-    if ["CS:", "DS:", "ES:", "SS:", ".CS:", ".DS:", ".ES:", ".SS:"]
+    ["CS:", "DS:", "ES:", "SS:", ".CS:", ".DS:", ".ES:", ".SS:"]
         .iter()
         .any(|segment| upper.starts_with(segment))
-    {
-        return true;
-    }
-    false
 }
 
 /// Whether a word names a register.
