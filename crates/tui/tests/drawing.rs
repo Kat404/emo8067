@@ -11,6 +11,7 @@ use emo8067_core::regs::Reg16;
 use emo8067_debug::panels::Flag;
 use emo8067_debug::{Access, Machine};
 use emo8067_tui::app::{App, Focus};
+use emo8067_tui::ui::theme;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -93,8 +94,8 @@ fn buffer(app: &App, width: u16, height: u16) -> Buffer {
 
 /// The text of the cells the app marks.
 ///
-/// A mark is the way the panels say where the cursor is: the byte under
-/// the memory cursor, the word the stack pointer is at.
+/// A mark is the way the panels say where the cursor is: the word the
+/// stack pointer is at, the entry the conditions cursor is on.
 fn marked(app: &App, width: u16, height: u16) -> String {
     buffer(app, width, height)
         .content()
@@ -102,6 +103,25 @@ fn marked(app: &App, width: u16, height: u16) -> String {
         .filter(|cell| cell.modifier.contains(Modifier::REVERSED))
         .map(|cell| cell.symbol())
         .collect()
+}
+
+/// Where a text is on the screen: the column and the row.
+///
+/// The column is counted in characters and not in bytes, so a glyph that
+/// is not ASCII is found where it is drawn.
+fn place(buffer: &Buffer, text: &str) -> Option<(u16, u16)> {
+    let area = buffer.area;
+    for y in 0..area.height {
+        let row: String = (0..area.width)
+            .filter_map(|x| buffer.cell((x, y)))
+            .map(|cell| cell.symbol())
+            .collect();
+        if let Some(index) = row.find(text) {
+            let column = row[..index].chars().count();
+            return Some((column as u16, y));
+        }
+    }
+    None
 }
 
 /// The status line the app draws.
@@ -534,7 +554,9 @@ const SOURCE: &str = "org 100h\n\
                       hlt\n";
 
 /// The marker the strip puts on the line the machine is stopped at.
-const MARK: char = '►';
+///
+/// It is the listing's own glyph: `▸` always means "here".
+const MARK: char = '▸';
 
 #[test]
 fn the_source_strip_shows_the_programs_own_lines() {
@@ -577,7 +599,14 @@ fn the_source_lines_carry_their_own_numbers() {
 fn the_line_the_machine_is_stopped_at_is_marked() {
     let app = app_of("source-mark", "org 100h\nmov ax, 1234h\nhlt\n");
     let rows = rows(&app, 80, 24);
-    let marked: Vec<&String> = rows.iter().filter(|row| row.contains(MARK)).collect();
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("source"))
+        .expect("the strip has a header of its own");
+    let marked: Vec<&String> = rows[strip..]
+        .iter()
+        .filter(|row| row.contains(MARK))
+        .collect();
     assert_eq!(marked.len(), 1, "one line is marked: {rows:?}");
     assert!(
         marked[0].contains("mov ax, 1234h"),
@@ -590,7 +619,14 @@ fn the_mark_moves_when_the_machine_steps() {
     let mut app = app_of("source-step", "org 100h\nmov ax, 1234h\nhlt\n");
     press(&mut app, &[KeyCode::F(8)]);
     let rows = rows(&app, 80, 24);
-    let marked: Vec<&String> = rows.iter().filter(|row| row.contains(MARK)).collect();
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("source"))
+        .expect("the strip has a header of its own");
+    let marked: Vec<&String> = rows[strip..]
+        .iter()
+        .filter(|row| row.contains(MARK))
+        .collect();
     assert_eq!(marked.len(), 1, "one line is marked: {rows:?}");
     assert!(
         marked[0].contains("hlt"),
@@ -1278,4 +1314,198 @@ fn a_watchpoint_carries_no_condition_and_the_model_says_so() {
         "the model says that there is no breakpoint there: {status}"
     );
     assert!(app.edit.is_some(), "and the prompt stays open");
+}
+
+/// The design's own rules, and what the screen says about them.
+///
+/// The redesign changes the frame and not the vocabulary: the words the
+/// tests pin are still there, and the frame around them is the design's
+/// own.
+
+#[test]
+fn no_panel_is_framed_with_a_box() {
+    let app = app("design-boxes");
+    let text = screen(&app, 140, 40);
+    for corner in ['┌', '┐', '└', '┘'] {
+        assert!(!text.contains(corner), "no panel is a card: {text}");
+    }
+}
+
+#[test]
+fn the_sections_are_separated_by_thin_rules() {
+    let app = app("design-rules");
+    let text = screen(&app, 140, 40);
+    assert!(
+        text.contains('│'),
+        "the bottom band's sections have a rule between them: {text}"
+    );
+    assert!(
+        text.contains('─'),
+        "the bands have a rule between them: {text}"
+    );
+}
+
+#[test]
+fn the_focused_sections_header_is_the_accent_and_the_others_are_not() {
+    let app = app("design-focus");
+    let buffer = buffer(&app, 140, 40);
+    let (column, row) = place(&buffer, "disassembly").expect("the listing is named");
+    let header = buffer.cell((column, row)).expect("the header is drawn");
+    assert_eq!(
+        header.fg,
+        theme::ACCENT,
+        "the section that has the focus is the accent"
+    );
+    assert!(
+        header.modifier.contains(Modifier::BOLD),
+        "and its header is bold"
+    );
+    let (column, row) = place(&buffer, "registers").expect("the registers are named");
+    let header = buffer.cell((column, row)).expect("the header is drawn");
+    assert_ne!(
+        header.fg,
+        theme::ACCENT,
+        "the sections that do not have the focus are not the accent"
+    );
+}
+
+#[test]
+fn the_memory_cursor_is_marked_even_when_the_memory_does_not_have_the_focus() {
+    let mut app = app("design-memory-cursor");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0100");
+    press(&mut app, &[KeyCode::Enter]);
+    // The listing takes the focus back, and the window keeps its cursor.
+    press(&mut app, &[KeyCode::Char('1')]);
+    assert_eq!(app.focus, Focus::Disassembly);
+    let unfocused = buffer(&app, 140, 40);
+    let (column, row) = place(&unfocused, "0100 B8 34 12").expect("the row is drawn");
+    let byte = unfocused
+        .cell((column + 5, row))
+        .expect("the byte under the cursor is drawn");
+    assert_eq!(byte.symbol(), "B8", "the byte under the cursor is there");
+    assert_eq!(
+        byte.fg,
+        theme::TEXT_MUTED,
+        "and it is marked without the focus"
+    );
+    // With the focus the same byte is the accent.
+    press(&mut app, &[KeyCode::Char('3')]);
+    let focused = buffer(&app, 140, 40);
+    let (column, row) = place(&focused, "0100 B8 34 12").expect("the row is drawn");
+    let byte = focused
+        .cell((column + 5, row))
+        .expect("the byte under the cursor is drawn");
+    assert_eq!(
+        byte.fg,
+        theme::ACCENT,
+        "the accent when the section has the focus"
+    );
+}
+
+#[test]
+fn the_instruction_the_machine_is_at_carries_the_marker() {
+    let app = app_of("design-marker", SOURCE);
+    let buffer = buffer(&app, 140, 40);
+    let (_, row) = place(&buffer, "MOV AX, 01234h").expect("the instruction is drawn");
+    let marker = buffer.cell((0, row)).expect("the marker is drawn");
+    assert_eq!(
+        marker.symbol(),
+        "▸",
+        "the instruction the machine is at carries the marker"
+    );
+}
+
+#[test]
+fn a_breakpoint_carries_its_own_marker() {
+    let mut app = app_of("design-breakpoint", SOURCE);
+    press(&mut app, &[KeyCode::Down, KeyCode::F(9)]);
+    let buffer = buffer(&app, 140, 40);
+    let (_, row) = place(&buffer, "MOV BX, 05678h").expect("the instruction is drawn");
+    let marker = buffer.cell((1, row)).expect("the marker is drawn");
+    assert_eq!(marker.symbol(), "◆", "a breakpoint carries its own marker");
+}
+
+#[test]
+fn a_watchpoint_carries_its_own_marker() {
+    let mut app = app_of("design-watchpoint", SOURCE);
+    app.breakpoints.watch(0x0000, 0x0103, Access::Write);
+    let buffer = buffer(&app, 140, 40);
+    let (_, row) = place(&buffer, "MOV BX, 05678h").expect("the instruction is drawn");
+    let marker = buffer.cell((1, row)).expect("the marker is drawn");
+    assert_eq!(marker.symbol(), "◇", "a watchpoint carries its own marker");
+}
+
+#[test]
+fn the_header_shows_the_program_and_the_state() {
+    let app = app("design-header");
+    let rows = rows(&app, 140, 40);
+    let header = &rows[0];
+    assert!(header.contains("emo8067"), "the product is named: {header}");
+    assert!(
+        header.contains("program.asm"),
+        "the program is named: {header}"
+    );
+    assert!(
+        header.contains('●'),
+        "the state carries its glyph: {header}"
+    );
+    assert!(header.contains("RUNNING"), "and it is named: {header}");
+}
+
+#[test]
+fn the_header_says_when_the_machine_is_halted() {
+    let mut app = app_of("design-halted", "org 100h\nhlt\n");
+    press(&mut app, &[KeyCode::F(8)]);
+    let rows = rows(&app, 140, 40);
+    assert!(
+        rows[0].contains('○'),
+        "the halted machine has its own glyph: {}",
+        rows[0]
+    );
+}
+
+#[test]
+fn the_status_bar_puts_the_hints_on_the_left_and_the_numbers_on_the_right() {
+    let app = app("design-status");
+    let rows = rows(&app, 140, 40);
+    let status = rows.last().expect("the status bar is there");
+    let hints = status.find("q quits").expect("the hints are on the bar");
+    let numbers = status.find("IP 0100").expect("the numbers are on the bar");
+    assert!(hints < numbers, "the hints are on the left: {status}");
+    assert!(
+        status.trim_end().ends_with("WATCH 0"),
+        "the numbers are on the right: {status}"
+    );
+}
+
+#[test]
+fn the_labels_are_dim_and_the_values_are_not() {
+    let app = app("design-labels");
+    let buffer = buffer(&app, 140, 40);
+    let (column, row) = place(&buffer, "AX 0000").expect("the register is drawn");
+    let name = buffer.cell((column, row)).expect("the name is drawn");
+    assert_eq!(name.fg, theme::TEXT_SECONDARY, "a label is dim");
+    let value = buffer.cell((column + 3, row)).expect("the value is drawn");
+    assert_eq!(value.fg, theme::TEXT_PRIMARY, "and a value is not");
+}
+
+#[test]
+fn the_source_strip_has_a_header_of_its_own() {
+    let app = app_of("design-strip", SOURCE);
+    let rows = rows(&app, 140, 40);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("source"))
+        .expect("the strip has a header");
+    assert!(listing < strip, "the strip is under the listing: {rows:?}");
+    let panels = rows
+        .iter()
+        .position(|row| row.contains("registers"))
+        .expect("the panels");
+    assert!(strip < panels, "and it is over the panels below: {rows:?}");
 }
