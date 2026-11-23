@@ -68,12 +68,24 @@ red is a watchpoint.
   `Esc` leaves the address as it was, and an address that cannot be read is
   refused in the reference's own words (`bad syntax`) and the window does
   not move.
+- **S12** — The stack is a pane you open, not a fourth column: `4` opens
+  it where the listing is, and `4` again closes it. The window shows the
+  segment, the `SP` and the words around it, so a push and a pop are
+  visible as a region and not as a number. The arrows move the window.
+  Every key that was there before still does what it did.
+- **S13** — The source strip is the context of the current instruction:
+  the program's own lines, three to five of them, each with its number
+  and its own text, and the line the machine is stopped at marked. It is
+  drawn under the listing, and a program that has no source has no strip.
+- **S14** — The source lives in the program: the assembler records where
+  every source line landed, and the debug crate's source panel is a pure
+  function of the program and the machine, the way every other panel is a
+  pure function of the machine and the UI state.
 
 ## Out of scope
 
-- **The panels that are not the disassembly, the registers and the memory**:
-  the stack, the source strip and the guest's screen. Each is its own
-  slice.
+- **The guest's screen**: the reference's own screen is a device of its
+  own, and the research says the TUI is weak there.
 - **The memory's own editing**: `e` writes a register in this slice, and a
   byte of memory is the next one.
 - **The segment the memory pane looks through**: `DS` is the one it looks
@@ -104,9 +116,33 @@ red is a watchpoint.
   drawing test is 18 passed, 0 failed; the model's is 4 passed, 0 failed;
   the whole tree is **499 passed, 0 failed**, and the clippy run is clean
   in every crate.
+- **T4** — The stack pane: the pane that opens where the listing is, the
+  window over the stack, and the keys that move it. S12. **RED**: the
+  seven stack tests failed, because the pane did not exist. **GREEN**:
+  the drawing test is 27 passed, 0 failed; the model's is 6 passed, 0
+  failed.
+- **T5** — The source strip: the assembler records where every source line
+  landed, the panel reads them, and the strip is drawn under the listing.
+  S13-S14. **RED**: the six strip tests failed, because the source was not
+  on the screen at all. **GREEN**: the drawing test is 37 passed, 0
+  failed, and the whole tree is **526 passed, 0 failed**.
 
 ## Log
 
+- **L8 (2026-11-21).** The fourth slice, chosen by the maintainer through
+  the question tool: **the stack and the source strip**.
+  - **The choice.** "Pila + source strip (en paralelo)", and for the
+    design: "Funciones primero, diseño al final".
+  - **The two halves do not touch the same file**, so they are built
+    together: the source map lives in the assembler and in the debug
+    crate's own module, and the stack pane lives in the panels model and
+    in the TUI.
+  - **The design comes at the end**, once every panel is in: one pass
+    over the layout, the colours, the keys and the help, with a visual
+    proof.
+  - **Still open.** The guest's screen; the memory's own editing; the
+    segment the memory pane looks through; the labels in the goto; the
+    flags' own editing; the debug console.
 - **L7 (2026-11-21).** The third slice, chosen by the maintainer through the
   question tool: **the TUI's memory window and its goto**.
   - **The choice.** "TUI: ventana de memoria + goto", and for the cleanup
