@@ -15,7 +15,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 
-use crate::app::{App, Focus};
+use crate::app::{App, Edit, FLAGS_COLUMNS, Focus};
 
 /// The registers panel's grid: two columns.
 const COLUMNS: usize = 2;
@@ -71,7 +71,7 @@ pub fn draw(app: &App, frame: &mut Frame) {
         .split(rows[2]);
     registers(&panels, app, frame, sides[0]);
     memory(&panels, app, frame, sides[1]);
-    flags(&panels, frame, sides[2]);
+    flags(&panels, app, frame, sides[2]);
     status(app, frame, rows[3]);
 }
 
@@ -253,13 +253,11 @@ fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
                 spans.push(Span::raw("  "));
             }
             let name = cell.register.name();
-            let text = match app
-                .edit
-                .as_ref()
-                .filter(|edit| edit.register == cell.register)
-            {
-                Some(edit) => format!("{name} {}", edit.text),
-                None => format!("{name} {:04X}", cell.value),
+            let text = match app.edit.as_ref() {
+                Some(Edit::Register { register, text }) if *register == cell.register => {
+                    format!("{name} {text}")
+                }
+                _ => format!("{name} {:04X}", cell.value),
             };
             let style = if index == app.register_cursor && app.focus == Focus::Registers {
                 Style::default().add_modifier(Modifier::REVERSED)
@@ -311,7 +309,18 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
             } else {
                 Style::default()
             };
-            spans.push(Span::styled(format!("{byte:02X}"), style));
+            // The byte that is being edited shows what has been typed
+            // over it, the way the register under the cursor does.
+            let at = view.window_at.wrapping_add((index + column) as u16);
+            let text = match app.edit.as_ref() {
+                Some(Edit::Byte {
+                    segment,
+                    offset,
+                    text,
+                }) if *segment == view.segment && *offset == at => text.clone(),
+                _ => format!("{byte:02X}"),
+            };
+            spans.push(Span::styled(text, style));
         }
         if printable {
             let characters: String = view.ascii.chars().skip(index).take(bytes_per_row).collect();
@@ -325,20 +334,30 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
 }
 
 /// The flags panel: the nine flags and their values.
-fn flags(panels: &Panels, frame: &mut Frame, area: Rect) {
+///
+/// The cursor is drawn the way the registers panel draws the register
+/// under it: the flag under the cursor is the marked one, and the flag
+/// that is being edited shows what has been typed over it.
+fn flags(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
     let mut lines = Vec::new();
-    for chunk in Flag::ALL.chunks(3) {
+    for (row, chunk) in Flag::ALL.chunks(FLAGS_COLUMNS).enumerate() {
         let mut spans = Vec::new();
-        for (index, flag) in chunk.iter().enumerate() {
-            if index > 0 {
+        for (column, flag) in chunk.iter().enumerate() {
+            if column > 0 {
                 spans.push(Span::raw("  "));
             }
-            let value = if panels.registers.flag(*flag) {
-                "1"
-            } else {
-                "0"
+            let index = row * FLAGS_COLUMNS + column;
+            let value = match app.edit.as_ref() {
+                Some(Edit::Flag { flag: edited, text }) if edited == flag => text.clone(),
+                _ if panels.registers.flag(*flag) => "1".to_string(),
+                _ => "0".to_string(),
             };
-            spans.push(Span::raw(format!("{} {}", flag.name(), value)));
+            let style = if index == app.flag_cursor && app.focus == Focus::Flags {
+                Style::default().add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+            spans.push(Span::styled(format!("{} {}", flag.name(), value), style));
         }
         lines.push(Line::from(spans));
     }
@@ -350,7 +369,7 @@ fn flags(panels: &Panels, frame: &mut Frame, area: Rect) {
 fn status(app: &App, frame: &mut Frame, area: Rect) {
     let text = match (&app.status, &app.edit, &app.goto) {
         (Some(status), _, _) => status.clone(),
-        (None, Some(edit), _) => format!("{} = {}", edit.register.name(), edit.text),
+        (None, Some(edit), _) => edit_says(edit),
         (None, None, Some(goto)) => format!("goto: {}", goto.text),
         (None, None, None) => format!(
             "IP {:04X}  ·  STEP {}  ·  BREAK {}  ·  WATCH {}  ·  q quits · ? helps",
@@ -363,6 +382,21 @@ fn status(app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(text), area);
 }
 
+/// What the status line says about the thing that is being edited.
+///
+/// The register is named with the value that is being typed, the flag is
+/// named, and the byte is named by its address: each of them says what
+/// the value will be written into.
+fn edit_says(edit: &Edit) -> String {
+    match edit {
+        Edit::Register { register, text } => format!("{} = {}", register.name(), text),
+        Edit::Flag { flag, .. } => flag.name().to_string(),
+        Edit::Byte {
+            segment, offset, ..
+        } => format!("{segment:04X}:{offset:04X}"),
+    }
+}
+
 /// The help overlay.
 fn help(frame: &mut Frame, area: Rect) {
     let lines = vec![
@@ -373,11 +407,12 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("1    the disassembly"),
         Line::from("2    the registers"),
         Line::from("3    the memory"),
-        Line::from("4    the stack (4 again closes it)"),
-        Line::from("e    edit the register under the cursor"),
-        Line::from("g    jump the memory to an address"),
+        Line::from("4    the flags"),
+        Line::from("5    the stack (5 again closes it)"),
+        Line::from("e    edit the value under the cursor"),
+        Line::from("g    jump the memory to an address, a label or a segment"),
         Line::from("↑ ↓  move the cursor"),
-        Line::from("← →  move the cursor (registers)"),
+        Line::from("← →  move the cursor (registers, flags)"),
         Line::from("PgUp PgDn  a page of memory"),
         Line::from("Enter commit the edit"),
         Line::from("Esc  cancel the edit, close the stack"),

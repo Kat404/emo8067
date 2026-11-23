@@ -12,7 +12,7 @@ use emo8067_core::regs::{Reg16, Seg};
 use emo8067_debug::breakpoints::Breakpoints;
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
-use emo8067_debug::panels::{Panels, Register, Ui};
+use emo8067_debug::panels::{Flag, Panels, Register, Ui};
 use emo8067_debug::source::SourceView;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
@@ -25,15 +25,57 @@ pub enum Focus {
     Registers,
     /// The memory window.
     Memory,
+    /// The flags.
+    Flags,
 }
 
 /// What is being edited, in place.
+///
+/// The panels write three things: a register, a flag and a byte. The edit
+/// says which one of them it is, because the value that is typed is
+/// written into a different place each time.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Edit {
+pub enum Edit {
     /// The register under the cursor.
-    pub register: Register,
+    Register {
+        /// The register.
+        register: Register,
+        /// What has been typed so far.
+        text: String,
+    },
+    /// The flag under the cursor.
+    Flag {
+        /// The flag.
+        flag: Flag,
+        /// What has been typed so far.
+        text: String,
+    },
+    /// The byte under the memory cursor.
+    Byte {
+        /// The segment the byte is at.
+        segment: u16,
+        /// The offset the byte is at.
+        offset: u16,
+        /// What has been typed so far.
+        text: String,
+    },
+}
+
+impl Edit {
     /// What has been typed so far.
-    pub text: String,
+    #[must_use]
+    pub fn text(&self) -> &str {
+        match self {
+            Edit::Register { text, .. } | Edit::Flag { text, .. } | Edit::Byte { text, .. } => text,
+        }
+    }
+
+    /// What has been typed so far, to write into.
+    pub fn text_mut(&mut self) -> &mut String {
+        match self {
+            Edit::Register { text, .. } | Edit::Flag { text, .. } | Edit::Byte { text, .. } => text,
+        }
+    }
 }
 
 /// The address the memory window is jumped to.
@@ -48,6 +90,12 @@ const ROW: i32 = 16;
 
 /// The bytes a page of the memory window holds.
 const PAGE: i32 = 0x100;
+
+/// The flags the panel shows on a row.
+///
+/// The flags are drawn three to a row, and their cursor moves on that
+/// grid: a flag to the left or to the right, and a row up or down.
+pub const FLAGS_COLUMNS: usize = 3;
 
 /// What the TUI knows.
 #[derive(Debug)]
@@ -74,6 +122,8 @@ pub struct App {
     pub focus: Focus,
     /// Which register of the panel the cursor is on.
     pub register_cursor: usize,
+    /// Which flag of the panel the cursor is on.
+    pub flag_cursor: usize,
     /// Whether the stack pane is open where the listing is.
     ///
     /// The stack is a pane you open and not a fourth column: it takes the
@@ -89,6 +139,12 @@ pub struct App {
     pub edit: Option<Edit>,
     /// The address the memory window is being jumped to.
     pub goto: Option<Goto>,
+    /// The segment the last goto named.
+    ///
+    /// The memory window looks through the segment the goto named, and
+    /// through the data segment when no goto has named one: the choice is
+    /// kept until another goto names another segment.
+    pub goto_segment: Option<u16>,
     /// The UI's state, which the panels are drawn from.
     pub ui: Ui,
     /// Whether the help overlay is up.
@@ -117,10 +173,12 @@ impl App {
             cursor: 0,
             focus: Focus::Disassembly,
             register_cursor: 0,
+            flag_cursor: 0,
             stack_open: false,
             stack_scroll: 0,
             edit: None,
             goto: None,
+            goto_segment: None,
             ui: Ui::default(),
             help: false,
             finished: false,
@@ -150,12 +208,23 @@ impl App {
         // The listing follows `CS:IP`, and the research says it is never
         // asked to disassemble a range.
         ui.disassembly_at = self.cpu.regs.ip;
-        // The memory window looks through the data segment.
-        ui.memory_segment = self.cpu.regs.segment(Seg::Ds);
+        // The memory window looks through the segment the goto named, and
+        // through the data segment when no goto has named one.
+        ui.memory_segment = self.memory_segment();
         // The stack window follows the stack pointer, and the scroll is
         // where the user has moved it to.
         ui.stack_at = self.stack_at();
         Panels::of(&self.cpu, &ui)
+    }
+
+    /// The segment the memory window looks through.
+    ///
+    /// The goto may name a segment, and the choice is kept: the window
+    /// looks through it until another goto names another one. Without one
+    /// the window looks through the data segment, the way it always has.
+    #[must_use]
+    pub fn memory_segment(&self) -> u16 {
+        self.goto_segment.unwrap_or(self.cpu.regs.segment(Seg::Ds))
     }
 
     /// Where the stack window starts: the stack pointer and the scroll.
@@ -234,7 +303,8 @@ impl App {
             KeyCode::Char('1') => self.take_listing(),
             KeyCode::Char('2') => self.focus = Focus::Registers,
             KeyCode::Char('3') => self.focus = Focus::Memory,
-            KeyCode::Char('4') => self.toggle_stack(),
+            KeyCode::Char('4') => self.focus = Focus::Flags,
+            KeyCode::Char('5') => self.toggle_stack(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
             KeyCode::Esc => self.close_stack(),
@@ -266,7 +336,8 @@ impl App {
         match self.focus {
             Focus::Disassembly => Focus::Registers,
             Focus::Registers => Focus::Memory,
-            Focus::Memory => Focus::Disassembly,
+            Focus::Memory => Focus::Flags,
+            Focus::Flags => Focus::Disassembly,
         }
     }
 
@@ -283,6 +354,7 @@ impl App {
             Focus::Disassembly => self.move_listing_cursor(vertical),
             Focus::Registers => self.move_register_cursor(horizontal, vertical),
             Focus::Memory => self.move_memory_cursor(horizontal, vertical),
+            Focus::Flags => self.move_flag_cursor(horizontal, vertical),
         }
     }
 
@@ -341,6 +413,22 @@ impl App {
         self.register_cursor = ((row * 2 + column) as usize).min(last);
     }
 
+    /// The flags panel's cursor, on its three-column grid.
+    ///
+    /// The flags are drawn three to a row, so the arrows move the cursor
+    /// the way the panel is drawn: a flag to the left or to the right, and
+    /// a row of three up or down.
+    fn move_flag_cursor(&mut self, horizontal: i32, vertical: i32) {
+        let last = Flag::ALL.len() - 1;
+        let columns = FLAGS_COLUMNS as i32;
+        let row = (self.flag_cursor / FLAGS_COLUMNS) as i32 + vertical;
+        let column = ((self.flag_cursor % FLAGS_COLUMNS) as i32 + horizontal).clamp(0, columns - 1);
+        if row < 0 {
+            return;
+        }
+        self.flag_cursor = ((row * columns + column) as usize).min(last);
+    }
+
     /// The memory window's cursor: a byte at a time, or a row of sixteen.
     fn move_memory_cursor(&mut self, horizontal: i32, vertical: i32) {
         let at = i32::from(self.ui.memory_at) + horizontal + vertical * ROW;
@@ -353,18 +441,38 @@ impl App {
         self.ui.memory_at = at.clamp(0, 0xFFFF) as u16;
     }
 
-    /// Open the register under the cursor for editing.
+    /// Open what is under the cursor for editing.
+    ///
+    /// A register, a flag or a byte: each of them is edited in place, with
+    /// the value typed over it.
     fn open_edit(&mut self) {
-        if self.focus != Focus::Registers {
-            return;
-        }
-        let Some(register) = Register::ALL.get(self.register_cursor).copied() else {
-            return;
+        let edit = match self.focus {
+            Focus::Registers => {
+                let Some(register) = Register::ALL.get(self.register_cursor).copied() else {
+                    return;
+                };
+                Edit::Register {
+                    register,
+                    text: String::new(),
+                }
+            }
+            Focus::Flags => {
+                let Some(flag) = Flag::ALL.get(self.flag_cursor).copied() else {
+                    return;
+                };
+                Edit::Flag {
+                    flag,
+                    text: String::new(),
+                }
+            }
+            Focus::Memory => Edit::Byte {
+                segment: self.memory_segment(),
+                offset: self.ui.memory_at,
+                text: String::new(),
+            },
+            Focus::Disassembly => return,
         };
-        self.edit = Some(Edit {
-            register,
-            text: String::new(),
-        });
+        self.edit = Some(edit);
         self.status = None;
     }
 
@@ -378,12 +486,12 @@ impl App {
             KeyCode::Enter => self.commit_edit(),
             KeyCode::Backspace => {
                 if let Some(edit) = &mut self.edit {
-                    edit.text.pop();
+                    edit.text_mut().pop();
                 }
             }
             KeyCode::Char(character) => {
                 if let Some(edit) = &mut self.edit {
-                    edit.text.push(character);
+                    edit.text_mut().push(character);
                 }
             }
             _ => {}
@@ -396,11 +504,16 @@ impl App {
     /// evaluator that reads the breakpoint conditions reads this one too:
     /// `1234h`, `4660` and `101b` are the same value, and `BX+1` is an
     /// expression.
+    ///
+    /// What is written depends on what is being edited: a register holds
+    /// sixteen bits, a flag holds one bit, and a byte holds eight. A
+    /// value that does not fit is refused and the machine is left as it
+    /// was.
     fn commit_edit(&mut self) {
         let Some(edit) = self.edit.clone() else {
             return;
         };
-        let text = edit.text.trim();
+        let text = edit.text().trim();
         if text.is_empty() {
             self.edit = None;
             self.status = None;
@@ -414,11 +527,31 @@ impl App {
                 return;
             }
         };
-        if !(0..=0xFFFF).contains(&value) {
-            self.status = Some(format!("value out of range: {value}"));
-            return;
+        match &edit {
+            Edit::Register { register, .. } => {
+                if !(0..=0xFFFF).contains(&value) {
+                    self.status = Some(format!("value out of range: {value}"));
+                    return;
+                }
+                register.write(&mut self.cpu, value as u16);
+            }
+            Edit::Flag { flag, .. } => {
+                if !matches!(value, 0 | 1) {
+                    self.status = Some(format!("value out of range: {value}"));
+                    return;
+                }
+                flag.write(&mut self.cpu, value == 1);
+            }
+            Edit::Byte {
+                segment, offset, ..
+            } => {
+                if !(0..=0xFF).contains(&value) {
+                    self.status = Some(format!("value out of range: {value}"));
+                    return;
+                }
+                self.cpu.mem.write_u8(*segment, *offset, value as u8);
+            }
         }
-        edit.register.write(&mut self.cpu, value as u16);
         self.edit = None;
         self.status = None;
     }
@@ -458,10 +591,11 @@ impl App {
 
     /// Jump the memory window to the address that was typed.
     ///
-    /// The address is hexadecimal, the way the reference types a memory
-    /// address: `0100` is the same address as `100h`. A text that cannot
-    /// be read is refused in the evaluator's own words, the prompt stays
-    /// open, and the window does not move.
+    /// The text is read in the reference's own order: a name of the
+    /// program's own names, then a memory reference `SSSS:OOOO`, and then
+    /// a bare hexadecimal offset. A text that cannot be read is refused
+    /// in the evaluator's own words, the prompt stays open, and the window
+    /// does not move.
     fn commit_goto(&mut self) {
         let Some(goto) = self.goto.clone() else {
             return;
@@ -472,9 +606,14 @@ impl App {
             self.status = None;
             return;
         }
-        match address_of(text) {
-            Ok(address) => {
-                self.ui.memory_at = address;
+        match self.target_of(text) {
+            Ok(target) => {
+                self.ui.memory_at = target.offset;
+                // The segment the goto named is kept: the window looks
+                // through it until another goto names another one.
+                if let Some(segment) = target.segment {
+                    self.goto_segment = Some(segment);
+                }
                 self.goto = None;
                 self.status = None;
             }
@@ -482,6 +621,66 @@ impl App {
                 self.status = Some(error);
             }
         }
+    }
+
+    /// Read the text of a goto, and say where it points.
+    ///
+    /// The text is read in the reference's own order:
+    ///
+    /// * a name of the program's own names wins,
+    /// * then a memory reference `SSSS:OOOO`,
+    /// * and then a bare hexadecimal offset.
+    ///
+    /// The name comes first because it is the most specific of the three:
+    /// the user typed a name and not a number, and the program's own
+    /// names are where the program's own things are. The memory reference
+    /// comes next because it carries a segment as well as an offset, and
+    /// the bare offset comes last because it says nothing but an offset.
+    fn target_of(&self, text: &str) -> Result<Target, String> {
+        // A name of the program's own names: the address it is at is an
+        // offset in the segment the window looks through.
+        if let Some(program) = &self.program {
+            if let Some((_, at)) = program
+                .names
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(text))
+            {
+                return Ok(Target {
+                    offset: *at,
+                    segment: None,
+                });
+            }
+        }
+        // A memory reference: `SSSS:OOOO`. The left half may be the name
+        // of a segment, and then it is the machine's own value of it.
+        if let Some((left, right)) = text.split_once(':') {
+            return Ok(Target {
+                offset: hexadecimal(right)?,
+                segment: Some(self.segment_of(left)?),
+            });
+        }
+        // A bare hexadecimal offset, in the segment the window looks
+        // through.
+        Ok(Target {
+            offset: offset_of(text)?,
+            segment: None,
+        })
+    }
+
+    /// The segment a memory reference names.
+    ///
+    /// The four segment registers have names, and the machine's own value
+    /// of the one that is named is the segment: `DS:0100` is the data
+    /// segment the machine holds and not the number thirteen.
+    fn segment_of(&self, text: &str) -> Result<u16, String> {
+        let segment = match text.trim().to_ascii_uppercase().as_str() {
+            "CS" => Seg::Cs,
+            "DS" => Seg::Ds,
+            "ES" => Seg::Es,
+            "SS" => Seg::Ss,
+            _ => return hexadecimal(text),
+        };
+        Ok(self.cpu.regs.segment(segment))
     }
 
     /// One instruction.
@@ -544,13 +743,36 @@ impl App {
     }
 }
 
-/// Read an address, the way the reference types one.
+/// Where a goto's text points: the offset, and the segment when the text
+/// named one.
+struct Target {
+    /// The offset the window goes to.
+    offset: u16,
+    /// The segment the window looks through, when the text named one.
+    segment: Option<u16>,
+}
+
+/// Read a hexadecimal offset, the way the reference types one.
 ///
-/// The reference types a memory address in hexadecimal and needs no suffix
-/// for it: `SSSS:OOOO`. The evaluator's own `h` suffix is read too, so
-/// `100h` is the same address as `0100`. A text that cannot be read is
-/// refused in the evaluator's own words.
-fn address_of(text: &str) -> Result<u16, String> {
-    let digits = text.strip_suffix(['h', 'H']).unwrap_or(text);
-    u16::from_str_radix(digits, 16).map_err(|_| expr::Error::BadSyntax.to_string())
+/// The reference types an address in hexadecimal and needs no suffix for
+/// it: `0100` is the same address as `100h`. A text that cannot be read
+/// is refused in the evaluator's own words.
+fn offset_of(text: &str) -> Result<u16, String> {
+    let trimmed = text.trim();
+    let digits = trimmed.strip_suffix(['h', 'H']).unwrap_or(trimmed);
+    hexadecimal(digits)
+}
+
+/// Read a plain hexadecimal number, with no suffix.
+///
+/// The two halves of a memory reference are written the way the reference
+/// writes them: `SSSS:OOOO`, with no suffix at all.
+fn hexadecimal(text: &str) -> Result<u16, String> {
+    u16::from_str_radix(text.trim(), 16).map_err(|_| bad_syntax())
+}
+
+/// The refusal of a text that cannot be read, in the evaluator's own
+/// words.
+fn bad_syntax() -> String {
+    expr::Error::BadSyntax.to_string()
 }

@@ -6,7 +6,9 @@
 
 use std::path::PathBuf;
 
+use emo8067_core::flags::{CF, PF};
 use emo8067_core::regs::Reg16;
+use emo8067_debug::panels::Flag;
 use emo8067_tui::app::{App, Focus};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -99,6 +101,17 @@ fn marked(app: &App, width: u16, height: u16) -> String {
         .filter(|cell| cell.modifier.contains(Modifier::REVERSED))
         .map(|cell| cell.symbol())
         .collect()
+}
+
+/// The status line the app draws.
+///
+/// The status line is the last row of the screen, and it says what is
+/// being edited while an edit is open.
+fn status(app: &App, width: u16, height: u16) -> String {
+    rows(app, width, height)
+        .pop()
+        .map(|row| row.trim().to_string())
+        .unwrap_or_default()
 }
 
 /// The keys, one at a time.
@@ -243,15 +256,30 @@ fn the_arrows_move_the_cursor_of_the_pane_that_has_it() {
 }
 
 #[test]
-fn the_focus_cycles_the_three_panes() {
-    let mut app = app("focus-three");
+fn the_focus_cycles_the_four_panes() {
+    let mut app = app("focus-four");
     assert_eq!(app.focus, Focus::Disassembly);
     press(&mut app, &[KeyCode::Tab]);
     assert_eq!(app.focus, Focus::Registers);
     press(&mut app, &[KeyCode::Tab]);
     assert_eq!(app.focus, Focus::Memory, "the memory pane is the third");
     press(&mut app, &[KeyCode::Tab]);
+    assert_eq!(app.focus, Focus::Flags, "and the flags are the fourth");
+    press(&mut app, &[KeyCode::Tab]);
     assert_eq!(app.focus, Focus::Disassembly, "and the cycle closes");
+}
+
+#[test]
+fn the_four_keys_take_their_own_panes() {
+    let mut app = app("focus-keys");
+    press(&mut app, &[KeyCode::Char('1')]);
+    assert_eq!(app.focus, Focus::Disassembly, "1 takes the disassembly");
+    press(&mut app, &[KeyCode::Char('2')]);
+    assert_eq!(app.focus, Focus::Registers, "2 takes the registers");
+    press(&mut app, &[KeyCode::Char('3')]);
+    assert_eq!(app.focus, Focus::Memory, "3 takes the memory");
+    press(&mut app, &[KeyCode::Char('4')]);
+    assert_eq!(app.focus, Focus::Flags, "and 4 takes the flags");
 }
 
 #[test]
@@ -339,7 +367,7 @@ fn the_stack_pane_opens_where_the_listing_is() {
         before.contains("disassembly"),
         "the listing is there to begin with: {before}"
     );
-    press(&mut app, &[KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::Char('5')]);
     let text = screen(&app, 80, 20);
     assert!(text.contains("stack"), "the pane is named: {text}");
     assert!(
@@ -350,13 +378,13 @@ fn the_stack_pane_opens_where_the_listing_is() {
         !text.contains("MOV"),
         "and neither is the listing's own text: {text}"
     );
-    press(&mut app, &[KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::Char('5')]);
     let text = screen(&app, 80, 20);
     assert!(
         text.contains("disassembly"),
         "and the listing comes back: {text}"
     );
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::Esc]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::Esc]);
     let text = screen(&app, 80, 20);
     assert!(
         text.contains("disassembly"),
@@ -367,7 +395,7 @@ fn the_stack_pane_opens_where_the_listing_is() {
 #[test]
 fn the_stack_window_moves_with_the_arrows() {
     let mut app = app_of("stack-arrows", "org 100h\n#sp=0200#\nhlt\n");
-    press(&mut app, &[KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::Char('5')]);
     let text = screen(&app, 80, 24);
     assert!(
         text.contains("0200  0000"),
@@ -396,7 +424,7 @@ fn a_pushed_word_is_in_the_window() {
     );
     press(
         &mut app,
-        &[KeyCode::Char('4'), KeyCode::F(8), KeyCode::F(8)],
+        &[KeyCode::Char('5'), KeyCode::F(8), KeyCode::F(8)],
     );
     let text = screen(&app, 80, 24);
     assert!(
@@ -413,7 +441,7 @@ fn the_word_the_pointer_is_at_is_marked() {
     );
     press(
         &mut app,
-        &[KeyCode::Char('4'), KeyCode::F(8), KeyCode::F(8)],
+        &[KeyCode::Char('5'), KeyCode::F(8), KeyCode::F(8)],
     );
     assert_eq!(
         marked(&app, 80, 24),
@@ -425,7 +453,7 @@ fn the_word_the_pointer_is_at_is_marked() {
 #[test]
 fn the_arrows_do_not_move_the_listing_while_the_stack_pane_is_open() {
     let mut app = app("stack-listing");
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::Down]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::Down]);
     assert_eq!(app.cursor, 0, "the listing's cursor did not move");
     assert_eq!(app.stack_scroll, 2, "and the stack window did");
 }
@@ -433,13 +461,13 @@ fn the_arrows_do_not_move_the_listing_while_the_stack_pane_is_open() {
 #[test]
 fn a_breakpoint_is_not_set_while_the_stack_pane_holds_the_listings_place() {
     let mut app = app("stack-breakpoint");
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::F(9)]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::F(9)]);
     assert_eq!(
         app.breakpoints.breakpoints().len(),
         0,
         "the cursor is not on the screen, so there is nowhere to set one"
     );
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::F(9)]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::F(9)]);
     assert_eq!(
         app.breakpoints.breakpoints().len(),
         1,
@@ -450,9 +478,9 @@ fn a_breakpoint_is_not_set_while_the_stack_pane_holds_the_listings_place() {
 #[test]
 fn the_stack_window_starts_at_the_pointer_every_time_it_is_opened() {
     let mut app = app_of("stack-open", "org 100h\n#sp=0200#\nhlt\n");
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::Down]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::Down]);
     assert_eq!(app.stack_scroll, 2, "the window was moved away");
-    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::Char('5'), KeyCode::Char('5')]);
     assert_eq!(app.stack_scroll, 0, "and it starts at the pointer again");
     let text = screen(&app, 80, 24);
     assert!(
@@ -464,7 +492,7 @@ fn the_stack_window_starts_at_the_pointer_every_time_it_is_opened() {
 #[test]
 fn the_keys_that_were_there_before_still_do_what_they_did_with_the_stack_open() {
     let mut app = app("stack-keys");
-    press(&mut app, &[KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::Char('5')]);
     press(&mut app, &[KeyCode::F(8)]);
     assert_eq!(app.steps, 1, "F8 still steps the machine");
     press(&mut app, &[KeyCode::Char('2')]);
@@ -487,7 +515,7 @@ fn the_help_overlay_lists_the_stack() {
     press(&mut app, &[KeyCode::Char('?')]);
     let text = screen(&app, 80, 40);
     assert!(
-        text.contains("4    the stack"),
+        text.contains("5    the stack"),
         "the help names the key: {text}"
     );
 }
@@ -663,4 +691,210 @@ fn an_app_with_no_program_has_no_source() {
     let view = app.source_view(3);
     assert!(view.lines.is_empty(), "there is no source to show");
     assert_eq!(view.current, None, "and nowhere to be stopped at");
+}
+
+#[test]
+fn the_byte_under_the_memory_cursor_is_written() {
+    let mut app = app("memory-edit");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('e')]);
+    type_text(&mut app, "34h");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(
+        app.cpu.mem.read_u8(0x0000, 0x0000),
+        0x34,
+        "the byte is in the machine's memory"
+    );
+    let panels = app.panels();
+    assert_eq!(
+        panels.memory.bytes[panels.memory.cursor], 0x34,
+        "and the panel reads it back"
+    );
+    assert!(app.edit.is_none(), "and the edit is over");
+}
+
+#[test]
+fn a_byte_that_does_not_fit_is_refused() {
+    let mut app = app("memory-refuse-range");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('e')]);
+    type_text(&mut app, "1FFh");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(
+        app.cpu.mem.read_u8(0x0000, 0x0000),
+        0x00,
+        "the memory is as it was"
+    );
+    let status = app.status.clone().unwrap_or_default();
+    assert!(status.contains("out of range"), "and it says why: {status}");
+    assert!(app.edit.is_some(), "and the edit is still open");
+}
+
+#[test]
+fn the_byte_under_the_cursor_is_drawn_as_being_edited() {
+    let mut app = app("memory-edit-drawing");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('e')]);
+    type_text(&mut app, "5Ah");
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("5Ah"),
+        "the byte shows what was typed: {text}"
+    );
+}
+
+#[test]
+fn the_flag_under_the_flags_cursor_is_written() {
+    let mut app = app("flag-edit");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('e')]);
+    type_text(&mut app, "1");
+    press(&mut app, &[KeyCode::Enter]);
+    assert!(app.cpu.regs.flags.get(CF), "the carry is in the flags word");
+    assert!(
+        app.panels().registers.flag(Flag::Cf),
+        "and the panel reads the new value"
+    );
+    assert!(app.edit.is_none(), "and the edit is over");
+}
+
+#[test]
+fn the_flag_the_cursor_is_on_is_the_one_that_is_written() {
+    let mut app = app("flag-cursor");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Right]);
+    press(&mut app, &[KeyCode::Char('e')]);
+    type_text(&mut app, "1");
+    press(&mut app, &[KeyCode::Enter]);
+    assert!(app.cpu.regs.flags.get(PF), "the parity flag is set");
+    assert!(!app.cpu.regs.flags.get(CF), "and the carry is as it was");
+}
+
+#[test]
+fn a_flag_that_is_not_a_boolean_is_refused() {
+    let mut app = app("flag-refuse");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('e')]);
+    type_text(&mut app, "2");
+    press(&mut app, &[KeyCode::Enter]);
+    assert!(!app.cpu.regs.flags.get(CF), "the flag is as it was");
+    let status = app.status.clone().unwrap_or_default();
+    assert!(status.contains("out of range"), "and it says why: {status}");
+    assert!(app.edit.is_some(), "and the edit is still open");
+}
+
+#[test]
+fn the_flag_under_the_cursor_is_drawn_as_being_edited() {
+    let mut app = app("flag-edit-drawing");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('e')]);
+    type_text(&mut app, "1");
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("CF 1"),
+        "the flag shows what was typed: {text}"
+    );
+}
+
+#[test]
+fn the_arrows_move_the_flags_cursor() {
+    let mut app = app("flag-arrows");
+    press(&mut app, &[KeyCode::Char('4')]);
+    assert_eq!(app.flag_cursor, 0, "the cursor is on the first flag");
+    press(&mut app, &[KeyCode::Right]);
+    assert_eq!(app.flag_cursor, 1, "one flag to the right");
+    press(&mut app, &[KeyCode::Down]);
+    assert_eq!(app.flag_cursor, 4, "and one row down");
+    press(&mut app, &[KeyCode::Up]);
+    assert_eq!(app.flag_cursor, 1, "and back up again");
+    press(&mut app, &[KeyCode::Left]);
+    assert_eq!(app.flag_cursor, 0, "and back to the first");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Down]);
+    assert_eq!(
+        app.flag_cursor, 0,
+        "and it stays put when another pane has the focus"
+    );
+}
+
+#[test]
+fn the_status_line_says_what_is_being_edited() {
+    let mut app = app("status-edit");
+    press(&mut app, &[KeyCode::Char('2'), KeyCode::Char('e')]);
+    type_text(&mut app, "34h");
+    assert_eq!(status(&app, 80, 20), "AX = 34h", "the register is named");
+    press(&mut app, &[KeyCode::Esc]);
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('e')]);
+    type_text(&mut app, "1");
+    assert_eq!(status(&app, 80, 20), "CF", "the flag is named");
+    press(&mut app, &[KeyCode::Esc]);
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('e')]);
+    type_text(&mut app, "34h");
+    assert_eq!(status(&app, 80, 20), "0000:0000", "the address is named");
+}
+
+#[test]
+fn the_stack_opens_with_five() {
+    let mut app = app("stack-five");
+    press(&mut app, &[KeyCode::Char('5')]);
+    assert!(app.stack_open, "the stack is open");
+    press(&mut app, &[KeyCode::Char('5')]);
+    assert!(!app.stack_open, "and it closes again");
+}
+
+#[test]
+fn the_goto_with_a_label_jumps_to_the_label() {
+    let mut app = app_of("goto-label", "org 100h\nstart: mov ax, 1234h\nhlt\n");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "start");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0x0100, "the window is at the label");
+    assert!(app.goto.is_none(), "and the prompt is closed");
+}
+
+#[test]
+fn the_goto_with_a_memory_reference_jumps_and_looks_through_that_segment() {
+    let mut app = app("goto-reference");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0200:0300");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0x0300, "the window is at the offset");
+    assert_eq!(
+        app.panels().memory.segment,
+        0x0200,
+        "and it looks through the segment the goto named"
+    );
+}
+
+#[test]
+fn the_goto_with_a_segment_name_looks_through_the_machines_own_segment() {
+    let mut app = app_of("goto-segment", "org 100h\n#ds=0200#\nhlt\n");
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "DS:0300");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0x0300, "the window is at the offset");
+    assert_eq!(
+        app.panels().memory.segment,
+        0x0200,
+        "and it looks through the machine's own data segment"
+    );
+}
+
+#[test]
+fn the_window_looks_through_ds_until_a_goto_names_another_segment() {
+    let mut app = app_of("goto-keeps", "org 100h\n#ds=0200#\nhlt\n");
+    assert_eq!(
+        app.panels().memory.segment,
+        0x0200,
+        "the window looks through the data segment"
+    );
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0400:0500");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(
+        app.panels().memory.segment,
+        0x0400,
+        "the segment the goto named is kept"
+    );
+    press(&mut app, &[KeyCode::Char('3'), KeyCode::Char('g')]);
+    type_text(&mut app, "0600");
+    press(&mut app, &[KeyCode::Enter]);
+    assert_eq!(app.ui.memory_at, 0x0600, "a bare offset moves the window");
+    assert_eq!(
+        app.panels().memory.segment,
+        0x0400,
+        "and the segment is the one the goto named"
+    );
 }

@@ -69,6 +69,25 @@ fn a_register_can_be_written() {
 }
 
 #[test]
+fn a_flag_can_be_written_and_the_others_are_left_alone() {
+    let mut cpu = machine();
+    let before = cpu.regs.flags.0;
+    assert!(!cpu.regs.flags.get(CF), "the carry starts clear");
+
+    Flag::Cf.write(&mut cpu, true);
+    assert!(cpu.regs.flags.get(CF), "the carry is set");
+    assert_eq!(
+        cpu.regs.flags.0 & !CF,
+        before & !CF,
+        "and the other flags are as they were"
+    );
+
+    Flag::Cf.write(&mut cpu, false);
+    assert!(!cpu.regs.flags.get(CF), "and it can be cleared again");
+    assert_eq!(cpu.regs.flags.0, before, "with the word as it was");
+}
+
+#[test]
 fn the_stack_window_is_where_the_ui_says_and_not_where_the_pointer_is() {
     let mut cpu = Cpu::new();
     cpu.regs.set_segment(Seg::Ss, 0x0200);

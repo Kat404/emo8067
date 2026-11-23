@@ -250,6 +250,15 @@ impl Flag {
             Flag::Df => DF,
         }
     }
+
+    /// Write a value into this flag.
+    ///
+    /// The other side of the panel's door: the model reads the machine,
+    /// and this writes it. The flag is a bit of the flags word, and the
+    /// other bits are left as they were.
+    pub fn write(self, cpu: &mut Cpu, value: bool) {
+        cpu.regs.flags.set(self.mask(), value);
+    }
 }
 
 impl Registers {
