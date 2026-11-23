@@ -136,6 +136,22 @@ impl Register {
     }
 }
 
+/// One line of the source, and where it landed.
+///
+/// A line that produced no bytes - a comment, a directive, a label on a
+/// line of its own - is not in the list: there is no address for it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SourceLine {
+    /// The line's number in the file.
+    pub number: usize,
+    /// The address the line's bytes are at.
+    pub address: u16,
+    /// How many bytes the line produced.
+    pub length: usize,
+    /// The line's own text, as the source wrote it.
+    pub text: String,
+}
+
 /// A program, assembled.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Program {
@@ -148,6 +164,8 @@ pub struct Program {
     /// The state the program asks to start in, by the reference's own
     /// register initialisers.
     pub initial: Vec<(Register, u16)>,
+    /// The lines that produced bytes, and where each of them landed.
+    pub lines: Vec<SourceLine>,
 }
 
 impl std::fmt::Display for Error {
@@ -186,6 +204,20 @@ enum Effect {
     Instruction(String, Vec<String>, u16, usize),
 }
 
+/// A line of the program, as the assembler reads it.
+///
+/// The line keeps the text the source wrote it with beside the code the
+/// assembler reads out of it: the source panel shows the line as the
+/// source wrote it.
+struct Source {
+    /// The number the line has in the source.
+    number: usize,
+    /// The line as the assembler read it.
+    parsed: line::Line,
+    /// The line's own text, as the source wrote it.
+    text: String,
+}
+
 /// Assemble a program.
 pub fn assemble_program(source: &str) -> Result<Program, Error> {
     // A macro is a line of the source that stands for other lines.
@@ -205,15 +237,25 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
     // The labels come after the macros are expanded: the body of a macro
     // carries labels of its own, and the reference's own examples write
     // them without a colon.
-    let source_lines: Vec<(usize, String)> = source_lines
+    //
+    // The line keeps the text the source wrote it with beside the code the
+    // assembler reads out of it, and the text is the one before the colon
+    // was put in: the source panel shows the line as the source wrote it.
+    let source_lines: Vec<(usize, String, String)> = source_lines
         .into_iter()
-        .map(|(number, raw)| (number, label_first(&raw, &known)))
-        .filter(|(_, raw)| !raw.trim().is_empty())
+        .map(|(number, raw)| (number, label_first(&raw, &known), raw))
+        .filter(|(_, code, _)| !code.trim().is_empty())
         .collect();
     // A line with nothing on it - blank, or only a comment - is not code.
-    let lines: Vec<(usize, line::Line)> = source_lines
+    let lines: Vec<Source> = source_lines
         .iter()
-        .filter_map(|(number, raw)| line::parse(raw).ok().map(|parsed| (*number, parsed)))
+        .filter_map(|(number, code, text)| {
+            line::parse(code).ok().map(|parsed| Source {
+                number: *number,
+                parsed,
+                text: text.trim_end().to_string(),
+            })
+        })
         .collect();
     // The segments the source declares. A segment is a name the program
     // gives a part of itself, and the flat program has one segment, so a
@@ -224,8 +266,8 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
     // them. A constant whose value needs an address - `size = ($ - x1) / 2` -
     // cannot be read yet, and the walk that counts the addresses reads it.
     let mut constants: Vec<(String, Vec<i64>)> = Vec::new();
-    for (_, parsed) in &lines {
-        if let Some((name, values)) = equ(parsed, &constants, &[], 0) {
+    for source in &lines {
+        if let Some((name, values)) = equ(&source.parsed, &constants, &[], 0) {
             constants.push((name, values));
         }
     }
@@ -259,24 +301,52 @@ pub fn assemble_program(source: &str) -> Result<Program, Error> {
         bytes: Vec::new(),
         names: names.clone(),
         initial,
+        lines: Vec::new(),
     };
     let mut address = origin;
-    for (number, parsed) in &lines {
-        match effect(parsed, &mut constants, &segments, &names, address, true).map_err(|error| {
-            Error::AtLine {
-                line: *number,
-                error: Box::new(error),
-            }
+    for source in &lines {
+        let number = source.number;
+        match effect(
+            &source.parsed,
+            &mut constants,
+            &segments,
+            &names,
+            address,
+            true,
+        )
+        .map_err(|error| Error::AtLine {
+            line: number,
+            error: Box::new(error),
         })? {
             Effect::Nothing | Effect::Label(..) | Effect::Constant | Effect::Origin(..) => {}
             Effect::End => break,
             Effect::Bytes(_, bytes) => {
+                // The line produced bytes, so it has an address: this is
+                // where the source map is written down.
+                program.lines.push(SourceLine {
+                    number,
+                    address,
+                    length: bytes.len(),
+                    text: source.text.clone(),
+                });
                 program.bytes.extend_from_slice(&bytes);
                 address = address.wrapping_add(bytes.len() as u16);
             }
             Effect::Instruction(_, texts, at, size) => {
-                let bytes =
-                    assemble_instruction(parsed, &texts, &constants, &segments, &names, at)?;
+                let bytes = assemble_instruction(
+                    &source.parsed,
+                    &texts,
+                    &constants,
+                    &segments,
+                    &names,
+                    at,
+                )?;
+                program.lines.push(SourceLine {
+                    number,
+                    address: at,
+                    length: bytes.len(),
+                    text: source.text.clone(),
+                });
                 program.bytes.extend_from_slice(&bytes);
                 address = at.wrapping_add(size as u16);
             }
@@ -390,7 +460,7 @@ const MAX_PASSES: usize = 8;
 
 /// Walk the program once, to count the addresses.
 fn count(
-    lines: &[(usize, line::Line)],
+    lines: &[Source],
     constants: &mut Vec<(String, Vec<i64>)>,
     segments: &[String],
     known: &[(String, u16)],
@@ -398,13 +468,14 @@ fn count(
     let mut origin = 0u16;
     let mut address = 0u16;
     let mut names: Vec<(String, u16)> = Vec::new();
-    for (number, parsed) in lines {
-        match effect(parsed, constants, segments, known, address, false).map_err(|error| {
-            Error::AtLine {
-                line: *number,
+    for source in lines {
+        let number = source.number;
+        match effect(&source.parsed, constants, segments, known, address, false).map_err(
+            |error| Error::AtLine {
+                line: number,
                 error: Box::new(error),
-            }
-        })? {
+            },
+        )? {
             Effect::Nothing => {}
             Effect::Label(name) => names.push((name, address)),
             Effect::Constant => {}
@@ -624,16 +695,20 @@ fn expand_at(
 /// MASM-style `.data` and `.code`. A segment is a name, and the flat
 /// program this assembler makes has one segment, so the name is worth
 /// nothing as a number.
-fn segments_of(lines: &[(usize, line::Line)]) -> Vec<String> {
+fn segments_of(lines: &[Source]) -> Vec<String> {
     let mut segments: Vec<String> = Vec::new();
-    for (_, parsed) in lines {
-        let mnemonic = parsed.mnemonic.trim_start_matches('.').to_ascii_uppercase();
+    for source in lines {
+        let mnemonic = source
+            .parsed
+            .mnemonic
+            .trim_start_matches('.')
+            .to_ascii_uppercase();
         if directives::is_segment(&mnemonic) {
             // `.data` is the segment called `data`.
             segments.push(mnemonic.to_ascii_lowercase());
         }
         if mnemonic == "SEGMENT" {
-            if let Some(label) = &parsed.label {
+            if let Some(label) = &source.parsed.label {
                 segments.push(label.to_ascii_lowercase());
             }
         }
