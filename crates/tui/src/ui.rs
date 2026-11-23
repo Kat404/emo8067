@@ -30,7 +30,7 @@ use ratatui::buffer::{Buffer, CellDiffOption};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Clear, Paragraph, Widget};
+use ratatui::widgets::{Paragraph, Widget};
 
 use crate::app::{App, Edit, FLAGS_COLUMNS, Focus};
 
@@ -47,10 +47,16 @@ const WIDE_BYTES: usize = 16;
 /// The bytes a row of the memory window holds under one.
 const NARROW_BYTES: usize = 8;
 
+/// The most bytes a row of the memory window holds.
+///
+/// The count is a power of two, so that the addresses of the rows are
+/// the addresses the memory is written at.
+const MAX_BYTES: usize = 64;
+
 /// The screen's width at which the memory window shows sixteen bytes.
 ///
-/// The window shows sixteen bytes a row over this width, and eight under
-/// it: a narrow terminal has no room for the printable side beside them.
+/// The window shows the design's own bytes over this width, and eight
+/// under it, and as many more as its share of the band holds.
 const WIDE_SCREEN: u16 = 140;
 
 /// The width of the memory window's gutter: the address, and the space
@@ -60,8 +66,11 @@ const GUTTER: usize = 5;
 /// The columns the registers take.
 const REGISTERS_WIDTH: u16 = 22;
 
-/// The columns the flags take.
-const FLAGS_WIDTH: u16 = 20;
+/// The columns the flags' own cells take.
+///
+/// The flags are drawn three to a row, and their cells are four columns
+/// wide: the name of the flag, a space and its value.
+const FLAGS_CONTENT: usize = 16;
 
 /// The lines of source the strip shows at most.
 ///
@@ -75,9 +84,23 @@ const SOURCE_LINES: u16 = 5;
 /// more row of the band.
 const LISTING_ROWS: u16 = 3;
 
+/// The columns a line of the source strip takes before its own text.
+///
+/// The marker of the line, the number the source gave it and the space
+/// after it.
+const SOURCE_GUTTER: usize = 7;
+
 /// The glyph that says "here": the instruction the machine is at, and the
 /// place the console's cursor is at.
 const HERE: &str = "▸";
+
+/// The caret of the console's command line.
+///
+/// It is the terminal's own: the block a terminal draws where the next
+/// character goes, in the cell that is inverted. It is not a glyph of the
+/// screen's family — `▸` means "here" and nothing else — and it is the
+/// terminal that draws it, not the screen.
+const CARET: &str = "█";
 
 /// The glyph of a breakpoint.
 const BREAKPOINT: &str = "◆";
@@ -128,7 +151,6 @@ fn bytes_of(line: &Instruction) -> String {
 
 /// Draw the whole screen.
 pub fn draw(app: &App, frame: &mut Frame) {
-    let panels = app.panels();
     let area = frame.area();
     // The ground of the screen is the canvas, and the header and the
     // bottom band are one step above it.
@@ -150,8 +172,13 @@ pub fn draw(app: &App, frame: &mut Frame) {
         .split(area);
     header(app, frame, rows[0]);
     rule(frame, rows[1]);
+    // The listing asks the model for as many instructions as the band
+    // holds: the model reads a window of bytes and gives the
+    // instructions it finds in it, and the band says how many of them
+    // are shown.
+    let panels = app.panels_with(listing_rows(app, rows[2].height));
     if app.help {
-        help(frame, rows[2]);
+        help(app, frame, rows[2]);
     } else if app.console_open {
         console(app, frame, rows[2]);
     } else if app.conditions_open {
@@ -163,20 +190,22 @@ pub fn draw(app: &App, frame: &mut Frame) {
     }
     rule(frame, rows[3]);
     // The bottom band: the registers, the memory window and the flags,
-    // side by side and separated by a rule.
+    // side by side and separated by a rule. The memory window takes the
+    // width its bytes need, and the flags take what is left.
+    let window = Memory::of(area.width);
     let sides = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(REGISTERS_WIDTH),
             Constraint::Length(1),
-            Constraint::Min(0),
+            Constraint::Length(window.width as u16),
             Constraint::Length(1),
-            Constraint::Length(FLAGS_WIDTH),
+            Constraint::Min(0),
         ])
         .split(rows[4]);
     frame.render_widget(Paragraph::new("").style(theme::surface()), rows[4]);
     registers(&panels, app, frame, sides[0]);
-    memory(&panels, app, frame, sides[2], area.width);
+    memory(&panels, app, frame, sides[2], &window);
     flags(&panels, app, frame, sides[4]);
     vertical_rule(frame, sides[1]);
     vertical_rule(frame, sides[3]);
@@ -253,36 +282,103 @@ fn section_style(focused: bool) -> Style {
 /// The band is split in two: the listing above, the strip below. The strip
 /// has a header of its own, so it does not float, and it takes as many
 /// rows as it can without squeezing the listing out - the listing keeps
-/// three rows of its own - and a program that has no source leaves the
-/// band to the listing alone.
+/// half of the band - and a program that has no source leaves the band to
+/// the listing alone.
 fn listing(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
-    // The model says how many lines the program has, and the band says how
-    // many of them fit under the listing.
-    let view = app.source_view(usize::from(SOURCE_LINES));
-    let rows = source_rows(area.height, view.lines.len() as u16);
+    let strip = Strip::of(app, area.height);
     let parts = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(rows)])
+        .constraints([Constraint::Min(0), Constraint::Length(strip.rows)])
         .split(area);
     disassembly(panels, app, frame, parts[0]);
-    if rows > 0 {
+    if strip.rows > 0 {
         // The view is asked again for the count the strip shows, so the
         // window of lines is the one that fits in the band.
-        let view = app.source_view(usize::from(rows - 1));
-        source(&view, frame, parts[1]);
+        let view = app.source_view(usize::from(strip.lines));
+        source(&view, frame, parts[1], &strip);
     }
 }
 
-/// The rows the source strip takes of the band.
+/// The rows the listing's instructions take of the band.
 ///
-/// The strip has a header of its own and the lines under it, and the
-/// listing keeps three rows of its own: the band is short on an 80x20
-/// terminal, and the strip must not squeeze the listing out. A program
-/// with fewer lines than that takes only the rows it has.
-fn source_rows(height: u16, available: u16) -> u16 {
-    let room = height.saturating_sub(LISTING_ROWS + 2);
-    let lines = room.min(SOURCE_LINES).min(available);
-    if lines == 0 { 0 } else { lines + 1 }
+/// The listing asks the model for as many instructions as the band
+/// holds, and the strip takes the rest: the model reads a window of
+/// bytes and gives the instructions it finds in it.
+fn listing_rows(app: &App, height: u16) -> usize {
+    let strip = Strip::of(app, height);
+    usize::from(height.saturating_sub(strip.rows).saturating_sub(1))
+}
+
+/// The source strip's shape: the rows it takes of the band, the lines it
+/// shows and the columns the lines go in.
+///
+/// The strip shows the program's own lines - five of them at most - and
+/// the listing is the panel a debugger lives in: it keeps half of the
+/// band, and the strip takes the rest. The lines go in one column when
+/// they fit in the rows the strip has, and in two when they do not: a
+/// narrow screen has few rows, and the context of the machine is worth
+/// more than the rows it takes.
+struct Strip {
+    /// The rows the strip takes of the band, its header among them.
+    rows: u16,
+    /// The lines the strip shows.
+    lines: u16,
+    /// The columns the lines go in.
+    columns: u16,
+}
+
+impl Strip {
+    /// The strip's shape, for a band of the given height.
+    ///
+    /// The program's own lines say how many there are, and the band says
+    /// how many of them fit in it.
+    fn of(app: &App, height: u16) -> Strip {
+        let view = app.source_view(usize::from(SOURCE_LINES));
+        let available = view.lines.len() as u16;
+        // The listing keeps half of the band, and never fewer than its
+        // own rows: the strip must not squeeze it out.
+        let listing = LISTING_ROWS.max(height.div_ceil(2));
+        // The rows the strip's lines have, over and above its header.
+        let spare = height.saturating_sub(listing + 2);
+        let lines = SOURCE_LINES.min(available);
+        if lines == 0 {
+            return Strip {
+                rows: 0,
+                lines: 0,
+                columns: 1,
+            };
+        }
+        // One column when the lines fit in the rows the strip has, and
+        // two when they do not.
+        if lines <= spare {
+            Strip {
+                rows: lines + 1,
+                lines,
+                columns: 1,
+            }
+        } else if lines.div_ceil(2) <= spare {
+            Strip {
+                rows: lines.div_ceil(2) + 1,
+                lines,
+                columns: 2,
+            }
+        } else if spare == 0 {
+            // The band has no room for the strip at all.
+            Strip {
+                rows: 0,
+                lines: 0,
+                columns: 1,
+            }
+        } else {
+            // The band is too short for them: the strip keeps what it
+            // has room for, and the listing keeps the rest.
+            Strip {
+                rows: spare + 1,
+                lines: spare,
+                columns: 1,
+            }
+        }
+    }
 }
 
 /// The disassembly: the instructions, with the cursor and the markers.
@@ -409,7 +505,11 @@ fn state_marker(app: &App, line: &Instruction) -> Option<(&'static str, Style)> 
 /// source's own text, and the line the machine is stopped at carries `▸`
 /// and the accent: the listing's own glyph, and the listing's own
 /// meaning.
-fn source(view: &SourceView, frame: &mut Frame, area: Rect) {
+///
+/// The lines go in as many columns as the strip has: a narrow screen has
+/// few rows, and the context of the machine is worth more than the rows
+/// it takes.
+fn source(view: &SourceView, frame: &mut Frame, area: Rect, strip: &Strip) {
     let header = Line::from(Span::styled("source", theme::muted()));
     frame.render_widget(
         Paragraph::new(header).style(theme::canvas()),
@@ -420,35 +520,62 @@ fn source(view: &SourceView, frame: &mut Frame, area: Rect) {
         height: area.height.saturating_sub(1),
         ..area
     };
-    let lines = view
-        .lines
-        .iter()
-        .enumerate()
-        .map(|(index, line)| {
-            let current = view.current == Some(index);
-            let text = if current {
-                theme::accent()
-            } else {
-                theme::value()
-            };
-            Line::from(vec![
-                Span::styled(
+    let columns = usize::from(strip.columns);
+    let per_column = usize::from(strip.lines).div_ceil(columns);
+    // The width of a column: the lines of a column are cut to it, so
+    // that one column never runs into the next.
+    let width = usize::from(area.width) / columns;
+    let lines = (0..per_column)
+        .map(|row| {
+            let mut spans = Vec::new();
+            for column in 0..columns {
+                let index = column * per_column + row;
+                let Some(line) = view.lines.get(index) else {
+                    continue;
+                };
+                if column > 0 {
+                    spans.push(Span::raw("  "));
+                }
+                let current = view.current == Some(index);
+                let text = if current {
+                    theme::accent()
+                } else {
+                    theme::value()
+                };
+                spans.push(Span::styled(
                     if current { HERE } else { " " },
                     if current {
                         theme::accent()
                     } else {
                         theme::canvas()
                     },
-                ),
-                Span::styled(format!("{:>4}", line.number), theme::meta()),
-                Span::raw("  "),
+                ));
+                spans.push(Span::styled(format!("{:>4}", line.number), theme::meta()));
+                spans.push(Span::raw("  "));
                 // The model keeps the truth: the drawing tidies the line,
                 // and the space at its end is not part of the source.
-                Span::styled(line.text.trim_end().to_string(), text),
-            ])
+                spans.push(Span::styled(
+                    cut(line.text.trim_end(), width.saturating_sub(SOURCE_GUTTER)),
+                    text,
+                ));
+            }
+            Line::from(spans)
         })
         .collect::<Vec<_>>();
     frame.render_widget(Paragraph::new(lines).style(theme::canvas()), body);
+}
+
+/// A text, cut to the width it has.
+///
+/// A line that does not fit is cut with `…`, the way the design says a
+/// value is cut: a source line is not a value that wraps.
+fn cut(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_string();
+    }
+    let mut out: String = text.chars().take(width.saturating_sub(1)).collect();
+    out.push('…');
+    out
 }
 
 /// The stack pane: the words on the stack, and the pointer among them.
@@ -634,12 +761,13 @@ fn console(app: &App, frame: &mut Frame, area: Rect) {
         .collect::<Vec<_>>();
     frame.render_widget(Paragraph::new(lines).style(theme::canvas()), parts[0]);
     // The command line: the `:` is the key that opens the console, and
-    // the `▸` is the cursor of the line: the place where the next
-    // character goes.
+    // the caret is the terminal's own: the inverted cell where the next
+    // character goes. It is not the `▸` of the listing, which means
+    // "here" and nothing else.
     let line = Line::from(vec![
         Span::styled(": ", theme::value()),
         Span::styled(app.console.text.clone(), theme::value()),
-        Span::styled(HERE, theme::accent()),
+        Span::styled(CARET, theme::value().add_modifier(Modifier::REVERSED)),
     ]);
     frame.render_widget(Paragraph::new(line).style(theme::canvas()), parts[1]);
 }
@@ -712,7 +840,7 @@ fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
 /// The byte under the cursor is marked whether the section has the focus
 /// or not: with the accent when it has it, and with the muted colour when
 /// it does not.
-fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, screen: u16) {
+fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, window: &Memory) {
     let view = &panels.memory;
     let header = Line::from(Span::styled(
         format!("memory · {:04X}:{:04X}", view.segment, view.at),
@@ -727,11 +855,7 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, screen: u16
         height: area.height.saturating_sub(1),
         ..area
     };
-    let width = usize::from(body.width);
-    let per_row = bytes_per_row(screen, width);
-    // What fits in the panel: the gutter, the bytes as hex, and — when
-    // there is room for it — the printable side.
-    let printable = width >= GUTTER + per_row * 4;
+    let per_row = window.bytes;
     let rows = usize::from(body.height);
     // The window follows the cursor: the cursor's row is in the middle of
     // what is shown, and the window is never left behind.
@@ -784,7 +908,7 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, screen: u16
             }
             spans.push(Span::styled(text, style));
         }
-        if printable {
+        if window.printable {
             let characters: String = view.ascii.chars().skip(index).take(per_row).collect();
             spans.push(Span::styled(format!(" {characters}"), theme::muted()));
         }
@@ -793,17 +917,60 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, screen: u16
     frame.render_widget(MemoryRows { lines, cursor }, body);
 }
 
-/// The bytes a row of the memory window holds.
+/// The memory window's shape: the bytes a row holds, the printable side
+/// beside them, and the width the rows take.
 ///
-/// The window shows sixteen bytes over a wide screen, and eight under one:
-/// a narrow terminal has no room for the printable side beside them.
-fn bytes_per_row(screen: u16, width: usize) -> usize {
-    let wanted = if screen >= WIDE_SCREEN {
-        WIDE_BYTES
-    } else {
-        NARROW_BYTES
-    };
-    wanted.min(width.saturating_sub(GUTTER) / 3).max(1)
+/// The window takes the width its bytes need: the bytes are drawn in the
+/// section, and the section is as wide as they are. The bytes a row holds
+/// follow the width the band gives the window — as many as fit, and
+/// never fewer than the design's own: eight under a wide screen, and
+/// sixteen over one. The printable side is drawn beside them when they
+/// fit as well.
+struct Memory {
+    /// The bytes a row of the window holds.
+    bytes: usize,
+    /// Whether the printable side is drawn beside the bytes.
+    printable: bool,
+    /// The width the window's rows take.
+    width: usize,
+}
+
+impl Memory {
+    /// The window's shape, for a screen of the given width.
+    fn of(screen: u16) -> Memory {
+        // The share of the band the window has: the screen less the
+        // registers, the flags' own cells and the two rules between
+        // them. The flags take what is left of the band, so the window
+        // has the room the flags do not need.
+        let share =
+            usize::from(screen).saturating_sub(usize::from(REGISTERS_WIDTH) + FLAGS_CONTENT + 2);
+        // The window shows the design's own bytes, and as many more as
+        // its share holds. The count is a power of two, so that the
+        // addresses of the rows are the addresses the memory is written
+        // at.
+        let mut bytes = if screen >= WIDE_SCREEN {
+            WIDE_BYTES
+        } else {
+            NARROW_BYTES
+        };
+        while bytes < MAX_BYTES && width_of(bytes * 2, false) <= share {
+            bytes *= 2;
+        }
+        // The printable side is drawn beside the bytes when it fits.
+        let printable = width_of(bytes, true) <= share;
+        Memory {
+            bytes,
+            printable,
+            width: width_of(bytes, printable),
+        }
+    }
+}
+
+/// The width the memory window's rows take: the gutter, the bytes as hex
+/// and the printable side beside them.
+fn width_of(bytes: usize, printable: bool) -> usize {
+    let hex = GUTTER + bytes * 3 - 1;
+    if printable { hex + 1 + bytes } else { hex }
 }
 
 /// The rows of the memory window.
@@ -985,12 +1152,16 @@ fn edit_says(edit: &Edit) -> String {
 
 /// The help overlay.
 ///
-/// The overlay takes the main band's place, and it is not a card: the
-/// ground is cleared and the keys are listed under a header of their own.
-fn help(frame: &mut Frame, area: Rect) {
-    frame.render_widget(Clear, area);
-    frame.render_widget(Paragraph::new("").style(theme::canvas()), area);
-    let header = Line::from(Span::styled("keys", theme::muted()));
+/// The overlay takes the main band's place, and it is a section and not a
+/// box: it is drawn with the same rules as the rest of the screen — a
+/// header of its own, the keys under it and the ground of the canvas.
+/// The keys it lists are the screen's own words, the same words the
+/// status bar and the sections use.
+fn help(app: &App, frame: &mut Frame, area: Rect) {
+    let header = Line::from(Span::styled(
+        "keys",
+        section_style(app.focus == Focus::Disassembly),
+    ));
     frame.render_widget(
         Paragraph::new(header).style(theme::canvas()),
         Rect { height: 1, ..area },
@@ -1019,8 +1190,8 @@ fn help(frame: &mut Frame, area: Rect) {
         "PgUp PgDn  a page of memory",
         "Enter commit the edit",
         "Esc  cancel the edit, close the stack",
-        "?    close this",
-        "q    quit",
+        "?    helps (? again closes it)",
+        "q    quits",
     ];
     let lines = keys
         .iter()

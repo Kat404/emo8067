@@ -1509,3 +1509,138 @@ fn the_source_strip_has_a_header_of_its_own() {
         .expect("the panels");
     assert!(strip < panels, "and it is over the panels below: {rows:?}");
 }
+
+/// The polish: the second round of the design.
+///
+/// The redesign changed the frame and not the vocabulary. The polish
+/// changes what the screen says with the space it has: the listing
+/// keeps the rows it needs, the strip takes the rest, the console's
+/// caret is the terminal's own and the help overlay is a section and
+/// not a box.
+
+#[test]
+fn the_listing_keeps_more_than_three_instructions_at_eighty_columns() {
+    let app = app_of("polish-listing", SOURCE);
+    let rows = rows(&app, 80, 24);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("source"))
+        .expect("the strip");
+    let instructions = strip - listing - 1;
+    assert!(
+        instructions > 3,
+        "the listing is the panel a debugger lives in: {instructions} instructions, {rows:?}"
+    );
+}
+
+#[test]
+fn the_listing_fills_the_band_on_a_tall_screen() {
+    let app = app_of("polish-tall", SOURCE);
+    let rows = rows(&app, 140, 40);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("source"))
+        .expect("the strip");
+    // Every row between the listing's header and the strip's header
+    // holds an instruction: the band says nothing.
+    for (offset, row) in rows[listing + 1..strip].iter().enumerate() {
+        assert!(
+            !row.trim().is_empty(),
+            "the band says nothing at row {}: {rows:?}",
+            listing + 1 + offset
+        );
+    }
+}
+
+#[test]
+fn the_console_caret_is_not_the_listings_glyph() {
+    let mut app = app("polish-console");
+    press(&mut app, &[KeyCode::Char(':')]);
+    let rows = rows(&app, 80, 24);
+    let command = rows
+        .iter()
+        .find(|row| row.contains(": "))
+        .expect("the command line is on the screen");
+    assert!(
+        !command.contains(MARK),
+        "the caret is not a second arrow: {command:?}"
+    );
+    // And it is the terminal's own: the inverted cell.
+    let buffer = buffer(&app, 80, 24);
+    let (column, row) = place(&buffer, ": ").expect("the command line is drawn");
+    let caret = buffer.cell((column + 2, row)).expect("the caret is drawn");
+    assert!(
+        caret.modifier.contains(Modifier::REVERSED),
+        "the caret is the inverted cell"
+    );
+}
+
+#[test]
+fn the_help_overlay_is_a_section_and_not_a_box() {
+    let mut app = app("polish-help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let buffer = buffer(&app, 80, 24);
+    let rows = rows(&app, 80, 24);
+    let header = rows
+        .iter()
+        .position(|row| row.contains("keys"))
+        .expect("the help has a header of its own");
+    let panels = rows
+        .iter()
+        .position(|row| row.contains("registers"))
+        .expect("the panels");
+    for row in &rows[header..panels] {
+        for corner in ['┌', '┐', '└', '┘', '│', '─'] {
+            assert!(!row.contains(corner), "the help is not a box: {row:?}");
+        }
+    }
+    // The section that has the focus says so with its header, the way
+    // every other section does.
+    let (column, row) = place(&buffer, "keys").expect("the header is drawn");
+    let header = buffer.cell((column, row)).expect("the header is drawn");
+    assert_eq!(
+        header.fg,
+        theme::ACCENT,
+        "the help is the section that is on the screen"
+    );
+    assert!(
+        header.modifier.contains(Modifier::BOLD),
+        "and its header is bold"
+    );
+}
+
+#[test]
+fn the_memory_window_takes_the_width_its_bytes_need() {
+    let app = app("polish-memory");
+    let rows = rows(&app, 80, 24);
+    let row = rows
+        .iter()
+        .position(|row| row.contains("0000 00"))
+        .expect("the window is drawn");
+    let text = &rows[row];
+    // The rule that follows the memory window, and the content that
+    // comes before it. The rule is counted in characters, so that the
+    // column it is at is the column it is drawn in.
+    let rule = text
+        .chars()
+        .enumerate()
+        .filter(|(_, character)| *character == '│')
+        .map(|(index, _)| index)
+        .last()
+        .expect("the rule that follows the window");
+    let content: String = text.chars().take(rule).collect();
+    let content = content.trim_end();
+    assert_eq!(
+        content.chars().count(),
+        rule,
+        "the window is as wide as the bytes it shows: {text:?}"
+    );
+}

@@ -257,10 +257,22 @@ impl App {
 
     /// The panels, drawn from the machine and the UI's state.
     pub fn panels(&self) -> Panels {
+        self.panels_with(self.ui.disassembly_len)
+    }
+
+    /// The panels, with the listing as long as the band that holds it.
+    ///
+    /// The listing asks the model for as many instructions as the band
+    /// holds: the model reads a window of bytes and gives the
+    /// instructions it finds in it, and the band says how many of them
+    /// are shown.
+    pub fn panels_with(&self, disassembly_len: usize) -> Panels {
         let mut ui = self.ui;
         // The listing follows `CS:IP`, and the research says it is never
         // asked to disassemble a range.
         ui.disassembly_at = self.cpu.regs.ip;
+        // The listing is as long as the band that holds it.
+        ui.disassembly_len = disassembly_len;
         // The memory window looks through the segment the goto named, and
         // through the data segment when no goto has named one.
         ui.memory_segment = self.memory_segment();
