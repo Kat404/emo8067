@@ -35,9 +35,20 @@ the cursor on a byte and a goto to jump to an address.
   stopped at marked. The assembler records where every source line landed
   (`Program.lines`), and the debug crate's `SourceView` reads them, the way
   every other panel is read.
-- **The commit is `2fd4731`**, and the plan is `odd/tasks/tui.md` (L7, T3).
-  The tree is **499 passed, 0 failed** and the clippy run is clean in
-  every crate.
+- **The panes write.** `e` writes the byte under the memory cursor and
+  the flag under the flags cursor, in the reference's own expression
+  language, and the model's write doors are `Register::write` and
+  `Flag::write`.
+- **The goto takes a label and a segment**: a name of the program's own
+  names first, then a memory reference `SSSS:OOOO`, and then a bare
+  hexadecimal offset; the segment the goto named is the one the memory
+  pane looks through.
+- **The panes have the research's own numbers**: `1` the disassembly, `2`
+  the registers, `3` the memory, `4` the flags. The stack is a window
+  and opens with `5`.
+- **The commits are `2fd4731`** (the memory window), and the plan is
+  `odd/tasks/tui.md` (L5-L10). The tree is **549 passed, 0 failed** and
+  the clippy run is clean in every crate.
 
 ## Where the 2026-11-19 work is
 
@@ -499,10 +510,9 @@ wins, so a device that writes a port byte does not reach the program.
     still lacks**~~ — **they are DONE**: the registers panel with its
     editing in place and the flags (2026-11-19), the memory window with
     its goto (2026-11-21), and the stack pane and the source strip
-    (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5,
-    L6, L7, L8). **What is left of the TUI** is the guest's screen, the
-    memory's own editing, the segment the memory pane looks through, the
-    labels in the goto, the flags' own editing and the debug console —
+    (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5
+    to L10). **What is left of the TUI** is the guest's screen, the debug
+    console, and the pane that draws the conditions the model now lists —
     and **one design pass over the whole thing at the end**, which the
     maintainer asked for: functions first, design last. After that come
     T17 (packaging and CI) and T18 (the GUI, the last stage).

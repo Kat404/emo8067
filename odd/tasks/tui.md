@@ -81,20 +81,43 @@ red is a watchpoint.
   every source line landed, and the debug crate's source panel is a pure
   function of the program and the machine, the way every other panel is a
   pure function of the machine and the UI state.
+- **S15** — The memory pane writes bytes: `e` opens the byte under the
+  cursor, the value is typed in the reference's own expression language
+  (`34h`, `101b`, `5`), and `Enter` writes it into the machine's memory at
+  that address. A value that does not fit in a byte is refused with "value
+  out of range", and the memory is left as it was.
+- **S16** — The flags are edited too: the flags panel has a focus and its
+  own cursor, `e` opens the flag under the cursor, and its value is `0` or
+  `1`; `Enter` writes it into the flags word. A value that is not a
+  boolean is refused with "value out of range", and the flag is left as it
+  was.
+- **S17** — The four persistent panes have the research's own numbers:
+  `1` the disassembly, `2` the registers, `3` the memory, `4` the flags.
+  The stack is a window and not a pane of the layout, so it opens with
+  `5`.
+- **S18** — The goto takes a label and a segment: the address is typed the
+  way the reference types a memory reference — `SSSS:OOOO` sets both
+  halves, a label sets the offset in the current segment, and a bare
+  hexadecimal offset sets the offset. The labels are the program's own
+  names. The memory pane looks through the segment the goto named, and
+  through `DS` when no goto has named one. A text that cannot be read is
+  refused in the reference's own words (`bad syntax`), and the window does
+  not move.
+- **S19** — The breakpoints are a panel too: the model lists every
+  breakpoint and every watchpoint with the segment, the offset and the
+  condition it carries, so a pane can show what the machine stops on and
+  let a condition be edited. The condition is the reference's own
+  expression, and the evaluator that reads it is the one the breakpoints
+  already use.
 
 ## Out of scope
 
 - **The guest's screen**: the reference's own screen is a device of its
   own, and the research says the TUI is weak there.
-- **The memory's own editing**: `e` writes a register in this slice, and a
-  byte of memory is the next one.
-- **The segment the memory pane looks through**: `DS` is the one it looks
-  through, and picking another is the segment picker's slice.
-- **The labels in the goto**: the reference's goto takes a label too, and
-  this project has no symbol table yet.
-- **Editing the flags**: the flags are drawn, and this slice writes
-  registers only.
 - **The debug console** and the reference's command vocabulary.
+- **The stop-on-condition window**: the evaluator and the breakpoints are
+  there; the window that shows the conditions and lets them be edited is
+  its own slice.
 - **The GUI** (T18), which will draw the same struct.
 
 ## Tasks
@@ -126,8 +149,60 @@ red is a watchpoint.
   S13-S14. **RED**: the six strip tests failed, because the source was not
   on the screen at all. **GREEN**: the drawing test is 37 passed, 0
   failed, and the whole tree is **526 passed, 0 failed**.
+- **T6** — The editing in the panes: the byte under the memory cursor and
+  the flag under the flags cursor, both written in the reference's own
+  language, with the flags pane's own focus and cursor. S15-S17. **RED**:
+  the new tests did not compile, because `Focus::Flags`, the flag cursor
+  and `Flag::write` did not exist. **GREEN**: the drawing test is 52
+  passed, 0 failed; the model's is 7 passed, 0 failed.
+- **T7** — The goto with labels and segments: the program's own names, the
+  reference's memory reference, and the segment the pane looks through.
+  S18. **RED**: the same compile failure, and the goto's own tests with
+  it. **GREEN**: part of the fifty-two.
+- **T8** — The breakpoints panel model: the list of the breakpoints and
+  the watchpoints with their conditions. S19. **RED**: the tests did not
+  compile — there was no `listing` and no `set_condition`. **GREEN**:
+  the breakpoints test is 20 passed, 0 failed. The whole tree is **549
+  passed, 0 failed**, and the clippy run is clean in every crate.
 
 ## Log
+
+- **L10 (2026-11-21).** The fifth slice is landed: the editing in the
+  panes, and the goto with labels and segments.
+  - **The two halves did not touch a file**, so they were built together:
+    the TUI's own hub (the keys, the focus and the edit state) and the
+    debug crate's breakpoints module.
+  - **The edit state is an enum now**, because what is edited is a
+    register, a flag or a byte, and the machine's three widths are not
+    the same width: sixteen bits, one bit, eight bits.
+  - **The goto reads the reference's own way**: a name of the program's
+    own names first, then a memory reference `SSSS:OOOO`, and then a
+    bare hexadecimal offset. The name comes first because it is the most
+    specific of the three.
+  - **The stack's key moved from `4` to `5`**: the four persistent panes
+    take the research's own numbers, and the stack is a window and not a
+    pane of the layout.
+  - **The slice was two units and a third of documentation**: the TUI's
+    hub and the breakpoints' model, each with its own commit, because
+    they do not touch the same file.
+  - **Still open.** The guest's screen; the debug console; the pane that
+    draws the conditions the model now lists; and the design pass over
+    the whole TUI, at the end.
+- **L9 (2026-11-21).** The fifth slice, chosen by the maintainer through
+  the question tool: **the editing in the panes, and the goto with labels
+  and segments**.
+  - **The choice.** "Editar en los panes + goto con labels", and for the
+    closing: "Lo que no se toque, en paralelo".
+  - **The parallel window here is narrow**, and the reason is the TUI's
+    own hub: the keys, the focus and the edit state live in one file, so
+    two features that add a key cannot be built at the same time. What
+    does not touch it — the model's write doors — is built apart.
+  - **The stack's key moves from `4` to `5`**, because the four
+    persistent panes take the research's own numbers and the stack is a
+    window and not a pane of the layout.
+  - **Still open.** The guest's screen; the debug console; the
+    stop-on-condition window; and the design pass over the whole TUI, at
+    the end, as the maintainer asked.
 
 - **L8 (2026-11-21).** The fourth slice, chosen by the maintainer through
   the question tool: **the stack and the source strip**.
