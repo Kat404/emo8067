@@ -109,6 +109,13 @@ red is a watchpoint.
   let a condition be edited. The condition is the reference's own
   expression, and the evaluator that reads it is the one the breakpoints
   already use.
+- **S20** — The conditions are a pane: `b` opens it where the listing is,
+  and it draws every breakpoint and every watchpoint with its segment, its
+  offset and the condition it carries. The condition under the cursor is
+  edited in place, in the reference's own expression language, and a
+  condition that does not read is refused in the evaluator's own words and
+  the old condition stays. The list is the model's own listing, and the
+  evaluator that reads a condition is the one the breakpoints use.
 
 ## Out of scope
 
@@ -164,9 +171,26 @@ red is a watchpoint.
   compile — there was no `listing` and no `set_condition`. **GREEN**:
   the breakpoints test is 20 passed, 0 failed. The whole tree is **549
   passed, 0 failed**, and the clippy run is clean in every crate.
+- **T9** — The conditions pane: the listing of the breakpoints and the
+  watchpoints, and the editing of a condition in place. S20. **RED**:
+  eleven of the new tests failed, because the pane did not open and the
+  condition was not written. **GREEN**: the drawing test is 66 passed, 0
+  failed; the whole tree is **563 passed, 0 failed**, and the clippy run
+  is clean in every crate.
 
 ## Log
 
+- **L11 (2026-11-21).** The conditions pane is landed: the breakpoints and
+  the watchpoints are drawn with their segment, their offset and their
+  condition, and the condition under the cursor is edited in place.
+  - **The model was already there**, so this slice was the TUI's alone.
+  - **The condition is the reference's own expression**, read by the
+    evaluator the breakpoints already use, and a condition that does not
+    read is refused in the evaluator's own words and the old one stays.
+  - **The pane is a window**, like the stack: it takes the listing's
+    place, and only one window holds it at a time.
+  - **Still open.** The debug console; the guest's screen, whose research
+    is running; and the design pass over the whole TUI, at the end.
 - **L10 (2026-11-21).** The fifth slice is landed: the editing in the
   panes, and the goto with labels and segments.
   - **The two halves did not touch a file**, so they were built together:

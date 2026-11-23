@@ -46,9 +46,12 @@ the cursor on a byte and a goto to jump to an address.
 - **The panes have the research's own numbers**: `1` the disassembly, `2`
   the registers, `3` the memory, `4` the flags. The stack is a window
   and opens with `5`.
-- **The commits are `2fd4731`** (the memory window), and the plan is
-  `odd/tasks/tui.md` (L5-L10). The tree is **549 passed, 0 failed** and
-  the clippy run is clean in every crate.
+- **The conditions are a pane**: `b` opens it where the listing is, and
+  it draws every breakpoint and every watchpoint with its segment, its
+  offset and its condition; the condition under the cursor is edited in
+  place.
+- **The plan is `odd/tasks/tui.md`** (L5-L11). The tree is **563 passed,
+  0 failed** and the clippy run is clean in every crate.
 
 ## Where the 2026-11-19 work is
 
@@ -511,11 +514,10 @@ wins, so a device that writes a port byte does not reach the program.
     editing in place and the flags (2026-11-19), the memory window with
     its goto (2026-11-21), and the stack pane and the source strip
     (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5
-    to L10). **What is left of the TUI** is the guest's screen, the debug
-    console, and the pane that draws the conditions the model now lists —
-    and **one design pass over the whole thing at the end**, which the
-    maintainer asked for: functions first, design last. After that come
-    T17 (packaging and CI) and T18 (the GUI, the last stage).
+    to L11). **What is left of the TUI** is the guest's screen, the debug
+    console, and **one design pass over the whole thing at the end**,
+    which the maintainer asked for: functions first, design last. After
+    that come T17 (packaging and CI) and T18 (the GUI, the last stage).
 14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
 
 ## Files worth reading first
