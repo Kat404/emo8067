@@ -10,7 +10,9 @@ use emo8067_core::regs::Reg16;
 use emo8067_tui::app::{App, Focus};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::style::Modifier;
 
 /// A program to open, written where the test can keep it.
 fn program(name: &str) -> PathBuf {
@@ -53,6 +55,48 @@ fn screen(app: &App, width: u16, height: u16) -> String {
         .buffer()
         .content()
         .iter()
+        .map(|cell| cell.symbol())
+        .collect()
+}
+
+/// The screen the app draws, one string per row.
+///
+/// The rows are what the drawing is made of: the strip is a band of the
+/// screen, and a test wants to know which row a line of the source is
+/// on.
+fn rows(app: &App, width: u16, height: u16) -> Vec<String> {
+    let buffer = buffer(app, width, height);
+    let area = buffer.area;
+    (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| buffer.cell((x, y)).map_or("", |cell| cell.symbol()))
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        })
+        .collect()
+}
+
+/// The cells the app draws, so a test can read the marks on them.
+fn buffer(app: &App, width: u16, height: u16) -> Buffer {
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).expect("the backend");
+    terminal
+        .draw(|frame| emo8067_tui::ui::draw(app, frame))
+        .expect("the drawing");
+    terminal.backend().buffer().clone()
+}
+
+/// The text of the cells the app marks.
+///
+/// A mark is the way the panels say where the cursor is: the byte under
+/// the memory cursor, the word the stack pointer is at.
+fn marked(app: &App, width: u16, height: u16) -> String {
+    buffer(app, width, height)
+        .content()
+        .iter()
+        .filter(|cell| cell.modifier.contains(Modifier::REVERSED))
         .map(|cell| cell.symbol())
         .collect()
 }
@@ -285,4 +329,338 @@ fn the_goto_prompt_can_be_left_without_moving() {
     type_text(&mut app, "0100");
     press(&mut app, &[KeyCode::Esc]);
     assert_eq!(app.ui.memory_at, 0, "the address is as it was");
+}
+
+#[test]
+fn the_stack_pane_opens_where_the_listing_is() {
+    let mut app = app("stack");
+    let before = screen(&app, 80, 20);
+    assert!(
+        before.contains("disassembly"),
+        "the listing is there to begin with: {before}"
+    );
+    press(&mut app, &[KeyCode::Char('4')]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("stack"), "the pane is named: {text}");
+    assert!(
+        !text.contains("disassembly"),
+        "the listing is not on the screen: {text}"
+    );
+    assert!(
+        !text.contains("MOV"),
+        "and neither is the listing's own text: {text}"
+    );
+    press(&mut app, &[KeyCode::Char('4')]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "and the listing comes back: {text}"
+    );
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Esc]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "and the escape closes it too: {text}"
+    );
+}
+
+#[test]
+fn the_stack_window_moves_with_the_arrows() {
+    let mut app = app_of("stack-arrows", "org 100h\n#sp=0200#\nhlt\n");
+    press(&mut app, &[KeyCode::Char('4')]);
+    let text = screen(&app, 80, 24);
+    assert!(
+        text.contains("0200  0000"),
+        "the window starts at the pointer: {text}"
+    );
+    press(&mut app, &[KeyCode::Down]);
+    let text = screen(&app, 80, 24);
+    assert!(
+        text.contains("0210  0000"),
+        "and it moves down a word: {text}"
+    );
+    assert!(
+        !text.contains("0200  0000"),
+        "and the word it left is gone: {text}"
+    );
+    press(&mut app, &[KeyCode::Up]);
+    let text = screen(&app, 80, 24);
+    assert!(text.contains("0200  0000"), "and back again: {text}");
+}
+
+#[test]
+fn a_pushed_word_is_in_the_window() {
+    let mut app = app_of(
+        "stack-push",
+        "org 100h\n#sp=0200#\nmov ax, 1234h\npush ax\nhlt\n",
+    );
+    press(
+        &mut app,
+        &[KeyCode::Char('4'), KeyCode::F(8), KeyCode::F(8)],
+    );
+    let text = screen(&app, 80, 24);
+    assert!(
+        text.contains("01FE  1234"),
+        "the pushed word is in the window: {text}"
+    );
+}
+
+#[test]
+fn the_word_the_pointer_is_at_is_marked() {
+    let mut app = app_of(
+        "stack-mark",
+        "org 100h\n#sp=0200#\nmov ax, 1234h\npush ax\nhlt\n",
+    );
+    press(
+        &mut app,
+        &[KeyCode::Char('4'), KeyCode::F(8), KeyCode::F(8)],
+    );
+    assert_eq!(
+        marked(&app, 80, 24),
+        "1234",
+        "the word the pointer is at is the marked one"
+    );
+}
+
+#[test]
+fn the_arrows_do_not_move_the_listing_while_the_stack_pane_is_open() {
+    let mut app = app("stack-listing");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Down]);
+    assert_eq!(app.cursor, 0, "the listing's cursor did not move");
+    assert_eq!(app.stack_scroll, 2, "and the stack window did");
+}
+
+#[test]
+fn a_breakpoint_is_not_set_while_the_stack_pane_holds_the_listings_place() {
+    let mut app = app("stack-breakpoint");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::F(9)]);
+    assert_eq!(
+        app.breakpoints.breakpoints().len(),
+        0,
+        "the cursor is not on the screen, so there is nowhere to set one"
+    );
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::F(9)]);
+    assert_eq!(
+        app.breakpoints.breakpoints().len(),
+        1,
+        "and with the listing back there is a cursor again"
+    );
+}
+
+#[test]
+fn the_stack_window_starts_at_the_pointer_every_time_it_is_opened() {
+    let mut app = app_of("stack-open", "org 100h\n#sp=0200#\nhlt\n");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Down]);
+    assert_eq!(app.stack_scroll, 2, "the window was moved away");
+    press(&mut app, &[KeyCode::Char('4'), KeyCode::Char('4')]);
+    assert_eq!(app.stack_scroll, 0, "and it starts at the pointer again");
+    let text = screen(&app, 80, 24);
+    assert!(
+        text.contains("0200  0000"),
+        "and the window is at the pointer: {text}"
+    );
+}
+
+#[test]
+fn the_keys_that_were_there_before_still_do_what_they_did_with_the_stack_open() {
+    let mut app = app("stack-keys");
+    press(&mut app, &[KeyCode::Char('4')]);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(app.steps, 1, "F8 still steps the machine");
+    press(&mut app, &[KeyCode::Char('2')]);
+    assert_eq!(app.focus, Focus::Registers, "and 2 takes the registers");
+    press(&mut app, &[KeyCode::Char('3')]);
+    assert_eq!(app.focus, Focus::Memory, "and 3 takes the memory");
+    press(&mut app, &[KeyCode::Char('1')]);
+    assert_eq!(app.focus, Focus::Disassembly, "and 1 takes the listing");
+    assert!(!app.stack_open, "and the listing comes back for it");
+    press(&mut app, &[KeyCode::Char('?')]);
+    assert!(app.help, "and ? is still the help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    press(&mut app, &[KeyCode::Char('q')]);
+    assert!(app.quit, "and q still quits");
+}
+
+#[test]
+fn the_help_overlay_lists_the_stack() {
+    let mut app = app("stack-help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let text = screen(&app, 80, 40);
+    assert!(
+        text.contains("4    the stack"),
+        "the help names the key: {text}"
+    );
+}
+
+/// A program with a few lines of source in it.
+///
+/// The first line is a directive, and a directive produces no bytes, so
+/// the source starts at the second line of the file.
+const SOURCE: &str = "org 100h\n\
+                      mov ax, 1234h\n\
+                      mov bx, 5678h\n\
+                      add ax, bx\n\
+                      sub cx, 1\n\
+                      xor dx, dx\n\
+                      hlt\n";
+
+/// The marker the strip puts on the line the machine is stopped at.
+const MARK: char = '►';
+
+#[test]
+fn the_source_strip_shows_the_programs_own_lines() {
+    let app = app_of("source-lines", SOURCE);
+    let rows = rows(&app, 80, 24);
+    let text = rows.join("\n");
+    assert!(
+        text.contains("mov ax, 1234h"),
+        "the source is the program's own: {text}"
+    );
+    assert!(
+        text.contains("mov bx, 5678h"),
+        "and the line after it: {text}"
+    );
+    assert!(
+        text.contains("xor dx, dx"),
+        "and the last of the five: {text}"
+    );
+    assert!(
+        !text.contains("hlt"),
+        "the strip shows five lines and no more: {text}"
+    );
+}
+
+#[test]
+fn the_source_lines_carry_their_own_numbers() {
+    let app = app_of("source-numbers", SOURCE);
+    let rows = rows(&app, 80, 24);
+    let row = rows
+        .iter()
+        .find(|row| row.contains("mov bx, 5678h"))
+        .expect("the strip shows the line");
+    assert!(
+        row.contains("3  mov bx, 5678h"),
+        "the line carries the number the source gave it: {row:?}"
+    );
+}
+
+#[test]
+fn the_line_the_machine_is_stopped_at_is_marked() {
+    let app = app_of("source-mark", "org 100h\nmov ax, 1234h\nhlt\n");
+    let rows = rows(&app, 80, 24);
+    let marked: Vec<&String> = rows.iter().filter(|row| row.contains(MARK)).collect();
+    assert_eq!(marked.len(), 1, "one line is marked: {rows:?}");
+    assert!(
+        marked[0].contains("mov ax, 1234h"),
+        "and it is the line the machine is stopped at: {marked:?}"
+    );
+}
+
+#[test]
+fn the_mark_moves_when_the_machine_steps() {
+    let mut app = app_of("source-step", "org 100h\nmov ax, 1234h\nhlt\n");
+    press(&mut app, &[KeyCode::F(8)]);
+    let rows = rows(&app, 80, 24);
+    let marked: Vec<&String> = rows.iter().filter(|row| row.contains(MARK)).collect();
+    assert_eq!(marked.len(), 1, "one line is marked: {rows:?}");
+    assert!(
+        marked[0].contains("hlt"),
+        "and the mark moved with the machine: {marked:?}"
+    );
+}
+
+#[test]
+fn the_strip_is_under_the_listing() {
+    let app = app_of("source-place", SOURCE);
+    let rows = rows(&app, 80, 24);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("mov ax, 1234h"))
+        .expect("the strip");
+    let panels = rows
+        .iter()
+        .position(|row| row.contains("registers"))
+        .expect("the panels");
+    assert!(listing < strip, "the strip is under the listing: {rows:?}");
+    assert!(strip < panels, "and over the panels below: {rows:?}");
+}
+
+#[test]
+fn the_strip_does_not_squeeze_the_listing_out() {
+    let app = app_of("source-rows", SOURCE);
+    let rows = rows(&app, 80, 20);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let strip = rows
+        .iter()
+        .position(|row| row.contains("mov ax, 1234h"))
+        .expect("the strip");
+    // The listing keeps three rows of its own, and its border is one row
+    // above them.
+    assert!(
+        strip - listing >= 4,
+        "the listing keeps three rows: {rows:?}"
+    );
+}
+
+#[test]
+fn an_app_with_no_program_has_no_strip() {
+    let app = App::new(None).expect("the app");
+    let rows = rows(&app, 80, 20);
+    let text = rows.join("\n");
+    assert!(
+        text.contains("disassembly"),
+        "the listing is still there: {text}"
+    );
+    assert!(!text.contains(MARK), "and there is no strip: {text}");
+    assert!(
+        !text.contains("mov ax"),
+        "and no source of any kind: {text}"
+    );
+}
+
+#[test]
+fn the_listing_keeps_the_whole_band_when_there_is_no_source() {
+    let app = App::new(None).expect("the app");
+    let rows = rows(&app, 80, 20);
+    let listing = rows
+        .iter()
+        .position(|row| row.contains("disassembly"))
+        .expect("the listing");
+    let panels = rows
+        .iter()
+        .position(|row| row.contains("registers"))
+        .expect("the panels");
+    assert_eq!(
+        panels - listing,
+        7,
+        "the listing has the band to itself: {rows:?}"
+    );
+}
+
+#[test]
+fn the_app_keeps_the_program_it_opened() {
+    let app = app_of("source-app", SOURCE);
+    let view = app.source_view(3);
+    assert_eq!(view.lines.len(), 3, "the strip shows three lines");
+    assert_eq!(view.current, Some(0), "and the machine is at the first");
+    assert_eq!(view.lines[0].number, 2, "the line's own number");
+    assert_eq!(
+        view.lines[0].text, "mov ax, 1234h",
+        "and the text the source wrote"
+    );
+}
+
+#[test]
+fn an_app_with_no_program_has_no_source() {
+    let app = App::new(None).expect("the app");
+    let view = app.source_view(3);
+    assert!(view.lines.is_empty(), "there is no source to show");
+    assert_eq!(view.current, None, "and nowhere to be stopped at");
 }

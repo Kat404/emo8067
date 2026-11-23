@@ -33,6 +33,12 @@ pub struct Ui {
     pub disassembly_len: usize,
     /// How many words the stack panel shows.
     pub stack_len: usize,
+    /// Where the stack window starts.
+    ///
+    /// The window is a window over the stack and not the stack itself: it
+    /// starts at this offset, so the pointer can be inside it or above it,
+    /// and the words around the pointer are there to be looked at.
+    pub stack_at: u16,
 }
 
 impl Default for Ui {
@@ -44,6 +50,7 @@ impl Default for Ui {
             disassembly_at: 0,
             disassembly_len: 16,
             stack_len: 8,
+            stack_at: 0,
         }
     }
 }
@@ -417,12 +424,19 @@ fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
 }
 
 /// The stack panel: the words on the stack, from the top down.
+///
+/// The window starts where the UI says and not at the stack pointer, so
+/// the pointer can be anywhere in it — or above it. The pointer itself is
+/// still reported, because the panel is about where the stack is and not
+/// only about what it holds.
 fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
     let segment = cpu.regs.segment(Seg::Ss);
     let sp = cpu.regs.word(Reg16::Sp);
     let words = (0..ui.stack_len)
         .map(|index| {
-            let offset = sp.wrapping_add(2 * index as u16);
+            // The offset wraps inside the segment, the way every other
+            // offset in the model does.
+            let offset = ui.stack_at.wrapping_add(2u16.wrapping_mul(index as u16));
             cpu.mem.read_u16(segment, offset)
         })
         .collect();

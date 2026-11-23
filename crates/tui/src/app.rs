@@ -8,11 +8,12 @@
 use std::path::PathBuf;
 
 use emo8067_core::Cpu;
-use emo8067_core::regs::Seg;
+use emo8067_core::regs::{Reg16, Seg};
 use emo8067_debug::breakpoints::Breakpoints;
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
 use emo8067_debug::panels::{Panels, Register, Ui};
+use emo8067_debug::source::SourceView;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 /// Which pane has the cursor.
@@ -55,6 +56,12 @@ pub struct App {
     pub cpu: Cpu,
     /// The name of the program, for the title.
     pub name: String,
+    /// The program that was opened, when there is one.
+    ///
+    /// The program carries the source: the assembler writes down where
+    /// every line landed, and the source strip is drawn from those lines.
+    /// Without a program there is no source and no strip.
+    pub program: Option<emo8067_asm::program::Program>,
     /// The breakpoints and the watchpoints.
     pub breakpoints: Breakpoints,
     /// The addresses the machine has been at, in order.
@@ -67,6 +74,17 @@ pub struct App {
     pub focus: Focus,
     /// Which register of the panel the cursor is on.
     pub register_cursor: usize,
+    /// Whether the stack pane is open where the listing is.
+    ///
+    /// The stack is a pane you open and not a fourth column: it takes the
+    /// listing's place in the main band.
+    pub stack_open: bool,
+    /// How far the stack window is from the stack pointer.
+    ///
+    /// The window follows the pointer, the way the listing follows the
+    /// instruction pointer, and this is the scroll the user has made from
+    /// it: it is the TUI's own state, like the listing's cursor.
+    pub stack_scroll: u16,
     /// What is being edited, in place.
     pub edit: Option<Edit>,
     /// The address the memory window is being jumped to.
@@ -92,12 +110,15 @@ impl App {
         let mut app = App {
             cpu: Cpu::new(),
             name: "no program".to_string(),
+            program: None,
             breakpoints: Breakpoints::new(),
             executed: Vec::new(),
             steps: 0,
             cursor: 0,
             focus: Focus::Disassembly,
             register_cursor: 0,
+            stack_open: false,
+            stack_scroll: 0,
             edit: None,
             goto: None,
             ui: Ui::default(),
@@ -117,6 +138,9 @@ impl App {
             .map(|name| name.to_string_lossy().to_string())
             .unwrap_or_else(|| path.clone());
         app.cpu = emo8067_debug::machine::load(&program)?;
+        // The program is kept: the source strip is drawn from the source
+        // the program carries.
+        app.program = Some(program);
         Ok(app)
     }
 
@@ -128,7 +152,43 @@ impl App {
         ui.disassembly_at = self.cpu.regs.ip;
         // The memory window looks through the data segment.
         ui.memory_segment = self.cpu.regs.segment(Seg::Ds);
+        // The stack window follows the stack pointer, and the scroll is
+        // where the user has moved it to.
+        ui.stack_at = self.stack_at();
         Panels::of(&self.cpu, &ui)
+    }
+
+    /// Where the stack window starts: the stack pointer and the scroll.
+    ///
+    /// The window follows the pointer, the way the listing follows the
+    /// instruction pointer, and the scroll is how far the user has moved it
+    /// from there.
+    #[must_use]
+    pub fn stack_at(&self) -> u16 {
+        self.cpu
+            .regs
+            .word(Reg16::Sp)
+            .wrapping_add(self.stack_scroll)
+    }
+
+    /// The source view: the program's own lines, and the machine's place
+    /// in them.
+    ///
+    /// The view is a pure function of the program and of the machine, the
+    /// way every other panel is a pure function of the machine and of the
+    /// UI's state. `count` is how many lines the strip shows.
+    ///
+    /// The view is asked again on every draw, so the mark moves with the
+    /// machine: a step moves the machine, and the strip follows it.
+    #[must_use]
+    pub fn source_view(&self, count: usize) -> SourceView {
+        let Some(program) = &self.program else {
+            return SourceView {
+                lines: Vec::new(),
+                current: None,
+            };
+        };
+        SourceView::of(program, &self.cpu, count)
     }
 
     /// The loop: draw, then wait for a key.
@@ -171,15 +231,19 @@ impl App {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.help = true,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => self.quit = true,
-            KeyCode::Char('1') => self.focus = Focus::Disassembly,
+            KeyCode::Char('1') => self.take_listing(),
             KeyCode::Char('2') => self.focus = Focus::Registers,
             KeyCode::Char('3') => self.focus = Focus::Memory,
+            KeyCode::Char('4') => self.toggle_stack(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
+            KeyCode::Esc => self.close_stack(),
             KeyCode::Tab => self.focus = self.other_focus(),
             KeyCode::F(8) => self.step(),
             KeyCode::F(5) => self.run_to_the_next_breakpoint(),
-            KeyCode::F(9) => self.toggle_breakpoint(),
+            // A breakpoint goes at the cursor, and the cursor is not on the
+            // screen while the stack pane holds the listing's place.
+            KeyCode::F(9) if !self.stack_open => self.toggle_breakpoint(),
             KeyCode::PageUp if self.focus == Focus::Memory => self.move_memory_page(-1),
             KeyCode::PageDown if self.focus == Focus::Memory => self.move_memory_page(1),
             KeyCode::Up => self.move_cursor(0, -1),
@@ -207,12 +271,54 @@ impl App {
     }
 
     /// Move the cursor of the pane that has it.
+    ///
+    /// The stack pane holds the listing's place while it is open, so the
+    /// arrows move its window and not the listing's cursor.
     fn move_cursor(&mut self, horizontal: i32, vertical: i32) {
+        if self.stack_open {
+            self.move_stack_window(vertical);
+            return;
+        }
         match self.focus {
             Focus::Disassembly => self.move_listing_cursor(vertical),
             Focus::Registers => self.move_register_cursor(horizontal, vertical),
             Focus::Memory => self.move_memory_cursor(horizontal, vertical),
         }
+    }
+
+    /// The stack window, a word at a time.
+    ///
+    /// The window moves over the stack and the pointer stays where it is,
+    /// so the words above the pointer come into view.
+    fn move_stack_window(&mut self, vertical: i32) {
+        if vertical < 0 {
+            self.stack_scroll = self.stack_scroll.wrapping_sub(2);
+        } else if vertical > 0 {
+            self.stack_scroll = self.stack_scroll.wrapping_add(2);
+        }
+    }
+
+    /// Open the stack pane where the listing is, or close it again.
+    fn toggle_stack(&mut self) {
+        if self.stack_open {
+            self.close_stack();
+            return;
+        }
+        self.stack_open = true;
+        // The window starts at the pointer: the scroll is the user's own,
+        // and it begins at the top of the stack.
+        self.stack_scroll = 0;
+    }
+
+    /// Close the stack pane, and the listing comes back.
+    fn close_stack(&mut self) {
+        self.stack_open = false;
+    }
+
+    /// Take the listing, and the stack pane gives way to it.
+    fn take_listing(&mut self) {
+        self.focus = Focus::Disassembly;
+        self.stack_open = false;
     }
 
     /// The listing's cursor, one line up or down.

@@ -126,6 +126,7 @@ fn the_panels_are_drawn_from_the_machine() {
         disassembly_at: 0x0000,
         disassembly_len: 2,
         stack_len: 2,
+        stack_at: 0x0000,
     };
     let panels = Panels::of(&cpu, &ui);
 

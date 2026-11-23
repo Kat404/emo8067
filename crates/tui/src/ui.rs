@@ -2,10 +2,13 @@
 //!
 //! The layout is the one the research draws (`features-and-ux.md` §4.4): the
 //! title, the disassembly, the registers and the flags, and the status line.
+//! The source strip is drawn under the disassembly, in the band the
+//! disassembly is in.
 //! The colours are the research's too: cyan is the current `IP`, grey is
 //! what has run, yellow is a breakpoint and red is a watchpoint.
 
 use emo8067_debug::panels::{Flag, Panels};
+use emo8067_debug::source::SourceView;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -24,6 +27,18 @@ const ROW_BYTES: usize = 16;
 /// after it.
 const GUTTER: usize = 5;
 
+/// The lines of source the strip shows at most.
+///
+/// The research's own strip is three to five lines, and five is the most
+/// that is worth showing.
+const SOURCE_LINES: u16 = 5;
+
+/// The rows the listing keeps, so the strip never squeezes it out.
+///
+/// These are the listing's own rows: the border around it takes two more
+/// rows of the band.
+const LISTING_ROWS: u16 = 3;
+
 /// Draw the whole screen.
 pub fn draw(app: &App, frame: &mut Frame) {
     let panels = app.panels();
@@ -39,8 +54,10 @@ pub fn draw(app: &App, frame: &mut Frame) {
     title(app, frame, rows[0]);
     if app.help {
         help(frame, rows[1]);
+    } else if app.stack_open {
+        stack(&panels, app, frame, rows[1]);
     } else {
-        disassembly(&panels, app, frame, rows[1]);
+        listing(&panels, app, frame, rows[1]);
     }
     // The registers and the flags are the two panes the research draws on
     // the sides, and the middle one is where the memory window goes.
@@ -66,6 +83,79 @@ fn title(app: &App, frame: &mut Frame, area: Rect) {
         .borders(Borders::ALL)
         .title(Line::from(title).centered());
     frame.render_widget(block, area);
+}
+
+/// The listing, and the source strip under it.
+///
+/// The band is split in two: the listing above, the strip below. The strip
+/// takes as many rows as it can without squeezing the listing out - the
+/// listing keeps three rows of its own - and a program that has no source
+/// leaves the band to the listing alone.
+fn listing(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
+    // The model says how many lines the program has, and the band says how
+    // many of them fit under the listing.
+    let view = app.source_view(usize::from(SOURCE_LINES));
+    let rows = source_rows(area.height, view.lines.len() as u16);
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(rows)])
+        .split(area);
+    disassembly(panels, app, frame, parts[0]);
+    if rows > 0 {
+        // The view is asked again for the count the strip shows, so the
+        // window of lines is the one that fits in the band.
+        let view = app.source_view(usize::from(rows));
+        source(&view, frame, parts[1]);
+    }
+}
+
+/// The rows the source strip takes of the band.
+///
+/// The strip shows up to five lines, and only as many as fit after the
+/// listing has kept three rows of its own: the band is short on an 80x20
+/// terminal, and the strip must not squeeze the listing out. A program
+/// with fewer lines than that takes only the rows it has.
+fn source_rows(height: u16, available: u16) -> u16 {
+    // The listing's border takes two rows of the band, and the listing
+    // keeps three rows of its own.
+    let listing = LISTING_ROWS + 2;
+    height
+        .saturating_sub(listing)
+        .min(SOURCE_LINES)
+        .min(available)
+}
+
+/// The source strip: the program's own lines, and the one the machine is
+/// stopped at.
+///
+/// The strip is drawn as plain lines, with no border of its own: it reads
+/// as the source and nothing else. Every line carries the number the
+/// source gave it and the source's own text.
+///
+/// The line the machine is stopped at is marked with `►` in the gutter.
+/// The research's own drawing marks it with `◄ current` at the end of the
+/// line; the arrow here is the other way round, because the marker is in
+/// the gutter and it points at the line it marks - and it stays visible
+/// however long the line is.
+fn source(view: &SourceView, frame: &mut Frame, area: Rect) {
+    let mut lines = Vec::new();
+    for (index, line) in view.lines.iter().enumerate() {
+        let current = view.current == Some(index);
+        let marker = if current { "►" } else { " " };
+        // The model keeps the truth: the drawing tidies the line, and the
+        // space at its end is not part of the source.
+        let text = format!("{marker}{:>4}  {}", line.number, line.text.trim_end());
+        // The line the machine is at is the current instruction's own
+        // line, and cyan is the colour the research gives to the current
+        // `IP`.
+        let style = if current {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default()
+        };
+        lines.push(Line::from(Span::styled(text, style)));
+    }
+    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// The disassembly, with the cursor and the colours.
@@ -118,6 +208,34 @@ fn disassembly(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
         app.cursor.min(panels.disassembly.len().saturating_sub(1)),
     ));
     frame.render_stateful_widget(list, area, &mut state);
+}
+
+/// The stack pane: the words on the stack, and the pointer among them.
+///
+/// The stack is a pane you open and not a fourth column: it takes the
+/// listing's place in the main band. The title carries the segment and the
+/// pointer, and every line is a word with the offset it is at.
+fn stack(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
+    let view = &panels.stack;
+    let at = app.stack_at();
+    let mut lines = Vec::new();
+    for (index, word) in view.words.iter().enumerate() {
+        let offset = at.wrapping_add(2u16.wrapping_mul(index as u16));
+        // The word the pointer is at is marked, the way the byte under the
+        // memory cursor is.
+        let style = if offset == view.sp {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default()
+        };
+        lines.push(Line::from(vec![
+            Span::raw(format!("{offset:04X}  ")),
+            Span::styled(format!("{word:04X}"), style),
+        ]));
+    }
+    let title = format!(" stack · {:04X}:{:04X} ", view.segment, view.sp);
+    let list = List::new(lines).block(Block::default().borders(Borders::ALL).title(title));
+    frame.render_widget(list, area);
 }
 
 /// The registers panel: the machine's registers, in two columns.
@@ -255,13 +373,14 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("1    the disassembly"),
         Line::from("2    the registers"),
         Line::from("3    the memory"),
+        Line::from("4    the stack (4 again closes it)"),
         Line::from("e    edit the register under the cursor"),
         Line::from("g    jump the memory to an address"),
         Line::from("↑ ↓  move the cursor"),
         Line::from("← →  move the cursor (registers)"),
         Line::from("PgUp PgDn  a page of memory"),
         Line::from("Enter commit the edit"),
-        Line::from("Esc  cancel the edit"),
+        Line::from("Esc  cancel the edit, close the stack"),
         Line::from("?    close this"),
         Line::from("q    quit"),
     ];
