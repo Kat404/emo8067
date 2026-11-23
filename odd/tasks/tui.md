@@ -254,6 +254,15 @@ red is a watchpoint.
 
 ## Log
 
+- **L15 (2026-11-21).** The maintainer chose the keys — with the core —
+  and then stopped: "Las teclas que faltan + núcleo pero no prosigas,
+  solo guarda la respuesta en memoria engram". The work is not started;
+  the answer is kept here and in the mirror.
+  - **What was decided.** `w` puts a watchpoint (the model's door is
+    already there), `F6` steps back and `F7` steps over — and the last
+    two enter **with the changes to the core they need**: the machine's
+    history for the step back and the tracking of the calls for the step
+    over. They are not a TUI-only change.
 - **L14 (2026-11-21).** The polish: the second round of the design, and
   the narrow terminal.
   - **The listing is the panel a debugger lives in**, and it keeps what it
