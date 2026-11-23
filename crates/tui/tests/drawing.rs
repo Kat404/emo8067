@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use emo8067_core::flags::{CF, PF};
 use emo8067_core::regs::Reg16;
 use emo8067_debug::panels::Flag;
+use emo8067_debug::{Access, Machine};
 use emo8067_tui::app::{App, Focus};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -897,4 +898,282 @@ fn the_window_looks_through_ds_until_a_goto_names_another_segment() {
         0x0400,
         "and the segment is the one the goto named"
     );
+}
+
+#[test]
+fn the_conditions_pane_opens_with_b_and_draws_the_breakpoints() {
+    let mut app = app("conditions");
+    press(&mut app, &[KeyCode::F(9)]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the breakpoint is there");
+    app.breakpoints
+        .set_condition(entry.segment, entry.offset, Some("AX==1234h"))
+        .expect("the condition is written");
+    press(&mut app, &[KeyCode::Char('b')]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("conditions"), "the pane is named: {text}");
+    assert!(
+        !text.contains("disassembly"),
+        "the listing is not on the screen: {text}"
+    );
+    assert!(
+        text.contains(&format!("{:04X}:{:04X}", entry.segment, entry.offset)),
+        "the breakpoint's segment and offset are drawn: {text}"
+    );
+    assert!(
+        text.contains("AX==1234h"),
+        "and the condition it carries: {text}"
+    );
+}
+
+#[test]
+fn a_breakpoint_without_a_condition_says_that_it_carries_none() {
+    let mut app = app("conditions-none");
+    press(&mut app, &[KeyCode::F(9)]);
+    press(&mut app, &[KeyCode::Char('b')]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("no condition"),
+        "the pane says that the breakpoint carries none: {text}"
+    );
+}
+
+#[test]
+fn a_watchpoint_is_drawn_as_a_watchpoint_and_says_what_it_watches() {
+    let mut app = app("watchpoint");
+    app.breakpoints.watch(0x0000, 0x0200, Access::Write);
+    press(&mut app, &[KeyCode::Char('b')]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("watchpoint"), "it is a watchpoint: {text}");
+    assert!(
+        text.contains("0000:0200"),
+        "with its segment and offset: {text}"
+    );
+    assert!(
+        text.contains("write"),
+        "and it says what it watches: {text}"
+    );
+}
+
+#[test]
+fn a_watchpoint_that_reads_says_that_too() {
+    let mut app = app("watchpoint-read");
+    app.breakpoints.watch(0x0000, 0x0200, Access::Read);
+    press(&mut app, &[KeyCode::Char('b')]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("read"), "it says what it watches: {text}");
+}
+
+#[test]
+fn the_condition_under_the_cursor_is_edited_and_the_machine_stops_on_it() {
+    let mut app = app("condition");
+    press(&mut app, &[KeyCode::F(9)]);
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::Char('e')]);
+    type_text(&mut app, "AX==1234h");
+    press(&mut app, &[KeyCode::Enter]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the entry is there");
+    assert_eq!(
+        entry.condition.as_deref(),
+        Some("AX==1234h"),
+        "the model has the condition"
+    );
+    assert!(app.edit.is_none(), "and the prompt is closed");
+    assert!(
+        !app.breakpoints
+            .stops_at(&Machine::new(&app.cpu), entry.segment, entry.offset),
+        "the condition does not hold yet"
+    );
+    press(&mut app, &[KeyCode::F(8)]);
+    assert!(
+        app.breakpoints
+            .stops_at(&Machine::new(&app.cpu), entry.segment, entry.offset),
+        "and the machine stops on it once the condition holds"
+    );
+}
+
+#[test]
+fn a_condition_that_does_not_read_is_refused_and_the_old_one_stays() {
+    let mut app = app("condition-refuse");
+    press(&mut app, &[KeyCode::F(9)]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the entry is there");
+    app.breakpoints
+        .set_condition(entry.segment, entry.offset, Some("AX==1234h"))
+        .expect("the condition is written");
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::Char('e')]);
+    type_text(&mut app, "zz");
+    press(&mut app, &[KeyCode::Enter]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the entry is there");
+    assert_eq!(
+        entry.condition.as_deref(),
+        Some("AX==1234h"),
+        "the old condition is still there"
+    );
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("bad expression"),
+        "the refusal is the evaluator's own: {status}"
+    );
+    assert!(app.edit.is_some(), "and the prompt stays open");
+}
+
+#[test]
+fn a_condition_that_is_typed_empty_clears_it() {
+    let mut app = app("condition-clear");
+    press(&mut app, &[KeyCode::F(9)]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the entry is there");
+    app.breakpoints
+        .set_condition(entry.segment, entry.offset, Some("AX==1234h"))
+        .expect("the condition is written");
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::Char('e')]);
+    press(&mut app, &[KeyCode::Enter]);
+    let entry = app
+        .breakpoints
+        .listing()
+        .into_iter()
+        .next()
+        .expect("the entry is there");
+    assert_eq!(entry.condition, None, "the condition is gone");
+    assert!(app.edit.is_none(), "and the prompt is closed");
+}
+
+#[test]
+fn the_arrows_move_the_cursor_over_the_entries() {
+    let mut app = app("conditions-arrows");
+    press(&mut app, &[KeyCode::F(9)]);
+    press(&mut app, &[KeyCode::Down, KeyCode::F(9)]);
+    assert_eq!(app.breakpoints.breakpoints().len(), 2, "two breakpoints");
+    press(&mut app, &[KeyCode::Char('b')]);
+    let entries = app.breakpoints.listing();
+    let first = format!("{:04X}:{:04X}", entries[0].segment, entries[0].offset);
+    let second = format!("{:04X}:{:04X}", entries[1].segment, entries[1].offset);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains(&first), "the first entry is drawn: {text}");
+    assert!(text.contains(&second), "and the second one: {text}");
+    press(&mut app, &[KeyCode::Down]);
+    let on_the_second = marked(&app, 80, 20);
+    assert!(
+        on_the_second.contains(&second),
+        "the cursor is on the second entry: {on_the_second}"
+    );
+    press(&mut app, &[KeyCode::Up]);
+    let on_the_first = marked(&app, 80, 20);
+    assert!(
+        on_the_first.contains(&first),
+        "and back to the first one: {on_the_first}"
+    );
+}
+
+#[test]
+fn the_conditions_pane_closes_with_b_again_and_with_esc() {
+    let mut app = app("conditions-close");
+    press(&mut app, &[KeyCode::Char('b')]);
+    assert!(
+        screen(&app, 80, 20).contains("conditions"),
+        "the pane is open"
+    );
+    press(&mut app, &[KeyCode::Char('b')]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "the listing comes back: {text}"
+    );
+    assert!(!text.contains("conditions"), "and the pane is gone: {text}");
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::Esc]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "and the escape closes it too: {text}"
+    );
+    assert!(!text.contains("conditions"), "and the pane is gone: {text}");
+}
+
+#[test]
+fn the_conditions_and_the_stack_do_not_hold_the_listings_place_at_the_same_time() {
+    let mut app = app("conditions-windows");
+    press(&mut app, &[KeyCode::Char('5')]);
+    assert!(app.stack_open, "the stack is open");
+    press(&mut app, &[KeyCode::Char('b')]);
+    assert!(app.conditions_open, "the conditions are open");
+    assert!(!app.stack_open, "and the stack gives way to them");
+    press(&mut app, &[KeyCode::Char('5')]);
+    assert!(app.stack_open, "the stack takes the place back");
+    assert!(!app.conditions_open, "and the conditions give way to it");
+}
+
+#[test]
+fn a_breakpoint_is_not_set_while_the_conditions_pane_holds_the_listings_place() {
+    let mut app = app("conditions-breakpoint");
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::F(9)]);
+    assert_eq!(
+        app.breakpoints.breakpoints().len(),
+        0,
+        "the cursor is not on the screen, so there is nowhere to set one"
+    );
+}
+
+#[test]
+fn the_keys_that_were_there_before_still_do_what_they_did_with_the_conditions_open() {
+    let mut app = app("conditions-keys");
+    press(&mut app, &[KeyCode::Char('b')]);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(app.steps, 1, "F8 still steps the machine");
+    press(&mut app, &[KeyCode::Char('2')]);
+    assert_eq!(app.focus, Focus::Registers, "and 2 takes the registers");
+    press(&mut app, &[KeyCode::Char('3')]);
+    assert_eq!(app.focus, Focus::Memory, "and 3 takes the memory");
+    press(&mut app, &[KeyCode::Char('?')]);
+    assert!(app.help, "and ? is still the help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    press(&mut app, &[KeyCode::Char('q')]);
+    assert!(app.quit, "and q still quits");
+}
+
+#[test]
+fn the_help_overlay_lists_the_conditions() {
+    let mut app = app("conditions-help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let text = screen(&app, 80, 40);
+    assert!(
+        text.contains("b    the conditions"),
+        "the help names the key: {text}"
+    );
+}
+
+#[test]
+fn a_watchpoint_carries_no_condition_and_the_model_says_so() {
+    let mut app = app("condition-watchpoint");
+    app.breakpoints.watch(0x0000, 0x0200, Access::Write);
+    press(&mut app, &[KeyCode::Char('b'), KeyCode::Char('e')]);
+    type_text(&mut app, "AX==1");
+    press(&mut app, &[KeyCode::Enter]);
+    let status = app.status.clone().unwrap_or_default();
+    assert!(
+        status.contains("no breakpoint there"),
+        "the model says that there is no breakpoint there: {status}"
+    );
+    assert!(app.edit.is_some(), "and the prompt stays open");
 }

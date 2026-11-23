@@ -4,11 +4,15 @@
 //! title, the disassembly, the registers and the flags, and the status line.
 //! The source strip is drawn under the disassembly, in the band the
 //! disassembly is in.
+//! The stack and the conditions are windows and not columns: they take the
+//! listing's place in the band, and only one of them holds that place at a
+//! time.
 //! The colours are the research's too: cyan is the current `IP`, grey is
 //! what has run, yellow is a breakpoint and red is a watchpoint.
 
 use emo8067_debug::panels::{Flag, Panels};
 use emo8067_debug::source::SourceView;
+use emo8067_debug::{Access, Entry, Kind};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -54,6 +58,8 @@ pub fn draw(app: &App, frame: &mut Frame) {
     title(app, frame, rows[0]);
     if app.help {
         help(frame, rows[1]);
+    } else if app.conditions_open {
+        conditions(app, frame, rows[1]);
     } else if app.stack_open {
         stack(&panels, app, frame, rows[1]);
     } else {
@@ -208,6 +214,95 @@ fn disassembly(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
         app.cursor.min(panels.disassembly.len().saturating_sub(1)),
     ));
     frame.render_stateful_widget(list, area, &mut state);
+}
+
+/// The conditions pane: the breakpoints and the watchpoints, and what
+/// each one carries.
+///
+/// The conditions are a window and not a fifth column: they take the
+/// listing's place in the main band, the way the stack does. The rows are
+/// the model's own listing, so the pane holds no copy of the
+/// breakpoints.
+///
+/// Every row says where the entry is, what it is, and what it carries: a
+/// breakpoint says the condition it has, and a watchpoint says what it
+/// watches. The colours are the research's: a breakpoint is yellow and a
+/// watchpoint is red.
+fn conditions(app: &App, frame: &mut Frame, area: Rect) {
+    let entries = app.breakpoints.listing();
+    let items = entries
+        .iter()
+        .map(|entry| {
+            // The entry under the cursor is edited in place, and it shows
+            // what has been typed over it, the way the register under the
+            // cursor does.
+            let detail = match app.edit.as_ref() {
+                Some(Edit::Condition {
+                    segment,
+                    offset,
+                    text,
+                }) if *segment == entry.segment && *offset == entry.offset => text.clone(),
+                _ => detail_of(entry),
+            };
+            let text = format!(
+                "{:04X}:{:04X}  {:<10}  {}",
+                entry.segment,
+                entry.offset,
+                kind_of(entry.kind),
+                detail
+            );
+            let style = match entry.kind {
+                Kind::Breakpoint => Style::default().fg(Color::Yellow),
+                Kind::Watchpoint(_) => Style::default().fg(Color::Red),
+            };
+            ListItem::new(Line::from(Span::styled(text, style)))
+        })
+        .collect::<Vec<_>>();
+    let list = List::new(items)
+        .block(Block::default().borders(Borders::ALL).title(" conditions "))
+        .highlight_symbol("> ")
+        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    let mut state = ListState::default();
+    state.select(Some(
+        app.condition_cursor.min(entries.len().saturating_sub(1)),
+    ));
+    frame.render_stateful_widget(list, area, &mut state);
+}
+
+/// What an entry of the listing is called.
+///
+/// The kind is the model's own: a breakpoint is a breakpoint and a
+/// watchpoint is a watchpoint, and the pane says which is which.
+fn kind_of(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Breakpoint => "breakpoint",
+        Kind::Watchpoint(_) => "watchpoint",
+    }
+}
+
+/// What an entry of the listing carries.
+///
+/// A breakpoint carries a condition, or none at all; a watchpoint carries
+/// no condition and says what it watches instead.
+fn detail_of(entry: &Entry) -> String {
+    match entry.kind {
+        Kind::Breakpoint => match entry.condition.as_deref() {
+            Some(text) if !text.is_empty() => text.to_string(),
+            _ => "no condition".to_string(),
+        },
+        Kind::Watchpoint(access) => access_of(access).to_string(),
+    }
+}
+
+/// What a watchpoint watches, in words.
+///
+/// The access says what it watches: a write, a read, or both.
+fn access_of(access: Access) -> &'static str {
+    match access {
+        Access::Write => "write",
+        Access::Read => "read",
+        Access::Both => "read and write",
+    }
 }
 
 /// The stack pane: the words on the stack, and the pointer among them.
@@ -386,7 +481,8 @@ fn status(app: &App, frame: &mut Frame, area: Rect) {
 ///
 /// The register is named with the value that is being typed, the flag is
 /// named, and the byte is named by its address: each of them says what
-/// the value will be written into.
+/// the value will be written into. The condition is named by its address
+/// too, because that is where it will be written.
 fn edit_says(edit: &Edit) -> String {
     match edit {
         Edit::Register { register, text } => format!("{} = {}", register.name(), text),
@@ -394,6 +490,11 @@ fn edit_says(edit: &Edit) -> String {
         Edit::Byte {
             segment, offset, ..
         } => format!("{segment:04X}:{offset:04X}"),
+        Edit::Condition {
+            segment,
+            offset,
+            text,
+        } => format!("{segment:04X}:{offset:04X} = {text}"),
     }
 }
 
@@ -409,6 +510,7 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("3    the memory"),
         Line::from("4    the flags"),
         Line::from("5    the stack (5 again closes it)"),
+        Line::from("b    the conditions (b again closes it)"),
         Line::from("e    edit the value under the cursor"),
         Line::from("g    jump the memory to an address, a label or a segment"),
         Line::from("↑ ↓  move the cursor"),

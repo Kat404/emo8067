@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::{Reg16, Seg};
-use emo8067_debug::breakpoints::Breakpoints;
+use emo8067_debug::breakpoints::{Breakpoints, Entry};
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
 use emo8067_debug::panels::{Flag, Panels, Register, Ui};
@@ -31,9 +31,10 @@ pub enum Focus {
 
 /// What is being edited, in place.
 ///
-/// The panels write three things: a register, a flag and a byte. The edit
-/// says which one of them it is, because the value that is typed is
-/// written into a different place each time.
+/// The panels write three things: a register, a flag and a byte, and the
+/// conditions pane writes a condition. The edit says which one of them it
+/// is, because the value that is typed is written into a different place
+/// each time.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Edit {
     /// The register under the cursor.
@@ -59,6 +60,18 @@ pub enum Edit {
         /// What has been typed so far.
         text: String,
     },
+    /// The condition of the entry under the cursor.
+    ///
+    /// The condition is a text and not a value: it is read by the
+    /// evaluator, and it is written through the model's own door.
+    Condition {
+        /// The segment the entry is in.
+        segment: u16,
+        /// The offset the entry is at.
+        offset: u16,
+        /// What has been typed so far.
+        text: String,
+    },
 }
 
 impl Edit {
@@ -66,14 +79,20 @@ impl Edit {
     #[must_use]
     pub fn text(&self) -> &str {
         match self {
-            Edit::Register { text, .. } | Edit::Flag { text, .. } | Edit::Byte { text, .. } => text,
+            Edit::Register { text, .. }
+            | Edit::Flag { text, .. }
+            | Edit::Byte { text, .. }
+            | Edit::Condition { text, .. } => text,
         }
     }
 
     /// What has been typed so far, to write into.
     pub fn text_mut(&mut self) -> &mut String {
         match self {
-            Edit::Register { text, .. } | Edit::Flag { text, .. } | Edit::Byte { text, .. } => text,
+            Edit::Register { text, .. }
+            | Edit::Flag { text, .. }
+            | Edit::Byte { text, .. }
+            | Edit::Condition { text, .. } => text,
         }
     }
 }
@@ -135,6 +154,17 @@ pub struct App {
     /// instruction pointer, and this is the scroll the user has made from
     /// it: it is the TUI's own state, like the listing's cursor.
     pub stack_scroll: u16,
+    /// Whether the conditions pane is open where the listing is.
+    ///
+    /// The conditions are a pane you open and not a fifth column: it takes
+    /// the listing's place in the main band, the way the stack does, and
+    /// only one of the two holds that place at a time.
+    pub conditions_open: bool,
+    /// Which entry of the conditions listing the cursor is on.
+    ///
+    /// The cursor is over the entries of the model's own listing, and it
+    /// is the TUI's own state, like the listing's cursor.
+    pub condition_cursor: usize,
     /// What is being edited, in place.
     pub edit: Option<Edit>,
     /// The address the memory window is being jumped to.
@@ -176,6 +206,8 @@ impl App {
             flag_cursor: 0,
             stack_open: false,
             stack_scroll: 0,
+            conditions_open: false,
+            condition_cursor: 0,
             edit: None,
             goto: None,
             goto_segment: None,
@@ -305,15 +337,16 @@ impl App {
             KeyCode::Char('3') => self.focus = Focus::Memory,
             KeyCode::Char('4') => self.focus = Focus::Flags,
             KeyCode::Char('5') => self.toggle_stack(),
+            KeyCode::Char('b') => self.toggle_conditions(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
-            KeyCode::Esc => self.close_stack(),
+            KeyCode::Esc => self.close_window(),
             KeyCode::Tab => self.focus = self.other_focus(),
             KeyCode::F(8) => self.step(),
             KeyCode::F(5) => self.run_to_the_next_breakpoint(),
             // A breakpoint goes at the cursor, and the cursor is not on the
-            // screen while the stack pane holds the listing's place.
-            KeyCode::F(9) if !self.stack_open => self.toggle_breakpoint(),
+            // screen while a window holds the listing's place.
+            KeyCode::F(9) if !self.window_open() => self.toggle_breakpoint(),
             KeyCode::PageUp if self.focus == Focus::Memory => self.move_memory_page(-1),
             KeyCode::PageDown if self.focus == Focus::Memory => self.move_memory_page(1),
             KeyCode::Up => self.move_cursor(0, -1),
@@ -343,9 +376,13 @@ impl App {
 
     /// Move the cursor of the pane that has it.
     ///
-    /// The stack pane holds the listing's place while it is open, so the
-    /// arrows move its window and not the listing's cursor.
+    /// A window holds the listing's place while it is open, so the arrows
+    /// move the window's own cursor and not the listing's cursor.
     fn move_cursor(&mut self, horizontal: i32, vertical: i32) {
+        if self.conditions_open {
+            self.move_condition_cursor(vertical);
+            return;
+        }
         if self.stack_open {
             self.move_stack_window(vertical);
             return;
@@ -356,6 +393,21 @@ impl App {
             Focus::Memory => self.move_memory_cursor(horizontal, vertical),
             Focus::Flags => self.move_flag_cursor(horizontal, vertical),
         }
+    }
+
+    /// The conditions pane's cursor: an entry at a time.
+    ///
+    /// The cursor stays on the listing: it never leaves the entries, and
+    /// the listing's own cursor does not move while the pane holds its
+    /// place.
+    fn move_condition_cursor(&mut self, vertical: i32) {
+        let count = self.breakpoints.listing().len();
+        if count == 0 {
+            self.condition_cursor = 0;
+            return;
+        }
+        let at = self.condition_cursor as i32 + vertical;
+        self.condition_cursor = at.clamp(0, count as i32 - 1) as usize;
     }
 
     /// The stack window, a word at a time.
@@ -373,24 +425,57 @@ impl App {
     /// Open the stack pane where the listing is, or close it again.
     fn toggle_stack(&mut self) {
         if self.stack_open {
-            self.close_stack();
+            self.close_window();
             return;
         }
         self.stack_open = true;
+        // Only one window holds the listing's place: the conditions pane
+        // gives way to the stack.
+        self.conditions_open = false;
         // The window starts at the pointer: the scroll is the user's own,
         // and it begins at the top of the stack.
         self.stack_scroll = 0;
     }
 
-    /// Close the stack pane, and the listing comes back.
-    fn close_stack(&mut self) {
+    /// Open the conditions pane where the listing is, or close it again.
+    ///
+    /// The conditions are a window and not a fifth column: they take the
+    /// listing's place in the main band, the way the stack does.
+    fn toggle_conditions(&mut self) {
+        if self.conditions_open {
+            self.close_window();
+            return;
+        }
+        self.conditions_open = true;
+        // Only one window holds the listing's place: the stack gives way to
+        // the conditions.
         self.stack_open = false;
+        // The cursor starts at the first entry of the listing.
+        self.condition_cursor = 0;
     }
 
-    /// Take the listing, and the stack pane gives way to it.
+    /// Close the window that holds the listing's place, whichever it is.
+    ///
+    /// The stack and the conditions are two windows over the same place,
+    /// and the listing comes back when they close.
+    fn close_window(&mut self) {
+        self.stack_open = false;
+        self.conditions_open = false;
+    }
+
+    /// Whether a window holds the listing's place.
+    ///
+    /// The listing's cursor is not on the screen while a window holds its
+    /// place, and the keys that act on the listing have nothing to act on.
+    fn window_open(&self) -> bool {
+        self.stack_open || self.conditions_open
+    }
+
+    /// Take the listing, and the window that holds its place gives way to
+    /// it.
     fn take_listing(&mut self) {
         self.focus = Focus::Disassembly;
-        self.stack_open = false;
+        self.close_window();
     }
 
     /// The listing's cursor, one line up or down.
@@ -444,8 +529,13 @@ impl App {
     /// Open what is under the cursor for editing.
     ///
     /// A register, a flag or a byte: each of them is edited in place, with
-    /// the value typed over it.
+    /// the value typed over it. The conditions pane edits the condition
+    /// under its own cursor, the same way.
     fn open_edit(&mut self) {
+        if self.conditions_open {
+            self.open_condition_edit();
+            return;
+        }
         let edit = match self.focus {
             Focus::Registers => {
                 let Some(register) = Register::ALL.get(self.register_cursor).copied() else {
@@ -474,6 +564,33 @@ impl App {
         };
         self.edit = Some(edit);
         self.status = None;
+    }
+
+    /// Open the condition under the cursor for editing.
+    ///
+    /// The condition is a text and not a value: it is read by the
+    /// evaluator, and it is written through the model's own door.
+    fn open_condition_edit(&mut self) {
+        let Some(entry) = self.condition_entry() else {
+            return;
+        };
+        self.edit = Some(Edit::Condition {
+            segment: entry.segment,
+            offset: entry.offset,
+            text: String::new(),
+        });
+        self.status = None;
+    }
+
+    /// The entry the conditions cursor is on.
+    ///
+    /// The listing is the model's own: the pane reads the rows out of the
+    /// breakpoints and holds none of its own.
+    fn condition_entry(&self) -> Option<Entry> {
+        self.breakpoints
+            .listing()
+            .get(self.condition_cursor)
+            .cloned()
     }
 
     /// A key, while an edit is open.
@@ -508,18 +625,29 @@ impl App {
     /// What is written depends on what is being edited: a register holds
     /// sixteen bits, a flag holds one bit, and a byte holds eight. A
     /// value that does not fit is refused and the machine is left as it
-    /// was.
+    /// was. A condition is not a value at all: it is written through the
+    /// model's own door.
     fn commit_edit(&mut self) {
         let Some(edit) = self.edit.clone() else {
             return;
         };
-        let text = edit.text().trim();
+        let text = edit.text().trim().to_string();
+        // A condition that is typed empty takes the condition away, and
+        // the breakpoint then always stops: an empty text is not a
+        // condition. A value that is typed empty is nothing at all.
         if text.is_empty() {
+            if let Edit::Condition {
+                segment, offset, ..
+            } = &edit
+            {
+                self.commit_condition(*segment, *offset, None);
+                return;
+            }
             self.edit = None;
             self.status = None;
             return;
         }
-        let outcome = expr::evaluate(text, &Machine::new(&self.cpu));
+        let outcome = expr::evaluate(&text, &Machine::new(&self.cpu));
         let value = match outcome {
             Ok(value) => value,
             Err(error) => {
@@ -551,9 +679,41 @@ impl App {
                 }
                 self.cpu.mem.write_u8(*segment, *offset, value as u8);
             }
+            // A condition is not a value: the value was only read to know
+            // that the condition reads, and the condition itself is
+            // written through the model's own door.
+            Edit::Condition {
+                segment, offset, ..
+            } => {
+                self.commit_condition(*segment, *offset, Some(&text));
+                return;
+            }
         }
         self.edit = None;
         self.status = None;
+    }
+
+    /// Write the condition into the breakpoint.
+    ///
+    /// The condition goes through the model's own door, `set_condition`, so
+    /// the pane holds no second opinion about what a condition is: the
+    /// evaluator that reads the breakpoint's condition is the one the
+    /// breakpoints use.
+    ///
+    /// The door has the last word: a watchpoint carries no condition, and
+    /// the model says so in its own words. A condition that does not read
+    /// was refused before the door was reached, and the old condition
+    /// stays where it was.
+    fn commit_condition(&mut self, segment: u16, offset: u16, condition: Option<&str>) {
+        match self.breakpoints.set_condition(segment, offset, condition) {
+            Ok(_) => {
+                self.edit = None;
+                self.status = None;
+            }
+            Err(error) => {
+                self.status = Some(error.to_string());
+            }
+        }
     }
 
     /// Open the goto, to jump the memory window to an address.
