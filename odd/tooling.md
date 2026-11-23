@@ -64,6 +64,61 @@ Lesson: when `which <name>` fails, check the packaged prefix
 installed, and before asserting the absence as a fact. An unverified negative
 becomes a repeated claim that other work then gets built on.
 
+## Screenshot of the TUI
+
+The TUI can be looked at instead of read out of the code. The example
+`screenshot` draws it into a ratatui `TestBackend` — the same backend the
+drawing tests read back — and writes what a terminal would show as an SVG:
+
+```
+cargo run -p emo8067-tui --example screenshot -- <cols> <rows> <out.svg> [program.asm]
+```
+
+The program is optional: without one the TUI opens empty, and an empty screen
+is a screen too. A screen of 80 by 24 cells is 720 by 432 pixels, and the tool
+says what it drew:
+
+```
+cargo run -p emo8067-tui --example screenshot -- 80 24 /tmp/shot.svg
+wrote /tmp/shot.svg (720x432 pixels, 80x24 cells)
+```
+
+The SVG holds the cell grid — the canvas, and a background rectangle for every
+cell whose background is not the canvas — the character of every cell in its
+own column and row, and the attributes ratatui carries: `REVERSED` swaps the
+foreground and the background, `BOLD` and `ITALIC` take the bold and the
+italic face, `DIM` takes the colour down, and `UNDERLINE` and `CROSSED_OUT`
+draw the line they name. The colours are the sixteen the terminal knows, with
+the xterm palette's values. The same grid can be printed as text, one line per
+row, with `--text`:
+
+```
+cargo run -p emo8067-tui --example screenshot -- 80 24 /tmp/shot.svg --text
+```
+
+**`rsvg-convert` turns the SVG into a PNG.** It is installed, and it is the
+way to look at the picture:
+
+```
+rsvg-convert -o /tmp/shot.png /tmp/shot.svg
+```
+
+### The font is Nimbus Mono PS, and the family name is what counts
+
+The cells are nine pixels wide and eighteen high, and the text is Nimbus Mono
+PS at fifteen pixels: the face advances nine pixels at fifteen, so the grid and
+the text are the same width and every character lands in its own cell. The
+four faces are on this machine, in `/usr/share/fonts/gsfonts/`:
+`NimbusMonoPS-Regular.otf`, `NimbusMonoPS-Bold.otf`, `NimbusMonoPS-Italic.otf`
+and `NimbusMonoPS-BoldItalic.otf`.
+
+**`rsvg-convert` does not read `@font-face`.** Verified on 2026-11-23 with
+librsvg 2.63.4: a family that only the declaration names is drawn in the
+default font, whether the declaration names a file or not. The SVG declares the
+four faces anyway, for a renderer that reads them, and it names the family
+`Nimbus Mono PS` as well — that name is what a renderer that reads no
+declaration resolves, through fontconfig, and the family is installed.
+
 ## Other environment facts
 
 | Tool | Version | Note |
