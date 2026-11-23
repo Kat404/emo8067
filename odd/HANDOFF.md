@@ -50,7 +50,14 @@ the cursor on a byte and a goto to jump to an address.
   it draws every breakpoint and every watchpoint with its segment, its
   offset and its condition; the condition under the cursor is edited in
   place.
-- **The plan is `odd/tasks/tui.md`** (L5-L11). The tree is **563 passed,
+- **The debug console**: `:` opens it where the listing is, with the
+  command line at the bottom and the log above it. The commands are the
+  reference's own ten words (`re/docs-txt/debug.txt`), every parameter is
+  hexadecimal and every value is printed in hexadecimal, and the text it
+  prints is this project's — the reference documents the commands and not
+  their output. `p`, the effective addresses and the symbols are refused
+  honestly.
+- **The plan is `odd/tasks/tui.md`** (L5-L12). The tree is **584 passed,
   0 failed** and the clippy run is clean in every crate.
 
 ## Where the 2026-11-19 work is
@@ -514,10 +521,11 @@ wins, so a device that writes a port byte does not reach the program.
     editing in place and the flags (2026-11-19), the memory window with
     its goto (2026-11-21), and the stack pane and the source strip
     (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5
-    to L11). **What is left of the TUI** is the guest's screen, the debug
-    console, and **one design pass over the whole thing at the end**,
-    which the maintainer asked for: functions first, design last. After
-    that come T17 (packaging and CI) and T18 (the GUI, the last stage).
+    to L12). **What is left of the TUI** is the guest's screen, whose
+    research is done, and **one design pass over the whole thing at the
+    end**, which the maintainer asked for: functions first, design last.
+    After that come T17 (packaging and CI) and T18 (the GUI, the last
+    stage).
 14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
 
 ## Files worth reading first

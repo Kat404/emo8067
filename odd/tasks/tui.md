@@ -116,12 +116,34 @@ red is a watchpoint.
   condition that does not read is refused in the evaluator's own words and
   the old condition stays. The list is the model's own listing, and the
   evaluator that reads a condition is the one the breakpoints use.
+- **S21** — The console is a window, like the stack and the conditions: `:`
+  opens it where the listing is, `:` again closes it, and `Esc` closes it
+  too. It has the command line at the bottom and the output above it, the
+  way the reference's own debug window has a log and a box to type in.
+  Every parameter the console takes is in hexadecimal and every value it
+  prints is in hexadecimal: "All output values are in hex. All input
+  parameters must be in hex. The h suffix is not required".
+- **S22** — The commands are the reference's own words: `r` shows the
+  registers and the instruction at `CS:IP`, `r <register>` reads or sets
+  one register, `rf` reads or sets the flags, `t` steps one instruction,
+  `d [address] [L count]` dumps memory, `i` and `iw` read a port, `o` and
+  `ow` write a port, and `c` compares two byte ranges and prints only the
+  addresses whose bytes differ. **The text the console prints is ours**:
+  the reference documents the commands and not their output, and the
+  registers and the flags are printed as the panels draw them, so the
+  project grows one format and not two.
+- **S23** — A command that cannot be read changes nothing: a command the
+  console does not know, a parameter that is not hexadecimal and a value
+  that does not fit are refused in the console's own words, and the
+  machine, the breakpoints and the counters are left as they were.
 
 ## Out of scope
 
 - **The guest's screen**: the reference's own screen is a device of its
   own, and the research says the TUI is weak there.
-- **The debug console** and the reference's command vocabulary.
+- **The commands the console cannot do yet**: `p` (step over — the machine
+  keeps no call tracking), the effective-address forms (`d bx+5`), and the
+  symbols (`d lion L 10`) — this project has no symbol table for them.
 - **The stop-on-condition window**: the evaluator and the breakpoints are
   there; the window that shows the conditions and lets them be edited is
   its own slice.
@@ -177,9 +199,40 @@ red is a watchpoint.
   condition was not written. **GREEN**: the drawing test is 66 passed, 0
   failed; the whole tree is **563 passed, 0 failed**, and the clippy run
   is clean in every crate.
+- **T10** — The console's window: the command line at the bottom, the log
+  above it, and the key that opens it. S21.
+- **T11** — The console's commands: the reference's own ten words, and
+  the refusals that change nothing. S22-S23. **RED**: the new tests did
+  not compile, because the console did not exist. **GREEN**: the console
+  test is 15 passed, 0 failed; the drawing test is 72 passed, 0 failed;
+  the whole tree is **584 passed, 0 failed**, and the clippy run is clean
+  in every crate.
 
 ## Log
 
+- **L12 (2026-11-21).** The debug console is landed, and with it the TUI
+  has every panel the research's layout draws.
+  - **The commands are the reference's own words**, read out of
+    `re/docs-txt/debug.txt`: `c`, `i`, `iw`, `o`, `ow`, `d`, `t`,
+    `r` and `rf`. The research's inventory says twelve; the reference's
+    own document says ten, and the document wins.
+  - **Every parameter is in hexadecimal and every value is printed in
+    hexadecimal**, the reference's own rule: "All output values are in
+    hex. All input parameters must be in hex. The h suffix is not
+    required."
+  - **The text the console prints is ours.** The reference documents the
+    commands and not their output, so the strings are this project's, and
+    the registers and the flags are printed as the panels draw them — the
+    project grows one format and not two.
+  - **Three commands are refused honestly**: `p` (the machine keeps no
+    call tracking), the effective addresses (`d bx+5`) and the symbols
+    (`d lion L 10`) — this project has no symbol table.
+  - **A refusal changes nothing**: the command is read before anything is
+    touched, and the machine, the breakpoints and the counters are left
+    exactly as they were.
+  - **Still open.** The guest's screen, whose research is done and whose
+    honest slice is a passive viewer of the video page; and the design
+    pass over the whole TUI, at the end, as the maintainer asked.
 - **L11 (2026-11-21).** The conditions pane is landed: the breakpoints and
   the watchpoints are drawn with their segment, their offset and their
   condition, and the condition under the cursor is edited in place.
