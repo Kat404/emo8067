@@ -2,7 +2,7 @@
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::{Reg16, Seg};
-use emo8067_debug::breakpoints::{Access, Breakpoints, Missed};
+use emo8067_debug::breakpoints::{Access, Breakpoints, ConditionError, Kind, Missed};
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
 use emo8067_debug::panels::{Panels, Ui};
@@ -62,6 +62,135 @@ fn a_condition_that_cannot_be_read_is_refused_where_it_is_written() {
     let mut breakpoints = Breakpoints::new();
     assert!(breakpoints.add(0x0200, 0x0010, Some("AX ==")).is_err());
     assert!(breakpoints.breakpoints().is_empty());
+}
+
+#[test]
+fn the_listing_holds_every_breakpoint_and_every_watchpoint() {
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, Some("AX==0x1234")).unwrap();
+    breakpoints.add(0x0200, 0x0020, None).unwrap();
+    breakpoints.watch(0x0100, 0x0004, Access::Write);
+    breakpoints.watch(0x0100, 0x0008, Access::Both);
+
+    let listing = breakpoints.listing();
+
+    assert_eq!(listing.len(), 4, "every breakpoint and every watchpoint");
+    assert_eq!(listing[0].segment, 0x0200);
+    assert_eq!(listing[0].offset, 0x0010);
+    assert_eq!(listing[0].condition.as_deref(), Some("AX==0x1234"));
+    assert_eq!(listing[1].segment, 0x0200);
+    assert_eq!(listing[1].offset, 0x0020);
+    assert_eq!(listing[2].segment, 0x0100);
+    assert_eq!(listing[2].offset, 0x0004);
+    assert_eq!(listing[3].segment, 0x0100);
+    assert_eq!(listing[3].offset, 0x0008);
+}
+
+#[test]
+fn the_listing_tells_a_breakpoint_from_a_watchpoint() {
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, None).unwrap();
+    breakpoints.watch(0x0100, 0x0004, Access::Write);
+
+    let listing = breakpoints.listing();
+
+    assert_eq!(listing[0].kind, Kind::Breakpoint);
+    assert_eq!(listing[1].kind, Kind::Watchpoint(Access::Write));
+}
+
+#[test]
+fn a_breakpoint_without_a_condition_carries_none() {
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, None).unwrap();
+
+    let listing = breakpoints.listing();
+
+    assert_eq!(listing[0].condition, None, "no condition at all");
+    assert!(
+        listing[0].condition.as_deref() != Some(""),
+        "and not an empty text either"
+    );
+}
+
+#[test]
+fn a_condition_can_be_set_and_taken_away() {
+    let cpu = machine();
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, None).unwrap();
+
+    breakpoints
+        .set_condition(0x0200, 0x0010, Some("AX==0x1234"))
+        .unwrap();
+    assert_eq!(
+        breakpoints.listing()[0].condition.as_deref(),
+        Some("AX==0x1234"),
+        "the listing shows the new condition"
+    );
+    assert!(
+        breakpoints.stops_at(&Machine::new(&cpu), 0x0200, 0x0010),
+        "and the breakpoint stops with it"
+    );
+
+    breakpoints.set_condition(0x0200, 0x0010, None).unwrap();
+    assert!(
+        breakpoints.listing()[0].condition.is_none(),
+        "the condition is gone when it is taken away"
+    );
+}
+
+#[test]
+fn a_condition_that_cannot_be_read_is_refused_and_the_old_one_stays() {
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, Some("AX==0x1234")).unwrap();
+
+    let error = breakpoints
+        .set_condition(0x0200, 0x0010, Some("AX =="))
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        ConditionError::Unreadable(expr::Error::BadExpression),
+        "the condition does not read"
+    );
+    assert_eq!(
+        breakpoints.listing()[0].condition.as_deref(),
+        Some("AX==0x1234"),
+        "the breakpoint keeps the condition it had"
+    );
+}
+
+#[test]
+fn a_condition_cannot_be_written_where_there_is_no_breakpoint() {
+    let mut breakpoints = Breakpoints::new();
+
+    let error = breakpoints
+        .set_condition(0x0200, 0x0010, Some("AX"))
+        .unwrap_err();
+
+    assert_eq!(error, ConditionError::NoBreakpoint);
+    assert!(breakpoints.listing().is_empty());
+}
+
+#[test]
+fn the_first_breakpoint_at_an_address_is_the_one_that_is_written() {
+    // The door that writes a condition and the door that takes a
+    // breakpoint away agree on which breakpoint at an address is the one:
+    // the first.
+    let mut breakpoints = Breakpoints::new();
+    breakpoints.add(0x0200, 0x0010, Some("AX")).unwrap();
+    breakpoints.add(0x0200, 0x0010, Some("BX")).unwrap();
+
+    breakpoints
+        .set_condition(0x0200, 0x0010, Some("CX"))
+        .unwrap();
+    let taken = breakpoints.remove(0x0200, 0x0010).unwrap();
+
+    assert_eq!(taken.condition.as_deref(), Some("CX"));
+    assert_eq!(
+        breakpoints.listing()[0].condition.as_deref(),
+        Some("BX"),
+        "and the second one is the one that is left"
+    );
 }
 
 #[test]
