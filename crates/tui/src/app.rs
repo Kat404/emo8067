@@ -16,6 +16,9 @@ use emo8067_debug::panels::{Flag, Panels, Register, Ui};
 use emo8067_debug::source::SourceView;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+use crate::console::{self, Console};
+use crate::ui;
+
 /// Which pane has the cursor.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Focus {
@@ -116,6 +119,9 @@ const PAGE: i32 = 0x100;
 /// grid: a flag to the left or to the right, and a row up or down.
 pub const FLAGS_COLUMNS: usize = 3;
 
+/// What the console says when the machine has stopped for good.
+const HALTED: &str = "the machine is halted";
+
 /// What the TUI knows.
 #[derive(Debug)]
 pub struct App {
@@ -165,6 +171,19 @@ pub struct App {
     /// The cursor is over the entries of the model's own listing, and it
     /// is the TUI's own state, like the listing's cursor.
     pub condition_cursor: usize,
+    /// Whether the console is open where the listing is.
+    ///
+    /// The console is a window and not a sixth column: it takes the
+    /// listing's place in the main band, the way the stack and the
+    /// conditions do, and only one of the three holds that place at a
+    /// time.
+    pub console_open: bool,
+    /// The console: its command line, its log and where its next dump
+    /// begins.
+    ///
+    /// The console is the TUI's own: the commands it takes are the
+    /// reference's own, and the words it says are this project's.
+    pub console: Console,
     /// What is being edited, in place.
     pub edit: Option<Edit>,
     /// The address the memory window is being jumped to.
@@ -208,6 +227,8 @@ impl App {
             stack_scroll: 0,
             conditions_open: false,
             condition_cursor: 0,
+            console_open: false,
+            console: Console::default(),
             edit: None,
             goto: None,
             goto_segment: None,
@@ -328,6 +349,12 @@ impl App {
             self.goto_key(key);
             return;
         }
+        // The console takes every key too, while it is open: it is a
+        // window with a command line in it, and the keys go there.
+        if self.console_open {
+            self.console_key(key);
+            return;
+        }
         match key.code {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.help = true,
@@ -338,6 +365,7 @@ impl App {
             KeyCode::Char('4') => self.focus = Focus::Flags,
             KeyCode::Char('5') => self.toggle_stack(),
             KeyCode::Char('b') => self.toggle_conditions(),
+            KeyCode::Char(':') => self.toggle_console(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
             KeyCode::Esc => self.close_window(),
@@ -430,8 +458,9 @@ impl App {
         }
         self.stack_open = true;
         // Only one window holds the listing's place: the conditions pane
-        // gives way to the stack.
+        // and the console give way to the stack.
         self.conditions_open = false;
+        self.console_open = false;
         // The window starts at the pointer: the scroll is the user's own,
         // and it begins at the top of the stack.
         self.stack_scroll = 0;
@@ -447,20 +476,48 @@ impl App {
             return;
         }
         self.conditions_open = true;
-        // Only one window holds the listing's place: the stack gives way to
-        // the conditions.
+        // Only one window holds the listing's place: the stack and the
+        // console give way to the conditions.
         self.stack_open = false;
+        self.console_open = false;
         // The cursor starts at the first entry of the listing.
         self.condition_cursor = 0;
     }
 
+    /// Open the console where the listing is, or close it again.
+    ///
+    /// The console is a window and not a sixth column: it takes the
+    /// listing's place in the main band, the way the stack and the
+    /// conditions do.
+    fn toggle_console(&mut self) {
+        if self.console_open {
+            self.close_console();
+            return;
+        }
+        self.console_open = true;
+        // Only one window holds the listing's place: the stack and the
+        // conditions give way to the console.
+        self.stack_open = false;
+        self.conditions_open = false;
+    }
+
+    /// Close the console.
+    ///
+    /// The command line goes with it: a command that was half typed is
+    /// abandoned, and the log stays where it is.
+    fn close_console(&mut self) {
+        self.console_open = false;
+        self.console.text.clear();
+    }
+
     /// Close the window that holds the listing's place, whichever it is.
     ///
-    /// The stack and the conditions are two windows over the same place,
-    /// and the listing comes back when they close.
+    /// The stack, the conditions and the console are three windows over
+    /// the same place, and the listing comes back when they close.
     fn close_window(&mut self) {
         self.stack_open = false;
         self.conditions_open = false;
+        self.close_console();
     }
 
     /// Whether a window holds the listing's place.
@@ -468,7 +525,7 @@ impl App {
     /// The listing's cursor is not on the screen while a window holds its
     /// place, and the keys that act on the listing have nothing to act on.
     fn window_open(&self) -> bool {
-        self.stack_open || self.conditions_open
+        self.stack_open || self.conditions_open || self.console_open
     }
 
     /// Take the listing, and the window that holds its place gives way to
@@ -841,6 +898,264 @@ impl App {
             _ => return hexadecimal(text),
         };
         Ok(self.cpu.regs.segment(segment))
+    }
+
+    /// A key, while the console is open.
+    ///
+    /// The console takes every key, the way the edit and the goto do: the
+    /// characters go on the command line and `Enter` runs what is there.
+    ///
+    /// The `:` closes the console when the command line is empty; with
+    /// text on the line it is a character, because a memory reference is
+    /// written `SSSS:OOOO`.
+    fn console_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.close_console(),
+            KeyCode::Enter => {
+                let text = std::mem::take(&mut self.console.text);
+                self.run_console_command(&text);
+            }
+            KeyCode::Backspace => {
+                self.console.text.pop();
+            }
+            KeyCode::Char(':') if self.console.text.is_empty() => self.close_console(),
+            KeyCode::Char(character) => self.console.text.push(character),
+            _ => {}
+        }
+    }
+
+    /// Run the command that was typed, and put what it says in the log.
+    ///
+    /// The command is read first, and a command that cannot be read is
+    /// refused before anything is touched: the machine, the breakpoints and
+    /// the counters are left exactly as they were.
+    fn run_console_command(&mut self, text: &str) {
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        // The console's own message is the last one in the status line.
+        self.status = None;
+        // The log says what was run, the way a console's own log does, and
+        // it says it before the answer: a command that is refused is in
+        // the log too.
+        self.console.output.push(format!("> {text}"));
+        let command = match console::parse(text, &self.cpu) {
+            Ok(command) => command,
+            Err(refusal) => {
+                self.refuse(refusal);
+                return;
+            }
+        };
+        match self.run_command(command) {
+            Ok(lines) => {
+                self.console.output.extend(lines);
+                self.trim_console_output();
+            }
+            Err(refusal) => self.refuse(refusal),
+        }
+    }
+
+    /// Say that the console cannot do what it was asked.
+    ///
+    /// The refusal is in the console's own words, and it is in the log and
+    /// in the status line. Nothing else is touched: the machine, the
+    /// breakpoints and the counters are left as they were.
+    fn refuse(&mut self, refusal: console::Refusal) {
+        let text = refusal.to_string();
+        self.console.output.push(text.clone());
+        self.trim_console_output();
+        self.status = Some(text);
+    }
+
+    /// Keep the log from growing without end.
+    ///
+    /// The log holds the last thousand lines: the oldest are the ones that
+    /// go, because a long session must not grow the UI's memory.
+    fn trim_console_output(&mut self) {
+        let extra = self
+            .console
+            .output
+            .len()
+            .saturating_sub(console::OUTPUT_LINES);
+        if extra > 0 {
+            self.console.output.drain(0..extra);
+        }
+    }
+
+    /// Run a command against the machine, and say what it says.
+    ///
+    /// The commands act on the machine: they read it, they write it and
+    /// they step it. The registers and the flags are said as the panels
+    /// draw them, so the project grows one format and not two.
+    fn run_command(&mut self, command: console::Command) -> Result<Vec<String>, console::Refusal> {
+        match command {
+            console::Command::Registers => {
+                let panels = self.panels();
+                let cells = panels.registers.cells();
+                let mut lines: Vec<String> = cells.iter().map(ui::register_text).collect();
+                // The instruction at `CS:IP` is the listing's own first
+                // line: the listing follows the instruction pointer.
+                if let Some(line) = panels.disassembly.first() {
+                    lines.push(ui::line_text(line));
+                }
+                Ok(lines)
+            }
+            console::Command::ReadRegister(register) => {
+                let panels = self.panels();
+                let cells = panels.registers.cells();
+                Ok(cells
+                    .iter()
+                    .filter(|cell| cell.register == register)
+                    .map(ui::register_text)
+                    .collect())
+            }
+            console::Command::WriteRegister { register, value } => {
+                // The write goes through the model's own door.
+                register.write(&mut self.cpu, value);
+                let panels = self.panels();
+                let cells = panels.registers.cells();
+                Ok(cells
+                    .iter()
+                    .filter(|cell| cell.register == register)
+                    .map(ui::register_text)
+                    .collect())
+            }
+            console::Command::Flags => {
+                let panels = self.panels();
+                Ok(Flag::ALL
+                    .iter()
+                    .map(|flag| ui::flag_text(*flag, panels.registers.flag(*flag)))
+                    .collect())
+            }
+            console::Command::ReadFlag(flag) => {
+                let panels = self.panels();
+                Ok(vec![ui::flag_text(flag, panels.registers.flag(flag))])
+            }
+            console::Command::WriteFlag { flag, value } => {
+                // The write goes through the model's own door.
+                flag.write(&mut self.cpu, value);
+                let panels = self.panels();
+                Ok(vec![ui::flag_text(flag, panels.registers.flag(flag))])
+            }
+            console::Command::Step => {
+                if self.finished {
+                    return Ok(vec![HALTED.to_string()]);
+                }
+                self.step();
+                if self.finished {
+                    return Ok(vec![
+                        self.status.clone().unwrap_or_else(|| HALTED.to_string()),
+                    ]);
+                }
+                let panels = self.panels();
+                Ok(panels
+                    .disassembly
+                    .first()
+                    .map(|line| vec![ui::line_text(line)])
+                    .unwrap_or_default())
+            }
+            console::Command::Dump { address, count } => {
+                let (segment, offset) = match address {
+                    Some(address) => (self.segment_of_address(address.segment), address.offset),
+                    None => match self.console.dump {
+                        Some(dump) => (dump.segment, dump.next()),
+                        None => (self.cpu.regs.segment(Seg::Cs), self.cpu.regs.ip),
+                    },
+                };
+                let bytes: Vec<u8> = (0..count)
+                    .map(|index| {
+                        self.cpu
+                            .mem
+                            .read_u8(segment, offset.wrapping_add(index as u16))
+                    })
+                    .collect();
+                let mut lines = Vec::new();
+                for (row, chunk) in bytes.chunks(16).enumerate() {
+                    let at = offset.wrapping_add((row * 16) as u16);
+                    lines.push(console::dump_row(segment, at, chunk));
+                }
+                // The console keeps where its last dump was, so that a
+                // bare `d` shows the next block.
+                self.console.dump = Some(console::Dump {
+                    segment,
+                    offset,
+                    count,
+                });
+                Ok(lines)
+            }
+            console::Command::ReadPort { port, word } => {
+                let mut bus = self.cpu.bus.borrow_mut();
+                Ok(vec![if word {
+                    let value = bus.read_word(port);
+                    format!("port {port:04X} = {value:04X}")
+                } else {
+                    let value = bus.read(port);
+                    format!("port {port:04X} = {value:02X}")
+                }])
+            }
+            console::Command::WritePort { port, value, word } => {
+                {
+                    let mut bus = self.cpu.bus.borrow_mut();
+                    if word {
+                        bus.write_word(port, value);
+                    } else {
+                        bus.write(port, value as u8);
+                    }
+                }
+                Ok(vec![if word {
+                    format!("wrote {value:04X} to port {port:04X}")
+                } else {
+                    format!("wrote {value:02X} to port {port:04X}")
+                }])
+            }
+            console::Command::Compare {
+                first,
+                count,
+                second,
+            } => {
+                let first_segment = self.segment_of_address(first.segment);
+                let second_segment = self.segment_of_address(second.segment);
+                let mut lines = Vec::new();
+                for index in 0..count {
+                    let at = index as u16;
+                    let one = self
+                        .cpu
+                        .mem
+                        .read_u8(first_segment, first.offset.wrapping_add(at));
+                    let other = self
+                        .cpu
+                        .mem
+                        .read_u8(second_segment, second.offset.wrapping_add(at));
+                    // Only the bytes that differ are said: "The command
+                    // outputs only those addresses with values that are
+                    // different. Equal bytes are not printed out."
+                    if one != other {
+                        lines.push(console::compare_row(
+                            first_segment,
+                            first.offset.wrapping_add(at),
+                            one,
+                            second_segment,
+                            second.offset.wrapping_add(at),
+                            other,
+                        ));
+                    }
+                }
+                Ok(lines)
+            }
+        }
+    }
+
+    /// The segment an address of the console is in.
+    ///
+    /// The segment is the one the address named, and the code segment when
+    /// it named none: "If no segment is specified CS is used by default."
+    fn segment_of_address(&self, segment: Option<console::Segment>) -> u16 {
+        match segment {
+            Some(console::Segment::Register(seg)) => self.cpu.regs.segment(seg),
+            Some(console::Segment::Number(number)) => number,
+            None => self.cpu.regs.segment(Seg::Cs),
+        }
     }
 
     /// One instruction.

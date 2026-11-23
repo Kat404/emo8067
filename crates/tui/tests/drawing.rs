@@ -1164,6 +1164,108 @@ fn the_help_overlay_lists_the_conditions() {
 }
 
 #[test]
+fn the_disassembly_draws_the_address_the_bytes_and_the_instruction() {
+    let app = app("disassembly-text");
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("0000:0100  B8 34 12"),
+        "the address and the bytes are drawn: {text}"
+    );
+    assert!(
+        text.contains("MOV AX, 01234h"),
+        "and the instruction is the reference's own: {text}"
+    );
+}
+
+#[test]
+fn the_console_opens_where_the_listing_is() {
+    let mut app = app("console-window");
+    let before = screen(&app, 80, 20);
+    assert!(
+        before.contains("disassembly"),
+        "the listing is there to begin with: {before}"
+    );
+    press(&mut app, &[KeyCode::Char(':')]);
+    let text = screen(&app, 80, 20);
+    assert!(text.contains("console"), "the window is named: {text}");
+    assert!(
+        !text.contains("disassembly"),
+        "the listing is not on the screen: {text}"
+    );
+    press(&mut app, &[KeyCode::Char(':')]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "and the listing comes back: {text}"
+    );
+    press(&mut app, &[KeyCode::Char(':'), KeyCode::Esc]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("disassembly"),
+        "and the escape closes it too: {text}"
+    );
+}
+
+#[test]
+fn the_console_shows_what_the_commands_said() {
+    let mut app = app("console-output");
+    press(&mut app, &[KeyCode::Char(':')]);
+    type_text(&mut app, "r AX");
+    press(&mut app, &[KeyCode::Enter]);
+    let text = screen(&app, 80, 20);
+    assert!(
+        text.contains("AX 0000"),
+        "the console says what the command said: {text}"
+    );
+    // The output is above and the command line is at the bottom.
+    let rows = rows(&app, 80, 20);
+    let output = rows
+        .iter()
+        .position(|row| row.contains("AX 0000"))
+        .expect("the output is on the screen");
+    let command = rows
+        .iter()
+        .position(|row| row.contains(": "))
+        .expect("the command line is on the screen");
+    assert!(
+        output < command,
+        "the command line is under the output: {rows:?}"
+    );
+}
+
+#[test]
+fn the_console_holds_the_listings_place_alone() {
+    let mut app = app("console-alone");
+    press(&mut app, &[KeyCode::Char('5')]);
+    assert!(app.stack_open, "the stack is open");
+    press(&mut app, &[KeyCode::Char(':')]);
+    assert!(app.console_open, "the console is open");
+    assert!(!app.stack_open, "and the stack gives way to it");
+}
+
+#[test]
+fn a_breakpoint_is_not_set_while_the_console_holds_the_listings_place() {
+    let mut app = app("console-breakpoint");
+    press(&mut app, &[KeyCode::Char(':'), KeyCode::F(9)]);
+    assert_eq!(
+        app.breakpoints.breakpoints().len(),
+        0,
+        "the cursor is not on the screen, so there is nowhere to set one"
+    );
+}
+
+#[test]
+fn the_help_overlay_lists_the_console() {
+    let mut app = app("console-help");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let text = screen(&app, 80, 40);
+    assert!(
+        text.contains(":    the console"),
+        "the help names the key: {text}"
+    );
+}
+
+#[test]
 fn a_watchpoint_carries_no_condition_and_the_model_says_so() {
     let mut app = app("condition-watchpoint");
     app.breakpoints.watch(0x0000, 0x0200, Access::Write);

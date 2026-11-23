@@ -10,7 +10,7 @@
 //! The colours are the research's too: cyan is the current `IP`, grey is
 //! what has run, yellow is a breakpoint and red is a watchpoint.
 
-use emo8067_debug::panels::{Flag, Panels};
+use emo8067_debug::panels::{Cell, Flag, Line as Instruction, Panels};
 use emo8067_debug::source::SourceView;
 use emo8067_debug::{Access, Entry, Kind};
 use ratatui::Frame;
@@ -43,6 +43,41 @@ const SOURCE_LINES: u16 = 5;
 /// rows of the band.
 const LISTING_ROWS: u16 = 3;
 
+/// The text of a register cell: the name of the register and its value.
+///
+/// The console prints the registers as the panel draws them, so the text
+/// is made here and used in both places: the project grows one format and
+/// not two.
+pub(crate) fn register_text(cell: &Cell) -> String {
+    format!("{} {:04X}", cell.register.name(), cell.value)
+}
+
+/// The text of a flag: the name of the flag and its value.
+///
+/// The console prints the flags as the panel draws them, so the text is
+/// made here and used in both places.
+pub(crate) fn flag_text(flag: Flag, value: bool) -> String {
+    format!("{} {}", flag.name(), if value { "1" } else { "0" })
+}
+
+/// The text of a line of the disassembly: the address, the bytes and the
+/// instruction.
+///
+/// The console says the instruction at `CS:IP` as the listing draws it,
+/// so the text is made here and used in both places.
+pub(crate) fn line_text(line: &Instruction) -> String {
+    let bytes = line
+        .bytes
+        .iter()
+        .map(|byte| format!("{byte:02X}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "{:04X}:{:04X}  {:<12}  {}",
+        line.segment, line.offset, bytes, line.text
+    )
+}
+
 /// Draw the whole screen.
 pub fn draw(app: &App, frame: &mut Frame) {
     let panels = app.panels();
@@ -58,6 +93,8 @@ pub fn draw(app: &App, frame: &mut Frame) {
     title(app, frame, rows[0]);
     if app.help {
         help(frame, rows[1]);
+    } else if app.console_open {
+        console(app, frame, rows[1]);
     } else if app.conditions_open {
         conditions(app, frame, rows[1]);
     } else if app.stack_open {
@@ -170,16 +207,7 @@ fn disassembly(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
         .disassembly
         .iter()
         .map(|line| {
-            let bytes = line
-                .bytes
-                .iter()
-                .map(|byte| format!("{byte:02X}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let text = format!(
-                "{:04X}:{:04X}  {:<12}  {}",
-                line.segment, line.offset, bytes, line.text
-            );
+            let text = line_text(line);
             let style = if app
                 .breakpoints
                 .watchpoints()
@@ -333,6 +361,38 @@ fn stack(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
     frame.render_widget(list, area);
 }
 
+/// The console window: the log of what the commands said, and the command
+/// line at the bottom.
+///
+/// The console is a window and not a column: it takes the listing's place
+/// in the main band, the way the stack and the conditions do. The log is
+/// above and the command line is at the bottom, the way the reference's
+/// own debug window has a log and a box to type in.
+///
+/// The log grows with the commands and the window does not, so the last
+/// lines that fit are the ones that are shown.
+fn console(app: &App, frame: &mut Frame, area: Rect) {
+    let block = Block::default().borders(Borders::ALL).title(" console ");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+    let height = usize::from(parts[0].height);
+    let lines = app
+        .console
+        .output
+        .iter()
+        .skip(app.console.output.len().saturating_sub(height))
+        .map(|line| Line::from(line.clone()))
+        .collect::<Vec<_>>();
+    frame.render_widget(Paragraph::new(lines), parts[0]);
+    // The command line: the `:` is the key that opens the console.
+    let prompt = format!(": {}", app.console.text);
+    frame.render_widget(Paragraph::new(prompt), parts[1]);
+}
+
 /// The registers panel: the machine's registers, in two columns.
 fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
     let cells = panels.registers.cells();
@@ -352,7 +412,7 @@ fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
                 Some(Edit::Register { register, text }) if *register == cell.register => {
                     format!("{name} {text}")
                 }
-                _ => format!("{name} {:04X}", cell.value),
+                _ => register_text(cell),
             };
             let style = if index == app.register_cursor && app.focus == Focus::Registers {
                 Style::default().add_modifier(Modifier::REVERSED)
@@ -442,17 +502,18 @@ fn flags(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
                 spans.push(Span::raw("  "));
             }
             let index = row * FLAGS_COLUMNS + column;
-            let value = match app.edit.as_ref() {
-                Some(Edit::Flag { flag: edited, text }) if edited == flag => text.clone(),
-                _ if panels.registers.flag(*flag) => "1".to_string(),
-                _ => "0".to_string(),
+            let text = match app.edit.as_ref() {
+                Some(Edit::Flag { flag: edited, text }) if edited == flag => {
+                    format!("{} {text}", flag.name())
+                }
+                _ => flag_text(*flag, panels.registers.flag(*flag)),
             };
             let style = if index == app.flag_cursor && app.focus == Focus::Flags {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()
             };
-            spans.push(Span::styled(format!("{} {}", flag.name(), value), style));
+            spans.push(Span::styled(text, style));
         }
         lines.push(Line::from(spans));
     }
@@ -511,6 +572,7 @@ fn help(frame: &mut Frame, area: Rect) {
         Line::from("4    the flags"),
         Line::from("5    the stack (5 again closes it)"),
         Line::from("b    the conditions (b again closes it)"),
+        Line::from(":    the console (: again closes it)"),
         Line::from("e    edit the value under the cursor"),
         Line::from("g    jump the memory to an address, a label or a segment"),
         Line::from("↑ ↓  move the cursor"),
