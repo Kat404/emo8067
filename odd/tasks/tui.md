@@ -136,6 +136,26 @@ red is a watchpoint.
   console does not know, a parameter that is not hexadecimal and a value
   that does not fit are refused in the console's own words, and the
   machine, the breakpoints and the counters are left as they were.
+- **S24** — The sections are not cards: the header is one row, the sections
+  are separated by a thin rule — a horizontal one between the bands, a
+  vertical one between the bottom band's sections — and **no panel is
+  framed with a box**.
+- **S25** — A state is never colour alone: the instruction the machine is
+  at carries the `▸` glyph, a breakpoint carries `◆`, a watchpoint `◇`,
+  the focused section's header is the accent, and the memory window's
+  cursor is marked whether the section has the focus or not.
+- **S26** — The palette is a set of roles and not a set of swatches: the
+  canvas, the surface, the rule, the three text roles, the accent and the
+  state colours, each with one meaning, and they live in
+  `crates/tui/src/theme.rs`. The research's meanings are kept — cyan is
+  the current `IP`, grey is what has run, yellow is a breakpoint, red is a
+  watchpoint — and the values are the calm ones, not the terminal's ANSI
+  ones.
+- **S27** — The words stay: the redesign changes the frame and not the
+  vocabulary. The sections keep their names ("disassembly", "registers",
+  "flags"), the registers and the flags keep their `AX 0000` form, the
+  memory row keeps its address and its bytes, and the status bar keeps
+  its hints.
 
 ## Out of scope
 
@@ -207,6 +227,37 @@ red is a watchpoint.
   test is 15 passed, 0 failed; the drawing test is 72 passed, 0 failed;
   the whole tree is **584 passed, 0 failed**, and the clippy run is clean
   in every crate.
+- **T12** — The redesign: the tokens, the sections, the glyphs, the focus
+  and the states, with the design's own document as the brief. S24-S27.
+
+## Log
+
+- **L13 (2026-11-21).** The design pass, the last unit of the TUI.
+  - **The TUI was captured and looked at**, which is the only way to judge
+    it: `crates/tui/examples/screenshot.rs` renders the TUI into the
+    TestBackend and writes an SVG, and `rsvg-convert` makes a PNG. The
+    captures are at 80x24, 140x40 and 180x50.
+  - **What the capture found.** P0: every panel is framed with a box —
+    five cards on one screen — and the memory window's cursor is
+    invisible unless the window has the focus, so the user cannot find
+    where the window is. P1: a state is colour alone (the machine's
+    instruction, a breakpoint, a watchpoint); the focus is invisible in
+    three of the four sections; two glyphs mean "here" (`>` in the
+    listing and `►` in the source strip); the source strip has no header
+    and floats. P2: the header is a boxed card; the labels are not dim;
+    the status bar puts the volatile data on the left. P3: the ANSI
+    palette on black is harsh, and the bottom band's sections inherit
+    the registers' empty rows.
+  - **The design's document** is `design/DESIGN.md`: the tokens, the
+    shape and the named rules. The colours' meanings are the research's;
+    the values are this project's.
+  - **The words stay.** The redesign changes the frame and not the
+    vocabulary, so the tests that pin the texts keep pinning them.
+  - **The GREEN** is the twelve new tests and **596 passed, 0 failed**,
+    with the clippy run clean in every crate. The before and after are
+    side by side at 80x24, 140x40 and 180x50.
+  - **Still open.** The guest's screen, whose research is done and whose
+    honest slice is a passive viewer of the video page.
 
 ## Log
 
