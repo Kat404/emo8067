@@ -62,9 +62,12 @@ The bands, top to bottom:
    memory window and the flags.
 4. **The status bar** — one row.
 
-The registers take 22 columns and the flags 20; the memory window takes
-the rest. The breakpoint is 140 columns: over it the memory window shows
-sixteen bytes and their printable side, and under it eight.
+The registers take 22 columns, the memory window takes the width its
+bytes need, and the flags take what is left. The bytes a row of the
+memory window holds follow the width the band gives it, in powers of two
+so the row addresses stay the memory's own: eight at eighty columns,
+sixteen at a hundred and twenty, thirty-two at a hundred and forty. The
+printable side is drawn beside them when the columns are there for both.
 
 ## Surfaces
 

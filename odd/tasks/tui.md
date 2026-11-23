@@ -156,6 +156,21 @@ red is a watchpoint.
   "flags"), the registers and the flags keep their `AX 0000` form, the
   memory row keeps its address and its bytes, and the status bar keeps
   its hints.
+- **S28** — The screen has no space that says nothing: the listing asks
+  the model for as many instructions as the band holds — the model reads
+  a window of bytes and the listing shows what is in it — and the source
+  strip takes only what the listing can spare. A tall screen is filled
+  with instructions and not with emptiness.
+- **S29** — One glyph, one meaning: `▸` means "here" and nothing else.
+  The console's caret is the terminal's own — the inverted cell — and not
+  a second arrow.
+- **S30** — The help overlay is a section and not a box: it is drawn with
+  the same rules as the rest of the screen, and the keys it lists are the
+  screen's vocabulary.
+- **S31** — The narrow terminal is a first-class size: at eighty columns
+  every section fits its content, the memory window takes the width its
+  bytes need and not one column more, and nothing is cut in a way that
+  loses a fact.
 
 ## Out of scope
 
@@ -229,9 +244,37 @@ red is a watchpoint.
   in every crate.
 - **T12** — The redesign: the tokens, the sections, the glyphs, the focus
   and the states, with the design's own document as the brief. S24-S27.
+- **T13** — The polish: the second round of the design, the narrow
+  terminal and the empty space. S28-S31. **RED**: the five new tests
+  failed, because the listing kept three rows, the console's row still
+  carried the `▸`, the help's header was muted and the memory window
+  stopped eight columns short of its rule. **GREEN**: the drawing test is
+  89 passed, 0 failed; the whole tree is **601 passed, 0 failed**, and the
+  clippy run is clean in every crate.
 
 ## Log
 
+- **L14 (2026-11-21).** The polish: the second round of the design, and
+  the narrow terminal.
+  - **The listing is the panel a debugger lives in**, and it keeps what it
+    needs: at 80x24 it went from three rows to five, and the strip takes
+    what the listing can spare — in two columns, when one column does not
+    fit.
+  - **The listing asks the model for its rows** (`App::panels_with`), so a
+    tall screen is filled with instructions and not with emptiness: at
+    180x50 the band holds 26 and at 140x40 it holds 17.
+  - **One glyph, one meaning.** `▸` means "here" and nothing else, and
+    the console's caret is the terminal's own inverted cell.
+  - **The help overlay is a section and not a box**, with the screen's own
+    words.
+  - **The memory window's width follows its bytes** — eight at eighty
+    columns with their printable side beside them, thirty-two at a hundred
+    and forty — and the columns it does not need go where they are used.
+  - **Still open.** The help's list of keys is cut at 80x24 (twenty keys,
+    ten rows: a two-column help needs shorter words), and the memory
+    cursor's row is the model's sixteen bytes while the drawn rows follow
+    the width (eight, sixteen or thirty-two). The guest's screen, whose
+    research is done, is still the last piece of the TUI.
 - **L13 (2026-11-21).** The design pass, the last unit of the TUI.
   - **The TUI was captured and looked at**, which is the only way to judge
     it: `crates/tui/examples/screenshot.rs` renders the TUI into the
@@ -256,6 +299,16 @@ red is a watchpoint.
   - **The GREEN** is the twelve new tests and **596 passed, 0 failed**,
     with the clippy run clean in every crate. The before and after are
     side by side at 80x24, 140x40 and 180x50.
+  - **The polish's findings**, from looking at the after: at 80x24 the
+    listing keeps three rows because the strip takes the rest of the
+    band; on a tall screen the listing's area is empty below the model's
+    sixteen instructions; the console's caret is a second `▸` for another
+    meaning; the help overlay is still a box; and at eighty columns the
+    memory window is wider than the bytes it shows.
+  - **The maintainer decided** (2026-11-21): the step back (`F6`) and the
+    step over (`F7`) **enter with the changes to the core they need** —
+    the machine's history and the tracking of the calls — when the keys
+    are built. They are not a TUI-only change.
   - **Still open.** The guest's screen, whose research is done and whose
     honest slice is a passive viewer of the video page.
 

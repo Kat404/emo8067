@@ -57,12 +57,15 @@ the cursor on a byte and a goto to jump to an address.
   prints is this project's — the reference documents the commands and not
   their output. `p`, the effective addresses and the symbols are refused
   honestly.
-- **The design's pass is done**: the panels are not cards, the
-  sections are separated by thin rules, every state carries a glyph and
-  not only a colour, and the tokens live in `crates/tui/src/theme.rs`.
-  The design's document is `design/DESIGN.md`, and the TUI can be
-  captured as an image with `crates/tui/examples/screenshot.rs`.
-- **The plan is `odd/tasks/tui.md`** (L5-L13). The tree is **596 passed,
+- **The design's pass is done**, and so is its polish: the panels are
+  not cards, the sections are separated by thin rules, every state
+  carries a glyph and not only a colour, and the tokens live in
+  `crates/tui/src/theme.rs`. The listing keeps what it needs (five rows
+  at 80x24), the strip takes the rest, the memory window's width follows
+  its bytes, and the console's caret is the terminal's own. The design's
+  document is `design/DESIGN.md`, and the TUI can be captured as an
+  image with `crates/tui/examples/screenshot.rs`.
+- **The plan is `odd/tasks/tui.md`** (L5-L14). The tree is **601 passed,
   0 failed** and the clippy run is clean in every crate.
 
 ## Where the 2026-11-19 work is
