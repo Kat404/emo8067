@@ -18,7 +18,9 @@ pub mod machine;
 pub mod panels;
 pub mod source;
 
-pub use breakpoints::{Access, Breakpoints, ConditionError, Entry, Kind, Missed, Report, Watchpoint};
+pub use breakpoints::{
+    Access, Breakpoints, ConditionError, Entry, Kind, Missed, Report, Watchpoint,
+};
 pub use expr::{Context, Error, Value, evaluate};
 pub use machine::Machine;
 pub use panels::{Cell, Flag, MemoryView, Panels, Register, Registers, StackView, Ui};
