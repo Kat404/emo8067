@@ -10,6 +10,9 @@ use emo8067_debug::panels::{Panels, Ui};
 /// The segment the text page lives in.
 const PAGE: u16 = 0xB800;
 
+/// The physical address the text page lives at.
+const PAGE_PHYSICAL: u32 = 0xB8000;
+
 /// The cells the page holds.
 const CELLS: usize = 80 * 25;
 
@@ -161,4 +164,247 @@ fn the_attribute_byte_says_the_colours_the_cell_is_drawn_with() {
     assert_eq!(bright.foreground(), 0, "and the foreground is still black");
 
     assert!(screen.cells[2].blink(), "the blink bit is the third one");
+}
+
+// The probes below were written from the specs and not from the code, so
+// they are a second opinion on the same question.
+
+/// The panel is a function of the machine's state: it is read again every
+/// time, and it holds no copy of the page.
+#[test]
+fn the_panel_is_read_again_and_holds_no_copy() {
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0000, b'A');
+    let first = Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        first.cells[0].character, 'A',
+        "the guest's byte is on the page"
+    );
+    cpu.mem.write_u8(PAGE, 0x0000, b'B');
+    let second = Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        second.cells[0].character, 'B',
+        "the page is read again: it is a function of the machine's state"
+    );
+    assert_eq!(
+        first.cells[0].character, 'A',
+        "and the first reading is its own: no copy is shared"
+    );
+}
+
+/// The panel follows the UI: the segment the UI names is the one that is
+/// read, and the panel says which one it read.
+#[test]
+fn the_panel_follows_the_ui_state() {
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0000, b'A');
+    cpu.mem.write_u8(0x1000, 0x0000, b'B');
+    let default = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(default.cells[0].character, 'A', "the default page");
+    let other = &Panels::of(
+        &cpu,
+        &Ui {
+            screen_segment: 0x1000,
+            ..Ui::default()
+        },
+    )
+    .screen;
+    assert_eq!(
+        other.cells[0].character, 'B',
+        "the segment the UI says is the one that is read"
+    );
+    assert_eq!(
+        other.segment, 0x1000,
+        "and the panel says which one it read"
+    );
+}
+
+/// The default page is the one at physical B8000.
+#[test]
+fn the_default_page_is_the_one_at_physical_b8000() {
+    let mut cpu = Cpu::new();
+    cpu.mem
+        .load_at(PAGE_PHYSICAL, &[b'Q', 0x1E])
+        .expect("the page loads");
+    cpu.mem
+        .load_at(0x0B800, b"Z")
+        .expect("the other byte loads");
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        screen.cells[0].character, 'Q',
+        "B800:0000 is physical B8000"
+    );
+    assert_eq!(
+        screen.cells[0].attribute, 0x1E,
+        "and the attribute is the second byte of the cell"
+    );
+    assert_ne!(
+        screen.cells[0].character, 'Z',
+        "and the page is not read at some other place"
+    );
+    assert_eq!(screen.segment, PAGE, "the default segment is B800");
+    assert_eq!(screen.page, 0, "and the default page is the first one");
+}
+
+/// The pages of text memory are four kilobytes apart.
+#[test]
+fn every_page_is_four_kilobytes_apart() {
+    let mut cpu = Cpu::new();
+    for page in 0..8u32 {
+        cpu.mem
+            .load_at(PAGE_PHYSICAL + page * 0x1000, &[b'0' + page as u8, 0x1E])
+            .expect("the page loads");
+    }
+    for page in 0..8u8 {
+        let ui = Ui {
+            screen_page: page,
+            ..Ui::default()
+        };
+        let screen = &Panels::of(&cpu, &ui).screen;
+        assert_eq!(
+            screen.cells[0].character,
+            (b'0' + page) as char,
+            "page {page} is four kilobytes after the one before it"
+        );
+        assert_eq!(
+            screen.cells[0].attribute, 0x1E,
+            "and its attribute is read with it"
+        );
+        assert_eq!(screen.page, page, "and the panel says which page it read");
+    }
+}
+
+/// A page past the last one is the last one, and it stays on the bus.
+#[test]
+fn a_page_past_the_last_one_is_the_last_one_and_stays_on_the_bus() {
+    let mut cpu = Cpu::new();
+    cpu.mem
+        .load_at(0xBFF9E, &[b'L', 0x9F])
+        .expect("the last cell loads");
+    for page in [7u8, 8, 9, 200, 255] {
+        let ui = Ui {
+            screen_page: page,
+            ..Ui::default()
+        };
+        let screen = &Panels::of(&cpu, &ui).screen;
+        assert_eq!(screen.page, 7, "the page {page} is bounded to the eighth");
+        assert_eq!(screen.cells.len(), CELLS, "the page still holds its cells");
+        assert_eq!(
+            screen.cells[CELLS - 1].character,
+            'L',
+            "the last cell of the last page is on the bus"
+        );
+        assert_eq!(
+            screen.cells[CELLS - 1].attribute,
+            0x9F,
+            "and so is its attribute"
+        );
+    }
+}
+
+/// No segment the UI names reads off the bus.
+#[test]
+fn no_segment_the_ui_names_reads_off_the_bus() {
+    for segment in [0x0000u16, 0x0001, PAGE, 0xBFFF, 0xC000, 0xFFFF] {
+        let cpu = Cpu::new();
+        let ui = Ui {
+            screen_segment: segment,
+            screen_page: 255,
+            ..Ui::default()
+        };
+        let screen = &Panels::of(&cpu, &ui).screen;
+        assert_eq!(screen.cells.len(), CELLS, "segment {segment:04X}");
+        assert_eq!(screen.page, 7, "segment {segment:04X}");
+    }
+}
+
+/// Every byte that is not printable is a space.
+#[test]
+fn every_byte_that_is_not_printable_is_a_space() {
+    let mut cpu = Cpu::new();
+    for index in 0..256u16 {
+        cpu.mem.write_u8(PAGE, index * 2, index as u8);
+    }
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    for (index, cell) in screen.cells[..256].iter().enumerate() {
+        let byte = index as u8;
+        let expected = if (0x20..0x7F).contains(&byte) {
+            byte as char
+        } else {
+            ' '
+        };
+        assert_eq!(
+            cell.character, expected,
+            "the byte {byte:#04x} is drawn as {expected:?}"
+        );
+    }
+}
+
+/// Two bytes a cell: the character and the attribute.
+#[test]
+fn two_bytes_a_cell_the_character_and_the_attribute() {
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0000, b'A');
+    cpu.mem.write_u8(PAGE, 0x0001, 0x07);
+    cpu.mem.write_u8(PAGE, 0x0002, b'B');
+    cpu.mem.write_u8(PAGE, 0x0003, 0x80);
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(screen.cells[0].character, 'A', "the first cell's character");
+    assert_eq!(screen.cells[0].attribute, 0x07, "and its attribute");
+    assert_eq!(
+        screen.cells[1].character, 'B',
+        "the second cell's character"
+    );
+    assert_eq!(screen.cells[1].attribute, 0x80, "and its attribute");
+}
+
+/// The attribute says the colours, for every byte there is.
+#[test]
+fn the_attribute_says_the_colours_for_every_byte() {
+    for attribute in 0u8..=255 {
+        let mut cpu = Cpu::new();
+        cpu.mem.write_u8(PAGE, 0x0000, b'A');
+        cpu.mem.write_u8(PAGE, 0x0001, attribute);
+        let screen = &Panels::of(&cpu, &Ui::default()).screen;
+        let cell = screen.cells[0];
+        assert_eq!(
+            cell.foreground(),
+            attribute & 0x07,
+            "the foreground of {attribute:#04x} is the low three bits"
+        );
+        assert_eq!(
+            cell.background(),
+            (attribute >> 4) & 0x0F,
+            "the background of {attribute:#04x} is the high nibble"
+        );
+        assert_eq!(
+            cell.blink(),
+            attribute & 0x08 != 0,
+            "the blink of {attribute:#04x} is the third bit"
+        );
+    }
+}
+
+/// The background's own brightness is the eighth background, and not a
+/// shade of the seventh.
+#[test]
+fn the_bright_background_bit_is_the_eighth_background_and_not_a_shade_of_the_seventh() {
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0001, 0x80);
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        screen.cells[0].background(),
+        8,
+        "the high bit is the eighth background"
+    );
+    assert_ne!(
+        screen.cells[0].background(),
+        7,
+        "and not a shade of the seventh"
+    );
+    assert_eq!(
+        screen.cells[0].foreground(),
+        0,
+        "and the foreground is still the low three bits"
+    );
 }

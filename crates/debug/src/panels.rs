@@ -539,9 +539,8 @@ fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
 /// The screen panel: the guest's text page.
 ///
 /// The page is read through the segment the UI says, the way the memory
-/// window reads its bytes: the offset wraps inside the segment and the
-/// address is masked, so the page cannot run off the bus whatever
-/// segment the UI names.
+/// window reads its bytes: the physical address is masked, so the read
+/// cannot run off the bus whatever segment the UI names.
 ///
 /// The page number is bounded before it is used: the hardware has eight
 /// pages of text memory and no more, and a page past the last one is the
