@@ -200,11 +200,43 @@ red is a watchpoint.
   columns. The list is laid out so it fits — the two columns the log
   already names as the remedy — and the words stay the screen's
   vocabulary.
+- **S37** — The guest's screen is a panel of the model, the way every
+  other panel is: it is the text page the machine wrote to, read through
+  the segment the UI says, and the TUI holds no copy of it. The panel is
+  a function of the machine's state and the UI's state, exactly like the
+  disassembly and the memory window.
+- **S38** — The page is the 8086's text page: eighty columns by
+  twenty-five rows, two bytes a cell — the character and the attribute —
+  read from `B800:0000` by default. A character that is not printable is
+  drawn as a space and not as a control glyph, and the page is the
+  machine's own memory: what the guest wrote to it is what it shows.
+- **S39** — The screen is a takeover: `x` opens it and the guest's screen
+  takes the screen, and `x` again closes it. The takeover takes every row
+  but the status line: the machine's state is in the status bar and
+  nowhere else, so it does not go under the takeover. The debugger's own
+  keys keep working while it is open, the way the reference's
+  `SCREEN_HOTKEYS` says they do.
+- **S40** — The attribute is drawn, and not only the character: the
+  foreground and the background of a cell are the ones its attribute byte
+  says, and no state is colour alone. The sixteen colours of the
+  attribute are the ones the byte carries, and the background's bright
+  bit is the eighth background, not a shade of the seventh.
+- **S41** — The help loses no key again: `x` is in the overlay, and every
+  key the overlay already listed is still whole at eighty columns.
+- **S42** — What does not fit is cut: the page is drawn from its top-left
+  corner, and the part of it the terminal cannot hold is not shown. The
+  page is eighty columns by twenty-five rows, and the terminal is not
+  always that big.
 
 ## Out of scope
 
-- **The guest's screen**: the reference's own screen is a device of its
-  own, and the research says the TUI is weak there.
+- **The video adapter and the BIOS**: the reference's screen is a device
+  of its own, and this slice is the passive viewer of the page the guest
+  wrote to. Nothing here is the adapter: the memory is plain RAM, the
+  page is read like any other memory, and `INT 10h` is not here — a
+  program that calls it still stops where the interrupt took it. The
+  graphics modes are not here either: this is the text page and nothing
+  else.
 - **The commands the console cannot do yet**: the effective-address forms
   (`d bx+5`), and the symbols (`d lion L 10`) — this project has no symbol
   table for them.
@@ -377,8 +409,50 @@ red is a watchpoint.
   failed** on `cargo nextest run`, the clippy run is clean in every
   crate, `cargo fmt --all --check` exits 0, and the headless runner is
   unchanged over the eighty-five reference programs.
+- **T15** — The guest's screen: the passive viewer of the text page, as
+  a panel of the model and a takeover of the terminal. S37-S42. Route:
+  delegated, one bounded writer, one commit, one independent verifier.
+  **The unit.** The text page is a panel of the model — `Panels::of` reads
+  it out of the machine's own memory through the segment the UI says, the
+  page is bounded to the eight the hardware has, and the TUI holds no copy
+  of it — and `x` takes the terminal over with it: every row but the
+  status bar, where the machine's state is. The cells are drawn with the
+  colours their attribute byte carries, in the guest's own sixteen, and
+  what the terminal cannot hold is cut. The debugger's own keys keep
+  working while the takeover is open — the takeover holds the whole
+  screen, the listing's cursor is not on it, and so `F9` and the arrows
+  act on nothing while it does. The files are
+  `crates/debug/src/panels.rs`, `crates/debug/src/lib.rs`,
+  `crates/debug/tests/screen.rs`, `crates/debug/tests/breakpoints.rs`,
+  `crates/tui/src/app.rs`,
+  `crates/tui/src/ui.rs`, `crates/tui/src/theme.rs`,
+  `crates/tui/tests/screen.rs` and `design/DESIGN.md`. **RED**: the model
+  had no screen panel at all — `Panels` had no `screen` field and `Ui` no
+  page — and the TUI had no takeover: `theme::VGA` did not exist, `App`
+  had no `screen_open`, and the takeover's own test did not compile.
+  **GREEN**: the whole tree is **706 passed, 0 failed** on
+  `cargo nextest run`, the clippy run is clean in every crate and
+  `cargo fmt --all --check` exits 0.
 
 ## Log
+
+- **L20 (2026-11-24).** The maintainer chose the cut: the guest's
+  screen.
+  - **The choice.** "La pantalla del invitado: visor pasivo de B800",
+    chosen through the question tool, and closed the way T14 was closed:
+    one unit, one commit, one independent verifier.
+  - **Why this slice and not the adapter.** The core has no video
+    adapter and no BIOS, and this slice does not add one: the memory is
+    plain RAM, so the text page is read like any other memory and the
+    guest's own writes to `B800:0000` are what it shows. The core's
+    golden for the reference's own `1_sample` program shows the program
+    writing "Hello, World!" straight to `B800:0002`, with no adapter in
+    the way.
+  - **What is not in this slice.** The graphics modes are not here, and
+    `INT 10h` is not here: a program that calls it still stops where
+    the interrupt took it, because there is no BIOS to vector to. The
+    research's own word for the honest slice is a *passive viewer of the
+    video page*, and that is what this is.
 
 - **L19 (2026-11-24).** The verifier's second round on the corrected
   candidate: two blockers and three advisories.

@@ -39,6 +39,16 @@ pub struct Ui {
     /// starts at this offset, so the pointer can be inside it or above it,
     /// and the words around the pointer are there to be looked at.
     pub stack_at: u16,
+    /// The segment the screen panel reads the text page through.
+    ///
+    /// The page is at `B800:0000` by default, and the segment is the
+    /// UI's own state, the way the memory window's segment is.
+    pub screen_segment: u16,
+    /// The page of text memory the screen panel shows.
+    ///
+    /// The hardware has eight pages of text memory and no more; a page
+    /// past the last one is the last one.
+    pub screen_page: u8,
 }
 
 impl Default for Ui {
@@ -51,6 +61,8 @@ impl Default for Ui {
             disassembly_len: 16,
             stack_len: 8,
             stack_at: 0,
+            screen_segment: 0xB800,
+            screen_page: 0,
         }
     }
 }
@@ -323,6 +335,75 @@ pub struct StackView {
     pub words: Vec<u16>,
 }
 
+/// The columns the guest's text page has.
+pub const SCREEN_COLUMNS: usize = 80;
+
+/// The rows the guest's text page has.
+pub const SCREEN_ROWS: usize = 25;
+
+/// The pages of text memory the hardware has.
+pub const SCREEN_PAGES: u8 = 8;
+
+/// The bytes between two pages of text memory.
+const PAGE_STRIDE: u16 = 0x1000;
+
+/// One cell of the guest's screen: what it says and how it is drawn.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ScreenCell {
+    /// The character the guest wrote.
+    ///
+    /// A byte that cannot be shown is a space and not a control glyph:
+    /// the screen shows what the guest wrote, and a control character is
+    /// not something a terminal shows.
+    pub character: char,
+    /// The attribute byte: the foreground, the blink, the background and
+    /// the background's own brightness.
+    pub attribute: u8,
+}
+
+impl ScreenCell {
+    /// The foreground colour: the low three bits, one of the eight.
+    #[must_use]
+    pub fn foreground(&self) -> u8 {
+        self.attribute & 0x07
+    }
+
+    /// The background colour: the high four bits, one of the sixteen.
+    ///
+    /// The high bit is the background's own brightness: it is the eighth
+    /// background and not a shade of the seventh.
+    #[must_use]
+    pub fn background(&self) -> u8 {
+        (self.attribute >> 4) & 0x0F
+    }
+
+    /// Whether the cell blinks.
+    #[must_use]
+    pub fn blink(&self) -> bool {
+        self.attribute & 0x08 != 0
+    }
+}
+
+/// The screen panel: the guest's text page.
+///
+/// The page is the machine's own memory: what the guest wrote to it is
+/// what it shows. There is no video adapter and no BIOS behind it — the
+/// page is read like any other memory, and a program that asks the
+/// machine's video for something gets nothing.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ScreenView {
+    /// The segment the page is read through.
+    pub segment: u16,
+    /// The page of text memory the panel shows.
+    pub page: u8,
+    /// The columns the page has.
+    pub columns: usize,
+    /// The rows the page has.
+    pub rows: usize,
+    /// The cells of the page, row by row.
+    pub cells: Vec<ScreenCell>,
+}
+
 /// Every panel, drawn from the machine and the UI's state.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Panels {
@@ -334,6 +415,8 @@ pub struct Panels {
     pub memory: MemoryView,
     /// The stack panel.
     pub stack: StackView,
+    /// The screen panel: the guest's own text page.
+    pub screen: ScreenView,
 }
 
 impl Panels {
@@ -364,6 +447,7 @@ impl Panels {
             registers,
             memory: memory_of(cpu, ui),
             stack: stack_of(cpu, ui),
+            screen: screen_of(cpu, ui),
         }
     }
 }
@@ -450,4 +534,52 @@ fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
         })
         .collect();
     StackView { segment, sp, words }
+}
+
+/// The screen panel: the guest's text page.
+///
+/// The page is read through the segment the UI says, the way the memory
+/// window reads its bytes: the offset wraps inside the segment and the
+/// address is masked, so the page cannot run off the bus whatever
+/// segment the UI names.
+///
+/// The page number is bounded before it is used: the hardware has eight
+/// pages of text memory and no more, and a page past the last one is the
+/// last one.
+fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
+    let page = ui.screen_page.min(SCREEN_PAGES - 1);
+    // The pages of text memory are four kilobytes apart.
+    let base = u16::from(page) * PAGE_STRIDE;
+    let cells = (0..SCREEN_COLUMNS * SCREEN_ROWS)
+        .map(|index| {
+            // Two bytes a cell: the character and the attribute.
+            let at = base.wrapping_add(2 * index as u16);
+            let character = cpu.mem.read_u8(ui.screen_segment, at);
+            let attribute = cpu.mem.read_u8(ui.screen_segment, at.wrapping_add(1));
+            ScreenCell {
+                character: printable(character),
+                attribute,
+            }
+        })
+        .collect();
+    ScreenView {
+        segment: ui.screen_segment,
+        page,
+        columns: SCREEN_COLUMNS,
+        rows: SCREEN_ROWS,
+        cells,
+    }
+}
+
+/// The character a byte is drawn as.
+///
+/// A byte that is not printable is a space and not a control glyph, and
+/// the range is the memory window's own: the page shows what the guest
+/// wrote, and a control character is not something a terminal shows.
+fn printable(byte: u8) -> char {
+    if (0x20..0x7F).contains(&byte) {
+        byte as char
+    } else {
+        ' '
+    }
 }

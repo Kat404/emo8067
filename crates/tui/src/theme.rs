@@ -22,6 +22,10 @@
 //!
 //! The research's meanings are kept: cyan is the current `IP`, grey is
 //! what has run, yellow is a breakpoint and red is a watchpoint.
+//!
+//! The guest's own screen has a palette of its own: the sixteen colours
+//! of the VGA's text page are the guest's and not the debugger's, and
+//! they live in [`VGA`].
 
 use ratatui::style::{Color, Modifier, Style};
 
@@ -54,6 +58,32 @@ pub const ERROR: Color = Color::Rgb(0xe0, 0x6c, 0x75);
 
 /// A value that was written.
 pub const SUCCESS: Color = Color::Rgb(0x98, 0xc3, 0x79);
+
+/// The sixteen colours of the guest's text page.
+///
+/// The values are the VGA's own DAC: the guest's colours are the guest's
+/// and not the terminal's ANSI ones. The first eight are the foreground's
+/// — black, blue, green, cyan, red, magenta, brown and light grey — and
+/// the last eight are the background's, the bright half of the first
+/// eight.
+pub const VGA: [Color; 16] = [
+    Color::Rgb(0x00, 0x00, 0x00), // black
+    Color::Rgb(0x00, 0x00, 0xaa), // blue
+    Color::Rgb(0x00, 0xaa, 0x00), // green
+    Color::Rgb(0x00, 0xaa, 0xaa), // cyan
+    Color::Rgb(0xaa, 0x00, 0x00), // red
+    Color::Rgb(0xaa, 0x00, 0xaa), // magenta
+    Color::Rgb(0xaa, 0x55, 0x00), // brown
+    Color::Rgb(0xaa, 0xaa, 0xaa), // light grey
+    Color::Rgb(0x55, 0x55, 0x55), // dark grey
+    Color::Rgb(0x55, 0x55, 0xff), // light blue
+    Color::Rgb(0x55, 0xff, 0x55), // light green
+    Color::Rgb(0x55, 0xff, 0xff), // light cyan
+    Color::Rgb(0xff, 0x55, 0x55), // light red
+    Color::Rgb(0xff, 0x55, 0xff), // light magenta
+    Color::Rgb(0xff, 0xff, 0x55), // yellow
+    Color::Rgb(0xff, 0xff, 0xff), // white
+];
 
 /// The style of the screen: the canvas, and the text on it.
 #[must_use]
@@ -129,4 +159,21 @@ pub fn error() -> Style {
 #[must_use]
 pub fn success() -> Style {
     Style::default().fg(SUCCESS)
+}
+
+/// The style of a cell of the guest's screen.
+///
+/// The colours are the guest's own: the foreground is one of the eight
+/// and the background one of the sixteen, and they are the values the
+/// hardware holds. A cell that blinks carries the terminal's own blink,
+/// so that the state is not colour alone.
+#[must_use]
+pub fn guest(foreground: u8, background: u8, blink: bool) -> Style {
+    let mut style = Style::default()
+        .fg(VGA[usize::from(foreground & 0x07)])
+        .bg(VGA[usize::from(background & 0x0F)]);
+    if blink {
+        style = style.add_modifier(Modifier::SLOW_BLINK);
+    }
+    style
 }

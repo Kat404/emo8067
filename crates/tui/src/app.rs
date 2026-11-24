@@ -129,7 +129,7 @@ const HALTED: &str = "the machine is halted";
 /// and not named is a key the user does not know about. The quit shortcut
 /// `Ctrl-C` is bound and not named: it is a shortcut and not a key of
 /// the screen.
-pub const BOUND_KEYS: [&str; 27] = [
+pub const BOUND_KEYS: [&str; 28] = [
     "F5",
     "F6",
     "F7",
@@ -146,6 +146,7 @@ pub const BOUND_KEYS: [&str; 27] = [
     "e",
     "g",
     "w",
+    "x",
     "↑",
     "↓",
     "←",
@@ -236,6 +237,12 @@ pub struct App {
     /// conditions do, and only one of the three holds that place at a
     /// time.
     pub console_open: bool,
+    /// Whether the guest's screen takes the terminal over.
+    ///
+    /// The screen is a takeover and not a window in the listing's place:
+    /// it takes every row of the screen but the status bar, and it shows
+    /// the page the guest wrote to and not a copy of it.
+    pub screen_open: bool,
     /// The console: its command line, its log and where its next dump
     /// begins.
     ///
@@ -287,6 +294,7 @@ impl App {
             conditions_open: false,
             condition_cursor: 0,
             console_open: false,
+            screen_open: false,
             console: Console::default(),
             edit: None,
             goto: None,
@@ -439,6 +447,7 @@ impl App {
             KeyCode::Char('5') => self.toggle_stack(),
             KeyCode::Char('b') => self.toggle_conditions(),
             KeyCode::Char(':') => self.toggle_console(),
+            KeyCode::Char('x') => self.toggle_screen(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
             KeyCode::Char('w') => self.toggle_watchpoint(),
@@ -493,6 +502,12 @@ impl App {
             self.move_stack_window(vertical);
             return;
         }
+        // The takeover has no cursor of its own: the listing's cursor is
+        // not on the screen while the guest's screen holds it, and the
+        // keys that act on the listing have nothing to act on.
+        if self.screen_open {
+            return;
+        }
         match self.focus {
             Focus::Disassembly => self.move_listing_cursor(vertical),
             Focus::Registers => self.move_register_cursor(horizontal, vertical),
@@ -535,10 +550,11 @@ impl App {
             return;
         }
         self.stack_open = true;
-        // Only one window holds the listing's place: the conditions pane
-        // and the console give way to the stack.
+        // Only one window holds the listing's place: the conditions pane,
+        // the console and the guest's screen give way to the stack.
         self.conditions_open = false;
         self.console_open = false;
+        self.screen_open = false;
         // The window starts at the pointer: the scroll is the user's own,
         // and it begins at the top of the stack.
         self.stack_scroll = 0;
@@ -554,10 +570,11 @@ impl App {
             return;
         }
         self.conditions_open = true;
-        // Only one window holds the listing's place: the stack and the
-        // console give way to the conditions.
+        // Only one window holds the listing's place: the stack, the console
+        // and the guest's screen give way to the conditions.
         self.stack_open = false;
         self.console_open = false;
+        self.screen_open = false;
         // The cursor starts at the first entry of the listing.
         self.condition_cursor = 0;
     }
@@ -573,10 +590,29 @@ impl App {
             return;
         }
         self.console_open = true;
-        // Only one window holds the listing's place: the stack and the
-        // conditions give way to the console.
+        // Only one window holds the listing's place: the stack, the
+        // conditions and the guest's screen give way to the console.
         self.stack_open = false;
         self.conditions_open = false;
+        self.screen_open = false;
+    }
+
+    /// Open the guest's screen, or close it again.
+    ///
+    /// The screen is a takeover and not a window in the listing's place:
+    /// it takes every row of the screen but the status bar, and it shows
+    /// the guest's own text page.
+    fn toggle_screen(&mut self) {
+        if self.screen_open {
+            self.close_window();
+            return;
+        }
+        self.screen_open = true;
+        // Only one window holds the screen: the stack, the conditions and
+        // the console give way to the guest's screen.
+        self.stack_open = false;
+        self.conditions_open = false;
+        self.console_open = false;
     }
 
     /// Close the console.
@@ -590,11 +626,13 @@ impl App {
 
     /// Close the window that holds the listing's place, whichever it is.
     ///
-    /// The stack, the conditions and the console are three windows over
-    /// the same place, and the listing comes back when they close.
+    /// The stack, the conditions, the console and the guest's screen are
+    /// four windows over the same screen, and the listing comes back when
+    /// they close.
     fn close_window(&mut self) {
         self.stack_open = false;
         self.conditions_open = false;
+        self.screen_open = false;
         self.close_console();
     }
 
@@ -602,8 +640,12 @@ impl App {
     ///
     /// The listing's cursor is not on the screen while a window holds its
     /// place, and the keys that act on the listing have nothing to act on.
+    ///
+    /// The guest's screen holds the screen itself, and it holds the
+    /// listing's place with it: the takeover takes the listing's place
+    /// and every other row of the screen with it.
     fn window_open(&self) -> bool {
-        self.stack_open || self.conditions_open || self.console_open
+        self.stack_open || self.conditions_open || self.console_open || self.screen_open
     }
 
     /// Take the listing, and the window that holds its place gives way to

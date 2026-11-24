@@ -22,7 +22,7 @@
 
 use std::num::NonZeroU16;
 
-use emo8067_debug::panels::{Cell, Flag, Line as Instruction, Panels};
+use emo8067_debug::panels::{Cell, Flag, Line as Instruction, Panels, ScreenView};
 use emo8067_debug::source::SourceView;
 use emo8067_debug::{Access, Entry, Kind};
 use ratatui::Frame;
@@ -110,7 +110,7 @@ const CARET: &str = "█";
 /// It is published because a test has to check the promise that the help
 /// loses no key, and a test that checks a copy of the list proves
 /// nothing about the list the screen draws.
-pub const KEYS: [&str; 24] = [
+pub const KEYS: [&str; 25] = [
     "F5   run to the next breakpoint",
     "F6   back one instruction",
     "F7   over a call",
@@ -127,6 +127,7 @@ pub const KEYS: [&str; 24] = [
     "e    edit the value under the cursor",
     "g    jump to an address, label, segment",
     "w    a watchpoint at the cursor",
+    "x    the guest's screen (x closes it)",
     "↑ ↓  move the cursor",
     "← →  move the cursor (registers, flags)",
     "PgUp PgDn  a page of memory",
@@ -246,11 +247,28 @@ pub fn draw(app: &App, frame: &mut Frame) {
     vertical_rule(frame, sides[3]);
     rule(frame, rows[5]);
     status(app, frame, rows[6]);
+    // The guest's own screen is a takeover: it takes every row but the
+    // status line, where the machine's state is, and it is drawn last so
+    // that it is over everything else.
+    if app.screen_open {
+        screen(&panels.screen, frame, takeover(area));
+    }
     // The help is an overlay: it is drawn last, and it covers everything
     // below the title when its list of keys is longer than the band that
     // holds the listing.
     if app.help {
         help(app, frame, help_area(&rows, area));
+    }
+}
+
+/// The area the guest's screen takes.
+///
+/// The takeover takes every row but the status line: the machine's state
+/// is in the status bar and nowhere else, so it does not go under it.
+fn takeover(area: Rect) -> Rect {
+    Rect {
+        height: area.height.saturating_sub(1),
+        ..area
     }
 }
 
@@ -1140,6 +1158,58 @@ fn flags(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
         lines.push(Line::from(spans));
     }
     frame.render_widget(Paragraph::new(lines).style(theme::surface()), body);
+}
+
+/// The guest's own screen: the text page the machine wrote to.
+///
+/// The page is drawn from its top-left corner, and the part of it the
+/// terminal cannot hold is not shown: the page is eighty columns by
+/// twenty-five rows, and the terminal is not always that big.
+fn screen(view: &ScreenView, frame: &mut Frame, area: Rect) {
+    // The takeover covers what is under it: the debugger's own panels are
+    // behind it, and the page is not always as big as the screen.
+    frame.render_widget(Clear, area);
+    frame.render_widget(Paragraph::new("").style(theme::canvas()), area);
+    frame.render_widget(Screen { view }, area);
+}
+
+/// The guest's page, cell by cell.
+///
+/// Every cell is one character with the colours its attribute byte
+/// carries: the foreground in the low three bits and the background in
+/// the high nibble, and the blink in the bit between them.
+struct Screen<'a> {
+    /// The page the panel holds.
+    view: &'a ScreenView,
+}
+
+impl Widget for Screen<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        // The page is eighty columns by twenty-five rows, and the
+        // terminal is not always that big: what does not fit is cut, and
+        // the cells past the page's own width are not the row below.
+        let columns = usize::from(area.width).min(self.view.columns);
+        let rows = usize::from(area.height).min(self.view.rows);
+        for row in 0..rows {
+            for column in 0..columns {
+                let index = row * self.view.columns + column;
+                let Some(cell) = self.view.cells.get(index) else {
+                    continue;
+                };
+                let Some(target) = buf.cell_mut((area.x + column as u16, area.y + row as u16))
+                else {
+                    continue;
+                };
+                let mut bytes = [0u8; 4];
+                target.set_symbol(cell.character.encode_utf8(&mut bytes));
+                target.set_style(theme::guest(
+                    cell.foreground(),
+                    cell.background(),
+                    cell.blink(),
+                ));
+            }
+        }
+    }
 }
 
 /// The status bar: the hints on the left, and the volatile data on the

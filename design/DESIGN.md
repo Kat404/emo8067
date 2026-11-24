@@ -38,6 +38,24 @@ bar and nowhere else.
 watchpoint. The values are the calm ones above, not the terminal's own
 ANSI ones.
 
+**The Guest's Palette.** The guest's screen has a palette of its own: the
+sixteen colours the VGA's palette holds. The first eight are the
+foreground's and the last eight the background's — the bright half of the
+first eight, not a shade of the seventh. They are the guest's colours and
+not the debugger's, and they appear on the guest's screen and nowhere
+else.
+
+| | Colour | Value | | Colour | Value |
+|---|---|---|---|---|---|
+| 0 | black | `#000000` | 8 | dark grey | `#555555` |
+| 1 | blue | `#0000AA` | 9 | light blue | `#5555FF` |
+| 2 | green | `#00AA00` | 10 | light green | `#55FF55` |
+| 3 | cyan | `#00AAAA` | 11 | light cyan | `#55FFFF` |
+| 4 | red | `#AA0000` | 12 | light red | `#FF5555` |
+| 5 | magenta | `#AA00AA` | 13 | light magenta | `#FF55FF` |
+| 6 | brown | `#AA5500` | 14 | yellow | `#FFFF55` |
+| 7 | light grey | `#AAAAAA` | 15 | white | `#FFFFFF` |
+
 ## Type roles
 
 | Role | Attribute | Where |
@@ -68,6 +86,16 @@ memory window holds follow the width the band gives it, in powers of two
 so the row addresses stay the memory's own: eight at eighty columns,
 sixteen at a hundred and twenty, thirty-two at a hundred and forty. The
 printable side is drawn beside them when the columns are there for both.
+
+**The Takeover.** The guest's screen takes the screen: `x` opens it, and
+it takes every row but the status bar, where the machine's state is and
+nowhere else. The page is drawn from its top-left corner, and the part of
+it the terminal cannot hold is cut. It is a takeover and not a section:
+no header of its own. The debugger's own keys keep working while it is
+open — the machine still runs, still steps and still halts. The keys that
+act on the listing do not: the takeover holds the whole screen and the
+listing's cursor is not on it, and a cursor nobody can see is not one to
+move or to set a breakpoint at.
 
 ## Surfaces
 
@@ -112,6 +140,9 @@ One family, geometric:
   and with the accent when the section has the focus.
 - **The flags**: the name dim, the value normal, and the flag under the
   cursor with the accent.
+- **The guest's screen**: the text page the guest wrote to, cell by
+  cell — the character, and the foreground and the background its
+  attribute byte carries, in the guest's own colours.
 - **The status bar**: the hints on the left, the volatile data on the
   right, divided by `·`.
 
