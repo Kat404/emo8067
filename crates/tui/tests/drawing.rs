@@ -1750,31 +1750,9 @@ fn the_help_lists_every_key_at_eighty_columns() {
     let mut app = app("help-keys");
     press(&mut app, &[KeyCode::Char('?')]);
     let text = rows(&app, 80, 24).join("\n");
-    for entry in [
-        "F5   run to the next breakpoint",
-        "F6   back one instruction",
-        "F7   over a call",
-        "F8   one instruction",
-        "F9   a breakpoint at the cursor",
-        "Tab  the next pane",
-        "1    the disassembly",
-        "2    the registers",
-        "3    the memory",
-        "4    the flags",
-        "5    the stack (5 again closes it)",
-        "b    the conditions (b again closes it)",
-        ":    the console (: again closes it)",
-        "e    edit the value under the cursor",
-        "g    jump to an address, label, segment",
-        "w    a watchpoint at the cursor",
-        "↑ ↓  move the cursor",
-        "← →  move the cursor",
-        "PgUp PgDn  a page of memory",
-        "Enter commit the edit",
-        "Esc  cancel the edit, close a window",
-        "?    helps (? again closes it)",
-        "q    quits",
-    ] {
+    // The list is the screen's own: the test reads the production list,
+    // so a key that is added and not shown fails the test.
+    for entry in emo8067_tui::ui::KEYS {
         assert!(text.contains(entry), "the help lists {entry}: {text}");
     }
 }

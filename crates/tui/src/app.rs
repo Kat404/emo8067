@@ -125,9 +125,17 @@ const HALTED: &str = "the machine is halted";
 
 /// How many instructions the machine may run before the budget is out.
 ///
-/// The step over runs a call to its end, and a call that never returns
-/// would run for ever without it.
+/// The budget bounds the run to the next breakpoint and the step over:
+/// both of them may run the machine for a long while, and neither may run
+/// it for ever.
 const BUDGET: u64 = 100_000;
+
+/// The message the budget's end is said in.
+///
+/// The run and the step over say it the same way.
+fn out_of_budget() -> String {
+    format!("the budget of {BUDGET} instructions ran out")
+}
 
 /// What the TUI knows.
 #[derive(Debug)]
@@ -1238,29 +1246,29 @@ impl App {
     /// The watchpoint is the model's own, and the model says whether the
     /// write hit it. The machine stops where it fired, and the status
     /// names the address that was written, the way the console prints its
-    /// addresses.
+    /// addresses. An instruction that wrote nothing fires nothing: the
+    /// core clears the last write at the start of every instruction, so
+    /// the write of the step before is not this step's.
     fn watchpoint_hit(&mut self) -> bool {
-        let Some(write) = self.cpu.mem.last_write else {
-            return false;
-        };
-        if self.breakpoints.written(Some(write)).hit.is_empty() {
-            return false;
+        let write = self.cpu.mem.last_write;
+        let hit = write.is_some_and(|write| !self.breakpoints.written(Some(write)).hit.is_empty());
+        match (hit, write) {
+            (true, Some((segment, offset, _))) => {
+                self.status = Some(format!("the machine wrote {segment:04X}:{offset:04X}"));
+                true
+            }
+            _ => {
+                self.status = None;
+                false
+            }
         }
-        let (segment, offset, _) = write;
-        self.status = Some(format!("the machine wrote {segment:04X}:{offset:04X}"));
-        true
     }
 
     /// Run until a breakpoint, a halt or the end of the budget.
     fn run_to_the_next_breakpoint(&mut self) {
         let budget = BUDGET;
         for _ in 0..budget {
-            let at = self.cpu.regs.ip;
-            if self.breakpoints.stops_at(
-                &Machine::new(&self.cpu),
-                self.cpu.regs.segment(emo8067_core::regs::Seg::Cs),
-                at,
-            ) {
+            if self.at_breakpoint() {
                 self.cursor = 0;
                 return;
             }
@@ -1269,7 +1277,7 @@ impl App {
                 return;
             }
         }
-        self.status = Some(format!("the budget of {budget} instructions ran out"));
+        self.status = Some(out_of_budget());
     }
 
     /// Rewind the machine one instruction.
@@ -1283,7 +1291,13 @@ impl App {
         // any more, and it goes off the list.
         let at = self.cpu.regs.ip;
         if !self.cpu.step_back() {
-            self.status = Some("There are no recorded back steps ....".to_string());
+            self.status = Some(if self.cpu.history.is_broken() {
+                // A step that wrote too much cannot be undone, and the
+                // machine's memory has moved past it.
+                "the step was too big to undo".to_string()
+            } else {
+                "There are no recorded back steps ....".to_string()
+            });
             return;
         }
         self.cursor = 0;
@@ -1301,9 +1315,16 @@ impl App {
     /// machine is: an instruction that is not a call is stepped once, the
     /// way `F8` does, and a call is run until the depth is back where it
     /// was — which is where the call returns.
+    ///
+    /// A breakpoint inside the procedure stops it, the way the run does:
+    /// the step over may not run past a breakpoint.
     pub fn step_over(&mut self) {
         let depth = self.cpu.call_depth;
         for _ in 0..BUDGET {
+            if self.at_breakpoint() {
+                self.status = Some("the machine stopped at a breakpoint".to_string());
+                return;
+            }
             let stopped = self.step();
             if stopped || self.finished {
                 return;
@@ -1312,7 +1333,19 @@ impl App {
                 return;
             }
         }
-        self.status = Some(format!("the budget of {BUDGET} instructions ran out"));
+        self.status = Some(out_of_budget());
+    }
+
+    /// Whether the machine is at an address a breakpoint sits on.
+    ///
+    /// The run asks the same question before every instruction it runs,
+    /// and the step over asks it too.
+    fn at_breakpoint(&self) -> bool {
+        self.breakpoints.stops_at(
+            &Machine::new(&self.cpu),
+            self.cpu.regs.segment(Seg::Cs),
+            self.cpu.regs.ip,
+        )
     }
 
     /// Put a watchpoint on the byte under the memory cursor, or take it

@@ -188,7 +188,8 @@ red is a watchpoint.
   instruction that is not a call is stepped once, as `F8` does. The core
   keeps the depth of the calls — a call goes in and a return comes out —
   and the TUI asks it how deep the machine is. A step over that runs out
-  of its budget says so, the way `F5` does.
+  of its budget says so, the way `F5` does. A step over stops at a
+  breakpoint, the way `F5` does.
 - **S35** — The console takes the reference's `p` too: it steps over, the
   way the TUI's `F7` does. The refusal it carried — "the machine keeps no
   call tracking" — is no longer true once the core keeps the depth of the
@@ -294,10 +295,13 @@ red is a watchpoint.
   whether the write the instruction left hit one, and the machine stops
   there and the status says "the machine wrote SSSS:OOOO"; the step back
   puts the depth of the calls back with the rest of the machine; and the
-  help keeps the words that fit in its columns. **RED** (corrections):
-  the watchpoint did not fire and the machine ran on to the halt, the
-  depth after a step back over a call was 1 and not 0, and the help said
-  "the stack" where it now says "the stack (5 again closes it)".
+  help's two columns keep the words that fit in them. The patch's help
+  ends where the base's began, and the two entries that moved are `Esc`
+  ("close a window", because the stack is one of three windows now) and
+  `g` (short enough for its column). **RED** (corrections): the watchpoint
+  did not fire and the machine ran on to the halt, the depth after a step
+  back over a call was 1 and not 0, and the help had shortened the words
+  that fit in its columns.
   **GREEN** (corrections): the whole tree is **614 passed, 0 failed** on
   `cargo nextest run`, the clippy run is clean in every crate,
   `cargo fmt --all --check` exits 0, and the headless runner is
@@ -318,8 +322,78 @@ red is a watchpoint.
   **GREEN**: the whole tree is **642 passed, 0 failed** on
   `cargo nextest run`, the clippy run is clean in every crate and
   `cargo fmt --all --check` exits 0.
+  **The native review's batch.** The journal's memory is bounded: the
+  write log had no bound, and a guest that writes a megabyte in one
+  instruction made the journal hold hundreds of megabytes. The bound is
+  on the entries the journal holds in total, the restore undoes the
+  last write first, the step over honours the breakpoints, the
+  watchpoint's silence is proved, and the tests make a directory of
+  their own for every run. **RED**: the step that writes more than the
+  cap did not break the journal, the journal's total went past the
+  bound, a byte the instruction wrote twice kept the intermediate value,
+  the instruction that wrote nothing fired the watchpoint again, and the
+  step over ran past a breakpoint. **GREEN**: the whole tree is **649
+  passed, 0 failed** on `cargo nextest run`, the clippy run is clean in
+  every crate, `cargo fmt --all --check` exits 0, and the headless
+  runner is unchanged over the eighty-six reference programs.
+  **The readability lens's batch.** The help's list is the screen's own:
+  the production list is published and the tests read it, so a key that
+  is added and not shown fails the test. The write log belongs to the
+  journal: a machine with the journal off records nothing and its memory
+  stays flat. The help falls back to one column below seventy-eight
+  columns, because a key that is cut is a key that is lost. The two
+  core test files say which guarantees they own, and the budget's two
+  loops share the message its end is said in. **RED**: the help's test
+  read a copy of the list, a key that could not be shown passed the
+  test, the memory kept a log with the journal off, and the narrow
+  terminal pushed the second column off the screen. **GREEN**: the whole
+  tree is **652 passed, 0 failed** on `cargo nextest run`, the clippy run
+  is clean in every crate, `cargo fmt --all --check` exits 0, and the
+  headless runner is unchanged over the eighty-six reference programs.
 
 ## Log
+
+- **L17 (2026-11-23).** The native review of `b208af3` came back with
+  findings, and the biggest one was the guest's own amplification.
+  - **The journal's memory is bounded.** The write log had no bound: a
+    `rep movsw` with a count of 64K put a megabyte into one undo record,
+    and the 256 records the journal keeps made that hundreds of
+    megabytes. The bound is on the entries the journal holds in total —
+    65 536 of them, about half a megabyte — and the oldest records go
+    rather than the journal growing. A step that wrote more than the
+    bound breaks the journal, because the machine's memory has moved
+    past it and cannot be put back; the TUI says "the step was too big
+    to undo".
+  - **The restore undoes the last write first.** The first value a byte
+    held is the one that must survive, so the writes are replayed in
+    reverse order.
+  - **The step over honours the breakpoints**, the way the run does, and
+    it says so: "the machine stopped at a breakpoint".
+  - **The watchpoint's silence is proved.** The core clears the last
+    write at the start of every instruction — that line is the core's
+    own — and a test now locks it down: an instruction that writes
+    nothing fires nothing.
+  - **This unit's own test helper makes a directory of its own.** The name
+    carries the process id and a counter, the directory is made
+    exclusively, and it goes when the test ends. The older helpers are
+    another matter, and they are listed below.
+  - **The help's width.** The two columns need seventy-eight columns,
+    and a narrower terminal gets one column instead of losing keys: a
+    key that is cut is a key that is lost.
+  - **The older test helpers still share a directory.** The helpers of
+    `crates/tui/tests/drawing.rs`, `crates/tui/tests/console.rs`,
+    `crates/asm/tests/include.rs`, `crates/cli/tests/disasm.rs`,
+    `crates/cli/tests/runner.rs` and `crates/core/tests/transport.rs`
+    make their directory under the shared temporary one with a fixed
+    name, create it without exclusivity and never remove it: another
+    local user can pre-create it or plant a symlink in it, and two
+    concurrent runs of the same test overwrite each other's program file.
+    That weakness is older than this unit.
+  - **Still open.** The watchpoint sees only the last write of an
+    instruction: a `rep movsb` fires on its last byte alone, because the
+    model's door takes one write. The step back does not rewind the
+    devices behind the I/O bus, and the reference flags such operations
+    instead of reversing them.
 
 - **L16 (2026-11-23).** The maintainer chose the cut: the keys that come
   with the core.
@@ -349,9 +423,11 @@ red is a watchpoint.
     the tree.
   - **The differentials.** The eighty-six reference programs of the
     headless runner are byte-identical against the base, the console's
-    twenty-three commands print the same words, the drawn screens are
-    identical at three sizes and eight states, and the gate over the
-    646000 captures is no slower.
+    twenty-three commands print the same words **except `p`**, which this
+    cut turns from a refusal into the reference's step over, the drawn
+    screens are identical at three sizes and eight states **except the
+    help**, which this cut redraws in two columns with three new keys,
+    and the gate over the 646000 captures is no slower.
   - **Still open.** The guest's screen; T17 (packaging and CI); T18 (the
     GUI); the `#MEM=` that the two frontends ignore; and the watchpoint,
     which sees only the **last** write of an instruction — a `rep movsb`

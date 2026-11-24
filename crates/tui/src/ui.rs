@@ -106,7 +106,11 @@ const CARET: &str = "█";
 ///
 /// The list is in two columns: the first half of it down the left column
 /// and the second half down the right one.
-const KEYS: [&str; 23] = [
+///
+/// It is published because a test has to check the promise that the help
+/// loses no key, and a test that checks a copy of the list proves
+/// nothing about the list the screen draws.
+pub const KEYS: [&str; 23] = [
     "F5   run to the next breakpoint",
     "F6   back one instruction",
     "F7   over a call",
@@ -252,7 +256,9 @@ pub fn draw(app: &App, frame: &mut Frame) {
 ///
 /// The help takes the main band's place, and it takes the panels' band
 /// too when its list of keys does not fit in the band that holds the
-/// listing: at eighty columns it does not.
+/// listing. The fit is a question of **height**: the list is taller than
+/// the band that holds the listing, and the width only decides whether the
+/// two columns are wide enough to hold the keys.
 fn help_area(rows: &[Rect], area: Rect) -> Rect {
     if help_rows() <= rows[2].height {
         return rows[2];
@@ -1242,9 +1248,22 @@ fn help_rows() -> u16 {
 /// The keys of the help, in two columns.
 ///
 /// The columns are half of the width each, and the left one is padded so
-/// that the right one starts where the columns say it does.
+/// that the right one starts where the columns say it does. A width that
+/// cannot hold the widest key twice gets one column instead: a key that
+/// is cut is a key that is lost.
 fn key_lines(width: u16) -> Vec<Line<'static>> {
     let column = usize::from(width / 2);
+    let widest = KEYS
+        .iter()
+        .map(|key| key.chars().count())
+        .max()
+        .unwrap_or(0);
+    if column < widest {
+        return KEYS
+            .iter()
+            .map(|key| Line::from(Span::styled(*key, theme::value())))
+            .collect();
+    }
     let rows = KEYS.len().div_ceil(2);
     (0..rows)
         .map(|row| {

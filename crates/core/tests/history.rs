@@ -5,9 +5,16 @@
 //! wrote have to go back too. These tests prove that through the public
 //! interface — the machine is stepped and rewound, and what it holds
 //! afterwards is read back.
+//!
+//! **These are the implementer's own cases**, the ones that went from
+//! red to green with the journal. The independent verifier's probes live
+//! in `journal.rs`, and they stay apart: a guarantee that two files
+//! prove is a guarantee with two owners.
 
 use emo8067_core::Cpu;
 use emo8067_core::flags::ZF;
+use emo8067_core::history::{MAXIMUM_STEPS_BACK, MAXIMUM_WRITES};
+use emo8067_core::memory::Memory;
 use emo8067_core::regs::{Reg16, Seg};
 
 /// A machine with a program in it.
@@ -101,4 +108,138 @@ fn a_journal_that_is_off_keeps_nothing() {
     assert!(!cpu.history.is_enabled(), "the journal is off");
     assert_eq!(cpu.history.len(), 0, "and it kept nothing");
     assert!(!cpu.step_back(), "so there is nothing to rewind");
+}
+
+/// A step that writes more than the journal can hold breaks the journal.
+///
+/// The guest chooses how much it writes: a `rep stosw` with a count of
+/// FFFFh writes 131 070 bytes, and the journal cannot hold them all.
+#[test]
+fn a_step_that_writes_more_than_the_cap_breaks_the_journal() {
+    // F3 AB   rep stosw
+    let mut cpu = machine(&[0xF3, 0xAB]);
+    cpu.regs.set_word(Reg16::Cx, 0xFFFF);
+    cpu.regs.set_word(Reg16::Di, 0x0300);
+    cpu.enable_history();
+    cpu.step().expect("the store runs");
+    assert!(
+        cpu.history.is_broken(),
+        "the journal is broken: the step cannot be undone"
+    );
+    assert!(
+        !cpu.step_back(),
+        "and the step back refuses: the memory moved past the step"
+    );
+    assert_eq!(cpu.history.len(), 0, "and the journal holds nothing");
+}
+
+/// The journal's total stays inside the bound, whatever the guest writes.
+///
+/// Every step writes a lot, and the journal drops the oldest records
+/// rather than grow past the bound.
+#[test]
+fn the_journal_keeps_its_total_inside_the_bound() {
+    // B9 00 10   mov cx, 1000h
+    // F3 AB      rep stosw
+    // EB F9      jmp back to the mov
+    let mut cpu = machine(&[0xB9, 0x00, 0x10, 0xF3, 0xAB, 0xEB, 0xF9]);
+    cpu.regs.set_word(Reg16::Di, 0x0300);
+    cpu.enable_history();
+    for _ in 0..40 {
+        cpu.step().expect("the program runs");
+    }
+    assert!(
+        cpu.history.writes() <= MAXIMUM_WRITES,
+        "the total is inside the bound: {}",
+        cpu.history.writes()
+    );
+    assert!(
+        cpu.history.len() < 40,
+        "and the oldest records went off the journal: {}",
+        cpu.history.len()
+    );
+}
+
+/// The oldest step goes off the journal when it is full.
+#[test]
+fn the_oldest_step_goes_off_the_journal_when_it_is_full() {
+    // EB FE   jmp back to itself
+    let mut cpu = machine(&[0xEB, 0xFE]);
+    cpu.enable_history();
+    for _ in 0..=MAXIMUM_STEPS_BACK {
+        cpu.step().expect("the program runs");
+    }
+    assert_eq!(
+        cpu.history.len(),
+        MAXIMUM_STEPS_BACK,
+        "the journal keeps its steps"
+    );
+    for _ in 0..MAXIMUM_STEPS_BACK {
+        assert!(cpu.step_back(), "the journal has a step to undo");
+    }
+    assert!(!cpu.step_back(), "and the oldest step went off the journal");
+}
+
+/// A machine with the journal off keeps no write log at all.
+///
+/// The log belongs to the journal: the headless runner never rewinds the
+/// machine, and it must not pay for a log it does not read.
+#[test]
+fn a_memory_that_keeps_no_log_keeps_nothing() {
+    let mut mem = Memory::new();
+    mem.write_u8(0x1000, 0x0300, 0x11);
+    assert!(
+        mem.take_writes().is_empty(),
+        "the log is empty: the journal is off"
+    );
+    mem.set_logging(true);
+    mem.write_u8(0x1000, 0x0300, 0x22);
+    assert_eq!(
+        mem.take_writes().len(),
+        1,
+        "and the log is kept when the journal is on"
+    );
+}
+
+/// The journal's own log holds the writes the instructions made.
+#[test]
+fn the_journal_turns_the_write_log_on() {
+    // A3 00 01   mov [0100], ax
+    let mut cpu = machine(&[0xA3, 0x00, 0x01]);
+    cpu.step().expect("the store runs");
+    assert_eq!(
+        cpu.history.writes(),
+        0,
+        "the journal is off: it keeps nothing"
+    );
+    cpu.enable_history();
+    cpu.step().expect("the store runs again");
+    assert_eq!(
+        cpu.history.writes(),
+        1,
+        "and the journal keeps the write when it is on"
+    );
+}
+
+/// The restore puts back the value a byte held before the instruction.
+///
+/// A byte the instruction wrote twice holds the value it had before the
+/// first write, and the restore must undo the last write first.
+#[test]
+fn the_restore_puts_back_the_value_a_byte_held_first() {
+    let mut mem = Memory::new();
+    mem.set_logging(true);
+    mem.write_u8(0x1000, 0x0300, 0x11);
+    mem.write_u8(0x1000, 0x0300, 0x22);
+    let writes = mem.take_writes();
+    mem.restore(&writes);
+    assert_eq!(
+        mem.read_u8(0x1000, 0x0300),
+        0x00,
+        "the byte goes back to the value it held first"
+    );
+    assert!(
+        mem.last_write.is_none(),
+        "and the last write is not the one that was undone"
+    );
 }

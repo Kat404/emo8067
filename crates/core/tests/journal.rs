@@ -8,9 +8,16 @@
 //!
 //! The code lives at `1000:0100` and the data at `1000:0300`, so the two
 //! never share a byte.
+//!
+//! **These are the independent verifier's probes**, written without the
+//! implementer's own cases in sight. They stay in a file of their own:
+//! the implementer's red-to-green cases live in `history.rs`, and a
+//! guarantee that two files prove is a guarantee with two owners.
 
 use emo8067_core::Cpu;
 use emo8067_core::flags::ZF;
+use emo8067_core::history::{MAXIMUM_STEPS_BACK, MAXIMUM_WRITES};
+use emo8067_core::memory::Memory;
 use emo8067_core::regs::{Reg16, Seg};
 
 /// The address the code is loaded at.
@@ -163,4 +170,162 @@ fn an_indirect_call_goes_in_and_comes_out() {
     assert_eq!(cpu.call_depth, 1, "the call went in");
     cpu.step().expect("ret");
     assert_eq!(cpu.call_depth, 0, "and the return came out");
+}
+
+/// The write log stops at the bound and says so.
+#[test]
+fn the_write_log_stops_at_the_bound_and_says_so() {
+    let mut mem = Memory::new();
+    mem.set_logging(true);
+    for i in 0..100_000u32 {
+        mem.write_u8(0x1000, (i & 0xFFFF) as u16, 0x55);
+    }
+    assert_eq!(
+        mem.take_writes().len(),
+        MAXIMUM_WRITES,
+        "the log stops at the bound"
+    );
+    assert!(mem.is_truncated(), "and it says so");
+}
+
+/// The journal's total stays inside the bound; the oldest records go.
+#[test]
+fn the_journal_total_stays_inside_the_bound() {
+    // B9 00 10   mov cx, 1000h
+    // F3 AB      rep stosw
+    // EB F9      jmp back to the mov
+    let mut cpu = machine(&[0xB9, 0x00, 0x10, 0xF3, 0xAB, 0xEB, 0xF9]);
+    cpu.regs.set_word(Reg16::Di, 0x0300);
+    for _ in 0..40 {
+        cpu.step().expect("the program runs");
+    }
+    assert!(
+        cpu.history.writes() <= MAXIMUM_WRITES,
+        "the total is inside the bound: {}",
+        cpu.history.writes()
+    );
+    assert!(
+        cpu.history.len() < 40,
+        "and the oldest records went off the journal: {}",
+        cpu.history.len()
+    );
+}
+
+/// The biggest bulk write the journal can hold is still undoable.
+#[test]
+fn the_biggest_bulk_write_the_journal_can_hold_is_still_undoable() {
+    // F3 A5   rep movsw
+    let mut cpu = machine(&[0xF3, 0xA5]);
+    cpu.regs.set_word(Reg16::Cx, 0x8000);
+    cpu.regs.set_word(Reg16::Si, 0x0300);
+    cpu.regs.set_word(Reg16::Di, 0x0400);
+    cpu.mem.write_u8(0x1000, 0x0400, 0x5A);
+    cpu.mem.write_u8(0x1000, 0x0401, 0xA5);
+    cpu.step().expect("the move runs");
+    assert!(
+        !cpu.history.is_broken(),
+        "65536 entries are inside the bound"
+    );
+    assert_eq!(cpu.history.writes(), 65536, "the journal holds them all");
+    assert!(cpu.step_back(), "and the step can be undone");
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x0400),
+        0x5A,
+        "and the bytes go back"
+    );
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x0401),
+        0xA5,
+        "and the other half too"
+    );
+}
+
+/// Two entries over the bound break the journal, and nothing moves.
+#[test]
+fn a_step_that_writes_more_than_the_bound_breaks_the_journal() {
+    // F3 A5   rep movsw, with 32769 words: 65538 bytes.
+    let mut cpu = machine(&[0xF3, 0xA5]);
+    cpu.regs.set_word(Reg16::Cx, 0x8001);
+    cpu.regs.set_word(Reg16::Si, 0x0300);
+    cpu.regs.set_word(Reg16::Di, 0x0400);
+    cpu.step().expect("the move runs");
+    assert!(cpu.history.is_broken(), "the journal is broken");
+    assert_eq!(cpu.history.len(), 0, "and it holds nothing");
+    let ip = cpu.regs.ip;
+    assert!(!cpu.step_back(), "and the step back refuses");
+    assert_eq!(cpu.regs.ip, ip, "and nothing moved");
+}
+
+/// The restore undoes the last write first.
+#[test]
+fn the_restore_undoes_the_last_write_first() {
+    let mut mem = Memory::new();
+    mem.set_logging(true);
+    mem.write_u8(0x1000, 0x0300, 0x11);
+    mem.write_u8(0x1000, 0x0301, 0x22);
+    mem.write_u8(0x1000, 0x0300, 0x33);
+    mem.write_u8(0x1000, 0x0300, 0x44);
+    let writes = mem.take_writes();
+    assert_eq!(writes.len(), 4, "the log holds the four writes");
+    mem.restore(&writes);
+    assert_eq!(
+        mem.read_u8(0x1000, 0x0300),
+        0x00,
+        "the first value the byte held survives"
+    );
+    assert_eq!(mem.read_u8(0x1000, 0x0301), 0x00, "and the other byte too");
+}
+
+/// The journal's boundary: 257 steps, 256 records, 256 rewinds.
+#[test]
+fn the_journal_keeps_256_steps_and_refuses_the_257th() {
+    // EB FE   jmp back to itself
+    let mut cpu = machine(&[0xEB, 0xFE]);
+    for _ in 0..=MAXIMUM_STEPS_BACK {
+        cpu.step().expect("the program runs");
+    }
+    assert_eq!(
+        cpu.history.len(),
+        MAXIMUM_STEPS_BACK,
+        "the journal keeps its steps"
+    );
+    for _ in 0..MAXIMUM_STEPS_BACK {
+        assert!(cpu.step_back(), "the journal has a step to undo");
+    }
+    assert!(!cpu.step_back(), "and the 257th refuses");
+}
+
+/// The write of the step before is not this step's.
+#[test]
+fn an_instruction_that_writes_nothing_leaves_no_last_write() {
+    // A3 00 03   mov [0300h], ax
+    // 90          nop
+    let mut cpu = machine(&[0xA3, 0x00, 0x03, 0x90]);
+    cpu.step().expect("the store runs");
+    assert_eq!(
+        cpu.mem.last_write,
+        Some((0x1000, 0x0300, 2)),
+        "the store wrote"
+    );
+    cpu.step().expect("the nop runs");
+    assert!(cpu.mem.last_write.is_none(), "the nop wrote nothing");
+    assert!(cpu.step_back(), "there is a step to undo");
+    assert!(
+        cpu.mem.last_write.is_none(),
+        "and the rewind names no write"
+    );
+}
+
+/// The log belongs to the journal; the watchpoint does not need it.
+#[test]
+fn the_journal_off_keeps_no_log_but_the_write_is_still_named() {
+    let mut cpu = machine(&[0xA3, 0x00, 0x03]);
+    cpu.disable_history();
+    cpu.step().expect("the store runs");
+    assert!(cpu.mem.take_writes().is_empty(), "the log keeps nothing");
+    assert_eq!(
+        cpu.mem.last_write,
+        Some((0x1000, 0x0300, 2)),
+        "and the write is still named"
+    );
 }

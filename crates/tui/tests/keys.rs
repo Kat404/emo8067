@@ -5,26 +5,70 @@
 //! through the core's own doors.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use emo8067_core::regs::Reg16;
+use emo8067_core::regs::{Reg16, Seg};
 use emo8067_tui::app::App;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// A program of the test's own words, written where the test can keep it.
-fn program_of(name: &str, source: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("emo8067-tui-keys-{name}"));
-    std::fs::create_dir_all(&dir).expect("the directory");
-    let path = dir.join("program.asm");
-    std::fs::write(&path, source).expect("the program");
-    path
+/// The counter that tells the directories of one run apart.
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// A directory of this run's own, and the guard that takes it away again.
+///
+/// The name carries the process id and a counter, so two runs never share
+/// one, and the directory is made exclusively: another local user cannot
+/// have made it before us, and the program inside it cannot be a symlink
+/// somebody else left behind.
+struct Directory {
+    path: PathBuf,
+}
+
+impl Drop for Directory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+/// A directory of this run's own, made exclusively.
+fn directory(name: &str) -> Directory {
+    let path = std::env::temp_dir().join(format!(
+        "emo8067-tui-keys-{}-{}-{name}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed),
+    ));
+    std::fs::create_dir(&path).expect("the directory");
+    Directory { path }
 }
 
 /// The app, with that program of the test's own words open.
+///
+/// The program is read while it is there, and the directory goes when the
+/// app is built: nothing reads it again.
 fn app_of(name: &str, source: &str) -> App {
-    App::new(Some(program_of(name, source).to_string_lossy().to_string()))
-        .expect("the program loads")
+    let dir = directory(name);
+    let path = dir.path.join("program.asm");
+    std::fs::write(&path, source).expect("the program");
+    App::new(Some(path.to_string_lossy().to_string())).expect("the program loads")
+}
+
+/// Two runs of the same test do not share a directory.
+#[test]
+fn two_runs_of_the_same_test_do_not_collide() {
+    let first = directory("collide");
+    let second = directory("collide");
+    assert_ne!(
+        first.path, second.path,
+        "the two runs have a directory of their own: {:?}",
+        first.path
+    );
+    assert!(
+        first.path.starts_with(std::env::temp_dir()),
+        "and it is under the system's temporary directory: {:?}",
+        first.path
+    );
 }
 
 /// The keys, one at a time.
@@ -334,40 +378,44 @@ fn the_console_p_steps_over() {
 }
 
 /// The help lists every key at eighty columns, and none of them is cut.
+///
+/// The list is the screen's own: the test reads the production list, so
+/// a key that is added and not shown fails the test.
 #[test]
 fn the_help_lists_every_key_at_eighty_columns() {
     let mut app = app_of("help-keys", STORES);
     press(&mut app, &[KeyCode::Char('?')]);
     let text = rows(&app, 80, 24).join("\n");
-    for entry in [
-        "F5   run to the next breakpoint",
-        "F6   back one instruction",
-        "F7   over a call",
-        "F8   one instruction",
-        "F9   a breakpoint at the cursor",
-        "Tab  the next pane",
-        "1    the disassembly",
-        "2    the registers",
-        "3    the memory",
-        "4    the flags",
-        "5    the stack (5 again closes it)",
-        "b    the conditions (b again closes it)",
-        ":    the console (: again closes it)",
-        "e    edit the value under the cursor",
-        "g    jump to an address, label, segment",
-        "w    a watchpoint at the cursor",
-        "PgUp PgDn  a page of memory",
-        "Enter commit the edit",
-        "Esc  cancel the edit, close a window",
-        "?    helps (? again closes it)",
-        "q    quits",
-    ] {
+    for entry in emo8067_tui::ui::KEYS {
         assert!(text.contains(entry), "the help lists {entry}: {text}");
     }
     // No line of the help is longer than the screen.
     for line in rows(&app, 80, 24) {
         assert!(line.chars().count() <= 80, "the line fits: {line:?}");
     }
+}
+
+/// The help falls back to one column when the width cannot hold two.
+///
+/// Below seventy-eight columns the two columns do not fit, and a key that
+/// is cut is a key that is lost: the keys go down one column instead.
+#[test]
+fn the_help_falls_back_to_one_column_at_a_narrow_width() {
+    let mut app = app_of("help-narrow", STORES);
+    press(&mut app, &[KeyCode::Char('?')]);
+    let rows = rows(&app, 60, 24);
+    let row = rows
+        .iter()
+        .find(|row| row.contains("F5   run to the next breakpoint"))
+        .expect("the first key is on the screen");
+    assert!(
+        !row.contains(":    the console"),
+        "the keys are in one column, not two: {row:?}"
+    );
+    assert!(
+        row.ends_with("F5   run to the next breakpoint"),
+        "and the key is whole: {row:?}"
+    );
 }
 
 /// The help keeps every key it had before the three new ones.
@@ -386,4 +434,175 @@ fn the_help_keeps_the_keys_it_had() {
         text.contains("the stack (5 again closes it)"),
         "the stack's own words: {text}"
     );
+}
+
+/// An instruction that writes nothing does not fire the watchpoint.
+///
+/// The core clears the last write at the start of every instruction, so
+/// the write of the step before is not this step's: an instruction that
+/// writes nothing at all must not fire the watchpoint.
+#[test]
+fn an_instruction_that_writes_nothing_does_not_fire_the_watchpoint() {
+    let mut app = app_of("watchpoint-silent", "org 100h\nmov [0300h], ax\nnop\nhlt\n");
+    app.ui.memory_at = 0x0300;
+    press(&mut app, &[KeyCode::Char('w')]);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine wrote 0000:0300"),
+        "the store fired the watchpoint"
+    );
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(
+        app.status, None,
+        "and the instruction that wrote nothing did not fire it"
+    );
+}
+
+/// The step over stops at a breakpoint, the way the run does.
+///
+/// A breakpoint inside the procedure being stepped over is not a thing
+/// the step over may run past.
+#[test]
+fn the_step_over_stops_at_a_breakpoint() {
+    let mut app = app_of(
+        "step-over-breakpoint",
+        "org 100h\ncall f\nhlt\nf:\nmov ax, 1234h\nret\n",
+    );
+    // The breakpoint is inside the procedure the step over runs.
+    app.breakpoints
+        .add(0x0000, 0x0104, None)
+        .expect("the breakpoint is set");
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_eq!(
+        app.cpu.regs.ip, 0x0104,
+        "the machine stopped at the breakpoint"
+    );
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine stopped at a breakpoint"),
+        "and it says so"
+    );
+}
+
+/// An app with raw bytes in it: the assembler does not know the string
+/// operations, and the bulk writes are what the journal's bound is about.
+fn app_with_bytes(code: &[u8]) -> App {
+    let mut app = App::new(None).expect("the app");
+    app.cpu.mem.load_at(0x0000, code).expect("the code loads");
+    app.cpu.regs.set_segment(Seg::Cs, 0x0000);
+    app.cpu.regs.set_segment(Seg::Es, 0x0000);
+    app.cpu.regs.ip = 0x0000;
+    app
+}
+
+/// The step back refuses a step that was too big to undo.
+#[test]
+fn the_step_back_after_a_too_big_step_says_so() {
+    // F3 AB   rep stosw, with 65535 words: 131070 bytes.
+    let mut app = app_with_bytes(&[0xF3, 0xAB, 0x90]);
+    app.cpu.regs.set_word(Reg16::Cx, 0xFFFF);
+    app.cpu.regs.set_word(Reg16::Di, 0x0300);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert!(app.cpu.history.is_broken(), "the journal is broken");
+    press(&mut app, &[KeyCode::F(6)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the step was too big to undo"),
+        "the refusal says it"
+    );
+}
+
+/// An instruction that writes nothing fires no watchpoint.
+#[test]
+fn an_instruction_that_writes_nothing_leaves_the_watchpoint_silent() {
+    let mut app = app_of(
+        "watchpoint-silent",
+        "org 100h\nmov ax, 1234h\nmov [0300h], ax\nnop\nhlt\n",
+    );
+    app.ui.memory_at = 0x0300;
+    press(&mut app, &[KeyCode::Char('w')]);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(app.status, None, "the mov wrote nothing");
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine wrote 0000:0300"),
+        "the store fired it"
+    );
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(app.status, None, "and the nop did not fire it again");
+}
+
+/// The watchpoint works with the journal off.
+#[test]
+fn the_watchpoint_fires_with_the_journal_off() {
+    let mut app = app_of("watchpoint-no-journal", "org 100h\nmov [0300h], ax\nhlt\n");
+    app.cpu.disable_history();
+    app.ui.memory_at = 0x0300;
+    press(&mut app, &[KeyCode::Char('w')]);
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine wrote 0000:0300"),
+        "the watchpoint does not need the journal"
+    );
+}
+
+/// The step over stops at a breakpoint inside the procedure.
+#[test]
+fn the_step_over_stops_at_a_breakpoint_inside_the_procedure() {
+    //0100 call f / 0103 hlt / 0104 f: nop / 0105 mov ax,1234h / 0108 ret
+    let mut app = app_of(
+        "step-over-breakpoint",
+        "org 100h\ncall f\nhlt\nf:\nnop\nmov ax, 1234h\nret\n",
+    );
+    app.breakpoints
+        .add(0x0000, 0x0105, None)
+        .expect("the breakpoint is set");
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_eq!(
+        app.cpu.regs.ip, 0x0105,
+        "the machine stopped at the breakpoint"
+    );
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine stopped at a breakpoint"),
+        "and it says so"
+    );
+}
+
+/// The run and the step over say the budget the same way.
+#[test]
+fn the_run_and_the_step_over_say_the_budget_the_same_way() {
+    let mut app = app_of("run-budget", "org 100h\njmp $\n");
+    press(&mut app, &[KeyCode::F(5)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the budget of 100000 instructions ran out"),
+        "the run says it"
+    );
+    let mut app = app_of("over-budget", "org 100h\ncall f\nhlt\nf:\njmp f\n");
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the budget of 100000 instructions ran out"),
+        "and the step over says it the same way"
+    );
+}
+
+/// The help keeps every key whole, at every width.
+#[test]
+fn the_help_keeps_every_key_whole_at_every_width() {
+    for width in [40u16, 50, 60, 70, 77, 78, 80, 100, 140] {
+        let mut app = app_of("help-widths", "org 100h\nhlt\n");
+        press(&mut app, &[KeyCode::Char('?')]);
+        let text = rows(&app, width, 40).join("\n");
+        for key in emo8067_tui::ui::KEYS {
+            assert!(
+                text.contains(key),
+                "at {width} columns the help loses {key:?}"
+            );
+        }
+    }
 }

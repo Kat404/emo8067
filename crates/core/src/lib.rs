@@ -132,11 +132,13 @@ impl Cpu {
     /// machine's memory without end.
     pub fn enable_history(&mut self) {
         self.history = History::new(MAXIMUM_STEPS_BACK);
+        self.mem.set_logging(true);
     }
 
     /// Turn the journal off, and let go of the steps it holds.
     pub fn disable_history(&mut self) {
         self.history = History::default();
+        self.mem.set_logging(false);
     }
 
     /// Take an `INT n`, the way an 8086 does.
@@ -191,13 +193,20 @@ impl Cpu {
         let outcome = exec::step(self);
         if self.history.is_enabled() {
             let writes = self.mem.take_writes();
-            self.history.push(history::Undo {
-                regs,
-                writes,
-                halted,
-                stop_reason,
-                call_depth,
-            });
+            if self.mem.is_truncated() {
+                // The step wrote more than the journal can hold: the
+                // machine's memory has moved past it and cannot be put
+                // back, so the journal breaks.
+                self.history.mark_broken();
+            } else {
+                self.history.push(history::Undo {
+                    regs,
+                    writes,
+                    halted,
+                    stop_reason,
+                    call_depth,
+                });
+            }
         } else {
             // The journal is off: the log keeps nothing, and the machine
             // pays nothing for it.

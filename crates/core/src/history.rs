@@ -13,6 +13,14 @@ use crate::regs::Registers;
 /// How many steps the journal keeps.
 pub const MAXIMUM_STEPS_BACK: usize = 256;
 
+/// How many write entries the journal holds, in total.
+///
+/// The bound is on the entries and not on the steps: a guest that writes
+/// a megabyte in one instruction must not make the debugger hold a
+/// megabyte for every step it keeps. Sixty-five thousand entries are
+/// about half a megabyte, whatever the guest does.
+pub const MAXIMUM_WRITES: usize = 65_536;
+
 /// One step, and everything needed to undo it.
 #[derive(Clone, Debug)]
 pub struct Undo {
@@ -41,6 +49,15 @@ pub struct History {
     records: VecDeque<Undo>,
     /// How many steps the journal keeps. Zero is a journal that is off.
     limit: usize,
+    /// How many write entries the records hold.
+    writes: usize,
+    /// Whether a step could not be kept whole.
+    ///
+    /// A step that wrote more than the journal can hold cannot be put
+    /// back: the machine's memory has moved past it, and the records that
+    /// are left would restore a state that never existed. The journal is
+    /// broken from then on.
+    broken: bool,
 }
 
 impl Default for History {
@@ -60,6 +77,8 @@ impl History {
         Self {
             records: VecDeque::new(),
             limit,
+            writes: 0,
+            broken: false,
         }
     }
 
@@ -81,19 +100,57 @@ impl History {
         self.records.is_empty()
     }
 
-    /// Keep a step, and drop the oldest one when the journal is full.
+    /// How many write entries the journal holds.
+    #[must_use]
+    pub fn writes(&self) -> usize {
+        self.writes
+    }
+
+    /// Whether a step could not be kept whole, and the journal is broken.
+    #[must_use]
+    pub fn is_broken(&self) -> bool {
+        self.broken
+    }
+
+    /// Keep a step, and drop the oldest ones when the journal is full.
+    ///
+    /// The oldest go first: the records that are left are the most recent
+    /// ones, and rewinding through them undoes the steps in order.
     pub fn push(&mut self, undo: Undo) {
-        if self.limit == 0 {
+        if self.limit == 0 || self.broken {
             return;
         }
-        while self.records.len() >= self.limit {
-            self.records.pop_front();
-        }
+        self.writes += undo.writes.len();
         self.records.push_back(undo);
+        while self.records.len() > self.limit || self.writes > MAXIMUM_WRITES {
+            let Some(oldest) = self.records.pop_front() else {
+                break;
+            };
+            self.writes -= oldest.writes.len();
+        }
     }
 
     /// Take the last step out of the journal.
+    ///
+    /// A broken journal gives nothing back: the step that broke it
+    /// cannot be undone, and the steps before it would restore a state
+    /// that never existed.
     pub fn pop(&mut self) -> Option<Undo> {
-        self.records.pop_back()
+        if self.broken {
+            return None;
+        }
+        let undo = self.records.pop_back()?;
+        self.writes -= undo.writes.len();
+        Some(undo)
+    }
+
+    /// Break the journal: a step could not be kept whole.
+    ///
+    /// The records go, because the machine's memory has already moved
+    /// past the step that could not be undone.
+    pub fn mark_broken(&mut self) {
+        self.records.clear();
+        self.writes = 0;
+        self.broken = true;
     }
 }
