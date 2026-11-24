@@ -213,9 +213,11 @@ red is a watchpoint.
 - **S39** — The screen is a takeover: `x` opens it and the guest's screen
   takes the screen, and `x` again closes it. The takeover takes every row
   but the status line: the machine's state is in the status bar and
-  nowhere else, so it does not go under the takeover. The debugger's own
-  keys keep working while it is open, the way the reference's
-  `SCREEN_HOTKEYS` says they do.
+  nowhere else, so it does not go under the takeover. The keys that run
+  and step the machine keep working while it is open, the way the
+  reference's `SCREEN_HOTKEYS` says they do; the keys that act on the
+  listing do not, because the listing's cursor is not on the screen
+  while the takeover holds it.
 - **S40** — The attribute is drawn, and not only the character: the
   foreground and the background of a cell are the ones its attribute byte
   says, and no state is colour alone. The sixteen colours of the
@@ -418,10 +420,10 @@ red is a watchpoint.
   of it — and `x` takes the terminal over with it: every row but the
   status bar, where the machine's state is. The cells are drawn with the
   colours their attribute byte carries, in the guest's own sixteen, and
-  what the terminal cannot hold is cut. The debugger's own keys keep
-  working while the takeover is open — the takeover holds the whole
-  screen, the listing's cursor is not on it, and so `F9` and the arrows
-  act on nothing while it does. The files are
+  what the terminal cannot hold is cut. The keys that run and step the
+  machine keep working while the takeover is open — the takeover holds
+  the whole screen, the listing's cursor is not on it, and so `F9` and
+  the arrows act on nothing while it does. The files are
   `crates/debug/src/panels.rs`, `crates/debug/src/lib.rs`,
   `crates/debug/tests/screen.rs`, `crates/debug/tests/breakpoints.rs`,
   `crates/tui/src/app.rs`,
@@ -435,6 +437,60 @@ red is a watchpoint.
   `cargo fmt --all --check` exits 0.
 
 ## Log
+
+- **L21 (2026-11-24).** The independent verifier's round on `48a0882`.
+  - **The verdict.** All six specs are met: S37 (the panel is a function
+    of the machine's state and the UI's state), S38 (the page is eighty
+    columns by twenty-five rows, two bytes a cell, `B800:0000` by
+    default, and a byte that cannot be shown is a space), S39 (the
+    takeover, `x`, every row but the status bar), S40 (the attribute,
+    the sixteen colours, the blink), S41 (the help loses no key) and S42
+    (what does not fit is cut). **No blockers.** The verifier wrote
+    **thirty probes of its own** and all thirty pass, and the
+    differential against the baseline says the only difference in the
+    whole screen is the help's own list, which grew by the key `x`.
+  - **Two documents said the opposite of the code.** The design's
+    document and this plan's `T15` line carried a sentence saying the
+    keys that act on the listing still act while the takeover is open —
+    the opposite of what `window_open()` and `move_cursor` do. The
+    parent found it reading the diff before the commit and fixed both;
+    the verifier found the same thing in the `T15` line, where the
+    wording had been changed but the absolute opening clause had been
+    kept. **The spec said it too**, and the spec is the oracle the code
+    is built against: `S39` now names the keys that keep working — the
+    ones that run and step the machine — and the ones that do not.
+  - **A doc comment that said more than the code does.** `screen_of`'s
+    said the offset wraps inside the segment. It does not, for a byte
+    read: the 8086 does not carry from the offset into the segment base,
+    and only the physical address is masked. The guarantee — the page
+    cannot run off the bus — holds; the wording did not.
+  - **The probes stay.** The verifier's thirty probes are in the tree as
+    regression tests, in the two files the unit's own tests live in, with
+    every assertion as the verifier wrote it — the only two changes the
+    clippy run forced were `&[b'Z']` becoming `b"Z"` and a range loop
+    becoming an iterator over the same cells, and neither touched an
+    assertion. They are the only tests here that were not written by the
+    implementer, and this project's own record says the implementer's
+    tests are not the evidence. The whole tree is **736 passed, 0
+    failed**.
+  - **Still open.** The help overlay covers the status bar — the item
+    L17 already named — so with the takeover open and `?` pressed, the
+    machine's state is on the screen nowhere. And `e`, `w`, `PgUp` and
+    `PgDn` still act on the memory pane under the takeover, whose cursor
+    is not on the screen while it is: the watchpoint shows in the status
+    bar, but the window the memory pane moves is not on the screen. The
+    verifier read `S39` as speaking about the stepping keys, and left
+    both alone.
+  - **The native review.** The candidate's own assessment is **medium**
+    and its reason is `under_budget`: a medium-risk candidate is not
+    reviewed on its own, and waits for a high-risk commit or the
+    maintainer's word. It is pending, not refused.
+  - **The residue.** The unit was written by two agents that were briefly
+    writing to the same worktree, and one of them was stopped
+    mid-flight. The committed tree is clean: no duplicated field, no
+    duplicated match arm, no duplicated constant, no test that asserts
+    something the code no longer does, and no comment that describes a
+    behaviour the code does not have.
 
 - **L20 (2026-11-24).** The maintainer chose the cut: the guest's
   screen.

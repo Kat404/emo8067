@@ -4,9 +4,57 @@ Written 2026-10-15 at the end of a long session, and kept current since: the
 2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
 units with it, and the 2026-11-10 unit that closed the three families the
 full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
-window.
+window, and the 2026-11-24 unit that gave it the guest's screen.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-24 work is
+
+The TUI has **the guest's screen**: a passive viewer of the emulated
+VGA text page, so a program that prints to video memory can be seen.
+
+- **The panel grew.** `Panels.screen` is a `ScreenView` — the page is
+  eighty columns by twenty-five rows, two bytes a cell, the character
+  and the attribute — and it is read out of the machine's own memory
+  through the segment the UI says, the way every other panel is read.
+  The core needed **nothing**: its memory is flat RAM, so `B800:0000` is
+  ordinary memory at physical `0xB8000`. There is still **no video
+  adapter and no BIOS**.
+- **The page is bounded.** The hardware has eight pages of text memory,
+  four kilobytes apart, and a page past the last one is the last one.
+  The page is read through the segment, so it cannot run off the bus
+  whatever segment the UI names.
+- **The attribute is drawn.** The foreground is the low three bits and
+  the background the high nibble, in the VGA's own sixteen DAC values:
+  the guest's colours are the guest's and not the debugger's. The
+  background's bright bit is the eighth background and not a shade of
+  the seventh, and a blinking cell carries the terminal's blink, so that
+  no state is colour alone.
+- **The takeover.** `x` takes the terminal over with the page: every
+  row but the status bar, where the machine's state is and nowhere
+  else. The page is drawn from its top-left corner and what the
+  terminal cannot hold is cut. The debugger's own keys keep working
+  while it is open, and the keys that act on the listing do not, because
+  the listing's cursor is not on the screen while the takeover holds
+  it.
+- **The plan is `odd/tasks/tui.md`** (T15, S37-S42, L20-L21). The tree is
+  **736 passed, 0 failed** and the clippy run is clean in every crate.
+- **It was verified independently.** All six specs met, no blockers, and
+  the verifier's own thirty probes pass and stay in the tree as
+  regression tests — they are the only tests here that were not written
+  by the implementer. The differential against the baseline says the
+  only difference in the whole screen is the help's own list, which
+  grew by the key `x`.
+- **The native review is pending, not refused.** The candidate's own
+  assessment is **medium** with the reason `under_budget`: a
+  medium-risk candidate is not reviewed on its own and waits for a
+  high-risk commit or the maintainer's word.
+- **What this slice cannot do.** `INT 10h` is not here: a program that
+  calls it still vectors to `0000:0000`, because there is no BIOS to
+  vector to. The reference's own `1_sample` writes "Hello, World!"
+  straight to `B800:0002`, but only after two `INT 10h` calls, so the
+  corpus's BIOS-using programs need the BIOS slice before their output
+  is on the page.
 
 ## Where the 2026-11-21 work is
 
@@ -214,15 +262,15 @@ the two plans above.
 ## Where the tree stands
 
 ```
-cargo test --workspace                  491 passed, 0 failed
-cargo clippy --workspace --all-targets   1 warning, 0 errors (the warning is
-                                         pre-existing, in `crates/asm`)
+cargo nextest run --workspace            736 passed, 0 failed
+cargo clippy --workspace --all-targets   0 warnings, 0 errors
 cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
                          each of the 85 leaves behind
-HEAD                     d40dc28 (docs), f3a216f (the gate and PUSH SP),
-                         25cef28 (docs), 49b9d27 (the rotate and the 8C/8E);
+HEAD                     48a0882 (the guest's screen), bee803a (the step
+                         back), d1a624f (the bounded journal), b208af3 (the
+                         keys that come with the core);
                          every commit is GPG-signed and none is pushed
 ```
 
@@ -529,12 +577,25 @@ wins, so a device that writes a port byte does not reach the program.
     editing in place and the flags (2026-11-19), the memory window with
     its goto (2026-11-21), and the stack pane and the source strip
     (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5
-    to L13). **What is left of the TUI** is the guest's screen, whose
-    research is done: the honest slice is a passive viewer of the video
-    page. The design pass the maintainer asked for — functions first,
-    design last — is done. After the screen come T17 (packaging and CI)
-    and T18 (the GUI, the last stage).
-14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
+    to L13). **The guest's screen is done too** (2026-11-24, `48a0882`),
+    and with it the TUI has every panel the research's layout draws. The
+    design pass the maintainer asked for — functions first, design last
+    — is done. What is left of the TUI is T17 (packaging and CI) and
+    T18 (the GUI, the last stage).
+14. **What is left besides that.** **The BIOS of video (`INT 10h`)** — the
+    core has none, so a program that calls it vectors to `0000:0000` and
+    the guest's screen shows nothing for the corpus's BIOS-using
+    programs; the research's own word for the next slice is the video
+    services, and the passive viewer is what they would show.
+    `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
+    fondo, the eighty-five examples run with their own baseline pinned;
+    the assembler's build directives (`#make_bin#`, `#make_com#`,
+    `#mem=...#` and the `.binf` file itself), which are not written yet;
+    an unknown `#directive=`, which the reference refuses and this
+    ignores; the two load models (the headless runner's and the debugger
+    crate's loader), which agree today and should be one; and `#MEM=`,
+    the memory the reference's `.binf` file can carry, which both
+    frontends ignore.
 
 ## Files worth reading first
 
