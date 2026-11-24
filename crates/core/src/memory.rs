@@ -22,6 +22,12 @@ pub struct Memory {
     /// of the value that was already there is still a write, and comparing
     /// the memory before and after would not see it.
     pub last_write: Option<(u16, u16, u8)>,
+    /// The bytes the instructions wrote, and the value they held.
+    ///
+    /// The addresses are physical: the journal needs them to undo a step,
+    /// and the byte an instruction wrote has to go back to the value it
+    /// had.
+    writes: Vec<(u32, u8)>,
 }
 
 impl std::fmt::Debug for Memory {
@@ -45,6 +51,7 @@ impl Memory {
         Self {
             bytes: Box::new([0; ADDR_SPACE]),
             last_write: None,
+            writes: Vec::new(),
         }
     }
 
@@ -65,7 +72,10 @@ impl Memory {
 
     /// Write one byte through a `segment:offset` pair.
     pub fn write_u8(&mut self, segment: u16, offset: u16, value: u8) {
-        self.bytes[Self::physical(segment, offset) as usize] = value;
+        let at = Self::physical(segment, offset);
+        let old = self.bytes[at as usize];
+        self.writes.push((at, old));
+        self.bytes[at as usize] = value;
         self.last_write = Some((segment, offset, 1));
     }
 
@@ -90,6 +100,10 @@ impl Memory {
         let low = Self::physical(segment, offset);
         let high = Self::physical(segment, offset.wrapping_add(1));
         let [lo, hi] = value.to_le_bytes();
+        let old_low = self.bytes[low as usize];
+        let old_high = self.bytes[high as usize];
+        self.writes.push((low, old_low));
+        self.writes.push((high, old_high));
         self.bytes[low as usize] = lo;
         self.bytes[high as usize] = hi;
         self.last_write = Some((segment, offset, 2));
@@ -114,6 +128,30 @@ impl Memory {
     pub fn slice(&self, physical: u32, len: usize) -> &[u8] {
         let start = (physical & BUS_MASK) as usize;
         &self.bytes[start..start + len]
+    }
+
+    /// Forget the writes the log holds.
+    ///
+    /// The log holds the writes of one instruction alone: the ones the
+    /// last instruction left, and the ones a caller wrote outside an
+    /// instruction, go when the next step begins.
+    pub fn clear_writes(&mut self) {
+        self.writes.clear();
+    }
+
+    /// Take the writes the log holds out of it.
+    pub fn take_writes(&mut self) -> Vec<(u32, u8)> {
+        std::mem::take(&mut self.writes)
+    }
+
+    /// Put the bytes back, the way they were.
+    ///
+    /// The bytes go straight into the memory: a restore is not an
+    /// instruction, and the journal must not log it.
+    pub fn restore(&mut self, writes: &[(u32, u8)]) {
+        for (at, value) in writes {
+            self.bytes[*at as usize] = *value;
+        }
     }
 }
 

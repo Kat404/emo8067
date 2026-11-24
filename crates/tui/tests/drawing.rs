@@ -1644,3 +1644,180 @@ fn the_memory_window_takes_the_width_its_bytes_need() {
         "the window is as wide as the bytes it shows: {text:?}"
     );
 }
+
+/// The keys that come with the core: the watchpoint, the step back and the
+/// step over.
+#[test]
+fn the_watchpoint_key_watches_the_byte_under_the_cursor() {
+    let mut app = app("watchpoint");
+    app.ui.memory_at = 0x0200;
+    press(&mut app, &[KeyCode::Char('w')]);
+    let watchpoints = app.breakpoints.watchpoints();
+    assert_eq!(watchpoints.len(), 1, "the watchpoint is the model's own");
+    assert_eq!(
+        watchpoints[0].segment,
+        app.memory_segment(),
+        "through the segment the window looks through"
+    );
+    assert_eq!(
+        watchpoints[0].offset, 0x0200,
+        "on the byte under the cursor"
+    );
+    assert_eq!(
+        watchpoints[0].access,
+        Access::Write,
+        "and it watches the writes"
+    );
+    // And the model lists it, the way the conditions pane draws it.
+    assert_eq!(
+        app.breakpoints.listing().len(),
+        1,
+        "the listing is the model's own"
+    );
+    // And `w` again takes it away.
+    press(&mut app, &[KeyCode::Char('w')]);
+    assert!(
+        app.breakpoints.watchpoints().is_empty(),
+        "and w again takes it away"
+    );
+}
+
+#[test]
+fn the_step_back_key_rewinds_the_machine() {
+    let mut app = app_of("step-back", SOURCE);
+    let before = app.cpu.regs.ip;
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_ne!(app.cpu.regs.ip, before, "the machine moved");
+    let after = app.cpu.regs.ip;
+    press(&mut app, &[KeyCode::F(6)]);
+    assert_eq!(app.cpu.regs.ip, before, "and F6 puts it back");
+    assert_eq!(app.steps, 0, "the counter went down");
+    assert!(
+        !app.executed.contains(&after),
+        "and the address the machine was at is not executed any more"
+    );
+}
+
+#[test]
+fn the_step_back_takes_the_address_the_machine_was_at_off_the_list() {
+    // The machine visits the same address twice: the list holds it once,
+    // and the step back takes that one off the list.
+    let mut app = app_of("step-back-list", "org 100h\njmp lower\nlower: jmp lower\n");
+    press(&mut app, &[KeyCode::F(8), KeyCode::F(8)]);
+    let at = app.cpu.regs.ip;
+    assert!(
+        app.executed.contains(&at),
+        "the machine has been there: {:?}",
+        app.executed
+    );
+    press(&mut app, &[KeyCode::F(6)]);
+    assert!(
+        !app.executed.contains(&at),
+        "and the step back takes it off the list: {:?}",
+        app.executed
+    );
+}
+
+#[test]
+fn a_step_back_with_nothing_to_rewind_is_refused() {
+    let mut app = app("step-back-empty");
+    press(&mut app, &[KeyCode::F(6)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("There are no recorded back steps ...."),
+        "the refusal is the reference's own words"
+    );
+    assert_eq!(app.steps, 0, "and nothing moved");
+}
+
+#[test]
+fn the_step_over_key_runs_a_call_to_its_end() {
+    let mut app = app_of("step-over", CALL);
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_eq!(
+        app.cpu.regs.ip, 0x0103,
+        "the machine is where the call returns"
+    );
+    assert_eq!(
+        app.cpu.regs.word(Reg16::Ax),
+        0x1234,
+        "and the call ran to its end"
+    );
+}
+
+#[test]
+fn the_help_lists_every_key_at_eighty_columns() {
+    let mut app = app("help-keys");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let text = rows(&app, 80, 24).join("\n");
+    for entry in [
+        "F5   run to the next breakpoint",
+        "F6   back one instruction",
+        "F7   over a call",
+        "F8   one instruction",
+        "F9   a breakpoint at the cursor",
+        "Tab  the next pane",
+        "1    the disassembly",
+        "2    the registers",
+        "3    the memory",
+        "4    the flags",
+        "5    the stack (5 again closes it)",
+        "b    the conditions (b again closes it)",
+        ":    the console (: again closes it)",
+        "e    edit the value under the cursor",
+        "g    jump to an address, label, segment",
+        "w    a watchpoint at the cursor",
+        "↑ ↓  move the cursor",
+        "← →  move the cursor",
+        "PgUp PgDn  a page of memory",
+        "Enter commit the edit",
+        "Esc  cancel the edit, close a window",
+        "?    helps (? again closes it)",
+        "q    quits",
+    ] {
+        assert!(text.contains(entry), "the help lists {entry}: {text}");
+    }
+}
+
+/// A program that writes to a byte and then runs on.
+const STORES: &str = "org 100h\n\
+                      mov ax, 1234h\n\
+                      mov [0200h], ax\n\
+                      mov bx, 5678h\n\
+                      hlt\n";
+
+#[test]
+fn a_watchpoint_fires_when_the_machine_writes_the_byte() {
+    let mut app = app_of("watchpoint-fires", STORES);
+    app.ui.memory_at = 0x0200;
+    press(&mut app, &[KeyCode::Char('w')]);
+    press(&mut app, &[KeyCode::F(5)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the machine wrote 0000:0200"),
+        "the status names the address that was written"
+    );
+    assert_eq!(
+        app.cpu.regs.ip, 0x0107,
+        "and the machine stopped there: it did not run on"
+    );
+}
+
+#[test]
+fn a_program_that_writes_elsewhere_runs_on() {
+    let mut app = app_of("watchpoint-miss", STORES);
+    // The watchpoint is on a byte the program does not write.
+    app.ui.memory_at = 0x0300;
+    press(&mut app, &[KeyCode::Char('w')]);
+    press(&mut app, &[KeyCode::F(5)]);
+    assert_eq!(app.status, None, "the watchpoint did not fire");
+    assert!(app.finished, "and the machine ran on to the halt");
+}
+
+/// A program with a call in it, for the step over.
+const CALL: &str = "org 100h\n\
+                    call f\n\
+                    hlt\n\
+                    f:\n\
+                    mov ax, 1234h\n\
+                    ret\n";

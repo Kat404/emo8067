@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::{Reg16, Seg};
+use emo8067_debug::Access;
 use emo8067_debug::breakpoints::{Breakpoints, Entry};
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
@@ -121,6 +122,12 @@ pub const FLAGS_COLUMNS: usize = 3;
 
 /// What the console says when the machine has stopped for good.
 const HALTED: &str = "the machine is halted";
+
+/// How many instructions the machine may run before the budget is out.
+///
+/// The step over runs a call to its end, and a call that never returns
+/// would run for ever without it.
+const BUDGET: u64 = 100_000;
 
 /// What the TUI knows.
 #[derive(Debug)]
@@ -238,20 +245,22 @@ impl App {
             quit: false,
             status: None,
         };
-        let Some(path) = path else {
-            return Ok(app);
-        };
-        let file = PathBuf::from(&path);
-        let program = emo8067_asm::program::assemble_file(&file, &[])
-            .map_err(|error| format!("{path}: {error}"))?;
-        app.name = file
-            .file_name()
-            .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| path.clone());
-        app.cpu = emo8067_debug::machine::load(&program)?;
-        // The program is kept: the source strip is drawn from the source
-        // the program carries.
-        app.program = Some(program);
+        if let Some(path) = path {
+            let file = PathBuf::from(&path);
+            let program = emo8067_asm::program::assemble_file(&file, &[])
+                .map_err(|error| format!("{path}: {error}"))?;
+            app.name = file
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.clone());
+            app.cpu = emo8067_debug::machine::load(&program)?;
+            // The program is kept: the source strip is drawn from the source
+            // the program carries.
+            app.program = Some(program);
+        }
+        // The journal is on: the step back is one of the keys, and the
+        // machine keeps the steps it can undo.
+        app.cpu.enable_history();
         Ok(app)
     }
 
@@ -380,9 +389,14 @@ impl App {
             KeyCode::Char(':') => self.toggle_console(),
             KeyCode::Char('e') => self.open_edit(),
             KeyCode::Char('g') => self.open_goto(),
+            KeyCode::Char('w') => self.toggle_watchpoint(),
             KeyCode::Esc => self.close_window(),
             KeyCode::Tab => self.focus = self.other_focus(),
-            KeyCode::F(8) => self.step(),
+            KeyCode::F(6) => self.step_back(),
+            KeyCode::F(7) => self.step_over(),
+            KeyCode::F(8) => {
+                self.step();
+            }
             KeyCode::F(5) => self.run_to_the_next_breakpoint(),
             // A breakpoint goes at the cursor, and the cursor is not on the
             // screen while a window holds the listing's place.
@@ -1067,6 +1081,23 @@ impl App {
                     .map(|line| vec![ui::line_text(line)])
                     .unwrap_or_default())
             }
+            console::Command::StepOver => {
+                if self.finished {
+                    return Ok(vec![HALTED.to_string()]);
+                }
+                self.step_over();
+                if self.finished {
+                    return Ok(vec![
+                        self.status.clone().unwrap_or_else(|| HALTED.to_string()),
+                    ]);
+                }
+                let panels = self.panels();
+                Ok(panels
+                    .disassembly
+                    .first()
+                    .map(|line| vec![ui::line_text(line)])
+                    .unwrap_or_default())
+            }
             console::Command::Dump { address, count } => {
                 let (segment, offset) = match address {
                     Some(address) => (self.segment_of_address(address.segment), address.offset),
@@ -1171,9 +1202,15 @@ impl App {
     }
 
     /// One instruction.
-    pub fn step(&mut self) {
+    ///
+    /// It is `true` when the machine stopped at a watchpoint: the write
+    /// the instruction left hit one, and the machine waits there. Every
+    /// path a step goes through — the `F8` key, the `F5` run, the `F7`
+    /// step over and the console's `t` and `p` — goes through here, so
+    /// they all see it.
+    pub fn step(&mut self) -> bool {
         if self.finished {
-            return;
+            return false;
         }
         let at = self.cpu.regs.ip;
         match self.cpu.step() {
@@ -1186,17 +1223,37 @@ impl App {
                 if info.opcode == 0xF4 {
                     self.finished = true;
                 }
+                self.watchpoint_hit()
             }
             Err(error) => {
                 self.finished = true;
                 self.status = Some(format!("the machine stopped: {error:?}"));
+                false
             }
         }
     }
 
+    /// Whether the write the last instruction left hit a watchpoint.
+    ///
+    /// The watchpoint is the model's own, and the model says whether the
+    /// write hit it. The machine stops where it fired, and the status
+    /// names the address that was written, the way the console prints its
+    /// addresses.
+    fn watchpoint_hit(&mut self) -> bool {
+        let Some(write) = self.cpu.mem.last_write else {
+            return false;
+        };
+        if self.breakpoints.written(Some(write)).hit.is_empty() {
+            return false;
+        }
+        let (segment, offset, _) = write;
+        self.status = Some(format!("the machine wrote {segment:04X}:{offset:04X}"));
+        true
+    }
+
     /// Run until a breakpoint, a halt or the end of the budget.
     fn run_to_the_next_breakpoint(&mut self) {
-        let budget = 100_000u64;
+        let budget = BUDGET;
         for _ in 0..budget {
             let at = self.cpu.regs.ip;
             if self.breakpoints.stops_at(
@@ -1207,12 +1264,71 @@ impl App {
                 self.cursor = 0;
                 return;
             }
-            self.step();
-            if self.finished {
+            let stopped = self.step();
+            if stopped || self.finished {
                 return;
             }
         }
         self.status = Some(format!("the budget of {budget} instructions ran out"));
+    }
+
+    /// Rewind the machine one instruction.
+    ///
+    /// The core keeps the journal — the registers, the flags and the bytes
+    /// the instruction wrote — and this puts them back, so the machine is
+    /// where it was before that instruction. The listing's cursor goes
+    /// back with it: the listing is anchored at `CS:IP`.
+    pub fn step_back(&mut self) {
+        // The address the machine was at is the one that is not executed
+        // any more, and it goes off the list.
+        let at = self.cpu.regs.ip;
+        if !self.cpu.step_back() {
+            self.status = Some("There are no recorded back steps ....".to_string());
+            return;
+        }
+        self.cursor = 0;
+        self.executed.retain(|address| *address != at);
+        self.steps = self.steps.saturating_sub(1);
+        // The debugger follows the machine: the machine is not halted any
+        // more, so the debugger is not finished either.
+        self.finished = self.cpu.halted;
+        self.status = None;
+    }
+
+    /// Run a procedure or an interrupt call to its end.
+    ///
+    /// The core keeps the depth of the calls, and this asks it how deep the
+    /// machine is: an instruction that is not a call is stepped once, the
+    /// way `F8` does, and a call is run until the depth is back where it
+    /// was — which is where the call returns.
+    pub fn step_over(&mut self) {
+        let depth = self.cpu.call_depth;
+        for _ in 0..BUDGET {
+            let stopped = self.step();
+            if stopped || self.finished {
+                return;
+            }
+            if self.cpu.call_depth <= depth {
+                return;
+            }
+        }
+        self.status = Some(format!("the budget of {BUDGET} instructions ran out"));
+    }
+
+    /// Put a watchpoint on the byte under the memory cursor, or take it
+    /// away.
+    ///
+    /// The watchpoint is the model's own: the conditions pane draws the
+    /// model's listing, and the TUI holds no copy of it. It watches the
+    /// writes, because a write of the value that was already there is
+    /// still a write.
+    fn toggle_watchpoint(&mut self) {
+        let segment = self.memory_segment();
+        let offset = self.ui.memory_at;
+        if self.breakpoints.unwatch(segment, offset).is_some() {
+            return;
+        }
+        self.breakpoints.watch(segment, offset, Access::Write);
     }
 
     /// Set a breakpoint at the cursor, or take it away.

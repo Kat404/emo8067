@@ -272,15 +272,6 @@ fn a_value_that_does_not_fit_is_refused_and_changes_nothing() {
 #[test]
 fn the_commands_the_console_cannot_do_yet_are_refused_honestly() {
     let mut app = app("not-implemented");
-    let lines = said(&mut app, "p");
-    assert!(
-        lines[0].contains("not implemented: p"),
-        "the step over is not implemented: {lines:?}"
-    );
-    assert!(
-        lines[0].contains("no call tracking"),
-        "and it says why: {lines:?}"
-    );
     let lines = said(&mut app, "d bx+5");
     assert!(
         lines[0].contains("not implemented: effective addresses"),
@@ -341,5 +332,32 @@ fn the_dump_command_reads_the_machines_own_segment() {
     assert!(
         lines[0].starts_with("0200:0100 "),
         "the segment is the machine's own: {lines:?}"
+    );
+}
+
+/// A program with a call in it, for the step over.
+const CALL: &str = "org 100h\n\
+                    call f\n\
+                    hlt\n\
+                    f:\n\
+                    mov ax, 1234h\n\
+                    ret\n";
+
+#[test]
+fn the_step_over_command_steps_over_a_call() {
+    let mut app = app_of("step-over", CALL);
+    let lines = said(&mut app, "p");
+    assert_eq!(
+        app.cpu.regs.ip, 0x0103,
+        "the machine is where the call returns"
+    );
+    assert_eq!(
+        app.cpu.regs.word(Reg16::Ax),
+        0x1234,
+        "and the call ran to its end"
+    );
+    assert!(
+        !lines.is_empty(),
+        "and the console says where the machine is: {lines:?}"
     );
 }

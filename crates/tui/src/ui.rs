@@ -30,7 +30,7 @@ use ratatui::buffer::{Buffer, CellDiffOption};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, Widget};
+use ratatui::widgets::{Clear, Paragraph, Widget};
 
 use crate::app::{App, Edit, FLAGS_COLUMNS, Focus};
 
@@ -101,6 +101,36 @@ const HERE: &str = "▸";
 /// screen's family — `▸` means "here" and nothing else — and it is the
 /// terminal that draws it, not the screen.
 const CARET: &str = "█";
+
+/// The keys the help lists, and what they do.
+///
+/// The list is in two columns: the first half of it down the left column
+/// and the second half down the right one.
+const KEYS: [&str; 23] = [
+    "F5   run to the next breakpoint",
+    "F6   back one instruction",
+    "F7   over a call",
+    "F8   one instruction",
+    "F9   a breakpoint at the cursor",
+    "Tab  the next pane",
+    "1    the disassembly",
+    "2    the registers",
+    "3    the memory",
+    "4    the flags",
+    "5    the stack (5 again closes it)",
+    "b    the conditions (b again closes it)",
+    ":    the console (: again closes it)",
+    "e    edit the value under the cursor",
+    "g    jump to an address, label, segment",
+    "w    a watchpoint at the cursor",
+    "↑ ↓  move the cursor",
+    "← →  move the cursor (registers, flags)",
+    "PgUp PgDn  a page of memory",
+    "Enter commit the edit",
+    "Esc  cancel the edit, close a window",
+    "?    helps (? again closes it)",
+    "q    quits",
+];
 
 /// The glyph of a breakpoint.
 const BREAKPOINT: &str = "◆";
@@ -177,16 +207,16 @@ pub fn draw(app: &App, frame: &mut Frame) {
     // instructions it finds in it, and the band says how many of them
     // are shown.
     let panels = app.panels_with(listing_rows(app, rows[2].height));
-    if app.help {
-        help(app, frame, rows[2]);
-    } else if app.console_open {
-        console(app, frame, rows[2]);
-    } else if app.conditions_open {
-        conditions(app, frame, rows[2]);
-    } else if app.stack_open {
-        stack(&panels, app, frame, rows[2]);
-    } else {
-        listing(&panels, app, frame, rows[2]);
+    if !app.help {
+        if app.console_open {
+            console(app, frame, rows[2]);
+        } else if app.conditions_open {
+            conditions(app, frame, rows[2]);
+        } else if app.stack_open {
+            stack(&panels, app, frame, rows[2]);
+        } else {
+            listing(&panels, app, frame, rows[2]);
+        }
     }
     rule(frame, rows[3]);
     // The bottom band: the registers, the memory window and the flags,
@@ -210,7 +240,28 @@ pub fn draw(app: &App, frame: &mut Frame) {
     vertical_rule(frame, sides[1]);
     vertical_rule(frame, sides[3]);
     rule(frame, rows[5]);
+    // The help is an overlay: it covers the panels when its list of keys
+    // is longer than the band that holds the listing.
+    if app.help {
+        help(app, frame, help_area(&rows, area));
+    }
     status(app, frame, rows[6]);
+}
+
+/// The area the help takes.
+///
+/// The help takes the main band's place, and it takes the panels' band
+/// too when its list of keys does not fit in the band that holds the
+/// listing: at eighty columns it does not.
+fn help_area(rows: &[Rect], area: Rect) -> Rect {
+    if help_rows() <= rows[2].height {
+        return rows[2];
+    }
+    Rect {
+        y: rows[2].y,
+        height: rows[2].height + rows[3].height + rows[4].height,
+        ..area
+    }
 }
 
 /// The rows the bottom band takes of the screen.
@@ -1157,7 +1208,14 @@ fn edit_says(edit: &Edit) -> String {
 /// header of its own, the keys under it and the ground of the canvas.
 /// The keys it lists are the screen's own words, the same words the
 /// status bar and the sections use.
+///
+/// The keys are in two columns, and the words are short enough for the
+/// columns to hold them: at eighty columns the list is longer than the
+/// band that holds the listing, and a key that is cut is a key that is
+/// lost.
 fn help(app: &App, frame: &mut Frame, area: Rect) {
+    // The overlay covers what is under it: the panels are behind it.
+    frame.render_widget(Clear, area);
     let header = Line::from(Span::styled(
         "keys",
         section_style(app.focus == Focus::Disassembly),
@@ -1171,31 +1229,31 @@ fn help(app: &App, frame: &mut Frame, area: Rect) {
         height: area.height.saturating_sub(1),
         ..area
     };
-    let keys = [
-        "F5   run to the next breakpoint",
-        "F8   one instruction",
-        "F9   a breakpoint at the cursor",
-        "Tab  the next pane",
-        "1    the disassembly",
-        "2    the registers",
-        "3    the memory",
-        "4    the flags",
-        "5    the stack (5 again closes it)",
-        "b    the conditions (b again closes it)",
-        ":    the console (: again closes it)",
-        "e    edit the value under the cursor",
-        "g    jump the memory to an address, a label or a segment",
-        "↑ ↓  move the cursor",
-        "← →  move the cursor (registers, flags)",
-        "PgUp PgDn  a page of memory",
-        "Enter commit the edit",
-        "Esc  cancel the edit, close the stack",
-        "?    helps (? again closes it)",
-        "q    quits",
-    ];
-    let lines = keys
-        .iter()
-        .map(|key| Line::from(Span::styled(*key, theme::value())))
-        .collect::<Vec<_>>();
+    let lines = key_lines(body.width);
     frame.render_widget(Paragraph::new(lines).style(theme::canvas()), body);
+}
+
+/// The rows the help takes: the header of the section and the rows of the
+/// two columns.
+fn help_rows() -> u16 {
+    1 + (KEYS.len().div_ceil(2) as u16)
+}
+
+/// The keys of the help, in two columns.
+///
+/// The columns are half of the width each, and the left one is padded so
+/// that the right one starts where the columns say it does.
+fn key_lines(width: u16) -> Vec<Line<'static>> {
+    let column = usize::from(width / 2);
+    let rows = KEYS.len().div_ceil(2);
+    (0..rows)
+        .map(|row| {
+            let left = KEYS.get(row).copied().unwrap_or_default();
+            let right = KEYS.get(row + rows).copied().unwrap_or_default();
+            Line::from(Span::styled(
+                format!("{left:<column$}{right}"),
+                theme::value(),
+            ))
+        })
+        .collect()
 }

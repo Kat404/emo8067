@@ -12,11 +12,10 @@
 //! only words of the reference this console reuses are the evaluator's
 //! five, and only where the value is read by the evaluator.
 //!
-//! Three commands of the reference are not implemented, and the console
-//! says so instead of pretending: the step over (`p`), because the machine
-//! keeps no call tracking; the effective addresses (`d bx+5`), because the
-//! console reads plain addresses; and the symbols (`d lion L 10`), because
-//! this project has no symbol table.
+//! **Two forms of an address are not implemented**, and the console says
+//! so instead of pretending: the effective addresses (`d bx+5`), because
+//! the console reads plain addresses; and the symbols (`d lion L 10`),
+//! because this project has no symbol table.
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::Seg;
@@ -112,6 +111,8 @@ pub enum Command {
     },
     /// `t` — one instruction.
     Step,
+    /// `p` — a procedure or an interrupt, run to its end.
+    StepOver,
     /// `d [address] [L count]` — a dump of the memory.
     Dump {
         /// Where the dump is, when the command named an address.
@@ -257,10 +258,13 @@ pub fn parse(text: &str, cpu: &Cpu) -> Result<Command, Refusal> {
         "o" => parse_write_port(&arguments, false, cpu),
         "ow" => parse_write_port(&arguments, true, cpu),
         "c" => parse_compare(&arguments),
-        "p" => Err(Refusal::NotImplemented {
-            what: "p",
-            why: "the machine keeps no call tracking",
-        }),
+        "p" => {
+            if arguments.is_empty() {
+                Ok(Command::StepOver)
+            } else {
+                Err(Refusal::TooManyArguments)
+            }
+        }
         other => Err(Refusal::UnknownCommand(other.to_string())),
     }
 }

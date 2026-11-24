@@ -171,14 +171,42 @@ red is a watchpoint.
   every section fits its content, the memory window takes the width its
   bytes need and not one column more, and nothing is cut in a way that
   loses a fact.
+- **S32** — The watchpoint is a key: `w` puts a watchpoint on the byte
+  under the memory window's cursor, through the segment the window looks
+  through, and `w` again takes it away. The watchpoint is the model's own
+  — the one the conditions pane already draws — and the TUI holds no copy
+  of it. It watches the writes: it fires when the machine writes that
+  byte.
+- **S33** — The step back is the reference's: `F6` rewinds the machine one
+  instruction. The core keeps the journal — the registers, the flags and
+  the bytes the instruction wrote — and `F6` puts them back, so the
+  machine is where it was before that instruction and the listing's cursor
+  goes back with it. A journal with nothing to rewind is refused in the
+  reference's own words: "There are no recorded back steps ...."
+- **S34** — The step over is the reference's: `F7` runs a procedure or an
+  interrupt call to its end and stops where the call returns. An
+  instruction that is not a call is stepped once, as `F8` does. The core
+  keeps the depth of the calls — a call goes in and a return comes out —
+  and the TUI asks it how deep the machine is. A step over that runs out
+  of its budget says so, the way `F5` does.
+- **S35** — The console takes the reference's `p` too: it steps over, the
+  way the TUI's `F7` does. The refusal it carried — "the machine keeps no
+  call tracking" — is no longer true once the core keeps the depth of the
+  calls, and the reference's own command is in its list: "p - step over
+  (procedure or interrupt)".
+- **S36** — The help loses no key: `w`, `F6` and `F7` are in the overlay,
+  and every key the overlay already listed is still there at eighty
+  columns. The list is laid out so it fits — the two columns the log
+  already names as the remedy — and the words stay the screen's
+  vocabulary.
 
 ## Out of scope
 
 - **The guest's screen**: the reference's own screen is a device of its
   own, and the research says the TUI is weak there.
-- **The commands the console cannot do yet**: `p` (step over — the machine
-  keeps no call tracking), the effective-address forms (`d bx+5`), and the
-  symbols (`d lion L 10`) — this project has no symbol table for them.
+- **The commands the console cannot do yet**: the effective-address forms
+  (`d bx+5`), and the symbols (`d lion L 10`) — this project has no symbol
+  table for them.
 - **The stop-on-condition window**: the evaluator and the breakpoints are
   there; the window that shows the conditions and lets them be edited is
   its own slice.
@@ -251,8 +279,85 @@ red is a watchpoint.
   stopped eight columns short of its rule. **GREEN**: the drawing test is
   89 passed, 0 failed; the whole tree is **601 passed, 0 failed**, and the
   clippy run is clean in every crate.
+- **T14** — The keys that come with the core: `w` puts a watchpoint on the
+  memory cursor, `F6` steps back and `F7` steps over — with the journal
+  and the depth of the calls that the core does not have. S32-S36. Route:
+  delegated, one bounded writer, one commit, one independent verifier.
+  **DONE.** **RED**: the core's four tests did not compile, because the
+  journal and the depth of the calls did not exist; and the five new
+  TUI tests failed: `w` set no watchpoint, `F6` did not rewind the
+  machine, `F7` did not step over the call, the console's `p` was still
+  refused, and the help was cut after its ninth key. **GREEN**: the whole
+  tree is **611 passed, 0 failed**, the clippy run is clean in every
+  crate, and `cargo fmt --all --check` exits 0.
+  **The corrections.** The watchpoint fires: the step path asks the model
+  whether the write the instruction left hit one, and the machine stops
+  there and the status says "the machine wrote SSSS:OOOO"; the step back
+  puts the depth of the calls back with the rest of the machine; and the
+  help keeps the words that fit in its columns. **RED** (corrections):
+  the watchpoint did not fire and the machine ran on to the halt, the
+  depth after a step back over a call was 1 and not 0, and the help said
+  "the stack" where it now says "the stack (5 again closes it)".
+  **GREEN** (corrections): the whole tree is **614 passed, 0 failed** on
+  `cargo nextest run`, the clippy run is clean in every crate,
+  `cargo fmt --all --check` exits 0, and the headless runner is
+  unchanged over the eighty-six reference programs.
+  **The verifier's batch.** The step back over a halt left the debugger
+  stuck: the machine was not halted any more and the debugger still said
+  it was, so `F8` and `F5` did nothing. The debugger's `finished` follows
+  the machine's own halt state after the rewind now. The step back also
+  takes the address the machine was at off the list of what has run —
+  the list holds no duplicates, so the last entry was not the one. And
+  the console's own doc says that the two forms of an address it cannot
+  read are what is missing, not two commands. **The probes**: the
+  verifier's twenty-seven probes are in the tree now, in
+  `crates/core/tests/journal.rs` and `crates/tui/tests/keys.rs`.
+  **RED** (the verifier's batch): twenty-six of the probes passed and
+  `the_step_back_over_a_halt_leaves_a_machine_that_can_be_stepped`
+  failed — "the step back takes the machine out of the halt".
+  **GREEN**: the whole tree is **642 passed, 0 failed** on
+  `cargo nextest run`, the clippy run is clean in every crate and
+  `cargo fmt --all --check` exits 0.
 
 ## Log
+
+- **L16 (2026-11-23).** The maintainer chose the cut: the keys that come
+  with the core.
+  - **The choice.** "Las teclas con el núcleo (w, F6, F7)", and for the
+    closing: "Una unidad, un commit, un verificador".
+  - **Why the core changes.** `F6` is the reference's step back
+    (`features-and-ux.md` DBG-3) and it is journal-based: the machine goes
+    back to the state it had before the instruction, which means the bytes
+    that instruction wrote have to go back too. `Memory` kept one
+    `last_write` and nothing else, so the core now keeps a journal of the
+    steps it can undo. `F7` is the reference's step over (DBG-2), which
+    runs "a procedure or interrupt call" to its end, so the core keeps the
+    depth of the calls.
+  - **The console's `p`.** The refusal it carried — "the machine keeps no
+    call tracking" — is no longer true once the core keeps the depth of
+    the calls, and the reference's own command is in its list, so `p`
+    steps over too.
+  - **The risk.** The journal changes the memory's write path, which every
+    instruction uses: **Risk: item 3**. The independent verifier is part of
+    this cut and is not optional.
+  - **The verification.** An independent verifier read the whole plan and
+    probed it: **S32, S34, S35 and S36 are met**, and **S33 was unmet** with
+    one blocker — the step back over a `HLT` left the TUI's own `finished`
+    flag set, so the debugger was stuck. The core already put the halt
+    state back; the TUI's flag now follows the machine's. The recheck of
+    that blocker is green, and the verifier's twenty-seven probes are in
+    the tree.
+  - **The differentials.** The eighty-six reference programs of the
+    headless runner are byte-identical against the base, the console's
+    twenty-three commands print the same words, the drawn screens are
+    identical at three sizes and eight states, and the gate over the
+    646000 captures is no slower.
+  - **Still open.** The guest's screen; T17 (packaging and CI); T18 (the
+    GUI); the `#MEM=` that the two frontends ignore; and the watchpoint,
+    which sees only the **last** write of an instruction — a `rep movsb`
+    fires on its last byte alone, because the model's door takes one write
+    and changing that is a change of the debug crate's model, not of the
+    TUI.
 
 - **L15 (2026-11-21).** The maintainer chose the keys — with the core —
   and then stopped: "Las teclas que faltan + núcleo pero no prosigas,
