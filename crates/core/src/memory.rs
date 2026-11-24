@@ -178,7 +178,7 @@ impl Memory {
     ///
     /// The log belongs to the journal: the core's `enable_history` turns
     /// it on and `disable_history` turns it off.
-    pub fn set_logging(&mut self, on: bool) {
+    pub(crate) fn set_logging(&mut self, on: bool) {
         self.logging = on;
     }
 
@@ -203,7 +203,13 @@ impl Memory {
     /// undone first.
     pub fn restore(&mut self, writes: &[(u32, u8)]) {
         for (at, value) in writes.iter().rev() {
-            self.bytes[*at as usize] = *value;
+            // An address outside the address space is refused: the memory
+            // is a fixed array, and a caller that hands it a number the
+            // bus cannot reach must not write outside it.
+            let Some(byte) = self.bytes.get_mut(*at as usize) else {
+                continue;
+            };
+            *byte = *value;
         }
         // The restored bytes are not the write the register names any more.
         self.last_write = None;

@@ -175,37 +175,37 @@ impl Cpu {
         self.stop_reason = StopReason::Interrupt(n);
         // The interrupt is a call: the `IRET` that comes back out of it
         // takes the depth down again.
-        self.call_depth += 1;
+        self.call_depth = self.call_depth.saturating_add(1);
     }
 
     /// Execute exactly one instruction.
     pub fn step(&mut self) -> Result<StepInfo, exec::ExecError> {
         // The journal keeps the state the machine had before the step, so
-        // it is taken before the step changes anything.
-        let regs = self.regs;
-        let halted = self.halted;
-        let stop_reason = self.stop_reason;
-        let call_depth = self.call_depth;
+        // it is taken before the step changes anything — and only when the
+        // journal is on: a machine that never rewinds pays nothing for it.
+        let undo = self.history.is_enabled().then(|| history::Undo {
+            regs: self.regs,
+            writes: Vec::new(),
+            halted: self.halted,
+            stop_reason: self.stop_reason,
+            call_depth: self.call_depth,
+        });
         // The log holds the writes of this instruction alone.
         self.mem.clear_writes();
         self.stop_reason = StopReason::None;
         self.halted = false;
         let outcome = exec::step(self);
-        if self.history.is_enabled() {
-            let writes = self.mem.take_writes();
+        if let Some(mut undo) = undo {
             if self.mem.is_truncated() {
                 // The step wrote more than the journal can hold: the
                 // machine's memory has moved past it and cannot be put
-                // back, so the journal breaks.
+                // back, so the journal breaks — and the log keeps
+                // nothing, because the step's writes are gone.
                 self.history.mark_broken();
+                self.mem.take_writes();
             } else {
-                self.history.push(history::Undo {
-                    regs,
-                    writes,
-                    halted,
-                    stop_reason,
-                    call_depth,
-                });
+                undo.writes = self.mem.take_writes();
+                self.history.push(undo);
             }
         } else {
             // The journal is off: the log keeps nothing, and the machine

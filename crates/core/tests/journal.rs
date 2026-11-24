@@ -17,7 +17,6 @@
 use emo8067_core::Cpu;
 use emo8067_core::flags::ZF;
 use emo8067_core::history::{MAXIMUM_STEPS_BACK, MAXIMUM_WRITES};
-use emo8067_core::memory::Memory;
 use emo8067_core::regs::{Reg16, Seg};
 
 /// The address the code is loaded at.
@@ -175,17 +174,18 @@ fn an_indirect_call_goes_in_and_comes_out() {
 /// The write log stops at the bound and says so.
 #[test]
 fn the_write_log_stops_at_the_bound_and_says_so() {
-    let mut mem = Memory::new();
-    mem.set_logging(true);
+    // The log belongs to the journal, and the journal is on: the machine
+    // keeps the writes.
+    let mut cpu = machine(&[0x90]);
     for i in 0..100_000u32 {
-        mem.write_u8(0x1000, (i & 0xFFFF) as u16, 0x55);
+        cpu.mem.write_u8(0x1000, (i & 0xFFFF) as u16, 0x55);
     }
     assert_eq!(
-        mem.take_writes().len(),
+        cpu.mem.take_writes().len(),
         MAXIMUM_WRITES,
         "the log stops at the bound"
     );
-    assert!(mem.is_truncated(), "and it says so");
+    assert!(cpu.mem.is_truncated(), "and it says so");
 }
 
 /// The journal's total stays inside the bound; the oldest records go.
@@ -259,21 +259,25 @@ fn a_step_that_writes_more_than_the_bound_breaks_the_journal() {
 /// The restore undoes the last write first.
 #[test]
 fn the_restore_undoes_the_last_write_first() {
-    let mut mem = Memory::new();
-    mem.set_logging(true);
-    mem.write_u8(0x1000, 0x0300, 0x11);
-    mem.write_u8(0x1000, 0x0301, 0x22);
-    mem.write_u8(0x1000, 0x0300, 0x33);
-    mem.write_u8(0x1000, 0x0300, 0x44);
-    let writes = mem.take_writes();
+    // The log belongs to the journal, and the journal is on.
+    let mut cpu = machine(&[0x90]);
+    cpu.mem.write_u8(0x1000, 0x0300, 0x11);
+    cpu.mem.write_u8(0x1000, 0x0301, 0x22);
+    cpu.mem.write_u8(0x1000, 0x0300, 0x33);
+    cpu.mem.write_u8(0x1000, 0x0300, 0x44);
+    let writes = cpu.mem.take_writes();
     assert_eq!(writes.len(), 4, "the log holds the four writes");
-    mem.restore(&writes);
+    cpu.mem.restore(&writes);
     assert_eq!(
-        mem.read_u8(0x1000, 0x0300),
+        cpu.mem.read_u8(0x1000, 0x0300),
         0x00,
         "the first value the byte held survives"
     );
-    assert_eq!(mem.read_u8(0x1000, 0x0301), 0x00, "and the other byte too");
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x0301),
+        0x00,
+        "and the other byte too"
+    );
 }
 
 /// The journal's boundary: 257 steps, 256 records, 256 rewinds.

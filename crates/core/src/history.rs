@@ -58,6 +58,12 @@ pub struct History {
     /// are left would restore a state that never existed. The journal is
     /// broken from then on.
     broken: bool,
+    /// Whether the recorded steps were thrown away.
+    ///
+    /// A step that fills the whole write budget leaves no room for the
+    /// steps before it, and their bytes are not all there any more: they
+    /// go, and the journal says so.
+    discarded: bool,
 }
 
 impl Default for History {
@@ -79,6 +85,7 @@ impl History {
             limit,
             writes: 0,
             broken: false,
+            discarded: false,
         }
     }
 
@@ -112,6 +119,13 @@ impl History {
         self.broken
     }
 
+    /// Whether the recorded steps were thrown away by a step that wrote
+    /// too much.
+    #[must_use]
+    pub fn is_discarded(&self) -> bool {
+        self.discarded
+    }
+
     /// Keep a step, and drop the oldest ones when the journal is full.
     ///
     /// The oldest go first: the records that are left are the most recent
@@ -122,11 +136,22 @@ impl History {
         }
         self.writes += undo.writes.len();
         self.records.push_back(undo);
-        while self.records.len() > self.limit || self.writes > MAXIMUM_WRITES {
+        // The number of steps is bounded.
+        while self.records.len() > self.limit {
             let Some(oldest) = self.records.pop_front() else {
                 break;
             };
             self.writes -= oldest.writes.len();
+        }
+        // The number of write entries is bounded too, and a record that
+        // goes over it cannot be undone: the bytes it holds are not all
+        // there any more.
+        while self.writes > MAXIMUM_WRITES {
+            let Some(oldest) = self.records.pop_front() else {
+                break;
+            };
+            self.writes -= oldest.writes.len();
+            self.discarded = true;
         }
     }
 

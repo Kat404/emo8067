@@ -123,6 +123,41 @@ pub const FLAGS_COLUMNS: usize = 3;
 /// What the console says when the machine has stopped for good.
 const HALTED: &str = "the machine is halted";
 
+/// The keys the help must name.
+///
+/// The handler binds these, and the help names them: a key that is bound
+/// and not named is a key the user does not know about. The quit shortcut
+/// `Ctrl-C` is bound and not named: it is a shortcut and not a key of
+/// the screen.
+pub const BOUND_KEYS: [&str; 27] = [
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "Tab",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "b",
+    ":",
+    "e",
+    "g",
+    "w",
+    "↑",
+    "↓",
+    "←",
+    "→",
+    "PgUp",
+    "PgDn",
+    "Enter",
+    "Backspace",
+    "Esc",
+    "?",
+    "q",
+];
 /// How many instructions the machine may run before the budget is out.
 ///
 /// The budget bounds the run to the next breakpoint and the step over:
@@ -154,6 +189,14 @@ pub struct App {
     pub breakpoints: Breakpoints,
     /// The addresses the machine has been at, in order.
     pub executed: Vec<u16>,
+    /// The address of the instruction that ran last.
+    ///
+    /// The step back takes it off the list of what has run: the
+    /// instruction is not executed any more. It is the address of the
+    /// instruction that ran, and not the address the machine was at when
+    /// the step back was pressed — that is the next instruction, which
+    /// never ran.
+    pub last_ran: Option<u16>,
     /// How many instructions have run.
     pub steps: u64,
     /// Which line of the listing the cursor is on.
@@ -233,6 +276,7 @@ impl App {
             program: None,
             breakpoints: Breakpoints::new(),
             executed: Vec::new(),
+            last_ran: None,
             steps: 0,
             cursor: 0,
             focus: Focus::Disassembly,
@@ -1227,6 +1271,7 @@ impl App {
                 if !self.executed.contains(&at) {
                     self.executed.push(at);
                 }
+                self.last_ran = Some(at);
                 self.cursor = 0;
                 if info.opcode == 0xF4 {
                     self.finished = true;
@@ -1236,6 +1281,10 @@ impl App {
             Err(error) => {
                 self.finished = true;
                 self.status = Some(format!("the machine stopped: {error:?}"));
+                // The instruction was attempted, and the journal holds a
+                // record for it, so its address is the one the step back
+                // takes off the list.
+                self.last_ran = Some(at);
                 false
             }
         }
@@ -1287,21 +1336,26 @@ impl App {
     /// where it was before that instruction. The listing's cursor goes
     /// back with it: the listing is anchored at `CS:IP`.
     pub fn step_back(&mut self) {
-        // The address the machine was at is the one that is not executed
-        // any more, and it goes off the list.
-        let at = self.cpu.regs.ip;
         if !self.cpu.step_back() {
             self.status = Some(if self.cpu.history.is_broken() {
                 // A step that wrote too much cannot be undone, and the
                 // machine's memory has moved past it.
                 "the step was too big to undo".to_string()
+            } else if self.cpu.history.is_discarded() {
+                // A step that wrote too much threw the recorded steps
+                // away: they cannot be undone either.
+                "the history was discarded by a step that wrote too much".to_string()
             } else {
                 "There are no recorded back steps ....".to_string()
             });
             return;
         }
         self.cursor = 0;
-        self.executed.retain(|address| *address != at);
+        // The address that is not executed any more goes off the list: it
+        // is the address of the instruction that ran last.
+        if let Some(ran) = self.last_ran.take() {
+            self.executed.retain(|address| *address != ran);
+        }
         self.steps = self.steps.saturating_sub(1);
         // The debugger follows the machine: the machine is not halted any
         // more, so the debugger is not finished either.
@@ -1317,19 +1371,21 @@ impl App {
     /// was — which is where the call returns.
     ///
     /// A breakpoint inside the procedure stops it, the way the run does:
-    /// the step over may not run past a breakpoint.
+    /// the step over may not run past a breakpoint. The place the user
+    /// started from is not reached by the step over, and the instruction
+    /// there runs as it does under `F8`.
     pub fn step_over(&mut self) {
         let depth = self.cpu.call_depth;
         for _ in 0..BUDGET {
-            if self.at_breakpoint() {
-                self.status = Some("the machine stopped at a breakpoint".to_string());
-                return;
-            }
             let stopped = self.step();
             if stopped || self.finished {
                 return;
             }
             if self.cpu.call_depth <= depth {
+                return;
+            }
+            if self.at_breakpoint() {
+                self.status = Some("the machine stopped at a breakpoint".to_string());
                 return;
             }
         }

@@ -14,7 +14,6 @@
 use emo8067_core::Cpu;
 use emo8067_core::flags::ZF;
 use emo8067_core::history::{MAXIMUM_STEPS_BACK, MAXIMUM_WRITES};
-use emo8067_core::memory::Memory;
 use emo8067_core::regs::{Reg16, Seg};
 
 /// A machine with a program in it.
@@ -185,19 +184,23 @@ fn the_oldest_step_goes_off_the_journal_when_it_is_full() {
 /// The log belongs to the journal: the headless runner never rewinds the
 /// machine, and it must not pay for a log it does not read.
 #[test]
-fn a_memory_that_keeps_no_log_keeps_nothing() {
-    let mut mem = Memory::new();
-    mem.write_u8(0x1000, 0x0300, 0x11);
+fn a_machine_with_the_journal_off_keeps_no_write_log() {
+    // A3 00 01   mov [0100], ax
+    // A3 00 02   mov [0200], ax
+    let mut cpu = machine(&[0xA3, 0x00, 0x01, 0xA3, 0x00, 0x02]);
+    cpu.disable_history();
+    cpu.step().expect("the store runs");
     assert!(
-        mem.take_writes().is_empty(),
+        cpu.mem.take_writes().is_empty(),
         "the log is empty: the journal is off"
     );
-    mem.set_logging(true);
-    mem.write_u8(0x1000, 0x0300, 0x22);
+    cpu.enable_history();
+    cpu.step().expect("the store runs again");
+    assert_eq!(cpu.history.len(), 1, "and the journal keeps the step");
     assert_eq!(
-        mem.take_writes().len(),
-        1,
-        "and the log is kept when the journal is on"
+        cpu.history.writes(),
+        2,
+        "and the write it made: a word is two bytes"
     );
 }
 
@@ -227,19 +230,71 @@ fn the_journal_turns_the_write_log_on() {
 /// first write, and the restore must undo the last write first.
 #[test]
 fn the_restore_puts_back_the_value_a_byte_held_first() {
-    let mut mem = Memory::new();
-    mem.set_logging(true);
-    mem.write_u8(0x1000, 0x0300, 0x11);
-    mem.write_u8(0x1000, 0x0300, 0x22);
-    let writes = mem.take_writes();
-    mem.restore(&writes);
+    let mut cpu = machine(&[0x90]);
+    cpu.enable_history();
+    cpu.mem.write_u8(0x1000, 0x0300, 0x11);
+    cpu.mem.write_u8(0x1000, 0x0300, 0x22);
+    let writes = cpu.mem.take_writes();
+    cpu.mem.restore(&writes);
     assert_eq!(
-        mem.read_u8(0x1000, 0x0300),
+        cpu.mem.read_u8(0x1000, 0x0300),
         0x00,
         "the byte goes back to the value it held first"
     );
     assert!(
-        mem.last_write.is_none(),
+        cpu.mem.last_write.is_none(),
         "and the last write is not the one that was undone"
+    );
+}
+
+/// A step back over a call puts the bytes the call pushed back.
+#[test]
+fn a_step_back_over_a_call_puts_the_stack_back() {
+    // E8 01 00   call +1
+    // 00         nop
+    // C3         ret
+    let mut cpu = machine(&[0xE8, 0x01, 0x00, 0x00, 0xC3]);
+    cpu.enable_history();
+    assert_eq!(cpu.mem.read_u8(0x1000, 0x00FE), 0x00, "the stack is empty");
+    cpu.step().expect("the call runs");
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x00FE),
+        0x03,
+        "the call pushed the return address"
+    );
+    assert!(cpu.step_back(), "there is a step to undo");
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x00FE),
+        0x00,
+        "and the stack is back"
+    );
+}
+
+/// The depth stops at its bound: a return without a call is the guest's
+/// business, and not a panic.
+#[test]
+fn the_depth_stops_at_its_bound() {
+    // C3   ret
+    let mut cpu = machine(&[0xC3]);
+    cpu.enable_history();
+    cpu.call_depth = i32::MIN;
+    cpu.step().expect("the return runs");
+    assert_eq!(
+        cpu.call_depth,
+        i32::MIN,
+        "the depth stops at its bound and does not wrap"
+    );
+}
+
+/// The restore refuses an address outside the address space.
+#[test]
+fn the_restore_refuses_an_address_outside_the_address_space() {
+    let mut cpu = machine(&[0x90]);
+    cpu.enable_history();
+    cpu.mem.restore(&[(0x0010_0000, 0x55)]);
+    assert_eq!(
+        cpu.mem.read_u8(0x1000, 0x0010),
+        0x00,
+        "the byte outside the space is not written"
     );
 }

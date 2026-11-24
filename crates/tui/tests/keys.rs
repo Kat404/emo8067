@@ -606,3 +606,153 @@ fn the_help_keeps_every_key_whole_at_every_width() {
         }
     }
 }
+
+/// A step back in straight-line code takes the address that ran off the
+/// list of what has run.
+#[test]
+fn a_step_back_in_straight_line_code_takes_the_ran_address_off() {
+    let mut app = app_of(
+        "step-back-straight",
+        "org 100h\nmov ax, 1234h\nmov bx, 5678h\nhlt\n",
+    );
+    press(&mut app, &[KeyCode::F(8)]);
+    assert_eq!(app.executed, vec![0x0100], "the first instruction ran");
+    press(&mut app, &[KeyCode::F(6)]);
+    assert!(
+        app.executed.is_empty(),
+        "and the step back takes that address off the list: {:?}",
+        app.executed
+    );
+}
+
+/// The step over steps from an address a breakpoint sits on.
+///
+/// The place the user started from is not reached by the step over: the
+/// single instruction key runs the instruction there, and so does F7.
+#[test]
+fn the_step_over_steps_from_an_address_with_a_breakpoint_on_it() {
+    let mut app = app_of(
+        "step-over-on-breakpoint",
+        "org 100h\nmov ax, 1234h\nmov bx, 5678h\nhlt\n",
+    );
+    app.breakpoints
+        .add(0x0000, 0x0100, None)
+        .expect("the breakpoint is set");
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_ne!(
+        app.cpu.regs.ip, 0x0100,
+        "the step over advanced: it did not stop where it started"
+    );
+    assert_ne!(
+        app.status.as_deref(),
+        Some("the machine stopped at a breakpoint"),
+        "and it did not answer the refusal"
+    );
+}
+
+/// The step over runs a procedure that calls another one.
+///
+/// The depth goes one, two and back to one: the inner call comes out
+/// before the outer one does.
+#[test]
+fn the_step_over_runs_a_procedure_that_calls_another() {
+    let mut app = app_of(
+        "step-over-nested",
+        "org 100h\ncall f\nhlt\nf:\ncall g\nret\ng:\nmov ax, 1234h\nret\n",
+    );
+    press(&mut app, &[KeyCode::F(7)]);
+    assert_eq!(
+        app.cpu.regs.ip, 0x0103,
+        "the machine is where the call returns"
+    );
+    assert_eq!(
+        app.cpu.regs.word(Reg16::Ax),
+        0x1234,
+        "and the inner call ran"
+    );
+    assert_eq!(app.cpu.call_depth, 0, "and the depth came back out");
+}
+
+/// Every key the handler binds is named in the help.
+#[test]
+fn every_bound_key_is_named_in_the_help() {
+    for key in emo8067_tui::app::BOUND_KEYS {
+        assert!(
+            emo8067_tui::ui::KEYS
+                .iter()
+                .any(|line| line.split_whitespace().any(|word| word == key)),
+            "the handler binds {key} and the help does not name it"
+        );
+    }
+}
+
+/// The help keeps every key whole at twenty-four rows, the short screen.
+#[test]
+fn the_help_keeps_every_key_whole_at_twenty_four_rows() {
+    for width in [78u16, 80, 100, 140] {
+        let mut app = app_of("help-short", "org 100h\nhlt\n");
+        press(&mut app, &[KeyCode::Char('?')]);
+        let text = rows(&app, width, 24).join("\n");
+        for key in emo8067_tui::ui::KEYS {
+            assert!(
+                text.contains(key),
+                "at {width} columns the help loses {key:?}"
+            );
+        }
+    }
+}
+
+/// A narrow screen cuts the keys vertically, and not sideways.
+#[test]
+fn a_narrow_screen_cuts_the_keys_vertically_and_not_sideways() {
+    let mut app = app_of("help-narrow-short", "org 100h\nhlt\n");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let row = rows(&app, 60, 24)
+        .iter()
+        .find(|row| row.contains("F5   run to the next breakpoint"))
+        .expect("the first key is on the screen")
+        .clone();
+    assert!(
+        row.ends_with("F5   run to the next breakpoint"),
+        "the key is whole and nothing is pushed off the side: {row:?}"
+    );
+}
+
+/// The help takes the room its layout needs.
+///
+/// One column of keys needs more rows than two, and the overlay must be
+/// as tall as the layout it draws.
+#[test]
+fn the_help_takes_the_room_its_layout_needs() {
+    let mut app = app_of("help-room", "org 100h\nhlt\n");
+    press(&mut app, &[KeyCode::Char('?')]);
+    let text = rows(&app, 40, 30).join("\n");
+    for key in emo8067_tui::ui::KEYS {
+        assert!(text.contains(key), "the help loses {key:?}: {text}");
+    }
+}
+
+/// A step that wrote too much threw the recorded steps away, and the
+/// refusal says so.
+#[test]
+fn the_refusal_says_that_a_bulk_write_threw_the_history_away() {
+    // A3 00 01   mov [0100], ax
+    // F3 A5      rep movsw
+    let mut app = app_with_bytes(&[0xA3, 0x00, 0x01, 0xF3, 0xA5]);
+    app.cpu.regs.set_word(Reg16::Cx, 0x8000);
+    app.cpu.regs.set_word(Reg16::Si, 0x0300);
+    app.cpu.regs.set_word(Reg16::Di, 0x0400);
+    press(&mut app, &[KeyCode::F(8), KeyCode::F(8)]);
+    assert!(
+        app.cpu.history.is_discarded(),
+        "the journal says its steps went: {}",
+        app.cpu.history.len()
+    );
+    press(&mut app, &[KeyCode::F(6)]);
+    press(&mut app, &[KeyCode::F(6)]);
+    assert_eq!(
+        app.status.as_deref(),
+        Some("the history was discarded by a step that wrote too much"),
+        "and the refusal says it"
+    );
+}

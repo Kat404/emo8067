@@ -1468,7 +1468,7 @@ fn call_relative(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
     let rel = take_u16(&cpu.mem, &mut cpu.regs);
     let ret = cpu.regs.ip;
     push(&mut cpu.mem, &mut cpu.regs, ret);
-    cpu.call_depth += 1;
+    cpu.call_depth = cpu.call_depth.saturating_add(1);
     cpu.regs.ip = (i32::from(ret as i16) + i32::from(rel)) as u16;
     Ok(())
 }
@@ -1486,7 +1486,7 @@ fn ret(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     cpu.regs.ip = pop(&cpu.mem, &mut cpu.regs);
     let sp = cpu.regs.word(Reg16::Sp).wrapping_add(adjust);
     cpu.regs.set_word(Reg16::Sp, sp);
-    cpu.call_depth -= 1;
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
     Ok(())
 }
 
@@ -1509,7 +1509,7 @@ fn iret(cpu: &mut crate::Cpu) {
     cpu.regs.ip = ip;
     cpu.regs.set_segment(Seg::Cs, cs);
     cpu.regs.flags = Flags::popped(flags);
-    cpu.call_depth -= 1;
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
 }
 
 /// `CA` is `RETF` and `CB` is `RETF iw`. The stack order is the mirror of
@@ -1526,7 +1526,7 @@ fn ret_far(cpu: &mut crate::Cpu, opcode: u8) {
     cpu.regs.set_segment(Seg::Cs, cs);
     let sp = cpu.regs.word(Reg16::Sp).wrapping_add(release);
     cpu.regs.set_word(Reg16::Sp, sp);
-    cpu.call_depth -= 1;
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
 }
 
 /// `CE` is `INTO`: the type 4 interrupt, and only when OF is set. One byte,
@@ -1546,7 +1546,7 @@ fn call_far_immediate(cpu: &mut crate::Cpu) {
     let ret = cpu.regs.ip;
     push(&mut cpu.mem, &mut cpu.regs, cs);
     push(&mut cpu.mem, &mut cpu.regs, ret);
-    cpu.call_depth += 1;
+    cpu.call_depth = cpu.call_depth.saturating_add(1);
     cpu.regs.ip = offset;
     cpu.regs.set_segment(Seg::Cs, segment);
 }
@@ -1690,7 +1690,7 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let ret = cpu.regs.ip;
             let target = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
             push(&mut cpu.mem, &mut cpu.regs, ret);
-            cpu.call_depth += 1;
+            cpu.call_depth = cpu.call_depth.saturating_add(1);
             cpu.regs.ip = target;
         }
         0x4 => {
@@ -1712,7 +1712,7 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 let ret = cpu.regs.ip;
                 push(&mut cpu.mem, &mut cpu.regs, cs);
                 push(&mut cpu.mem, &mut cpu.regs, ret);
-                cpu.call_depth += 1;
+                cpu.call_depth = cpu.call_depth.saturating_add(1);
             }
             cpu.regs.ip = offset;
             cpu.regs.set_segment(Seg::Cs, segment);

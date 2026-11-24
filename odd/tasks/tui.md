@@ -305,7 +305,7 @@ red is a watchpoint.
   **GREEN** (corrections): the whole tree is **614 passed, 0 failed** on
   `cargo nextest run`, the clippy run is clean in every crate,
   `cargo fmt --all --check` exits 0, and the headless runner is
-  unchanged over the eighty-six reference programs.
+  unchanged over the eighty-five reference programs.
   **The verifier's batch.** The step back over a halt left the debugger
   stuck: the machine was not halted any more and the debugger still said
   it was, so `F8` and `F5` did nothing. The debugger's `finished` follows
@@ -335,7 +335,7 @@ red is a watchpoint.
   step over ran past a breakpoint. **GREEN**: the whole tree is **649
   passed, 0 failed** on `cargo nextest run`, the clippy run is clean in
   every crate, `cargo fmt --all --check` exits 0, and the headless
-  runner is unchanged over the eighty-six reference programs.
+  runner is unchanged over the eighty-five reference programs.
   **The readability lens's batch.** The help's list is the screen's own:
   the production list is published and the tests read it, so a key that
   is added and not shown fails the test. The write log belongs to the
@@ -349,10 +349,101 @@ red is a watchpoint.
   terminal pushed the second column off the screen. **GREEN**: the whole
   tree is **652 passed, 0 failed** on `cargo nextest run`, the clippy run
   is clean in every crate, `cargo fmt --all --check` exits 0, and the
-  headless runner is unchanged over the eighty-six reference programs.
+  headless runner is unchanged over the eighty-five reference programs.
+  **The review's findings.** The step back takes the address that ran
+  off the list of what has run, and not the address the machine was at;
+  the step over runs the first instruction and stops at a breakpoint it
+  reaches; the depth saturates; the restore refuses an address outside
+  the address space; the log's door belongs to the journal; the help
+  takes the room its layout needs; and the pre-step snapshot is taken
+  only when the journal is on. **RED**: the undone instruction kept its
+  grey mark, `F7` did nothing on a breakpoint address, a return without
+  a call panicked the host, the restore indexed the memory blind, the
+  help lost its last keys on a narrow screen, and the bulk write threw
+  the recorded steps away without a word. **GREEN**: the whole tree is
+  **677 passed, 0 failed** on `cargo nextest run`, the clippy run is
+  clean in every crate, `cargo fmt --all --check` exits 0, and the
+  headless runner is unchanged over the eighty-five reference programs.
+  **The verifier's second round.** The help takes the whole area below
+  the title and shows every key the screen can hold; the step back takes
+  the failed instruction's address off the list of what has run; the help
+  names `Backspace`; and a step that wrote too much leaves no log behind.
+  The promise about a narrow help at twenty-four rows was mine and it
+  was impossible: one or two keys cannot be shown at that size, and the
+  log says so now. **RED**: the narrow help showed nineteen of the keys,
+  the step back took the nop's mark off after a failed step, the help did
+  not name `Backspace`, and the truncated step left sixty-five thousand
+  entries in the log. **GREEN**: the whole tree is **690 passed, 0
+  failed** on `cargo nextest run`, the clippy run is clean in every
+  crate, `cargo fmt --all --check` exits 0, and the headless runner is
+  unchanged over the eighty-five reference programs.
 
 ## Log
 
+- **L19 (2026-11-24).** The verifier's second round on the corrected
+  candidate: two blockers and three advisories.
+  - **The promise about the narrow help was impossible, and it was mine.**
+    I told the writer that at a narrow width and twenty-four rows every
+    key of the list must be on the screen. It cannot be: the one-column
+    layout needs a row per key and the section's header, and a
+    twenty-four-row terminal has twenty-two rows below the title. One or
+    two keys cannot be shown at that size, whatever the layout does.
+    What the help does now: it takes the whole area below the title and
+    shows every key the screen can hold, and **no key is cut in half** —
+    at a width too narrow for two columns the one column is the only one
+    that fits, and its keys are whole. At a narrow width the height of
+    the screen, and not the layout, decides how many keys are on it.
+    The promise `S36` and `S31` make is about eighty columns, and it
+    holds there.
+  - **The step back took the wrong mark off after a step that failed.**
+    The instruction was attempted and the journal holds a record for it,
+    so the address that goes off the list is the failed instruction's
+    address and not the previous one's. The app remembers it on the fault
+    path too.
+  - **Backspace was bound and not named.** The handler binds it in the
+    edit and in the goto, and the help now names it.
+  - **A step that wrote too much left its log behind.** The truncated
+    branch takes the writes too, so the log keeps nothing.
+  - **The differential note was wrong.** The local gold holds eighty-five
+    `.asm` examples, and that is what the differential reports.
+- **L18 (2026-11-23).** The native review of the corrected candidate came
+  back with findings from its risk and reliability lenses, and the
+  biggest one was a regression.
+  - **The step back took the wrong address off the list.** The list of
+    what has run holds the address of the instruction that ran, and the
+    rewind read the instruction pointer instead: it removed an address
+    that was never there and left the undone instruction's mark. The app
+    remembers the address that ran now.
+  - **The step over was inert on a breakpoint address.** The check ran
+    before the first instruction, so `F7` did nothing where `F5` leaves
+    the machine. The check belongs after the first instruction: the place
+    the user started from is not reached by the step over.
+  - **The depth could overflow.** A return without a call drove the
+    counter past its bound, and the host panicked. The depth saturates
+    now, and the promise the core's own doc makes holds.
+  - **The restore wrote at a caller's address.** The method refused an
+    address outside the address space, and the log's door is the core's
+    own: a caller cannot turn the journal's log off behind its back and
+    leave the journal with empty write lists.
+  - **The help's height did not follow its layout.** The overlay was
+    sized for the two columns and the narrow layout is one column, so
+    the tail of the keys was cut. The area the help takes is the area
+    the layout it draws needs.
+  - **The pre-step snapshot was taken with the journal off.** The
+    headless runner paid for a copy of the registers on every step and
+    never read it. The snapshot is taken only when the journal is on.
+  - **Still open.** `executed` holds one entry per distinct address, so
+    an address visited twice loses its mark entirely when the second
+    visit is undone. The console's `p` output is not pinned by a test,
+    and a step over that ended at a breakpoint or ran out of its budget
+    says nothing in the console output: the reason only reaches the
+    status bar. The step over's exit condition is the call depth, so a
+    procedure that ends by jumping rather than returning never brings
+    the depth back and the step over runs to its budget. And the core's
+    `step` clears `stop_reason` and `halted` before every instruction,
+    for every caller of the core, the runner included: that predates
+    this unit, but the journal now restores both, so the two semantics
+    meet.
 - **L17 (2026-11-23).** The native review of `b208af3` came back with
   findings, and the biggest one was the guest's own amplification.
   - **The journal's memory is bounded.** The write log had no bound: a
@@ -393,7 +484,15 @@ red is a watchpoint.
     instruction: a `rep movsb` fires on its last byte alone, because the
     model's door takes one write. The step back does not rewind the
     devices behind the I/O bus, and the reference flags such operations
-    instead of reversing them.
+    instead of reversing them. A broken journal has no way back: the
+    steps after the oversized one are undoable, but the journal refuses
+    them, and the write log keeps being paid for a journal nobody can
+    use. A rewind over an instruction that wrote a byte also discards a
+    write made **after** it — the debugger's own edit of a memory byte —
+    with nothing said. And the help, which takes the whole area below the
+    title, covers the status bar: the machine's state is in the status
+    bar and nowhere else, so with the help open that fact is on the
+    screen nowhere until the help is closed.
 
 - **L16 (2026-11-23).** The maintainer chose the cut: the keys that come
   with the core.
@@ -421,7 +520,7 @@ red is a watchpoint.
     state back; the TUI's flag now follows the machine's. The recheck of
     that blocker is green, and the verifier's twenty-seven probes are in
     the tree.
-  - **The differentials.** The eighty-six reference programs of the
+  - **The differentials.** The eighty-five reference programs of the
     headless runner are byte-identical against the base, the console's
     twenty-three commands print the same words **except `p`**, which this
     cut turns from a refusal into the reference's step over, the drawn

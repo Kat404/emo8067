@@ -110,7 +110,7 @@ const CARET: &str = "█";
 /// It is published because a test has to check the promise that the help
 /// loses no key, and a test that checks a copy of the list proves
 /// nothing about the list the screen draws.
-pub const KEYS: [&str; 23] = [
+pub const KEYS: [&str; 24] = [
     "F5   run to the next breakpoint",
     "F6   back one instruction",
     "F7   over a call",
@@ -131,6 +131,7 @@ pub const KEYS: [&str; 23] = [
     "← →  move the cursor (registers, flags)",
     "PgUp PgDn  a page of memory",
     "Enter commit the edit",
+    "Backspace erase the last character",
     "Esc  cancel the edit, close a window",
     "?    helps (? again closes it)",
     "q    quits",
@@ -244,12 +245,13 @@ pub fn draw(app: &App, frame: &mut Frame) {
     vertical_rule(frame, sides[1]);
     vertical_rule(frame, sides[3]);
     rule(frame, rows[5]);
-    // The help is an overlay: it covers the panels when its list of keys
-    // is longer than the band that holds the listing.
+    status(app, frame, rows[6]);
+    // The help is an overlay: it is drawn last, and it covers everything
+    // below the title when its list of keys is longer than the band that
+    // holds the listing.
     if app.help {
         help(app, frame, help_area(&rows, area));
     }
-    status(app, frame, rows[6]);
 }
 
 /// The area the help takes.
@@ -260,12 +262,14 @@ pub fn draw(app: &App, frame: &mut Frame) {
 /// the band that holds the listing, and the width only decides whether the
 /// two columns are wide enough to hold the keys.
 fn help_area(rows: &[Rect], area: Rect) -> Rect {
-    if help_rows() <= rows[2].height {
+    if help_rows(area.width) <= rows[2].height {
         return rows[2];
     }
+    // The whole area below the title: the title keeps the program's name,
+    // and the help takes the rest of the screen.
     Rect {
-        y: rows[2].y,
-        height: rows[2].height + rows[3].height + rows[4].height,
+        y: rows[1].y,
+        height: area.height - rows[0].height,
         ..area
     }
 }
@@ -1240,9 +1244,32 @@ fn help(app: &App, frame: &mut Frame, area: Rect) {
 }
 
 /// The rows the help takes: the header of the section and the rows of the
-/// two columns.
-fn help_rows() -> u16 {
-    1 + (KEYS.len().div_ceil(2) as u16)
+/// keys.
+///
+/// The keys are in two columns when the width can hold them, and in one
+/// column when it cannot: the area the help takes must be the area the
+/// layout it draws needs.
+fn help_rows(width: u16) -> u16 {
+    1 + key_rows(width)
+}
+
+/// The rows the keys take in the layout the width asks for.
+fn key_rows(width: u16) -> u16 {
+    if fits_two_columns(width) {
+        return (KEYS.len().div_ceil(2)) as u16;
+    }
+    KEYS.len() as u16
+}
+
+/// Whether the width can hold the keys in two columns.
+fn fits_two_columns(width: u16) -> bool {
+    let column = usize::from(width / 2);
+    let widest = KEYS
+        .iter()
+        .map(|key| key.chars().count())
+        .max()
+        .unwrap_or(0);
+    column >= widest
 }
 
 /// The keys of the help, in two columns.
@@ -1253,12 +1280,7 @@ fn help_rows() -> u16 {
 /// is cut is a key that is lost.
 fn key_lines(width: u16) -> Vec<Line<'static>> {
     let column = usize::from(width / 2);
-    let widest = KEYS
-        .iter()
-        .map(|key| key.chars().count())
-        .max()
-        .unwrap_or(0);
-    if column < widest {
+    if !fits_two_columns(width) {
         return KEYS
             .iter()
             .map(|key| Line::from(Span::styled(*key, theme::value())))
