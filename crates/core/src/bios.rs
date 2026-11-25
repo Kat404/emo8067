@@ -303,19 +303,21 @@ impl Cpu {
         Some(end)
     }
 
-    /// The head and the tail of the keyboard buffer, when they are offsets
-    /// of the ring.
+    /// The head, the tail and the end of the keyboard buffer, when they
+    /// are offsets of the ring.
     ///
     /// The head is the entry to read and the tail the entry to write, and
     /// both hold **absolute** offsets, the way the IBM's own buffer holds
-    /// them: a guest that reads `0040:001A` sees where the buffer is.
-    fn keyboard_ends(&self) -> Option<(u16, u16)> {
+    /// them: a guest that reads `0040:001A` sees where the buffer is. The
+    /// end comes with them, because the ring's end is the size word's and
+    /// the size is validated once, here.
+    fn keyboard_ends(&self) -> Option<(u16, u16, u16)> {
         let end = self.keyboard_end()?;
         let head = self.data_word(KEYBOARD_HEAD);
         let tail = self.data_word(KEYBOARD_TAIL);
         let offset_of_the_ring =
             |offset: u16| offset >= KEYBOARD_BUFFER && offset < end && offset % 2 == 0;
-        (offset_of_the_ring(head) && offset_of_the_ring(tail)).then_some((head, tail))
+        (offset_of_the_ring(head) && offset_of_the_ring(tail)).then_some((head, tail, end))
     }
 
     /// Put a keystroke into the keyboard buffer.
@@ -329,12 +331,9 @@ impl Cpu {
     /// tail" is unambiguously empty — drops the keystroke, and so does a
     /// buffer whose ends the guest scribbled.
     pub fn push_key(&mut self, scan_code: u8, ascii: u8) -> bool {
-        let Some((head, tail)) = self.keyboard_ends() else {
+        let Some((head, tail, end)) = self.keyboard_ends() else {
             // The guest scribbled where the head and the tail live: the
             // buffer is empty, and the keystroke has nowhere to go.
-            return false;
-        };
-        let Some(end) = self.keyboard_end() else {
             return false;
         };
         let next = next_entry(tail, end);
@@ -354,10 +353,7 @@ impl Cpu {
     /// the guest has not taken yet.
     #[must_use]
     pub fn keys_waiting(&self) -> usize {
-        let Some((head, tail)) = self.keyboard_ends() else {
-            return 0;
-        };
-        let Some(end) = self.keyboard_end() else {
+        let Some((head, tail, end)) = self.keyboard_ends() else {
             return 0;
         };
         let size = end - KEYBOARD_BUFFER;
@@ -915,7 +911,7 @@ fn take_keystroke(cpu: &mut Cpu) -> Option<(u8, u8)> {
 
 /// The keystroke at the head of the buffer, and the buffer left as it is.
 fn peek_keystroke(cpu: &mut Cpu) -> Option<(u8, u8)> {
-    let (head, tail) = cpu.keyboard_ends()?;
+    let (head, tail, _) = cpu.keyboard_ends()?;
     if head == tail {
         // The buffer is empty.
         return None;

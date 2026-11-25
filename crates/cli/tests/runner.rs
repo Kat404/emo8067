@@ -499,7 +499,7 @@ fn the_keys_option_leaves_a_program_that_asks_for_no_key_alone() {
     let source = dir.join("program.asm");
     std::fs::write(&source, "org 100h\nmov ax, 1234h\nhlt\n").unwrap();
 
-    let (out, err, code) = run(&["run", source.to_str().unwrap()]);
+    let (out, err, code) = run(&["run", "--keys", "xy", source.to_str().unwrap()]);
     assert!(err.is_empty(), "{err}");
     assert_eq!(code, 0, "the program halted: {out}");
     assert!(out.contains("AX 1234"), "{out}");

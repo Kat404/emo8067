@@ -50,7 +50,7 @@ fn press(app: &mut App, keys: &[KeyCode]) {
     }
 }
 
-/// The scan code and the ASCII character of the keystroke at the head of
+/// The ASCII character and the scan code of the keystroke at the head of
 /// the guest's keyboard buffer.
 ///
 /// The head holds the absolute offset of the entry to read.
@@ -62,7 +62,7 @@ fn at_head(app: &App) -> (u8, u8) {
     )
 }
 
-/// The scan code and the ASCII character of the keystroke at the tail of
+/// The ASCII character and the scan code of the keystroke at the tail of
 /// the guest's keyboard buffer: the one that went in last.
 ///
 /// The tail holds the absolute offset of the entry to write, so the entry

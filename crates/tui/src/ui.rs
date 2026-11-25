@@ -1305,7 +1305,7 @@ fn help(app: &App, frame: &mut Frame, area: Rect) {
     // The overlay covers what is under it: the panels are behind it.
     frame.render_widget(Clear, area);
     let header = Line::from(Span::styled(
-        "keys",
+        "keys · the rest go to the guest",
         section_style(app.focus == Focus::Disassembly),
     ));
     frame.render_widget(

@@ -321,6 +321,16 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
         }
     }
 
+    // A script's tail that never reached the guest is said out loud: the
+    // run itself is not a failure, but a script the guest did not get is
+    // not the script the user wrote.
+    if next_key < script.len() {
+        eprintln!(
+            "emo8067: {} of the script's keys did not fit in the guest's keyboard buffer",
+            script.len() - next_key
+        );
+    }
+
     print_state(&cpu, executed, max, &failure);
     if golden {
         pages(&cpu);

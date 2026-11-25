@@ -131,7 +131,10 @@ fn press(c: &mut Cpu, scan_code: u8, ascii: u8) {
     let tail = c.mem.read_u16(DATA, TAIL);
     c.mem.write_u8(DATA, tail, ascii);
     c.mem.write_u8(DATA, tail + 1, scan_code);
-    c.mem.write_u16(DATA, TAIL, tail + 2);
+    // The tail wraps at the ring's end, the way the door's does.
+    let end = BUFFER + c.mem.read_u16(DATA, SIZE);
+    let next = if tail + 2 >= end { BUFFER } else { tail + 2 };
+    c.mem.write_u16(DATA, TAIL, next);
 }
 
 /// The character at a cell of a page.
