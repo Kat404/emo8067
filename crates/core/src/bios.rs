@@ -361,11 +361,11 @@ fn scroll(cpu: &mut Cpu, down: bool) {
         } else {
             row.checked_add(lines)
         };
-        let (character, attribute) = match source {
-            Some(source) if source < height => window[(source * width) as usize],
-            _ => (b' ', attribute),
-        };
         for column in 0..width {
+            let (character, attribute) = match source {
+                Some(source) if source < height => window[(source * width + column) as usize],
+                _ => (b' ', attribute),
+            };
             put_cell(
                 cpu,
                 page,

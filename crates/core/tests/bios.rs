@@ -798,7 +798,16 @@ fn s7_the_services_write_and_read_the_page() {
     // with the attribute in BH.
     let c = bios(|c| {
         for row in 0..3u16 {
-            c.mem.write_u8(VIDEO, row * 160, b'A' + row as u8);
+            for column in 0..80u16 {
+                // Every cell of the row carries a character of its own: a
+                // scroll that repeats one cell cannot pass for a scroll
+                // that moves them all.
+                c.mem.write_u8(
+                    VIDEO,
+                    (row * 80 + column) * 2,
+                    b'A' + row as u8 + column as u8,
+                );
+            }
         }
         c.regs.set_byte(Reg8::Ah, 0x06);
         c.regs.set_byte(Reg8::Al, 2);
@@ -814,6 +823,13 @@ fn s7_the_services_write_and_read_the_page() {
         0x1E,
         "and the space the scroll left carries the attribute in BH"
     );
+    for column in 0..80u16 {
+        assert_eq!(
+            character(&c, 0, column),
+            b'A' + 2 + column as u8,
+            "the row moved whole: every cell of the row is where it belongs"
+        );
+    }
 }
 
 /// A machine with no geometry has no page to write on, and the service does
