@@ -67,3 +67,92 @@ fn a_register_can_be_written() {
     Register::Ip.write(&mut cpu, 0x0100);
     assert_eq!(cpu.regs.ip, 0x0100);
 }
+
+#[test]
+fn a_flag_can_be_written_and_the_others_are_left_alone() {
+    let mut cpu = machine();
+    let before = cpu.regs.flags.0;
+    assert!(!cpu.regs.flags.get(CF), "the carry starts clear");
+
+    Flag::Cf.write(&mut cpu, true);
+    assert!(cpu.regs.flags.get(CF), "the carry is set");
+    assert_eq!(
+        cpu.regs.flags.0 & !CF,
+        before & !CF,
+        "and the other flags are as they were"
+    );
+
+    Flag::Cf.write(&mut cpu, false);
+    assert!(!cpu.regs.flags.get(CF), "and it can be cleared again");
+    assert_eq!(cpu.regs.flags.0, before, "with the word as it was");
+}
+
+#[test]
+fn the_stack_window_is_where_the_ui_says_and_not_where_the_pointer_is() {
+    let mut cpu = Cpu::new();
+    cpu.regs.set_segment(Seg::Ss, 0x0200);
+    cpu.regs.set_word(Reg16::Sp, 0x0100);
+    cpu.mem.write_u16(0x0200, 0x0100, 0xAAAA);
+    cpu.mem.write_u16(0x0200, 0x0080, 0xBBBB);
+    let ui = Ui {
+        stack_at: 0x0080,
+        stack_len: 4,
+        ..Ui::default()
+    };
+
+    let panels = Panels::of(&cpu, &ui);
+    let stack = &panels.stack;
+
+    assert_eq!(
+        stack.words[0], 0xBBBB,
+        "the window starts where the UI says and not at the pointer"
+    );
+    assert_eq!(stack.words[1], 0x0000, "and the next word is above it");
+    assert_eq!(stack.sp, 0x0100, "the pointer is still reported");
+    assert_eq!(stack.segment, 0x0200, "and the segment it is in");
+}
+
+#[test]
+fn the_stack_window_wraps_inside_the_segment() {
+    let mut cpu = Cpu::new();
+    cpu.regs.set_segment(Seg::Ss, 0x0200);
+    cpu.mem.write_u16(0x0200, 0xFFFF, 0x1111);
+    cpu.mem.write_u16(0x0200, 0x0001, 0x2222);
+    let ui = Ui {
+        stack_at: 0xFFFF,
+        stack_len: 2,
+        ..Ui::default()
+    };
+
+    let stack = &Panels::of(&cpu, &ui).stack;
+
+    assert_eq!(stack.words[0], 0x1111, "the word at the window's start");
+    assert_eq!(
+        stack.words[1], 0x2222,
+        "and the offset wrapped inside the segment"
+    );
+}
+
+#[test]
+fn the_memory_panel_is_a_window_around_the_cursor() {
+    let mut cpu = Cpu::new();
+    cpu.mem.load_at(0x02010, &[0xAB]).unwrap();
+    let ui = Ui {
+        memory_at: 0x0010,
+        memory_segment: 0x0200,
+        memory_len: 16,
+        ..Ui::default()
+    };
+
+    let panels = Panels::of(&cpu, &ui);
+    let memory = &panels.memory;
+
+    assert_eq!(memory.at, 0x0010, "the cursor is at the address");
+    assert_eq!(memory.window_at, 0x0008, "the window starts before it");
+    assert_eq!(memory.cursor, 8, "and the cursor is in the window");
+    assert_eq!(memory.bytes.len(), 16, "the window holds what it says");
+    assert_eq!(
+        memory.bytes[8], 0xAB,
+        "and the byte under the cursor is there"
+    );
+}

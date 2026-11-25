@@ -3,9 +3,136 @@
 Written 2026-10-15 at the end of a long session, and kept current since: the
 2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
 units with it, and the 2026-11-10 unit that closed the three families the
-full-capture gate left.
+full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
+window, and the 2026-11-24 unit that gave it the guest's screen.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-24 work is
+
+The TUI has **the guest's screen**: a passive viewer of the emulated
+VGA text page, so a program that prints to video memory can be seen.
+
+- **The panel grew.** `Panels.screen` is a `ScreenView` — the page is
+  eighty columns by twenty-five rows, two bytes a cell, the character
+  and the attribute — and it is read out of the machine's own memory
+  through the segment the UI says, the way every other panel is read.
+  The core needed **nothing** for that: its memory is flat RAM, so
+  `B800:0000` is ordinary memory at physical `0xB8000`.
+- **The machine has a video BIOS.** `crates/core/src/bios.rs` implements
+  the reference's own **thirteen text-mode services** for `INT 10h`,
+  with the register contracts quoted from
+  `re/docs-txt/8086_bios_and_dos_interrupts.txt`. The `INT` is the
+  8086's `INT`: it pushes FLAGS, CS and IP, clears TF and IF, and loads
+  `CS:IP` from the vector table — the two `CD 10` captures of the
+  646 000 agree with the chip on the stack, the flags, the landing
+  place and the memory. The BIOS is a **handler at an address**: the
+  machine installs the vector for `10h` at boot, and the reference's
+  own map gives the video functions' entry as `F400:0190`. The ROM is
+  this project's own; the reference's `BIOS_ROM` is its code and is
+  never copied.
+- **The BIOS keeps no state of its own.** Everything it knows lives in
+  the BIOS data area at `0040:0000`, at the offsets the reference's
+  map gives: the columns at `0040:004A`, the current page's start at
+  `0040:004E`, the eight cursors at `0040:0050`, the current page at
+  `0040:0062`, the rows minus one at `0040:0084`. The guest can read
+  them back, and the panel reads them through the same door.
+- **The page is bounded.** The hardware has eight pages of text memory,
+  four kilobytes apart, and a page past the last one is the last one.
+  The page is read through the segment, so it cannot run off the bus
+  whatever segment the UI names.
+- **The attribute is drawn.** The foreground is the low three bits and
+  the background the high nibble, in the VGA's own sixteen DAC values:
+  the guest's colours are the guest's and not the debugger's. The
+  background's bright bit is the eighth background and not a shade of
+  the seventh, and a blinking cell carries the terminal's blink, so that
+  no state is colour alone.
+- **The takeover.** `x` takes the terminal over with the page: every
+  row but the status bar, where the machine's state is and nowhere
+  else. The page is drawn from its top-left corner and what the
+  terminal cannot hold is cut. The debugger's own keys keep working
+  while it is open, and the keys that act on the listing do not, because
+  the listing's cursor is not on the screen while the takeover holds
+  it.
+- **The plan is `odd/tasks/tui.md`** (T15, S37-S42, L20-L21) and
+  `odd/tasks/video-bios.md` (T1, S1-S11, L1-L2). The tree is
+  **751 passed, 0 failed** and the clippy run is clean in every crate.
+- **It was verified independently, twice.** The native review ran three
+  lenses, a refuter and a targeted validator: it found one CRITICAL —
+  the window scroll repeated the first cell of the row across the whole
+  row instead of moving the cells — and it is fixed. The project's own
+  verifier checked S1-S11 against the specs and the silicon: all
+  eleven met, and it found three more defects — the guest-writable
+  geometry is computed with unchecked, which panics the emulator and
+  makes the panel allocate without bound. Those are being fixed.
+- **What this slice cannot do.** The graphics modes are not here: `13h`
+  and the pixel functions `0Ch`/`0Dh` belong to their own unit, and the
+  page of graphics is `A0000:B1000`. The reference's own `1_sample`
+  writes "Hello, World!" straight to `B800:0002`, but only after two
+  `INT 10h` calls, and the BIOS answers them now — so the corpus's
+  programs reach their text.
+  corpus's BIOS-using programs need the BIOS slice before their output
+  is on the page.
+
+## Where the 2026-11-21 work is
+
+The TUI has a **memory window**: a window over the machine's memory, with
+the cursor on a byte and a goto to jump to an address.
+
+- **The model grew.** `Ui.memory_at` is the address the memory panel's
+  cursor is at, `Ui.memory_len` is how many bytes the window holds (256),
+  and `MemoryView` carries `window_at` and `cursor`. The window is built
+  around the cursor, so the UI holds no megabyte of memory.
+- **The pane** is the middle column of the bottom band, between the
+  registers and the flags: the row address in the gutter, the bytes as
+  hex, and the printable side beside them when the panel is wide enough.
+- **The keys.** `3` takes the pane, `Tab` cycles the three, the arrows move
+  the cursor a byte and a row at a time, `PageUp` and `PageDown` move a
+  page, and `g` opens the goto.
+- **The address is hexadecimal**, the way the reference types a memory
+  address: `0100` and `100h` are the same address, and a text that cannot
+  be read is refused with "bad syntax" — the evaluator's own word.
+- **The stack is a pane you open**, not a fourth column: `4` opens it where
+  the listing is, and `4` again closes it. The window shows the segment,
+  the `SP` and the words around it, so a push and a pop are visible as a
+  region and not as a number.
+- **The source strip** is the context of the current instruction: the
+  program's own lines, under the listing, with the line the machine is
+  stopped at marked. The assembler records where every source line landed
+  (`Program.lines`), and the debug crate's `SourceView` reads them, the way
+  every other panel is read.
+- **The panes write.** `e` writes the byte under the memory cursor and
+  the flag under the flags cursor, in the reference's own expression
+  language, and the model's write doors are `Register::write` and
+  `Flag::write`.
+- **The goto takes a label and a segment**: a name of the program's own
+  names first, then a memory reference `SSSS:OOOO`, and then a bare
+  hexadecimal offset; the segment the goto named is the one the memory
+  pane looks through.
+- **The panes have the research's own numbers**: `1` the disassembly, `2`
+  the registers, `3` the memory, `4` the flags. The stack is a window
+  and opens with `5`.
+- **The conditions are a pane**: `b` opens it where the listing is, and
+  it draws every breakpoint and every watchpoint with its segment, its
+  offset and its condition; the condition under the cursor is edited in
+  place.
+- **The debug console**: `:` opens it where the listing is, with the
+  command line at the bottom and the log above it. The commands are the
+  reference's own ten words (`re/docs-txt/debug.txt`), every parameter is
+  hexadecimal and every value is printed in hexadecimal, and the text it
+  prints is this project's — the reference documents the commands and not
+  their output. `p`, the effective addresses and the symbols are refused
+  honestly.
+- **The design's pass is done**, and so is its polish: the panels are
+  not cards, the sections are separated by thin rules, every state
+  carries a glyph and not only a colour, and the tokens live in
+  `crates/tui/src/theme.rs`. The listing keeps what it needs (five rows
+  at 80x24), the strip takes the rest, the memory window's width follows
+  its bytes, and the console's caret is the terminal's own. The design's
+  document is `design/DESIGN.md`, and the TUI can be captured as an
+  image with `crates/tui/examples/screenshot.rs`.
+- **The plan is `odd/tasks/tui.md`** (L5-L14). The tree is **601 passed,
+  0 failed** and the clippy run is clean in every crate.
 
 ## Where the 2026-11-19 work is
 
@@ -100,27 +227,6 @@ three families it was missing:
 - **The glued segment override** (`cs:mov ax,1`) keeps its prefix. It was
   worse than refused: the single-line assembler dropped the override
   silently, so the program read `DS:` where it wrote `CS:`.
-- **`PUSHA` and `POPA`** are the eight-word sequences the reference's own
-  documentation gives. They were seven words each way, so the `SP` was
-  never on the stack, and a `POPA` on its own left the stack two bytes
-  off.
-- **The second `LOCK`** needed no code: the reference's own binary carries
-  the string `LOCK-OPCODE:F0`, so its assembler writes `F0h` twice over,
-  exactly as this one does.
-- **The register initialisers** (`#cs=1234#` and the rest) are read, and
-  the program starts where it says. Three of the reference's own examples
-  declare one, and they were running in the wrong state.
-- **The length table** has `8F`, `C4`/`C5` and `FF /2`–`FF /5`: fourteen
-  rows, 191 encodings in all.
-
-## Where the 2026-11-10 assembler work is
-
-The debt the assembler plan left is closed, and the length table has the
-three families it was missing:
-
-- **The glued segment override** (`cs:mov ax,1`) keeps its prefix. It was
-  worse than refused: the single-line assembler dropped the override
-  silently, so the program read `DS:` where it wrote `CS:`.
 - **The operand's own segment override** (`mov cs:temp1, si`) is a prefix
   too. It was parsed and thrown away, and the bytes came out without the
   `2Eh` — the reference's own documentation says the manual attachment is
@@ -174,15 +280,18 @@ the two plans above.
 ## Where the tree stands
 
 ```
-cargo test --workspace                  491 passed, 0 failed
-cargo clippy --workspace --all-targets   1 warning, 0 errors (the warning is
-                                         pre-existing, in `crates/asm`)
+cargo nextest run --workspace            751 passed, 0 failed
+cargo clippy --workspace --all-targets   0 warnings, 0 errors
 cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
                          each of the 85 leaves behind
-HEAD                     d40dc28 (docs), f3a216f (the gate and PUSH SP),
-                         25cef28 (docs), 49b9d27 (the rotate and the 8C/8E);
+the full capture gate  646000 captures, no disagreement; the two CD 10
+                         captures among them agree with the chip on the
+                         stack, the flags, the landing place and the memory
+HEAD                     be6d568 (the scroll moves the cells), dbc45f4 (the
+                         video BIOS), 48a0882 (the guest's screen), bee803a
+                         (the step back), d1a624f (the bounded journal);
                          every commit is GPG-signed and none is pushed
 ```
 
@@ -485,14 +594,37 @@ wins, so a device that writes a port byte does not reach the program.
 11. ~~**The unit chosen by the maintainer on 2026-11-10: the three families the full gate left.**~~ — **DONE and closed.** The tens correction of `DAA`/`DAS`, the zero-immediate `AAD` and the seven-bit quotient of `IDIV r/m8` are all the chip's rule now, the family pins are at zero, and the gate over all 646000 captures has **no disagreement left**. The plan is `odd/tasks/full-capture-gate.md` (L17).
 12. ~~**The unit chosen by the maintainer on 2026-11-10: the assembler's debt and the length table.**~~ — **DONE and closed.** The glued segment override keeps its prefix (`21099ac`), `PUSHA`/`POPA` are the eight-word sequences the reference's own documentation gives (`d7c1cd8`), the second `LOCK` needed no code because the reference's own string says `LOCK-OPCODE:F0` (`re/FINDINGS.md`), the register initialisers are read and the program starts where it says (`ed2e4b6`), and the length table got the three families it was missing (`9e2252b`). The plan is `odd/tasks/assembler.md` (L9).
 13. ~~**The unit chosen by the maintainer on 2026-11-10: the panels the TUI
-    still lacks**~~ — **the first of them is DONE** (2026-11-19): the
-    registers panel with its editing in place, and the flags. The plan is
-    `odd/tasks/tui.md` (L5, L6). **The next unit is not chosen.** What is
-    left of that slice is the memory window, the stack and the source
-    strip; after it come the stop-on-condition window, the debug console,
-    the guest's screen, T17 (packaging and CI) and T18 (the GUI, the last
-    stage).
-14. **What is left besides that.** `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a fondo, the eighty-five examples run with their own baseline pinned; the assembler's build directives (`#make_bin#`, `#make_com#`, `#mem=...#` and the `.binf` file itself), which are not written yet; an unknown `#directive=`, which the reference refuses and this ignores; the two load models (the headless runner's and the debugger crate's loader), which agree today and should be one; and `#MEM=`, the memory the reference's `.binf` file can carry, which both frontends ignore.
+    still lacks**~~ — **they are DONE**: the registers panel with its
+    editing in place and the flags (2026-11-19), the memory window with
+    its goto (2026-11-21), and the stack pane and the source strip
+    (2026-11-21, later the same day). The plan is `odd/tasks/tui.md` (L5
+    to L13). **The guest's screen is done too** (2026-11-24, `48a0882`),
+    and with it the TUI has every panel the research's layout draws. The
+    design pass the maintainer asked for — functions first, design last
+    — is done. What is left of the TUI is T17 (packaging and CI) and
+    T18 (the GUI, the last stage).
+14. **What is left besides that.** **The keyboard of the BIOS
+    (`INT 16h`)** is the next unit, chosen by the maintainer on
+    2026-11-25: sixty of the eighty-five reference programs call it, and
+    without it those programs sit waiting for a key that never comes. The
+    reference documents exactly two functions — `00h` gets a keystroke
+    and removes it from the buffer, `01h` checks for one and leaves it —
+    and its own memory map gives the keyboard buffer **no** home, so
+    where the buffer lives and where the keystrokes come from are the
+    unit's own decisions. The plan is `odd/tasks/video-bios.md` (T2).
+    **The graphics modes of the video BIOS** — `13h`, the page of graphics
+    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
+    unit, and the screen panel is a character grid that cannot show them
+    yet.
+    `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
+    fondo, the eighty-five examples run with their own baseline pinned;
+    the assembler's build directives (`#make_bin#`, `#make_com#`,
+    `#mem=...#` and the `.binf` file itself), which are not written yet;
+    an unknown `#directive=`, which the reference refuses and this
+    ignores; the two load models (the headless runner's and the debugger
+    crate's loader), which agree today and should be one; and `#MEM=`,
+    the memory the reference's `.binf` file can carry, which both
+    frontends ignore.
 
 ## Files worth reading first
 

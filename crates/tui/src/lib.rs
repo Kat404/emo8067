@@ -9,4 +9,5 @@
 //! a UI state struct, and the GUI will draw the same struct.
 
 pub mod app;
+pub mod console;
 pub mod ui;

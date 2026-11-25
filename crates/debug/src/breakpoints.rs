@@ -13,6 +13,13 @@
 //! The condition of a breakpoint is an expression in the reference's own
 //! language, with the comparisons this project added
 //! (`odd/research/features-and-ux.md` §6).
+//!
+//! The listing the pane draws comes out of the same model: it holds every
+//! breakpoint and every watchpoint, with the segment, the offset and the
+//! condition each one carries, and the door that writes a condition is
+//! `set_condition`.
+
+use std::fmt;
 
 use crate::expr::{self, Context};
 
@@ -91,6 +98,67 @@ impl Report {
     }
 }
 
+/// What an entry of the listing is.
+///
+/// The research's colours say which is which: a breakpoint is yellow and a
+/// watchpoint is red (`features-and-ux.md` §4.4), so the listing tells a
+/// reader which of the two a row is.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Kind {
+    /// A breakpoint: the machine stops there when its condition holds.
+    Breakpoint,
+    /// A watchpoint: the machine reports the accesses there.
+    ///
+    /// The access says what it watches: a write, a read, or both.
+    Watchpoint(Access),
+}
+
+/// One row of the listing the pane draws.
+///
+/// The row is flat on purpose: the pane reads the segment, the offset and
+/// the condition of every row the same way, and a watchpoint and a
+/// breakpoint differ only in what [`Entry::kind`] says.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Entry {
+    /// What the row is: a breakpoint or a watchpoint.
+    pub kind: Kind,
+    /// The segment the address is in.
+    pub segment: u16,
+    /// The offset the address is at.
+    pub offset: u16,
+    /// The condition it carries, if it has one.
+    ///
+    /// A breakpoint with no condition carries none: the condition is
+    /// absent and not an empty text. A watchpoint carries none either.
+    pub condition: Option<String>,
+}
+
+/// Why a condition could not be written.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ConditionError {
+    /// There is no breakpoint at that address.
+    NoBreakpoint,
+    /// The condition does not read.
+    Unreadable(expr::Error),
+}
+
+impl From<expr::Error> for ConditionError {
+    fn from(error: expr::Error) -> ConditionError {
+        ConditionError::Unreadable(error)
+    }
+}
+
+impl fmt::Display for ConditionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConditionError::NoBreakpoint => f.write_str("no breakpoint there"),
+            // The expression's own words: "bad syntax", "bad expression",
+            // and the rest of the reference's five refusals.
+            ConditionError::Unreadable(error) => error.fmt(f),
+        }
+    }
+}
+
 /// The breakpoints and the watchpoints.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Breakpoints {
@@ -140,6 +208,66 @@ impl Breakpoints {
             offset,
             condition: condition.map(str::to_string),
         });
+        Ok(self)
+    }
+
+    /// The listing the pane draws: every breakpoint and every watchpoint.
+    ///
+    /// The listing is a function of the breakpoints alone: it reads no
+    /// machine and draws nothing, so the TUI and the GUI draw the same
+    /// rows. The breakpoints come first, in the order they were set, and
+    /// the watchpoints after them, in the order they were set.
+    #[must_use]
+    pub fn listing(&self) -> Vec<Entry> {
+        let mut entries = self
+            .breakpoints
+            .iter()
+            .map(|breakpoint| Entry {
+                kind: Kind::Breakpoint,
+                segment: breakpoint.segment,
+                offset: breakpoint.offset,
+                condition: breakpoint.condition.clone(),
+            })
+            .collect::<Vec<Entry>>();
+        entries.extend(self.watchpoints.iter().map(|watchpoint| Entry {
+            kind: Kind::Watchpoint(watchpoint.access),
+            segment: watchpoint.segment,
+            offset: watchpoint.offset,
+            condition: None,
+        }));
+        entries
+    }
+
+    /// Set the condition of the breakpoint at an address, or take it away.
+    ///
+    /// This is the door the pane writes a condition through. The condition
+    /// is checked where it is written, the same way [`Breakpoints::add`]
+    /// checks it: a condition that cannot be read is refused and the
+    /// breakpoint is left as it was. `None` takes the condition away, and
+    /// the breakpoint then always stops.
+    ///
+    /// The first breakpoint at the address is the one that is written, the
+    /// same way [`Breakpoints::remove`] takes the first one away.
+    ///
+    /// # Errors
+    /// Returns [`ConditionError::NoBreakpoint`] when there is no
+    /// breakpoint at the address, and the expression's own refusal when the
+    /// condition does not parse.
+    pub fn set_condition(
+        &mut self,
+        segment: u16,
+        offset: u16,
+        condition: Option<&str>,
+    ) -> Result<&mut Breakpoints, ConditionError> {
+        let at = self
+            .breakpoints
+            .iter()
+            .position(|breakpoint| breakpoint.segment == segment && breakpoint.offset == offset)
+            .ok_or(ConditionError::NoBreakpoint)?;
+        if let Some(text) = condition {
+            expr::check(text)?;
+        }
+        self.breakpoints[at].condition = condition.map(str::to_string);
         Ok(self)
     }
 

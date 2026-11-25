@@ -272,6 +272,14 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // the memory, and the write of the step before is not this step's.
     cpu.mem.last_write = None;
     let at = cpu.regs.ip;
+    // The BIOS's entry. The machine reached the ROM through the interrupt
+    // vector, the way it reaches any handler, and the video service runs
+    // where the ROM's code is: this project's own code, native, at the
+    // address the vector names. The ROM's own byte at the entry — the
+    // `IRET` that comes out of it — is the instruction that retires.
+    if cpu.regs.segment(Seg::Cs) == crate::bios::ENTRY_SEGMENT && at == crate::bios::ENTRY_OFFSET {
+        crate::bios::service(cpu);
+    }
     let mut opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
 
     // A run of prefixes is consumed here, in a loop, rather than by each
@@ -1468,6 +1476,7 @@ fn call_relative(cpu: &mut crate::Cpu) -> Result<(), ExecError> {
     let rel = take_u16(&cpu.mem, &mut cpu.regs);
     let ret = cpu.regs.ip;
     push(&mut cpu.mem, &mut cpu.regs, ret);
+    cpu.call_depth = cpu.call_depth.saturating_add(1);
     cpu.regs.ip = (i32::from(ret as i16) + i32::from(rel)) as u16;
     Ok(())
 }
@@ -1485,6 +1494,7 @@ fn ret(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
     cpu.regs.ip = pop(&cpu.mem, &mut cpu.regs);
     let sp = cpu.regs.word(Reg16::Sp).wrapping_add(adjust);
     cpu.regs.set_word(Reg16::Sp, sp);
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
     Ok(())
 }
 
@@ -1507,6 +1517,7 @@ fn iret(cpu: &mut crate::Cpu) {
     cpu.regs.ip = ip;
     cpu.regs.set_segment(Seg::Cs, cs);
     cpu.regs.flags = Flags::popped(flags);
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
 }
 
 /// `CA` is `RETF` and `CB` is `RETF iw`. The stack order is the mirror of
@@ -1523,6 +1534,7 @@ fn ret_far(cpu: &mut crate::Cpu, opcode: u8) {
     cpu.regs.set_segment(Seg::Cs, cs);
     let sp = cpu.regs.word(Reg16::Sp).wrapping_add(release);
     cpu.regs.set_word(Reg16::Sp, sp);
+    cpu.call_depth = cpu.call_depth.saturating_sub(1);
 }
 
 /// `CE` is `INTO`: the type 4 interrupt, and only when OF is set. One byte,
@@ -1542,6 +1554,7 @@ fn call_far_immediate(cpu: &mut crate::Cpu) {
     let ret = cpu.regs.ip;
     push(&mut cpu.mem, &mut cpu.regs, cs);
     push(&mut cpu.mem, &mut cpu.regs, ret);
+    cpu.call_depth = cpu.call_depth.saturating_add(1);
     cpu.regs.ip = offset;
     cpu.regs.set_segment(Seg::Cs, segment);
 }
@@ -1685,6 +1698,7 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
             let ret = cpu.regs.ip;
             let target = read_operand(&cpu.mem, &cpu.regs, m.rm, 16);
             push(&mut cpu.mem, &mut cpu.regs, ret);
+            cpu.call_depth = cpu.call_depth.saturating_add(1);
             cpu.regs.ip = target;
         }
         0x4 => {
@@ -1706,6 +1720,7 @@ fn ff_group(cpu: &mut crate::Cpu, opcode: u8) -> Result<(), ExecError> {
                 let ret = cpu.regs.ip;
                 push(&mut cpu.mem, &mut cpu.regs, cs);
                 push(&mut cpu.mem, &mut cpu.regs, ret);
+                cpu.call_depth = cpu.call_depth.saturating_add(1);
             }
             cpu.regs.ip = offset;
             cpu.regs.set_segment(Seg::Cs, segment);

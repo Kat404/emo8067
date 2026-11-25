@@ -17,11 +17,15 @@ use emo8067_core::regs::{Reg16, Seg};
 /// What the panels show, besides the machine's own state.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ui {
-    /// Where the memory panel looks.
+    /// Where the memory panel's cursor is.
+    ///
+    /// The panel is a window around this address and not a buffer from it:
+    /// the bytes it holds are the ones around it, and the cursor is in the
+    /// middle of them.
     pub memory_at: u16,
     /// The segment the memory panel looks through.
     pub memory_segment: u16,
-    /// How many bytes the memory panel shows.
+    /// How many bytes the memory panel's window holds.
     pub memory_len: usize,
     /// Where the disassembly starts.
     pub disassembly_at: u16,
@@ -29,6 +33,22 @@ pub struct Ui {
     pub disassembly_len: usize,
     /// How many words the stack panel shows.
     pub stack_len: usize,
+    /// Where the stack window starts.
+    ///
+    /// The window is a window over the stack and not the stack itself: it
+    /// starts at this offset, so the pointer can be inside it or above it,
+    /// and the words around the pointer are there to be looked at.
+    pub stack_at: u16,
+    /// The segment the screen panel reads the text page through.
+    ///
+    /// The page is at `B800:0000` by default, and the segment is the
+    /// UI's own state, the way the memory window's segment is.
+    pub screen_segment: u16,
+    /// The page of text memory the screen panel shows.
+    ///
+    /// The hardware has eight pages of text memory and no more; a page
+    /// past the last one is the last one.
+    pub screen_page: u8,
 }
 
 impl Default for Ui {
@@ -36,10 +56,13 @@ impl Default for Ui {
         Ui {
             memory_at: 0,
             memory_segment: 0x1000,
-            memory_len: 16,
+            memory_len: 256,
             disassembly_at: 0,
             disassembly_len: 16,
             stack_len: 8,
+            stack_at: 0,
+            screen_segment: 0xB800,
+            screen_page: 0,
         }
     }
 }
@@ -239,6 +262,15 @@ impl Flag {
             Flag::Df => DF,
         }
     }
+
+    /// Write a value into this flag.
+    ///
+    /// The other side of the panel's door: the model reads the machine,
+    /// and this writes it. The flag is a bit of the flags word, and the
+    /// other bits are left as they were.
+    pub fn write(self, cpu: &mut Cpu, value: bool) {
+        cpu.regs.flags.set(self.mask(), value);
+    }
 }
 
 impl Registers {
@@ -270,13 +302,21 @@ impl Registers {
     }
 }
 
-/// The memory panel: the bytes, and the same bytes as characters.
+/// The memory panel: the bytes around the cursor, and the same bytes as
+/// characters.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MemoryView {
     /// The segment the bytes are read through.
     pub segment: u16,
-    /// The offset the view starts at.
+    /// The address the cursor is at.
     pub at: u16,
+    /// The address the window starts at.
+    ///
+    /// The window begins before the cursor, so the bytes around it are
+    /// there to be looked at.
+    pub window_at: u16,
+    /// Where the cursor is in the window: an index into the bytes.
+    pub cursor: usize,
     /// The bytes.
     pub bytes: Vec<u8>,
     /// The same bytes as characters: the printable ones, and a dot for the
@@ -295,6 +335,98 @@ pub struct StackView {
     pub words: Vec<u16>,
 }
 
+/// The columns the guest's text page has by default.
+///
+/// The panel shows the geometry the machine has, and the machine's geometry
+/// is the mode's: the mode sets it and the data area holds it. This is the
+/// geometry a machine starts in.
+pub const SCREEN_COLUMNS: usize = emo8067_core::bios::DEFAULT_COLUMNS as usize;
+
+/// The rows the guest's text page has by default.
+///
+/// The panel shows the geometry the machine has, and the machine's geometry
+/// is the mode's: the mode sets it and the data area holds it. This is the
+/// geometry a machine starts in.
+pub const SCREEN_ROWS: usize = emo8067_core::bios::DEFAULT_ROWS as usize;
+
+/// The pages of text memory the hardware has.
+pub const SCREEN_PAGES: u8 = 8;
+
+/// The bytes between two pages of text memory.
+const PAGE_STRIDE: u16 = 0x1000;
+
+/// One cell of the guest's screen: what it says and how it is drawn.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ScreenCell {
+    /// The character the guest wrote.
+    ///
+    /// A byte that cannot be shown is a space and not a control glyph:
+    /// the screen shows what the guest wrote, and a control character is
+    /// not something a terminal shows.
+    pub character: char,
+    /// The attribute byte: the foreground, the blink, the background and
+    /// the background's own brightness.
+    pub attribute: u8,
+}
+
+impl ScreenCell {
+    /// The foreground colour: the low three bits, one of the eight.
+    #[must_use]
+    pub fn foreground(&self) -> u8 {
+        self.attribute & 0x07
+    }
+
+    /// The background colour: the high four bits, one of the sixteen.
+    ///
+    /// The high bit is the background's own brightness: it is the eighth
+    /// background and not a shade of the seventh.
+    #[must_use]
+    pub fn background(&self) -> u8 {
+        (self.attribute >> 4) & 0x0F
+    }
+
+    /// Whether the cell blinks.
+    #[must_use]
+    pub fn blink(&self) -> bool {
+        self.attribute & 0x08 != 0
+    }
+}
+
+/// Where the cursor is on the guest's screen.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Cursor {
+    /// The row the cursor is on.
+    pub row: usize,
+    /// The column the cursor is on.
+    pub column: usize,
+}
+
+/// The screen panel: the guest's text page.
+///
+/// The page is the machine's own memory: what the guest wrote to it is
+/// what it shows. The geometry is the machine's own too — the mode sets it
+/// and the data area holds it — and so is the cursor: the panel reads the
+/// machine again every time and holds no copy of any of it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ScreenView {
+    /// The segment the page is read through.
+    pub segment: u16,
+    /// The page of text memory the panel shows.
+    pub page: u8,
+    /// The columns the page has.
+    pub columns: usize,
+    /// The rows the page has.
+    pub rows: usize,
+    /// The cells of the page, row by row.
+    pub cells: Vec<ScreenCell>,
+    /// The cursor, where the BIOS says it is.
+    ///
+    /// `None` when there is no cursor on the page the panel shows: the
+    /// guest hid it, or the panel shows another page than the one the
+    /// machine is on.
+    pub cursor: Option<Cursor>,
+}
+
 /// Every panel, drawn from the machine and the UI's state.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Panels {
@@ -306,6 +438,8 @@ pub struct Panels {
     pub memory: MemoryView,
     /// The stack panel.
     pub stack: StackView,
+    /// The screen panel: the guest's own text page.
+    pub screen: ScreenView,
 }
 
 impl Panels {
@@ -336,6 +470,7 @@ impl Panels {
             registers,
             memory: memory_of(cpu, ui),
             stack: stack_of(cpu, ui),
+            screen: screen_of(cpu, ui),
         }
     }
 }
@@ -369,12 +504,19 @@ fn disassembly_of(cpu: &Cpu, ui: &Ui) -> Vec<Line> {
     out
 }
 
-/// The memory panel: the bytes from where the UI says.
+/// The memory panel: the bytes around the cursor.
+///
+/// The window is a window and not a buffer: it holds the bytes around one
+/// address, so there is no megabyte of memory in the UI anywhere.
 fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
-    let bytes = (0..ui.memory_len)
+    let count = ui.memory_len.max(1);
+    // The cursor sits in the middle of the window, so there are as many
+    // bytes before it as there are after it.
+    let window_at = ui.memory_at.saturating_sub((count / 2) as u16);
+    let bytes = (0..count)
         .map(|offset| {
             cpu.mem
-                .read_u8(ui.memory_segment, ui.memory_at.wrapping_add(offset as u16))
+                .read_u8(ui.memory_segment, window_at.wrapping_add(offset as u16))
         })
         .collect::<Vec<u8>>();
     let ascii = bytes
@@ -390,20 +532,90 @@ fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
     MemoryView {
         segment: ui.memory_segment,
         at: ui.memory_at,
+        window_at,
+        cursor: usize::from(ui.memory_at.wrapping_sub(window_at)),
         bytes,
         ascii,
     }
 }
 
 /// The stack panel: the words on the stack, from the top down.
+///
+/// The window starts where the UI says and not at the stack pointer, so
+/// the pointer can be anywhere in it — or above it. The pointer itself is
+/// still reported, because the panel is about where the stack is and not
+/// only about what it holds.
 fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
     let segment = cpu.regs.segment(Seg::Ss);
     let sp = cpu.regs.word(Reg16::Sp);
     let words = (0..ui.stack_len)
         .map(|index| {
-            let offset = sp.wrapping_add(2 * index as u16);
+            // The offset wraps inside the segment, the way every other
+            // offset in the model does.
+            let offset = ui.stack_at.wrapping_add(2u16.wrapping_mul(index as u16));
             cpu.mem.read_u16(segment, offset)
         })
         .collect();
     StackView { segment, sp, words }
+}
+
+/// The screen panel: the guest's text page.
+///
+/// The page is read through the segment the UI says, the way the memory
+/// window reads its bytes: the physical address is masked, so the read
+/// cannot run off the bus whatever segment the UI names.
+///
+/// The geometry is the machine's own — the mode sets it and the data area
+/// holds it — and so is the cursor: the panel reads the machine's video
+/// through the core's door and holds no copy of it.
+///
+/// The page number is bounded before it is used: the hardware has eight
+/// pages of text memory and no more, and a page past the last one is the
+/// last one.
+fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
+    let page = ui.screen_page.min(SCREEN_PAGES - 1);
+    // The pages of text memory are four kilobytes apart.
+    let base = u16::from(page) * PAGE_STRIDE;
+    let video = cpu.video();
+    let columns = usize::from(video.columns);
+    let rows = usize::from(video.rows);
+    let cells = (0..columns * rows)
+        .map(|index| {
+            // Two bytes a cell: the character and the attribute.
+            let at = base.wrapping_add(2 * index as u16);
+            let character = cpu.mem.read_u8(ui.screen_segment, at);
+            let attribute = cpu.mem.read_u8(ui.screen_segment, at.wrapping_add(1));
+            ScreenCell {
+                character: printable(character),
+                attribute,
+            }
+        })
+        .collect();
+    // The cursor is on the page the panel shows only when the panel shows
+    // the machine's own page, and only when the guest has not hidden it.
+    let cursor = (video.page == page && video.cursor_visible).then_some(Cursor {
+        row: usize::from(video.cursor_row),
+        column: usize::from(video.cursor_column),
+    });
+    ScreenView {
+        segment: ui.screen_segment,
+        page,
+        columns,
+        rows,
+        cells,
+        cursor,
+    }
+}
+
+/// The character a byte is drawn as.
+///
+/// A byte that is not printable is a space and not a control glyph, and
+/// the range is the memory window's own: the page shows what the guest
+/// wrote, and a control character is not something a terminal shows.
+fn printable(byte: u8) -> char {
+    if (0x20..0x7F).contains(&byte) {
+        byte as char
+    } else {
+        ' '
+    }
 }

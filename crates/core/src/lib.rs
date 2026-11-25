@@ -14,14 +14,17 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bios;
 pub mod devices;
 pub mod exec;
 pub mod flags;
+pub mod history;
 pub mod memory;
 pub mod modrm;
 pub mod regs;
 pub mod transport;
 
+use history::{History, MAXIMUM_STEPS_BACK};
 use memory::Memory;
 use regs::{Registers, Seg};
 
@@ -76,6 +79,19 @@ pub struct Cpu {
     /// while the emulator runs. An empty bus reads every port as all ones,
     /// which is what a bare chip with nothing plugged into it does.
     pub bus: devices::SharedBus,
+    /// The journal of the steps the machine can undo.
+    ///
+    /// It is off until [`Cpu::enable_history`] turns it on: the headless
+    /// runner never rewinds the machine, and it pays nothing for a
+    /// journal it does not keep.
+    pub history: History,
+    /// How deep the machine is in the calls it made.
+    ///
+    /// A call goes in and a return comes out, and the step over asks how
+    /// deep the machine is to know where the call returns. A return
+    /// without a call takes the count below zero: the guest's business,
+    /// and not a panic.
+    pub call_depth: i32,
 }
 
 /// Why the CPU stopped.
@@ -97,7 +113,7 @@ impl Cpu {
     /// bit 1 is a fixed one on every x86 rather than a storage bit.
     #[must_use]
     pub fn new() -> Self {
-        Self {
+        let mut cpu = Self {
             regs: Registers::new(),
             mem: Memory::new(),
             seg_override: None,
@@ -105,7 +121,30 @@ impl Cpu {
             halted: false,
             stop_reason: StopReason::None,
             bus: devices::empty_bus(),
-        }
+            history: History::default(),
+            call_depth: 0,
+        };
+        // The machine starts in the emulator's own default video mode: the
+        // BIOS data area holds the geometry from the moment the machine
+        // starts.
+        bios::init(&mut cpu);
+        cpu
+    }
+
+    /// Turn the journal on, so that the machine can be rewound.
+    ///
+    /// The journal keeps [`MAXIMUM_STEPS_BACK`] steps: the debugger's
+    /// step back is one instruction, and a long run must not grow the
+    /// machine's memory without end.
+    pub fn enable_history(&mut self) {
+        self.history = History::new(MAXIMUM_STEPS_BACK);
+        self.mem.set_logging(true);
+    }
+
+    /// Turn the journal off, and let go of the steps it holds.
+    pub fn disable_history(&mut self) {
+        self.history = History::default();
+        self.mem.set_logging(false);
     }
 
     /// Take an `INT n`, the way an 8086 does.
@@ -140,13 +179,66 @@ impl Cpu {
         self.regs.set_segment(Seg::Cs, segment);
         self.regs.ip = offset;
         self.stop_reason = StopReason::Interrupt(n);
+        // The interrupt is a call: the `IRET` that comes back out of it
+        // takes the depth down again.
+        self.call_depth = self.call_depth.saturating_add(1);
     }
 
     /// Execute exactly one instruction.
     pub fn step(&mut self) -> Result<StepInfo, exec::ExecError> {
+        // The journal keeps the state the machine had before the step, so
+        // it is taken before the step changes anything — and only when the
+        // journal is on: a machine that never rewinds pays nothing for it.
+        let undo = self.history.is_enabled().then(|| history::Undo {
+            regs: self.regs,
+            writes: Vec::new(),
+            halted: self.halted,
+            stop_reason: self.stop_reason,
+            call_depth: self.call_depth,
+        });
+        // The log holds the writes of this instruction alone.
+        self.mem.clear_writes();
         self.stop_reason = StopReason::None;
         self.halted = false;
-        exec::step(self)
+        let outcome = exec::step(self);
+        if let Some(mut undo) = undo {
+            if self.mem.is_truncated() {
+                // The step wrote more than the journal can hold: the
+                // machine's memory has moved past it and cannot be put
+                // back, so the journal breaks — and the log keeps
+                // nothing, because the step's writes are gone.
+                self.history.mark_broken();
+                self.mem.take_writes();
+            } else {
+                undo.writes = self.mem.take_writes();
+                self.history.push(undo);
+            }
+        } else {
+            // The journal is off: the log keeps nothing, and the machine
+            // pays nothing for it.
+            self.mem.clear_writes();
+        }
+        outcome
+    }
+
+    /// Rewind the machine one instruction.
+    ///
+    /// The journal puts back the registers, the flags, `IP`, the depth of
+    /// the calls and the bytes the instruction wrote, so the machine is
+    /// where it was before it.
+    ///
+    /// It is `false` when there is nothing to rewind — the journal is
+    /// empty or off — and nothing changes when it is.
+    pub fn step_back(&mut self) -> bool {
+        let Some(undo) = self.history.pop() else {
+            return false;
+        };
+        self.regs = undo.regs;
+        self.halted = undo.halted;
+        self.stop_reason = undo.stop_reason;
+        self.call_depth = undo.call_depth;
+        self.mem.restore(&undo.writes);
+        true
     }
 }
 

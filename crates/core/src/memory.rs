@@ -5,6 +5,8 @@
 //! That truncation is not an edge case to be normalised away — it is the
 //! documented behaviour, and the reason the 640 KiB DOS limit exists.
 
+use crate::history::MAXIMUM_WRITES;
+
 /// Physical address space of the 8086: 2^20 bytes.
 pub const ADDR_SPACE: usize = 1 << 20;
 
@@ -22,6 +24,26 @@ pub struct Memory {
     /// of the value that was already there is still a write, and comparing
     /// the memory before and after would not see it.
     pub last_write: Option<(u16, u16, u8)>,
+    /// The bytes the instructions wrote, and the value they held.
+    ///
+    /// The addresses are physical: the journal needs them to undo a step,
+    /// and the byte an instruction wrote has to go back to the value it
+    /// had.
+    writes: Vec<(u32, u8)>,
+    /// Whether the log had to leave a write out.
+    ///
+    /// A guest that writes a megabyte in one instruction would put a
+    /// megabyte in the log, and the journal would hold a megabyte for
+    /// every step it keeps. The log stops at
+    /// [`MAXIMUM_WRITES`](crate::history::MAXIMUM_WRITES) entries and says
+    /// so, and the step that wrote too much cannot be undone.
+    truncated: bool,
+    /// Whether the write log is kept at all.
+    ///
+    /// The log belongs to the journal: the core's `enable_history` turns
+    /// it on and `disable_history` turns it off, so a machine that never
+    /// rewinds keeps nothing and its memory stays flat.
+    logging: bool,
 }
 
 impl std::fmt::Debug for Memory {
@@ -45,6 +67,9 @@ impl Memory {
         Self {
             bytes: Box::new([0; ADDR_SPACE]),
             last_write: None,
+            writes: Vec::new(),
+            truncated: false,
+            logging: false,
         }
     }
 
@@ -65,8 +90,27 @@ impl Memory {
 
     /// Write one byte through a `segment:offset` pair.
     pub fn write_u8(&mut self, segment: u16, offset: u16, value: u8) {
-        self.bytes[Self::physical(segment, offset) as usize] = value;
+        let at = Self::physical(segment, offset);
+        if self.logging {
+            self.log(at);
+        }
+        self.bytes[at as usize] = value;
         self.last_write = Some((segment, offset, 1));
+    }
+
+    /// Keep the byte a write is about to change, and the value it had.
+    ///
+    /// The log holds the writes of one instruction alone, and it holds at
+    /// most [`MAXIMUM_WRITES`](crate::history::MAXIMUM_WRITES) of them: a
+    /// guest must not make the log grow without end. A write that does
+    /// not fit is left out, and the log says so.
+    fn log(&mut self, at: u32) {
+        if self.writes.len() >= MAXIMUM_WRITES {
+            self.truncated = true;
+            return;
+        }
+        let old = self.bytes[at as usize];
+        self.writes.push((at, old));
     }
 
     /// Read a little-endian word through a `segment:offset` pair.
@@ -90,6 +134,10 @@ impl Memory {
         let low = Self::physical(segment, offset);
         let high = Self::physical(segment, offset.wrapping_add(1));
         let [lo, hi] = value.to_le_bytes();
+        if self.logging {
+            self.log(low);
+            self.log(high);
+        }
         self.bytes[low as usize] = lo;
         self.bytes[high as usize] = hi;
         self.last_write = Some((segment, offset, 2));
@@ -114,6 +162,57 @@ impl Memory {
     pub fn slice(&self, physical: u32, len: usize) -> &[u8] {
         let start = (physical & BUS_MASK) as usize;
         &self.bytes[start..start + len]
+    }
+
+    /// Forget the writes the log holds.
+    ///
+    /// The log holds the writes of one instruction alone: the ones the
+    /// last instruction left, and the ones a caller wrote outside an
+    /// instruction, go when the next step begins.
+    pub fn clear_writes(&mut self) {
+        self.writes.clear();
+        self.truncated = false;
+    }
+
+    /// Keep the write log, or keep nothing.
+    ///
+    /// The log belongs to the journal: the core's `enable_history` turns
+    /// it on and `disable_history` turns it off.
+    pub(crate) fn set_logging(&mut self, on: bool) {
+        self.logging = on;
+    }
+
+    /// Whether the log had to leave a write out.
+    #[must_use]
+    pub fn is_truncated(&self) -> bool {
+        self.truncated
+    }
+
+    /// Take the writes the log holds out of it.
+    pub fn take_writes(&mut self) -> Vec<(u32, u8)> {
+        std::mem::take(&mut self.writes)
+    }
+
+    /// Put the bytes back, the way they were.
+    ///
+    /// The bytes go straight into the memory: a restore is not an
+    /// instruction, and the journal must not log it. The writes are undone
+    /// in reverse order, because the first value a byte held is the one
+    /// that must survive: a byte the instruction wrote twice holds the
+    /// value it had before the first write only if the last write is
+    /// undone first.
+    pub fn restore(&mut self, writes: &[(u32, u8)]) {
+        for (at, value) in writes.iter().rev() {
+            // An address outside the address space is refused: the memory
+            // is a fixed array, and a caller that hands it a number the
+            // bus cannot reach must not write outside it.
+            let Some(byte) = self.bytes.get_mut(*at as usize) else {
+                continue;
+            };
+            *byte = *value;
+        }
+        // The restored bytes are not the write the register names any more.
+        self.last_write = None;
     }
 }
 

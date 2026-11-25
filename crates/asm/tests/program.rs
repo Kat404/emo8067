@@ -1,6 +1,6 @@
 //! A program, assembled.
 
-use emo8067_asm::program::{Error, Register, assemble_program};
+use emo8067_asm::program::{Error, Register, SourceLine, assemble_program};
 
 #[test]
 fn a_program_knows_where_it_starts_and_what_it_holds() {
@@ -494,6 +494,93 @@ fn a_prefixed_jump_reaches_the_same_label() {
     // The prefix is a byte of the jump, so the short jump ends at three and
     // the label is at four: the displacement is one.
     assert_eq!(program.bytes, vec![0xF3, 0x74, 0x01, 0x90, 0x90]);
+}
+
+/// The program carries its source: where every line landed.
+///
+/// The source strip of the TUI is a view of this, so the numbers, the
+/// addresses and the lengths have to be the ones the program itself has.
+/// A line that produces no bytes - a comment, a directive, a label on a
+/// line of its own - is not in the list: there is no address for it.
+#[test]
+fn the_program_carries_where_every_line_landed() {
+    let program = assemble_program(
+        "org 100h\n\
+         ; a comment is not a line of the program\n\
+         mov ax, 1\n\
+         here:\n\
+         nop\n\
+         db 'H', 0\n",
+    )
+    .unwrap();
+    assert_eq!(
+        program.lines,
+        vec![
+            SourceLine {
+                number: 3,
+                address: 0x100,
+                length: 3,
+                text: "mov ax, 1".to_string(),
+            },
+            SourceLine {
+                number: 5,
+                address: 0x103,
+                length: 1,
+                text: "nop".to_string(),
+            },
+            SourceLine {
+                number: 6,
+                address: 0x104,
+                length: 2,
+                text: "db 'H', 0".to_string(),
+            },
+        ],
+    );
+    assert!(
+        !program.lines.iter().any(|line| line.number == 4),
+        "the label on a line of its own has no address, so it is not in the list"
+    );
+}
+
+/// The lines of a macro carry the number of the call.
+///
+/// The body of a macro is somewhere else in the source, and an expansion is
+/// not a line of the source at all: the number it carries is the number of
+/// the line that called it.
+#[test]
+fn the_lines_of_a_macro_carry_the_number_of_the_call() {
+    let program = assemble_program(
+        "MACRO twice value\n\
+         mov ax, value\n\
+         add ax, value\n\
+         ENDM\n\
+         nop\n\
+         twice 5\n",
+    )
+    .unwrap();
+    assert_eq!(
+        program.lines,
+        vec![
+            SourceLine {
+                number: 5,
+                address: 0,
+                length: 1,
+                text: "nop".to_string(),
+            },
+            SourceLine {
+                number: 6,
+                address: 1,
+                length: 3,
+                text: "mov ax, 5".to_string(),
+            },
+            SourceLine {
+                number: 6,
+                address: 4,
+                length: 3,
+                text: "add ax, 5".to_string(),
+            },
+        ],
+    );
 }
 
 /// The opcode the guide's table gives a short jump.
