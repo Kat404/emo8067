@@ -344,9 +344,9 @@ registers with no state of its own.
   deleted and recorded again.
 - **T2** — The keyboard of the BIOS: `INT 16h`. Route: delegated, one
   bounded writer, one commit, one independent verifier. **CHOSEN
-  2026-11-25; THE FOUR DECISIONS ARE THE MAINTAINER'S**, taken the same day
-  through the question tool, and the specs S12-S21 above are written from
-  them. The decisions, verbatim:
+  2026-11-25; DONE AND REVIEWED** — the four decisions are the
+  maintainer's, taken the same day through the question tool, and the specs
+  S12-S21 above are written from them. The decisions, verbatim:
   - "Área de datos del BIOS (0040:001A-0031)" — the buffer lives in the BIOS
     data area, at the IBM PC's conventional offsets.
   - "Inyección del host: TUI + guion del CLI" — the keystrokes come from
@@ -383,6 +383,61 @@ registers with no state of its own.
     first attempt.
 
 ## Log
+
+- **L7 (2026-11-25).** The native review of the unit: four lenses, a
+  refuter and a targeted validator, and the authority burned.
+  - **What the review found.** The risk lens and the reliability lens
+    reported the same CRITICAL: `keyboard_end` derived the ring's end with
+    an unchecked `u16` addition of the size word, which is the guest's own,
+    so a guest that wrote `0xFFE2` into `0040:0030` and called `INT 16h`
+    killed the emulator with "attempt to add with overflow". **It is the
+    sibling of the `SP + 4` this unit had already fixed**, and the parent
+    had read the same class in the diff and missed this one. The refuter
+    corroborated both claims, and the parent reproduced it:
+    `cargo run -p emo8067-cli -- run --ds 0040 size.asm` panicked with
+    exit 101.
+  - **The correction** — one bounded correction, the budget's 200 lines:
+    the size word's addition is checked now (`KEYBOARD_BUFFER.checked_add(size)?`),
+    and a size that would leave the segment leaves the buffer empty, which
+    is what S14 asks of every value the BIOS reads from that area. The probe
+    `s14_a_guest_that_scribbles_the_size_word_sees_an_empty_buffer` pins it:
+    RED (the overflow panic on the unfixed code) and GREEN (19/19). The
+    commit is `3c5741e`, and the targeted validator passed both
+    `original_criteria` and `correction_regression`.
+  - **The review is closed and its authority burned**: the acknowledgement
+    was the exact one the bound STATUS named, and the envelope says
+    `authority: burned`.
+  - **The advisories are not corrections.** The review's own words: "Every
+    finding listed here is non-blocking... Treat them as separate later
+    work, never as a reason to re-run review on this candidate."
+    **What the follow-up commit took**: the key mapper's catch-all no
+    longer turns an unnamed key into a NUL keystroke (three lenses
+    reported it, and the code contradicted its own doc comment); the CLI
+    says out loud the keys of a script that never reached the guest; the
+    CLI's own test now passes the option its name claims; the ring's end
+    comes from the validated ends once instead of being derived twice
+    with an unreachable fallback; and the test helper wraps the tail the
+    way the door does. **What is left, accepted**: the TUI's help names the
+    keys in its header ("keys · the rest go to the guest"), because a line
+    of the list may be 39 characters at most; the TUI still drops a
+    keystroke silently when the guest's buffer is full, because this
+    project has no bell; the probes re-declare the layout's offsets on
+    purpose, so that they do not lean on the implementation's constants; and
+    the quit keys are matched twice, which is a duplication and not a
+    defect.
+  - **The tooling, for whoever runs the next review here.** The OpenCode
+    host relay refuses at the `start` operation with the typed frame
+    `provider_failed`, **but the reviewer task runs anyway** and its result
+    arrives as a background result. The prompt must be the provider's exact
+    `GENTLE_AI_REVIEW_BINDING` line: a prompt that only points at a file is
+    refused with `binding_mismatch` **before the session is created**, so
+    the task never runs and the desktop card lies about it. The refuter's
+    and the validator's results are captured with
+    `gentle-ai review capture-refuter --input <file> --agent pi` (and
+    `capture-validation`): `--execute --agent pi` fails because the role's
+    agent is not installed for pi, `--execute --agent claude-code` fails
+    because that CLI is not logged in, and `--input --agent opencode` is
+    refused because opencode has no role capture contract.
 
 - **L6 (2026-11-25).** The verification round: one blocker from the
   independent verifier, three more from the parent's own reading of the

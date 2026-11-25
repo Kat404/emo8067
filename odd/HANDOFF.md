@@ -5,7 +5,7 @@ Written 2026-10-15 at the end of a long session, and kept current since: the
 units with it, and the 2026-11-10 unit that closed the three families the
 full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
 window, and the 2026-11-24 unit that gave it the guest's screen, and the
-2026-11-25 unit that is giving the BIOS its keyboard.
+2026-11-25 unit that gave the BIOS its keyboard.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
 
@@ -66,6 +66,15 @@ door, the TUI's forwarding and the runner's `--keys` script. Branch
   table had the same mistake the code had, and confirmed the table it was
   meant to check. **A verifier that builds its own oracle from the same
   intuition as the code confirms the code's bug.**
+- **The native review of the unit is closed and its authority burned.**
+  Four lenses, a refuter and a targeted validator. It found one CRITICAL —
+  the size word the guest writes could take the ring's end out of the
+  segment and overflow the `u16` addition, which killed the emulator the
+  same way the stack pointer had — and it is fixed in `3c5741e`, with the
+  targeted validator passing both its criteria. The acknowledgement was
+  the exact one the bound STATUS named. The advisories are not corrections:
+  the review says so itself, and the follow-up commit took the ones that
+  are this project's own errors.
 
 ## Where the 2026-11-24 work is
 
@@ -685,10 +694,6 @@ wins, so a device that writes a port byte does not reach the program.
     calls `4Bh`, `4Dh`, `48h` and `50h` "bios key codes". The specs are
     S12-S21 of `odd/tasks/video-bios.md` (T2, L5-L6), and the state is in
     "Where the 2026-11-25 work is" above.
-    **The graphics modes of the video BIOS** — `13h`, the page of graphics
-    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
-    unit, and the screen panel is a character grid that cannot show them
-    yet.
     **The graphics modes of the video BIOS** — `13h`, the page of graphics
     at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
     unit, and the screen panel is a character grid that cannot show them
