@@ -220,8 +220,90 @@ registers with no state of its own.
   moment the machine starts and the frames the `INT` pushes land on the
   stack — and the gate writes them when the file is absent, so they were
   deleted and recorded again.
+- **T2** — The keyboard of the BIOS: `INT 16h`. Route: delegated, one
+  bounded writer, one commit, one independent verifier. **CHOSEN
+  2026-11-25, NOT STARTED.** The maintainer's decision: "El teclado del
+  BIOS: INT 16h". It is the BIOS's other half, and the one the corpus
+  needs most — **sixty of the eighty-five reference programs call it**,
+  and without it those programs sit waiting for a key that never comes.
+  What the next session needs to know, and what it still has to decide:
+  - **The reference documents exactly two functions**
+    (`re/docs-txt/8086_bios_and_dos_interrupts.txt:304`-`:315`): `AH =
+    00h` gets a keystroke **without echo** and **removes it from the
+    keyboard buffer**, returning `AH` = the BIOS scan code and `AL` = the
+    ASCII character; `AH = 01h` checks for a keystroke, sets `ZF = 1`
+    when there is none, returns the same pair, and **does not remove**
+    the keystroke.
+  - **The keyboard buffer has no documented home.** The reference's own
+    memory map (`re/docs-txt/memory.txt`) gives the *video* state its
+    offsets in the data area and gives the **keyboard buffer none** —
+    `0040:001A`-`:0032` are not in it. So the video BIOS could keep its
+    state where the reference says it is, and the keyboard cannot. Two
+    candidates: the IBM PC's conventional BIOS keyboard buffer
+    (`0040:001A` head, `0040:001C` tail, `0040:001E` start, `0040:0030`
+    end, `0040:0031` size), or Rust state in the core fed by the host's
+    keyboard. **This is the unit's first design decision, and it is not
+    the parent's to make alone.**
+  - **Where the keystrokes come from is the second decision.** The TUI
+    has a keyboard — the terminal's own keys — and the headless runner
+    has none, and the reference's `INT 16h/00h` **waits** when the buffer
+    is empty ("if there is no character in the keyboard buffer, the
+    function waits until any key is pressed", `:339`). So the runner's
+    keyboard has to be decided: an empty buffer and programs that wait
+    until the budget ends them, or a buffer the runner can be given, or
+    something else. The eighty-five recorded states will move whatever
+    the answer is.
+  - **The scan code table needs its own evidence.** The reference's
+    document says only "AH = BIOS scan code" and never gives the table.
+    The IBM's set 1 is the obvious candidate, and the project's rule is
+    that a claim needs a source: either the published table or the
+    reference's own observed behaviour.
+  - **The BIOS's shape carries over.** The services live in
+    `crates/core/src/bios.rs`, the state in the data area where the
+    reference puts it, the `INT` is the 8086's, and the ROM's entry is
+    the vector's target. The keyboard's two functions are the same shape
+    of thing: the `INT` is the chip's `INT`, and the service answers
+    where the ROM is.
+  - **Do not forget the rule L2 states**: a hook that changes what an
+    instruction does is decided by the oracle, not by the brief. The
+    646 000-capture gate is the judge, and it is the one that caught the
+    first attempt.
 
 ## Log
+
+- **L4 (2026-11-25).** The session ends here, on the maintainer's word:
+  "deja de construir por hoy".
+  - **The decision.** The next unit is **the keyboard of the BIOS**,
+    `INT 16h` — sixty of the eighty-five reference programs call it, and
+    without it those programs wait for a key that never comes. It is
+    written as **T2** above, with what the reference documents, what its
+    own map does **not** document, and the two decisions the next
+    session has to make before it writes the specs.
+  - **Where the work stands.** Four commits on
+    `feat/tui-memory-window`: `dbc45f4` (the BIOS and the `INT` that is
+    the chip's), `be6d568` (the scroll moves the cells), `a894cb3` (the
+    guest's geometry is bounded by the hardware) and `2562881` (this
+    log). **781 passed, 0 failed**; the clippy run is clean in every
+    crate; `cargo fmt --all --check` exits 0; **the full gate over all
+    646 000 captures passes with no disagreement**, and the examples'
+    gate is green with the recorded states recorded again. Both remotes
+    carry the branch.
+  - **The native review of this unit is closed and its authority burned.**
+    Three lenses, a refuter and a targeted validator; one CRITICAL found
+    and fixed; the acknowledgement was the exact one the bound STATUS
+    named. The candidate that came after it — the bounded correction — is
+    **medium** with the reason `under_budget`, so it waits for a
+    high-risk commit or the maintainer's word, and it is not a reason to
+    re-review the one that was approved.
+  - **A note on the tooling, for whoever runs the next review here.** The
+    OpenCode host relay for the reviewer tasks refuses at the `start`
+    operation with the typed frame `provider_failed` **before it asks for
+    the prompt**, and the reviewer tasks run behind the refusal anyway.
+    The route that works on this host: submit the lens results with
+    `gentle-ai review capture-result --input`, and run the refuter and
+    the targeted validator with the `pi` runtime, which is the only one
+    with a role capture contract. The occurrence is reported on Gentle
+    AI's tracker.
 
 - **L1 (2026-11-24).** The maintainer chose the cut: the video BIOS.
   - **The choice.** "El BIOS de video: INT 10h", and the surface: the

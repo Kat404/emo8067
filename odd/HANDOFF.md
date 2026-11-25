@@ -603,10 +603,19 @@ wins, so a device that writes a port byte does not reach the program.
     design pass the maintainer asked for — functions first, design last
     — is done. What is left of the TUI is T17 (packaging and CI) and
     T18 (the GUI, the last stage).
-14. **What is left besides that.** **The graphics modes of the video
-    BIOS** — `13h`, the page of graphics at `A0000:B1000`, and the pixel
-    functions `0Ch`/`0Dh` — are their own unit, and the screen panel is
-    a character grid that cannot show them yet.
+14. **What is left besides that.** **The keyboard of the BIOS
+    (`INT 16h`)** is the next unit, chosen by the maintainer on
+    2026-11-25: sixty of the eighty-five reference programs call it, and
+    without it those programs sit waiting for a key that never comes. The
+    reference documents exactly two functions — `00h` gets a keystroke
+    and removes it from the buffer, `01h` checks for one and leaves it —
+    and its own memory map gives the keyboard buffer **no** home, so
+    where the buffer lives and where the keystrokes come from are the
+    unit's own decisions. The plan is `odd/tasks/video-bios.md` (T2).
+    **The graphics modes of the video BIOS** — `13h`, the page of graphics
+    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
+    unit, and the screen panel is a character grid that cannot show them
+    yet.
     `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
     fondo, the eighty-five examples run with their own baseline pinned;
     the assembler's build directives (`#make_bin#`, `#make_com#`,
