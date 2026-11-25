@@ -697,7 +697,11 @@ wins, so a device that writes a port byte does not reach the program.
     **The graphics modes of the video BIOS** — `13h`, the page of graphics
     at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
     unit, and the screen panel is a character grid that cannot show them
-    yet.
+    yet. **That is the next unit, chosen by the maintainer on 2026-11-25**,
+    and the construction paused there: "Los modos gráficos del BIOS (13h,
+    0Ch/0Dh) pero solo guarda la respuesta en memoria y en odd/,
+    seguiremos la construcción en otro momento". What the unit is and what
+    it will have to settle are in `odd/tasks/video-bios.md` (L8).
     `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
     fondo, the eighty-five examples run with their own baseline pinned;
     the assembler's build directives (`#make_bin#`, `#make_com#`,

@@ -384,6 +384,38 @@ registers with no state of its own.
 
 ## Log
 
+- **L8 (2026-11-25).** The next unit is chosen and the construction
+  pauses.
+  - **The decision**, the maintainer's own words: "Los modos gráficos del
+    BIOS (13h, 0Ch/0Dh) pero solo guarda la respuesta en memoria y en
+    odd/, seguiremos la construcción en otro momento". So: the unit is
+    recorded here and in the handoff, and the construction stops for now.
+  - **What the unit is.** The video BIOS's other half: the mode `13h`
+    (forty by twenty-five in 256 colours with a 320×200 framebuffer), the
+    page of graphics at `A0000:B1000` (`memory.txt:24`-`:27`), the
+    pixel's address (a row of 320 pixels in eight-pixel bytes), and the
+    pixel functions `0Ch` (write a pixel) and `0Dh` (read a pixel). The
+    corpus draws in it: `0_sample_vga_graphics.asm`, `pixel.asm`,
+    `attrib.asm`, `scroll.asm`.
+  - **What it will have to settle.** The screen panel is a grid of
+    characters, and a 320×200 framebuffer is not that: either the panel
+    draws pixels or the unit keeps to the BIOS's functions and the panel
+    comes later. The mode `13h` also changes the machine's geometry, and
+    the BIOS data area's own video state — the page's start, the rows —
+    has one shape for text and another for graphics. The reference
+    documents `0Ch` and `0Dh` in
+    `re/docs-txt/8086_bios_and_dos_interrupts.txt`, and its map gives the
+    page's home.
+  - **Where the work stands.** Branch `feat/bios-keyboard`, pushed to
+    GitHub and Codeberg at `4809944`: the unit (`47d2b4e`), the
+    verification round's log (`b112196`), the native review's correction
+    (`3c5741e`), the advisories' follow-up (`030756a`) and this log
+    (`4809944`). **822 passed, 0 failed**; clippy clean; `cargo fmt
+    --all --check` exits 0; the full gate over all 646 000 captures passes
+    with no family added. The unit's own native review is closed and its
+    authority burned; the follow-up commit's review is the one this
+    session opened last.
+
 - **L7 (2026-11-25).** The native review of the unit: four lenses, a
   refuter and a targeted validator, and the authority burned.
   - **What the review found.** The risk lens and the reliability lens
