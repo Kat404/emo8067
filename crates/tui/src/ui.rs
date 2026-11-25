@@ -127,7 +127,7 @@ pub const KEYS: [&str; 25] = [
     "e    edit the value under the cursor",
     "g    jump to an address, label, segment",
     "w    a watchpoint at the cursor",
-    "x    the guest's screen (x closes it)",
+    "x    the guest's screen (keys go to it)",
     "↑ ↓  move the cursor",
     "← →  move the cursor (registers, flags)",
     "PgUp PgDn  a page of memory",

@@ -1,4 +1,5 @@
-//! The video BIOS: the services of `INT 10h`.
+//! The BIOS: the video services of `INT 10h` and the keyboard services of
+//! `INT 16h`.
 //!
 //! The BIOS keeps **no state of its own**. Everything it knows lives in the
 //! BIOS data area at `0040:0000`, at the offsets the reference's own memory
@@ -20,6 +21,13 @@
 //! The text pages are the machine's own memory at `B800:0000`, four
 //! kilobytes apart: a page is read and written like any other memory, and
 //! what the guest wrote to it is what the panel shows.
+//!
+//! The keyboard's entry is the mirror of the video's, `F400:01C0`, and the
+//! reference's own map gives it too: "16 16x4 = 58 F400:01C0 - keyboard
+//! functions" (`memory.txt:66`). Its buffer is the BIOS data area as well:
+//! the **shape** is the IBM PC's — a head, a tail, a start and a size — and
+//! the **offsets** are this project's own, for the reference's own map
+//! documents none of them.
 
 use crate::Cpu;
 use crate::regs::{Reg8, Reg16, Seg};
@@ -45,15 +53,24 @@ pub const ENTRY_SEGMENT: u16 = 0xF400;
 /// The offset the video functions' entry is at.
 pub const ENTRY_OFFSET: u16 = 0x0190;
 
+/// The offset the keyboard functions' entry is at.
+///
+/// The mirror of the video's entry, and the reference's own map gives it:
+/// "16 16x4 = 58 F400:01C0 - keyboard functions" (`memory.txt:66`).
+pub const KEYBOARD_ENTRY_OFFSET: u16 = 0x01C0;
+
 /// The vector the BIOS's entry is installed at: `INT 10h`.
 const VECTOR: u8 = 0x10;
+
+/// The vector the keyboard's entry is installed at: `INT 16h`.
+const KEYBOARD_VECTOR: u8 = 0x16;
 
 /// The ROM's own byte at the entry: the `IRET` that comes out of the
 /// service.
 ///
 /// The services are native, so the ROM is one byte of this project's own
 /// code: the return that ends the handler.
-const ENTRY_BYTE: u8 = 0xCF;
+pub const ENTRY_BYTE: u8 = 0xCF;
 
 /// The columns the machine starts in: the equipment list's "80x25 CGA color
 /// (emulator default)".
@@ -93,6 +110,65 @@ const PAGE: u16 = 0x0062;
 const SHAPE: u16 = 0x0080;
 /// The offset of the rows on screen, minus one.
 const ROWS: u16 = 0x0084;
+
+/// The offset of the keyboard buffer's head.
+///
+/// The **shape** is the IBM PC's — a head, a tail, a start and a size in
+/// the BIOS data area — and the **offsets** are this project's own: the
+/// reference's own map documents none of them, for it gives the area
+/// `0040:0000`-`:0084` seven entries, all of video.
+const KEYBOARD_HEAD: u16 = 0x001A;
+/// The offset of the keyboard buffer's tail.
+const KEYBOARD_TAIL: u16 = 0x001C;
+/// The offset of the keyboard buffer's first entry: the ring's start.
+const KEYBOARD_BUFFER: u16 = 0x001E;
+/// The offset of the keyboard buffer's size, in bytes.
+const KEYBOARD_SIZE: u16 = 0x0030;
+
+/// The bytes the keyboard buffer's ring holds: nine two-byte entries.
+///
+/// The size word holds it, and the ring's end is derived from it. The
+/// word is outside the body, so the ring can never clobber it.
+const KEYBOARD_RING: u16 = 0x0012;
+
+/// The IBM PC's set 1 scan codes.
+///
+/// The set is the IBM's, and the corpus is the evidence inside the
+/// repository: `re/extracted/app/examples/snake.asm:37`-`:41` names the
+/// four arrow codes "bios key codes" (`4bh`, `4dh`, `48h`, `50h`) and
+/// compares the returned `AH` against them (`:143`, `:204`-`:211`).
+pub const SCAN_ESCAPE: u8 = 0x01;
+/// The scan code of the backspace key.
+pub const SCAN_BACKSPACE: u8 = 0x0E;
+/// The scan code of the tab key.
+pub const SCAN_TAB: u8 = 0x0F;
+/// The scan code of the enter key.
+pub const SCAN_ENTER: u8 = 0x1C;
+/// The scan code of the space bar.
+pub const SCAN_SPACE: u8 = 0x39;
+/// The scan code of the home key.
+pub const SCAN_HOME: u8 = 0x47;
+/// The scan code of the up arrow.
+pub const SCAN_UP: u8 = 0x48;
+/// The scan code of the page up key.
+pub const SCAN_PAGE_UP: u8 = 0x49;
+/// The scan code of the left arrow.
+pub const SCAN_LEFT: u8 = 0x4B;
+/// The scan code of the right arrow.
+pub const SCAN_RIGHT: u8 = 0x4D;
+/// The scan code of the end key.
+pub const SCAN_END: u8 = 0x4F;
+/// The scan code of the down arrow.
+pub const SCAN_DOWN: u8 = 0x50;
+/// The scan code of the page down key.
+pub const SCAN_PAGE_DOWN: u8 = 0x51;
+/// The scan code of the insert key.
+pub const SCAN_INSERT: u8 = 0x52;
+/// The scan code of the delete key.
+pub const SCAN_DELETE: u8 = 0x53;
+
+/// The scan code of a function key: `F1` is the first of the ten.
+pub const SCAN_FUNCTION_FIRST: u8 = 0x3B;
 
 /// The attribute the emulator's own text carries: light grey on black.
 ///
@@ -208,6 +284,171 @@ impl Cpu {
     fn set_data_word(&mut self, offset: u16, value: u16) {
         self.mem.write_u16(DATA_SEGMENT, offset, value);
     }
+
+    /// Where the keyboard buffer's ring ends.
+    ///
+    /// The size is the size word's, and the end is derived from it. The
+    /// data area is ordinary guest-writable memory, so the size is
+    /// validated before it is trusted: a size that is not even, or one
+    /// whose ring would reach the size word, leaves the buffer empty.
+    fn keyboard_end(&self) -> Option<u16> {
+        let size = self.data_word(KEYBOARD_SIZE);
+        if size == 0 || size % 2 != 0 || KEYBOARD_BUFFER + size > KEYBOARD_SIZE {
+            return None;
+        }
+        Some(KEYBOARD_BUFFER + size)
+    }
+
+    /// The head and the tail of the keyboard buffer, when they are offsets
+    /// of the ring.
+    ///
+    /// The head is the entry to read and the tail the entry to write, and
+    /// both hold **absolute** offsets, the way the IBM's own buffer holds
+    /// them: a guest that reads `0040:001A` sees where the buffer is.
+    fn keyboard_ends(&self) -> Option<(u16, u16)> {
+        let end = self.keyboard_end()?;
+        let head = self.data_word(KEYBOARD_HEAD);
+        let tail = self.data_word(KEYBOARD_TAIL);
+        let offset_of_the_ring =
+            |offset: u16| offset >= KEYBOARD_BUFFER && offset < end && offset % 2 == 0;
+        (offset_of_the_ring(head) && offset_of_the_ring(tail)).then_some((head, tail))
+    }
+
+    /// Put a keystroke into the keyboard buffer.
+    ///
+    /// This is the door the host writes through: the BIOS module owns the
+    /// buffer's layout, and the door it offers is the pair of the scan code
+    /// and the ASCII character.
+    ///
+    /// The answer says whether the keystroke was taken: a ring that is full
+    /// — one of its nine slots stays free, so that "the head equals the
+    /// tail" is unambiguously empty — drops the keystroke, and so does a
+    /// buffer whose ends the guest scribbled.
+    pub fn push_key(&mut self, scan_code: u8, ascii: u8) -> bool {
+        let Some((head, tail)) = self.keyboard_ends() else {
+            // The guest scribbled where the head and the tail live: the
+            // buffer is empty, and the keystroke has nowhere to go.
+            return false;
+        };
+        let Some(end) = self.keyboard_end() else {
+            return false;
+        };
+        let next = next_entry(tail, end);
+        if next == head {
+            // The ring is full: the keystroke is dropped.
+            return false;
+        }
+        self.set_data_byte(tail, ascii);
+        self.set_data_byte(tail + 1, scan_code);
+        self.set_data_word(KEYBOARD_TAIL, next);
+        true
+    }
+
+    /// How many keystrokes are waiting in the keyboard buffer.
+    ///
+    /// The other half of the door: what the host is told about the keys
+    /// the guest has not taken yet.
+    #[must_use]
+    pub fn keys_waiting(&self) -> usize {
+        let Some((head, tail)) = self.keyboard_ends() else {
+            return 0;
+        };
+        let Some(end) = self.keyboard_end() else {
+            return 0;
+        };
+        let size = end - KEYBOARD_BUFFER;
+        usize::from((tail + size - head) % size) / 2
+    }
+}
+
+/// The offset of the entry after the one at `offset`.
+///
+/// The ring wraps: the entry after the last one is the first one again.
+fn next_entry(offset: u16, end: u16) -> u16 {
+    if offset + 2 >= end {
+        KEYBOARD_BUFFER
+    } else {
+        offset + 2
+    }
+}
+
+/// The IBM PC's set 1 scan code of a character.
+///
+/// The table is the published one
+/// (`https://www.marjorie.de/ps2/scancode-set1.htm`, the table
+/// Wikipedia's "Scancode" article cites): the letters are **not**
+/// contiguous in it — the rows break at the bracket keys and at the `` ` ``
+/// and `\` keys — so `Q = 10h`, `E = 12h`, `I = 17h`, `Z = 2Ch` and
+/// `M = 32h`.
+///
+/// A character the shift made — `?`, `:`, `|`, the rest — has the code of
+/// the **key** it is on, the way the IBM's own BIOS answers: the shift
+/// itself lives in the `AH = 02h` service this unit does not have. A
+/// character the set has no code for has none either: the scan code is
+/// zero, and the ASCII character is what the guest reads.
+#[must_use]
+pub fn scan_code(character: u8) -> u8 {
+    match character {
+        // The number row: 1h to 0h, and the two keys after it. A
+        // character the shift made has the code of the key it is on.
+        b'1' | b'!' => 0x02,
+        b'2' | b'@' => 0x03,
+        b'3' | b'#' => 0x04,
+        b'4' | b'$' => 0x05,
+        b'5' | b'%' => 0x06,
+        b'6' | b'^' => 0x07,
+        b'7' | b'&' => 0x08,
+        b'8' | b'*' => 0x09,
+        b'9' | b'(' => 0x0A,
+        b'0' | b')' => 0x0B,
+        b'-' | b'_' => 0x0C,
+        b'=' | b'+' => 0x0D,
+        // The top letter row.
+        b'q' | b'Q' => 0x10,
+        b'w' | b'W' => 0x11,
+        b'e' | b'E' => 0x12,
+        b'r' | b'R' => 0x13,
+        b't' | b'T' => 0x14,
+        b'y' | b'Y' => 0x15,
+        b'u' | b'U' => 0x16,
+        b'i' | b'I' => 0x17,
+        b'o' | b'O' => 0x18,
+        b'p' | b'P' => 0x19,
+        b'[' | b'{' => 0x1A,
+        b']' | b'}' => 0x1B,
+        // The home row.
+        b'a' | b'A' => 0x1E,
+        b's' | b'S' => 0x1F,
+        b'd' | b'D' => 0x20,
+        b'f' | b'F' => 0x21,
+        b'g' | b'G' => 0x22,
+        b'h' | b'H' => 0x23,
+        b'j' | b'J' => 0x24,
+        b'k' | b'K' => 0x25,
+        b'l' | b'L' => 0x26,
+        b';' | b':' => 0x27,
+        b'\'' | b'"' => 0x28,
+        b'`' | b'~' => 0x29,
+        // The key between the two lower rows, and the bottom row.
+        b'\\' | b'|' => 0x2B,
+        b'z' | b'Z' => 0x2C,
+        b'x' | b'X' => 0x2D,
+        b'c' | b'C' => 0x2E,
+        b'v' | b'V' => 0x2F,
+        b'b' | b'B' => 0x30,
+        b'n' | b'N' => 0x31,
+        b'm' | b'M' => 0x32,
+        b',' | b'<' => 0x33,
+        b'.' | b'>' => 0x34,
+        b'/' | b'?' => 0x35,
+        // And the keys that are not characters of their own.
+        b' ' => SCAN_SPACE,
+        b'\t' => SCAN_TAB,
+        b'\r' | b'\n' => SCAN_ENTER,
+        0x08 => SCAN_BACKSPACE,
+        0x1B => SCAN_ESCAPE,
+        _ => 0,
+    }
 }
 
 /// The state the machine starts with, and the BIOS it starts with.
@@ -235,6 +476,19 @@ pub fn init(cpu: &mut Cpu) {
     cpu.mem.write_u16(0x0000, at + 2, ENTRY_SEGMENT);
     // And the ROM's own byte at the entry.
     cpu.mem.write_u8(ENTRY_SEGMENT, ENTRY_OFFSET, ENTRY_BYTE);
+    // The keyboard's entry is the mirror of the video's, and the machine
+    // installs its vector the same way.
+    let at = u16::from(KEYBOARD_VECTOR) * 4;
+    cpu.mem.write_u16(0x0000, at, KEYBOARD_ENTRY_OFFSET);
+    cpu.mem.write_u16(0x0000, at + 2, ENTRY_SEGMENT);
+    cpu.mem
+        .write_u8(ENTRY_SEGMENT, KEYBOARD_ENTRY_OFFSET, ENTRY_BYTE);
+    // And the keyboard buffer: empty, and the layout this project chose.
+    // The head and the tail hold absolute offsets, so they point at the
+    // ring's first entry, and the size word holds the ring's size.
+    cpu.set_data_word(KEYBOARD_HEAD, KEYBOARD_BUFFER);
+    cpu.set_data_word(KEYBOARD_TAIL, KEYBOARD_BUFFER);
+    cpu.set_data_word(KEYBOARD_SIZE, KEYBOARD_RING);
 }
 
 /// The offset of a cell in the video memory.
@@ -593,6 +847,99 @@ fn write_string(cpu: &mut Cpu) {
 /// for is the one the page is already in. The service runs and the page is
 /// left as it is.
 fn toggle_intensity(_cpu: &mut Cpu) {}
+
+/// Run the keyboard services of `INT 16h`.
+///
+/// The machine reached the BIOS's entry through the interrupt vector, the
+/// way it reaches any handler, and the service runs here: this project's
+/// own code, at the address the vector names.
+///
+/// The answer says whether the machine may return: a service that waits
+/// for a keystroke keeps the machine at the entry, and the machine comes
+/// back to it on the next step, so the step budget still bounds the wait.
+pub fn keyboard_service(cpu: &mut Cpu) -> bool {
+    match cpu.regs.byte(Reg8::Ah) {
+        0x00 => get_keystroke(cpu),
+        0x01 => check_keystroke(cpu),
+        _ => true,
+    }
+}
+
+/// `AH = 00h` — get keystroke from keyboard (no echo).
+///
+/// "return: AH = BIOS scan code. AL = ASCII character. (if a keystroke is
+/// present, it is removed from the keyboard buffer)."
+///
+/// With an empty buffer the service waits: the machine stays at the
+/// entry, and it comes back to it on the next step.
+fn get_keystroke(cpu: &mut Cpu) -> bool {
+    let Some((scan_code, ascii)) = take_keystroke(cpu) else {
+        return false;
+    };
+    cpu.regs.set_byte(Reg8::Ah, scan_code);
+    cpu.regs.set_byte(Reg8::Al, ascii);
+    true
+}
+
+/// `AH = 01h` — check for keystroke in the keyboard buffer.
+///
+/// "return: ZF = 1 if keystroke is not available. ZF = 0 if keystroke
+/// available. AH = BIOS scan code. AL = ASCII character. (if a keystroke
+/// is present, it is not removed from the keyboard buffer)."
+///
+/// The service never waits: an empty buffer is an answer, not a wait.
+fn check_keystroke(cpu: &mut Cpu) -> bool {
+    match peek_keystroke(cpu) {
+        Some((scan_code, ascii)) => {
+            cpu.regs.set_byte(Reg8::Ah, scan_code);
+            cpu.regs.set_byte(Reg8::Al, ascii);
+            set_zero_flag(cpu, false);
+        }
+        None => set_zero_flag(cpu, true),
+    }
+    true
+}
+
+/// The keystroke at the head of the buffer, and the head moved past it.
+fn take_keystroke(cpu: &mut Cpu) -> Option<(u8, u8)> {
+    let keystroke = peek_keystroke(cpu)?;
+    let head = cpu.data_word(KEYBOARD_HEAD);
+    let end = cpu.keyboard_end()?;
+    cpu.set_data_word(KEYBOARD_HEAD, next_entry(head, end));
+    Some(keystroke)
+}
+
+/// The keystroke at the head of the buffer, and the buffer left as it is.
+fn peek_keystroke(cpu: &mut Cpu) -> Option<(u8, u8)> {
+    let (head, tail) = cpu.keyboard_ends()?;
+    if head == tail {
+        // The buffer is empty.
+        return None;
+    }
+    let ascii = cpu.data_byte(head);
+    let scan_code = cpu.data_byte(head + 1);
+    Some((scan_code, ascii))
+}
+
+/// Set the zero flag in the frame the `INT` pushed.
+///
+/// The `IRET` that comes out of the service restores the flags the `INT`
+/// pushed, so the flag the service answers with is set there: the frame's
+/// flags word is the one the `IRET` pops.
+///
+/// The address **wraps**: the frame's flags word is where the push put it,
+/// and a stack pointer near the segment's end puts it across the end.
+fn set_zero_flag(cpu: &mut Cpu, value: bool) {
+    let segment = cpu.regs.segment(Seg::Ss);
+    let at = cpu.regs.word(Reg16::Sp).wrapping_add(4);
+    let flags = cpu.mem.read_u16(segment, at);
+    let flags = if value {
+        flags | crate::flags::ZF
+    } else {
+        flags & !crate::flags::ZF
+    };
+    cpu.mem.write_u16(segment, at, flags);
+}
 
 #[cfg(test)]
 mod tests {

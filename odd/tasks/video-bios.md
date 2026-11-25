@@ -1,13 +1,17 @@
-# The video BIOS — `INT 10h`
+# The video BIOS — `INT 10h` — and the keyboard of the BIOS — `INT 16h`
 
-Objective: the video services `INT 10h`, in the core, so a guest that asks
-the BIOS for something gets it, and the guest's screen shows what the guest
-asked for. Branch: `feat/tui-memory-window`. Delivery: one commit, one
-independent verifier. Test runner: `cargo nextest run --workspace`.
+Objective: the BIOS's services, in the core, so a guest that asks the BIOS
+for something gets it: the video services `INT 10h` (T1) and the keyboard's
+`INT 16h` (T2). Branch: `feat/tui-memory-window` (T1), `feat/bios-keyboard`
+(T2, cut from `main`). Delivery: one commit and one independent verifier per
+unit. Test runner: `cargo nextest run --workspace`.
 
 **Risk: item 3** — the core's interrupt path is shared code that the runner,
 the CLI, the programs gate, the TUI and every program consume, and this unit
-changes what the machine does when a program calls `INT 10h`.
+changes what the machine does when a program calls `INT 10h`. T2 carries the
+same risk and one more of the same kind: it gives the core a door the host
+writes into, so the `Cpu` and the BIOS's data area become a contract that the
+TUI and the CLI consume.
 
 Written 2026-11-24. Continues `odd/tasks/tui.md` (T15, the guest's screen),
 whose passive viewer is what the BIOS's output is seen through.
@@ -151,6 +155,122 @@ registers with no state of its own.
   guest's stack and the guest's flags are where they were and the machine's
   depth of calls goes down as it came up — the way the `IRET` that comes out
   of an interrupt does.
+- **S12** — The `INT 16h` is the 8086's `INT`, exactly as the `INT 10h` is
+  (S1). It pushes FLAGS, CS and IP, it clears TF and IF, and it loads
+  `CS:IP` from the interrupt vector table. The BIOS is a handler at an
+  address: the machine installs the vector for `16h` when it starts, and the
+  entry is the one the reference's own map gives — "16 16x4 = 58 F400:01C0 -
+  keyboard functions" (`memory.txt:66`) — the mirror of the video entry
+  `F400:0190` (`memory.txt:60`). The ROM is this project's own code, and
+  the byte at the entry is the `IRET` that comes out of the service, the way
+  `F400:0190` holds the video's.
+- **S13** — The two services are the reference's own two, with the
+  reference's own register contracts, quoted verbatim from
+  `re/docs-txt/8086_bios_and_dos_interrupts.txt:304`-`:315`:
+  - `AH = 00h` — "get keystroke from keyboard (no echo)." "return: AH = BIOS
+    scan code. AL = ASCII character. (if a keystroke is present, it is
+    removed from the keyboard buffer)."
+  - `AH = 01h` — "check for keystroke in the keyboard buffer." "return: ZF =
+    1 if keystroke is not available. ZF = 0 if keystroke available. AH = BIOS
+    scan code. AL = ASCII character. (if a keystroke is present, it is not
+    removed from the keyboard buffer)."
+  No other `AH` is answered: the reference documents no other `INT 16h`
+  function, and the corpus calls no other.
+- **S14** — The keyboard buffer is the BIOS data area, at the offsets the
+  maintainer approved: the head at `0040:001A`, the tail at `0040:001C`,
+  the start at `0040:001E` and the size at `0040:0030` — the range
+  `0040:001A`-`:0031` and nothing outside it. The head and the tail hold
+  the **absolute** offsets of the entry to read and of the entry to write,
+  the way the IBM's own buffer holds them, so a guest that reads
+  `0040:001A` sees where the buffer is. The size word holds the ring's
+  size in bytes — `0012h`, eighteen — and the ring's end is derived from it
+  (`start` + `size`), not stored: the four words the range holds are the
+  head, the tail, the start and the size. The body is `0040:001E`-`:002F`:
+  nine two-byte entries, the ASCII character and the scan code.
+  **The reference's own map documents none of this**: `memory.txt` gives
+  the area `0040:0000`-`:0084` seven entries, all of video (`memory.txt:85`,
+  `:109`, `:115`, `:119`, `:123`, `:128`, `:132`). The **shape** is the IBM
+  PC's — a head, a tail, a start and a size in the BIOS data area — and the
+  offsets are this project's own, so the code says so where it is written.
+  The BIOS keeps no state of its own, as in S3: the buffer is the machine's
+  memory.
+  - **One slot stays free.** The ring holds nine slots, so that "the head
+    equals the tail" is unambiguously empty; the ninth slot is what tells
+    full from empty, and **eight keystrokes fit**. A keystroke that does
+    not fit is dropped. The reference detects the overflow and signals it
+    audibly (`odd/research/features-and-ux.md:153`, SCR-7); this project has
+    no bell.
+  - **The data area is guest-writable memory**, and every value the BIOS
+    reads from it is untrusted: the BIOS validates the head and the tail
+    against the ring before it trusts them, and a guest that scribbles there
+    sees an empty buffer, never a panic. The video BIOS learned this the
+    hard way — the guest's geometry overflowed `u16` and killed the
+    emulator — and the same rule holds here.
+- **S15** — The scan code is the IBM PC's set 1. The corpus is the evidence
+  inside the repository: `re/extracted/app/examples/snake.asm:37`-`:41`
+  names them "bios key codes" — `left equ 4bh`, `right equ 4dh`, `up equ
+  48h`, `down equ 50h` — and compares the returned `AH` against them (`:143`,
+  `:204`-`:211`); it is the only program of the eighty-five that reads `AH`
+  at all. The published table is the oracle for the rest: the set 1 table
+  at `https://www.marjorie.de/ps2/scancode-set1.htm`, the one Wikipedia's
+  "Scancode" article cites. **The letters are not contiguous in it** — the
+  rows break at the bracket keys and at the `` ` `` and `\` keys — so `Q =
+  10h`, `E = 12h`, `I = 17h`, `Z = 2Ch` and `M = 32h`; a table that counts
+  from `A = 1Eh` is not set 1's, and it is wrong for every letter but the
+  first. A character the shift made — `?`, `:`, `|`, the rest — has the code
+  of the **key** it is on (`35h`, `27h`, `2Bh`), the way the IBM's own BIOS
+  answers, because the shift itself lives in the `AH = 02h` service this
+  unit does not have.
+- **S16** — `AH = 00h` waits when the buffer is empty. The project's own
+  research says so of the reference: "`INT 16h/00h` blocks for a key,
+  `INT 16h/01h` polls the buffer" (`odd/research/features-and-ux.md:152`,
+  SCR-6), and the IBM's BIOS does. **The reference's own `INT 16h` block
+  says nothing about waiting**: the sentence "if there is no character in
+  the keyboard buffer, the function waits until any key is pressed"
+  (`8086_bios_and_dos_interrupts.txt:339`) belongs to the `INT 21h / AH=1`
+  block, not to `INT 16h`. That is a correction to the brief this task was
+  written from.
+  - **The wait costs the machine one step at a time.** The service stays at
+    the ROM's entry and the machine re-enters it on the next step, so the
+    step budget still bounds the run and the TUI still gets its turn between
+    steps. The wait never spins inside a single step. The 646 000-capture
+    gate is the judge of the shape (L2).
+- **S17** — `AH = 01h` never waits. With an empty buffer it sets ZF = 1 and
+  returns; with a keystroke it sets ZF = 0 and returns the pair **without**
+  removing the keystroke, and the next `AH = 00h` returns the same one. The
+  three programs that poll rely on this: `keybrd.asm:28`-`:30`,
+  `bintest.asm:68`, `snake.asm:133`.
+- **S18** — Where the keys come from: the host injects them. There is no
+  keyboard hardware in the emulator, and the core gains no channel, no thread
+  and no queue for it.
+  - **The TUI forwards the terminal's keys.** A key the TUI binds to a
+    debugger command is the debugger's, and every other key goes to the
+    guest's keyboard buffer. **When the guest's screen has the focus — the
+    takeover the `x` key gives it — the keys reach the guest as well, all
+    of them but the TUI's quit keys.** The takeover **adds** the guest's
+    keys, it does not take the debugger's away: the design document says
+    the debugger's own keys keep working while the takeover is open
+    (`design/DESIGN.md:90`-`:99`) and the tree's own tests pin it. The
+    arrows are the guest's most wanted key: `snake.asm` reads `48h`, `4Bh`,
+    `4Dh` and `50h`.
+  - **The headless runner takes the keys from a script** on the command line
+    (`--keys`), and it feeds the script as the guest consumes it, so a
+    script longer than the buffer works. With no script the runner has no
+    keyboard at all, and the guest waits (S16).
+- **S19** — The core's one door: a keystroke goes into the BIOS data area's
+  buffer, and the BIOS reads it from there. The BIOS module owns the
+  buffer's layout, so the door it offers is the pair of the scan code and
+  the ASCII character, and what it reports back is how many keystrokes are
+  waiting **and whether the keystroke it was given was taken**. The TUI and
+  the CLI use that door and nothing else.
+- **S20** — The recorded states move. The programs that ask the BIOS for a
+  key now run past it, and the ones that wait for a key that never comes end
+  with the step budget spent ("step budget exhausted"), which is not a
+  failure. The recorded states are this project's own (S9), so they are
+  recorded again.
+- **S21** — The help and the docs move with the change: the CLI's `--keys`
+  option is in the CLI's own help, and the TUI's help says which keys reach
+  the guest.
 
 ## Out of scope
 
@@ -165,8 +285,10 @@ registers with no state of its own.
 - **The reference's ROM.** `INT_VECT` and `BIOS_ROM` are the reference's own
   code, local gold that is never committed, and no code of the reference is
   ever copied.
-- **The keyboard.** `INT 16h` is in sixty of the examples and is the BIOS's
-  other half; it is not this unit.
+- **The keyboard's other functions.** The reference documents two `INT 16h`
+  functions and the corpus calls two (S13); the IBM's `AH = 02h` (the shift
+  flags), `AH = 05h` (storing a keystroke) and the enhanced-keyboard
+  functions are not in the reference's surface, so they are not in ours.
 
 ## Tasks
 
@@ -222,54 +344,85 @@ registers with no state of its own.
   deleted and recorded again.
 - **T2** — The keyboard of the BIOS: `INT 16h`. Route: delegated, one
   bounded writer, one commit, one independent verifier. **CHOSEN
-  2026-11-25, NOT STARTED.** The maintainer's decision: "El teclado del
-  BIOS: INT 16h". It is the BIOS's other half, and the one the corpus
-  needs most — **sixty of the eighty-five reference programs call it**,
-  and without it those programs sit waiting for a key that never comes.
-  What the next session needs to know, and what it still has to decide:
-  - **The reference documents exactly two functions**
-    (`re/docs-txt/8086_bios_and_dos_interrupts.txt:304`-`:315`): `AH =
-    00h` gets a keystroke **without echo** and **removes it from the
-    keyboard buffer**, returning `AH` = the BIOS scan code and `AL` = the
-    ASCII character; `AH = 01h` checks for a keystroke, sets `ZF = 1`
-    when there is none, returns the same pair, and **does not remove**
-    the keystroke.
-  - **The keyboard buffer has no documented home.** The reference's own
-    memory map (`re/docs-txt/memory.txt`) gives the *video* state its
-    offsets in the data area and gives the **keyboard buffer none** —
-    `0040:001A`-`:0032` are not in it. So the video BIOS could keep its
-    state where the reference says it is, and the keyboard cannot. Two
-    candidates: the IBM PC's conventional BIOS keyboard buffer
-    (`0040:001A` head, `0040:001C` tail, `0040:001E` start, `0040:0030`
-    end, `0040:0031` size), or Rust state in the core fed by the host's
-    keyboard. **This is the unit's first design decision, and it is not
-    the parent's to make alone.**
-  - **Where the keystrokes come from is the second decision.** The TUI
-    has a keyboard — the terminal's own keys — and the headless runner
-    has none, and the reference's `INT 16h/00h` **waits** when the buffer
-    is empty ("if there is no character in the keyboard buffer, the
-    function waits until any key is pressed", `:339`). So the runner's
-    keyboard has to be decided: an empty buffer and programs that wait
-    until the budget ends them, or a buffer the runner can be given, or
-    something else. The eighty-five recorded states will move whatever
-    the answer is.
-  - **The scan code table needs its own evidence.** The reference's
-    document says only "AH = BIOS scan code" and never gives the table.
-    The IBM's set 1 is the obvious candidate, and the project's rule is
-    that a claim needs a source: either the published table or the
-    reference's own observed behaviour.
-  - **The BIOS's shape carries over.** The services live in
-    `crates/core/src/bios.rs`, the state in the data area where the
-    reference puts it, the `INT` is the 8086's, and the ROM's entry is
-    the vector's target. The keyboard's two functions are the same shape
-    of thing: the `INT` is the chip's `INT`, and the service answers
-    where the ROM is.
+  2026-11-25; THE FOUR DECISIONS ARE THE MAINTAINER'S**, taken the same day
+  through the question tool, and the specs S12-S21 above are written from
+  them. The decisions, verbatim:
+  - "Área de datos del BIOS (0040:001A-0031)" — the buffer lives in the BIOS
+    data area, at the IBM PC's conventional offsets.
+  - "Inyección del host: TUI + guion del CLI" — the keystrokes come from
+    the host: the TUI forwards the terminal's keys, and the headless runner
+    takes a script.
+  - "Espera hasta que haya tecla" — `INT 16h/00h` waits when the buffer is
+    empty.
+  - "Set 1 del IBM" — the scan code table is the IBM's set 1.
+  - **The unit.** The `INT 16h` is the 8086's `INT` (S12): it pushes FLAGS,
+    CS and IP, it clears TF and IF, and it loads `CS:IP` from the vector
+    table. The BIOS is a handler at `F400:01C0` — the entry the reference's
+    own map gives for the keyboard (`memory.txt:66`), the mirror of the
+    video's `F400:0190` — the ROM is this project's own, and the byte at the
+    entry is the `IRET` that comes out of the service. The two services are
+    the reference's own two, with its own register contracts (S13). The
+    buffer is the BIOS data area at the IBM's conventional offsets (S14),
+    one slot kept free so that "the head equals the tail" is unambiguously
+    empty, and the head and the tail validated before they are trusted,
+    because the data area is guest-writable memory. The scan code is the
+    IBM's set 1 (S15), whose four arrow codes the corpus itself names.
+    `AH = 00h` waits, one step at a time, so the step budget still bounds
+    the run (S16); `AH = 01h` never waits and never removes the keystroke
+    (S17). The keys come from the host — the TUI forwards the terminal's
+    keys, the runner takes a script (S18) — through the one door the BIOS
+    module offers (S19). The recorded states move (S20) and the help moves
+    with the change (S21).
+  - **The files** are `crates/core/src/bios.rs`, `crates/core/src/lib.rs`,
+    `crates/core/src/exec.rs`, `crates/core/tests/bios.rs`,
+    `crates/cli/src/main.rs`, `crates/tui/src/app.rs`, `crates/tui/src/ui.rs`
+    and the docs that carry the help.
   - **Do not forget the rule L2 states**: a hook that changes what an
     instruction does is decided by the oracle, not by the brief. The
     646 000-capture gate is the judge, and it is the one that caught the
     first attempt.
 
 ## Log
+
+- **L5 (2026-11-25).** The keyboard's four decisions are the maintainer's,
+  and the specs S12-S21 are written from them.
+  - **The decisions**, the maintainer's answers verbatim: "Área de datos del
+    BIOS (0040:001A-0031)"; "Inyección del host: TUI + guion del CLI";
+    "Espera hasta que haya tecla"; "Set 1 del IBM". They are S12-S21 above,
+    and T2 above carries them.
+  - **What the research changed in the brief.** Three findings:
+    1. **The reference's own map DOES name the keyboard's entry**:
+       `memory.txt:66` — "16 16x4 = 58 F400:01C0 - keyboard functions" — the
+       mirror of the video's `F400:0190` (`memory.txt:60`). T2's brief said
+       the map gave the keyboard nothing; that is true of the **buffer** and
+       false of the **entry**. The buffer's offsets are still the IBM's
+       convention and still this project's assumption (S14); the entry is
+       the reference's own.
+    2. **The wait is not in the reference's `INT 16h` contract.** The
+       sentence "if there is no character in the keyboard buffer, the
+       function waits until any key is pressed" (`:339`) is inside the
+       `INT 21h / AH=1` block; the `INT 16h` section (`:304`-`:315`) says
+       nothing about waiting. The project's own research already had it
+       right — `odd/research/features-and-ux.md:152` (SCR-6): "`INT 16h/00h`
+       blocks for a key, `INT 16h/01h` polls the buffer" — and so does the
+       IBM's BIOS.
+    3. **The corpus is the scan code's evidence**: `snake.asm:37`-`:41`
+       calls `4Bh`, `4Dh`, `48h` and `50h` "bios key codes" and compares the
+       returned `AH` against them; it is the only one of the eighty-five
+       that reads `AH` at all. The census: **62** programs call `INT 16h`
+       (the brief said sixty), 79 call sites, 76 of them `AH = 00h` and 3 of
+       them `AH = 01h` — the three that poll first (`keybrd.asm`,
+       `bintest.asm`, `snake.asm`).
+  - **What the map found in the code.** The core has **no input surface at
+    all** — no channel, no keyboard, no queue; the only host doors are the
+    I/O port bus and the device socket. **23 of the 85 recorded states**
+    already stop with "took INT 0x16". The TUI consumes every key itself
+    (28 bound keys) and none of them ever reaches the `Cpu`. The headless
+    runner has an instruction budget (`100_000` by default) and no input
+    channel, and spending the budget is not a failure.
+  - **Where the work stands.** Branch `feat/bios-keyboard`, cut from `main`
+    at `5e4a702`; `main` and the merged feature branch have the same tree,
+    and both remotes carry `main` at `5e4a702`.
 
 - **L4 (2026-11-25).** The session ends here, on the maintainer's word:
   "deja de construir por hoy".

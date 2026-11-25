@@ -1,9 +1,9 @@
-//! The video BIOS: the services of `INT 10h`.
+//! The BIOS: the services of `INT 10h` and the services of `INT 16h`.
 //!
-//! One test per spec rule, S1 to S9. The BIOS keeps no state of its own:
-//! everything it knows lives in the BIOS data area at `0040:0000`, where the
-//! guest can read it, and every service is a function of the machine's
-//! memory and its registers.
+//! One test per spec rule, S1 to S9 for the video and S12 to S19 for the
+//! keyboard. The BIOS keeps no state of its own: everything it knows lives
+//! in the BIOS data area at `0040:0000`, where the guest can read it, and
+//! every service is a function of the machine's memory and its registers.
 //!
 //! The tests read the machine's own memory and the machine's own data area,
 //! never the BIOS's internals: what the guest can see is what is asserted.
@@ -28,6 +28,15 @@ const PAGE: u16 = 0x0062;
 const SHAPE: u16 = 0x0080;
 /// The rows on screen, minus one.
 const ROWS: u16 = 0x0084;
+
+/// The offset of the keyboard buffer's head.
+const HEAD: u16 = 0x001A;
+/// The offset of the keyboard buffer's tail.
+const TAIL: u16 = 0x001C;
+/// The offset of the keyboard buffer's first entry: the ring's start.
+const BUFFER: u16 = 0x001E;
+/// The offset of the keyboard buffer's size, in bytes.
+const SIZE: u16 = 0x0030;
 
 /// The segment the text pages live in.
 const VIDEO: u16 = 0xB800;
@@ -87,6 +96,42 @@ fn bios_twice(first: impl FnOnce(&mut Cpu), second: impl FnOnce(&mut Cpu)) -> Cp
     c.step().expect("the second service runs");
     run(&mut c);
     c
+}
+
+/// A machine that calls `INT 16h` once, with the registers the test sets
+/// before the call.
+fn int16(setup: impl FnOnce(&mut Cpu)) -> Cpu {
+    let mut c = machine(&[0xCD, 0x16, 0xF4]); // int 16h; hlt
+    setup(&mut c);
+    run(&mut c);
+    c
+}
+
+/// A machine that calls `INT 16h` twice: the first call with the registers
+/// the first closure sets, the second with the registers the second one
+/// sets.
+///
+/// It is one machine throughout, so the first call's state is the second
+/// call's state.
+fn int16_twice(first: impl FnOnce(&mut Cpu), second: impl FnOnce(&mut Cpu)) -> Cpu {
+    let mut c = machine(&[0xCD, 0x16, 0xCD, 0x16, 0xF4]); // int 16h; int 16h; hlt
+    first(&mut c);
+    c.step().expect("the first call runs");
+    c.step().expect("the first service runs");
+    second(&mut c);
+    c.step().expect("the second call runs");
+    c.step().expect("the second service runs");
+    run(&mut c);
+    c
+}
+
+/// Put a keystroke into the keyboard buffer, the way the host's door puts
+/// it there: the ASCII character and the scan code, at the tail.
+fn press(c: &mut Cpu, scan_code: u8, ascii: u8) {
+    let tail = c.mem.read_u16(DATA, TAIL);
+    c.mem.write_u8(DATA, tail, ascii);
+    c.mem.write_u8(DATA, tail + 1, scan_code);
+    c.mem.write_u16(DATA, TAIL, tail + 2);
 }
 
 /// The character at a cell of a page.
@@ -848,5 +893,399 @@ fn a_machine_with_no_geometry_has_no_page_to_write_on() {
         cpu.mem.read_u8(VIDEO, 0x0000),
         0,
         "nothing was written: the machine has no page"
+    );
+}
+
+/// S12 — The `INT 16h` is the 8086's `INT`, exactly as the `INT 10h` is.
+///
+/// It pushes FLAGS, CS and IP, it clears TF and IF, and it loads `CS:IP`
+/// from the interrupt vector table. The BIOS is a handler at an address:
+/// the entry is the one the reference's own map gives — "16 16x4 = 58
+/// F400:01C0 - keyboard functions" (`memory.txt:66`) — and the ROM's own
+/// byte at the entry is the `IRET` that comes out of the service.
+#[test]
+fn s12_the_int_16h_pushes_the_frame_and_vectors() {
+    let mut c = machine(&[0xCD, 0x16, 0xF4]);
+    c.regs.set_word(Reg16::Sp, 0x0100);
+    c.regs.flags.set(flags::TF, true);
+    c.regs.flags.set(flags::IF, true);
+    let flags = c.regs.flags.0;
+    c.step().expect("the interrupt runs");
+
+    // The stack is six bytes lower: the frame is three words.
+    assert_eq!(c.regs.word(Reg16::Sp), 0x0100 - 6, "the frame was pushed");
+    // And the frame holds what the machine pushed: FLAGS, then CS, then IP.
+    assert_eq!(
+        c.mem.read_u16(CODE, 0x00FE),
+        flags | flags::UNDEFINED,
+        "the flags word is on the top of the stack"
+    );
+    assert_eq!(
+        c.mem.read_u16(CODE, 0x00FC),
+        CODE,
+        "and the machine's own code segment under it"
+    );
+    assert_eq!(
+        c.mem.read_u16(CODE, 0x00FA),
+        0x0002,
+        "and the instruction after the call under that"
+    );
+    // The machine is at the vector table's entry: the keyboard's.
+    assert_eq!(
+        c.regs.segment(Seg::Cs),
+        c.mem.read_u16(0x0000, 0x005A),
+        "the machine is at the vector's segment"
+    );
+    assert_eq!(
+        c.regs.ip,
+        c.mem.read_u16(0x0000, 0x0058),
+        "and at the vector's offset"
+    );
+    assert_eq!(c.regs.segment(Seg::Cs), 0xF400, "the BIOS's own segment");
+    assert_eq!(c.regs.ip, 0x01C0, "and the keyboard's own entry");
+    // TF and IF are cleared, the way the chip clears them.
+    assert!(!c.regs.flags.get(flags::TF), "TF is cleared");
+    assert!(!c.regs.flags.get(flags::IF), "IF is cleared");
+    // And the ROM's own byte at the entry is the `IRET` that comes out of
+    // the service.
+    assert_eq!(
+        c.mem.read_u8(0xF400, 0x01C0),
+        0xCF,
+        "the ROM's byte at the entry is the IRET"
+    );
+}
+
+/// S13 — The two services are the reference's own two, with the reference's
+/// own register contracts.
+#[test]
+fn s13_the_two_services_have_the_reference_own_register_contracts() {
+    // AH = 00h — get keystroke from keyboard (no echo). "return: AH = BIOS
+    // scan code. AL = ASCII character. (if a keystroke is present, it is
+    // removed from the keyboard buffer)."
+    let c = int16(|c| {
+        press(c, 0x1E, b'A');
+        c.regs.set_byte(Reg8::Ah, 0x00);
+    });
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x1E, "AH = the BIOS scan code");
+    assert_eq!(c.regs.byte(Reg8::Al), b'A', "AL = the ASCII character");
+    assert_eq!(
+        c.mem.read_u16(DATA, HEAD),
+        BUFFER + 2,
+        "and the keystroke is removed from the buffer"
+    );
+
+    // AH = 01h — check for keystroke in the keyboard buffer. "return: ZF =
+    // 1 if keystroke is not available. ZF = 0 if keystroke available. AH =
+    // BIOS scan code. AL = ASCII character. (if a keystroke is present, it
+    // is not removed from the keyboard buffer)."
+    let c = int16(|c| {
+        press(c, 0x1E, b'A');
+        c.regs.set_byte(Reg8::Ah, 0x01);
+    });
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x1E, "AH = the BIOS scan code");
+    assert_eq!(c.regs.byte(Reg8::Al), b'A', "AL = the ASCII character");
+    assert_eq!(
+        c.mem.read_u16(DATA, HEAD),
+        BUFFER,
+        "and the keystroke is not removed from the buffer"
+    );
+
+    // No other `AH` is answered: the reference documents no other `INT
+    // 16h` function, and the corpus calls no other.
+    let c = int16(|c| {
+        press(c, 0x1E, b'A');
+        c.regs.set_byte(Reg8::Ah, 0x02);
+    });
+    assert_eq!(
+        c.mem.read_u16(DATA, HEAD),
+        BUFFER,
+        "a function the BIOS has no service for takes nothing out"
+    );
+    assert_eq!(
+        c.regs.ip, 0x0003,
+        "and the program carries on past the call"
+    );
+}
+
+/// S14 — The keyboard buffer is the BIOS data area, at the offsets the
+/// maintainer approved.
+///
+/// The head is at `0040:001A`, the tail at `0040:001C`, the start at
+/// `0040:001E` and the size at `0040:0030`. The head and the tail hold
+/// the **absolute** offsets of the entry to read and of the entry to
+/// write, and the size word holds the ring's size in bytes — `0012h`,
+/// eighteen. The body is nine two-byte entries — the ASCII character and
+/// the scan code — and one slot stays free, so the ring holds eight
+/// keystrokes and the ninth is dropped. The data area is guest-writable
+/// memory, so the head and the tail are validated before they are trusted.
+#[test]
+fn s14_the_buffer_is_the_bios_data_area() {
+    let c = Cpu::new();
+
+    // The layout this project chose: the shape is the IBM PC's, and the
+    // offsets are its own — the reference's own map documents none of them.
+    assert_eq!(
+        c.mem.read_u16(DATA, HEAD),
+        BUFFER,
+        "the head is at 0040:001A and it points at the ring's first entry"
+    );
+    assert_eq!(
+        c.mem.read_u16(DATA, TAIL),
+        BUFFER,
+        "the tail is at 0040:001C and it points at it too: the buffer is empty"
+    );
+    assert_eq!(
+        c.mem.read_u16(DATA, SIZE),
+        0x12,
+        "the size is at 0040:0030 and it is eighteen bytes: nine entries"
+    );
+
+    // The body is two bytes an entry: the ASCII character and the scan
+    // code, and the head and the tail are the absolute offsets of the
+    // entries to read and to write.
+    let c = int16(|c| {
+        press(c, 0x1E, b'A');
+        c.regs.set_byte(Reg8::Ah, 0x01);
+    });
+    assert_eq!(c.mem.read_u8(DATA, BUFFER), b'A', "the character is first");
+    assert_eq!(c.mem.read_u8(DATA, BUFFER + 1), 0x1E, "and the scan code");
+    assert_eq!(
+        c.mem.read_u16(DATA, TAIL),
+        BUFFER + 2,
+        "and the tail moved two bytes on"
+    );
+    assert_eq!(
+        c.mem.read_u16(DATA, SIZE),
+        0x12,
+        "and the size word is untouched: it is outside the body"
+    );
+
+    // One slot stays free: the ring holds nine slots and eight keystrokes
+    // fit, so that "the head equals the tail" is unambiguously empty.
+    let mut c = Cpu::new();
+    for _ in 0..8 {
+        press(&mut c, 0x1E, b'A');
+    }
+    assert_eq!(
+        c.mem.read_u16(DATA, TAIL),
+        BUFFER + 16,
+        "the ring holds eight keystrokes and the ninth slot is free"
+    );
+    assert_eq!(
+        c.mem.read_u8(DATA, BUFFER + 16),
+        0,
+        "and the ninth slot holds nothing"
+    );
+
+    // The head and the tail are validated: the data area is guest-writable
+    // memory, and a guest that scribbles there sees an empty buffer.
+    for scribble in [0xFFFFu16, 0x0000, 0x0001, 0x001F, 0x0030, 0x0100] {
+        let c = int16(|c| {
+            c.mem.write_u16(DATA, HEAD, scribble);
+            c.mem.write_u16(DATA, TAIL, scribble);
+            c.regs.set_byte(Reg8::Ah, 0x01);
+        });
+        assert!(
+            c.regs.flags.get(flags::ZF),
+            "the head and the tail at {scribble:#06x} are not offsets of the ring: the buffer is empty"
+        );
+    }
+}
+
+/// S16 — `AH = 00h` waits when the buffer is empty.
+///
+/// The service stays at the ROM's entry and the machine re-enters it on
+/// the next step, so the step budget still bounds the run and the TUI
+/// still gets its turn between steps. The wait never spins inside a
+/// single step.
+#[test]
+fn s16_the_get_waits_one_step_at_a_time() {
+    let mut c = machine(&[0xCD, 0x16, 0xF4]);
+    c.regs.set_byte(Reg8::Ah, 0x00);
+    c.step().expect("the interrupt runs");
+    assert_eq!(c.regs.ip, 0x01C0, "the machine is at the keyboard's entry");
+
+    // The buffer is empty: the service waits, and the machine stays at the
+    // entry with the frame still on the stack.
+    c.step().expect("the service runs");
+    assert_eq!(c.regs.segment(Seg::Cs), 0xF400, "the machine is in the ROM");
+    assert_eq!(c.regs.ip, 0x01C0, "and it is still at the entry");
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0100 - 6,
+        "and the frame the INT pushed is still on the stack"
+    );
+    c.step().expect("the service runs again");
+    assert_eq!(
+        c.regs.ip, 0x01C0,
+        "and the machine waits one step at a time"
+    );
+
+    // A keystroke arrives: the service answers it and the machine returns
+    // the way a handler returns.
+    press(&mut c, 0x1E, b'A');
+    c.step().expect("the service runs");
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x1E, "AH = the scan code");
+    assert_eq!(c.regs.byte(Reg8::Al), b'A', "AL = the ASCII character");
+    assert_eq!(
+        c.regs.ip, 0x0002,
+        "and the machine carries on after the call"
+    );
+    assert_eq!(
+        c.regs.word(Reg16::Sp),
+        0x0100,
+        "and the stack is where it was"
+    );
+}
+
+/// The video's service still runs at the video's own entry: the keyboard's
+/// entry is a second entry, and it did not move the first one.
+#[test]
+fn the_video_service_still_runs_at_its_own_entry() {
+    let mut c = machine(&[0xCD, 0x10, 0xF4]);
+    c.regs.set_byte(Reg8::Ah, 0x0E);
+    c.regs.set_byte(Reg8::Al, b'T');
+    c.step().expect("the interrupt runs");
+    assert_eq!(
+        c.regs.segment(Seg::Cs),
+        0xF400,
+        "the machine is at the BIOS"
+    );
+    assert_eq!(c.regs.ip, 0x0190, "at the video's own entry");
+    c.step().expect("the service runs");
+    assert_eq!(
+        character(&c, 0, 0),
+        b'T',
+        "and the video's service wrote the character"
+    );
+    assert_eq!(
+        c.regs.ip, 0x0002,
+        "and the machine carried on past the call"
+    );
+}
+
+/// S15 — The scan code is the IBM PC's set 1.
+///
+/// The corpus is the evidence inside the repository:
+/// `re/extracted/app/examples/snake.asm:37`-`:41` names the four arrow
+/// codes "bios key codes" — `left equ 4bh`, `right equ 4dh`, `up equ
+/// 48h`, `down equ 50h` — and compares the returned `AH` against them.
+#[test]
+fn s15_the_scan_code_is_the_ibm_set_1() {
+    use emo8067_core::bios;
+
+    assert_eq!(bios::SCAN_UP, 0x48, "up is 48h");
+    assert_eq!(bios::SCAN_LEFT, 0x4B, "left is 4Bh");
+    assert_eq!(bios::SCAN_RIGHT, 0x4D, "right is 4Dh");
+    assert_eq!(bios::SCAN_DOWN, 0x50, "down is 50h");
+    assert_eq!(
+        bios::scan_code(b'a'),
+        0x1E,
+        "'a' is the first letter's code"
+    );
+    assert_eq!(
+        bios::scan_code(b'A'),
+        0x1E,
+        "and the upper case has the same one"
+    );
+    assert_eq!(bios::scan_code(b'q'), 0x10, "'q' is 10h: the rows break");
+    assert_eq!(bios::scan_code(b'b'), 0x30, "'b' is 30h");
+    assert_eq!(bios::scan_code(b'1'), 0x02, "'1' is the second code");
+    assert_eq!(bios::scan_code(b'0'), 0x0B, "and '0' is the eleventh");
+    assert_eq!(bios::scan_code(b' '), 0x39, "the space bar is 39h");
+    assert_eq!(
+        bios::scan_code(b'?'),
+        0x35,
+        "and a character the shift made has the code of the key it is on"
+    );
+}
+
+/// S19 — The core's one door.
+///
+/// A keystroke goes into the BIOS data area's buffer, and the BIOS reads
+/// it from there. The door is the pair of the scan code and the ASCII
+/// character, and what it reports back is how many keystrokes are waiting
+/// and whether the keystroke it was given was taken.
+#[test]
+fn s19_the_door_is_the_pair_and_the_count() {
+    let mut c = Cpu::new();
+    assert_eq!(c.keys_waiting(), 0, "the buffer is empty to begin with");
+
+    assert!(
+        c.push_key(0x1E, b'A'),
+        "and the door says the keystroke was taken"
+    );
+    assert_eq!(c.keys_waiting(), 1, "and the keystroke is waiting");
+    assert_eq!(
+        c.mem.read_u8(DATA, BUFFER),
+        b'A',
+        "the character is in the buffer"
+    );
+    assert_eq!(
+        c.mem.read_u8(DATA, BUFFER + 1),
+        0x1E,
+        "and the scan code is the second byte"
+    );
+
+    // One slot stays free: the ring holds nine slots and eight keystrokes
+    // fit, and the ninth is dropped.
+    for _ in 0..7 {
+        assert!(c.push_key(0x1E, b'A'), "the ring takes the keystroke");
+    }
+    assert_eq!(c.keys_waiting(), 8, "the ring holds eight keystrokes");
+    assert!(!c.push_key(0x1E, b'B'), "and the ninth one is not taken");
+    assert_eq!(c.keys_waiting(), 8, "and it is dropped");
+
+    // And the BIOS reads the buffer from there: the guest gets the
+    // keystroke the door put in.
+    let c = int16(|c| {
+        c.push_key(0x1E, b'A');
+        c.regs.set_byte(Reg8::Ah, 0x00);
+    });
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x1E, "AH = the scan code");
+    assert_eq!(c.regs.byte(Reg8::Al), b'A', "AL = the ASCII character");
+}
+
+/// S17 — `AH = 01h` never waits.
+///
+/// With an empty buffer it sets ZF = 1 and returns; with a keystroke it
+/// sets ZF = 0 and returns the pair without removing the keystroke, and
+/// the next `AH = 00h` returns the same one.
+#[test]
+fn s17_the_check_never_waits_and_never_removes() {
+    // With an empty buffer it sets ZF = 1 and returns.
+    let c = int16(|c| {
+        c.regs.set_byte(Reg8::Ah, 0x01);
+    });
+    assert!(
+        c.regs.flags.get(flags::ZF),
+        "ZF = 1: no keystroke is available"
+    );
+    assert_eq!(
+        c.regs.ip, 0x0003,
+        "and the machine carried on past the call: it did not wait"
+    );
+
+    // With a keystroke it sets ZF = 0, returns the pair, and leaves the
+    // keystroke in the buffer: the next `AH = 00h` returns the same one.
+    let c = int16_twice(
+        |c| {
+            press(c, 0x1E, b'A');
+            c.regs.set_byte(Reg8::Ah, 0x01);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+        },
+    );
+    assert!(
+        !c.regs.flags.get(flags::ZF),
+        "ZF = 0: a keystroke is available"
+    );
+    assert_eq!(c.regs.byte(Reg8::Ah), 0x1E, "AH = the scan code");
+    assert_eq!(c.regs.byte(Reg8::Al), b'A', "AL = the ASCII character");
+    assert_eq!(
+        c.mem.read_u16(DATA, HEAD),
+        BUFFER + 2,
+        "and the next get took the keystroke out of the buffer"
     );
 }

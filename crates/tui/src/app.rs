@@ -8,6 +8,11 @@
 use std::path::PathBuf;
 
 use emo8067_core::Cpu;
+use emo8067_core::bios::{
+    SCAN_BACKSPACE, SCAN_DELETE, SCAN_DOWN, SCAN_END, SCAN_ENTER, SCAN_ESCAPE, SCAN_FUNCTION_FIRST,
+    SCAN_HOME, SCAN_INSERT, SCAN_LEFT, SCAN_PAGE_DOWN, SCAN_PAGE_UP, SCAN_RIGHT, SCAN_TAB, SCAN_UP,
+    scan_code,
+};
 use emo8067_core::regs::{Reg16, Seg};
 use emo8067_debug::Access;
 use emo8067_debug::breakpoints::{Breakpoints, Entry};
@@ -440,6 +445,15 @@ impl App {
             self.console_key(key);
             return;
         }
+        // The quit keys are the TUI's own, in every mode: they quit, and
+        // they never reach the guest.
+        let quitting = match key.code {
+            KeyCode::Char('q') => true,
+            KeyCode::Char('c') => key.modifiers.contains(KeyModifiers::CONTROL),
+            _ => false,
+        };
+        // And the takeover has the focus: the keyboard is the guest's.
+        let takeover = self.screen_open;
         match key.code {
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('?') => self.help = true,
@@ -472,7 +486,16 @@ impl App {
             KeyCode::Down => self.move_cursor(0, 1),
             KeyCode::Left => self.move_cursor(-1, 0),
             KeyCode::Right => self.move_cursor(1, 0),
+            // A key the TUI does not bind is the guest's — and in the
+            // takeover the key below is the one that reaches it.
+            _ if !takeover => self.forward_to_guest(key),
             _ => {}
+        }
+        // And in the takeover the keys go to the guest, all of them but the
+        // quit keys: in that mode the user is typing to the guest, and the
+        // arrows are the guest's most wanted key.
+        if takeover && !quitting {
+            self.forward_to_guest(key);
         }
         // The cursor never leaves the listing.
         let lines = self.panels().disassembly.len();
@@ -481,6 +504,18 @@ impl App {
         } else {
             self.cursor = self.cursor.min(lines - 1);
         }
+    }
+
+    /// Put the key into the guest's keyboard.
+    ///
+    /// The scan code is the IBM PC's set 1, and the ASCII character is what
+    /// the guest reads. A character that is not ASCII is not a keystroke:
+    /// it is skipped.
+    fn forward_to_guest(&mut self, key: KeyEvent) {
+        let Some((scan_code, ascii)) = key_of(key.code) else {
+            return;
+        };
+        self.cpu.push_key(scan_code, ascii);
     }
 
     /// The other pane, for `Tab`.
@@ -1488,6 +1523,53 @@ struct Target {
     offset: u16,
     /// The segment the window looks through, when the text named one.
     segment: Option<u16>,
+}
+
+/// The scan code and the ASCII character of a key.
+///
+/// The scan code is the IBM PC's set 1: the corpus is the evidence inside
+/// the repository — `re/extracted/app/examples/snake.asm:37`-`:41` names
+/// the four arrow codes "bios key codes" and compares the returned `AH`
+/// against them.
+///
+/// A character that is not ASCII is not a keystroke: there is none.
+fn key_of(code: KeyCode) -> Option<(u8, u8)> {
+    match code {
+        KeyCode::Char(character) => {
+            if !character.is_ascii() {
+                return None;
+            }
+            let ascii = u8::try_from(character).ok()?;
+            Some((scan_code(ascii), ascii))
+        }
+        KeyCode::Enter => Some((SCAN_ENTER, b'\r')),
+        KeyCode::Esc => Some((SCAN_ESCAPE, 0x1B)),
+        KeyCode::Backspace => Some((SCAN_BACKSPACE, 0x08)),
+        KeyCode::Tab => Some((SCAN_TAB, b'\t')),
+        KeyCode::Up => Some((SCAN_UP, 0)),
+        KeyCode::Down => Some((SCAN_DOWN, 0)),
+        KeyCode::Left => Some((SCAN_LEFT, 0)),
+        KeyCode::Right => Some((SCAN_RIGHT, 0)),
+        KeyCode::Home => Some((SCAN_HOME, 0)),
+        KeyCode::End => Some((SCAN_END, 0)),
+        KeyCode::PageUp => Some((SCAN_PAGE_UP, 0)),
+        KeyCode::PageDown => Some((SCAN_PAGE_DOWN, 0)),
+        KeyCode::Insert => Some((SCAN_INSERT, 0)),
+        KeyCode::Delete => Some((SCAN_DELETE, 0)),
+        KeyCode::F(number) => Some((function_scan_code(number), 0)),
+        _ => Some((0, 0)),
+    }
+}
+
+/// The scan code of a function key: the ten the IBM's keyboard has, and
+/// the two the enhanced one added.
+fn function_scan_code(number: u8) -> u8 {
+    match number {
+        1..=10 => SCAN_FUNCTION_FIRST + number - 1,
+        11 => 0x57,
+        12 => 0x58,
+        _ => 0,
+    }
 }
 
 /// Read a hexadecimal offset, the way the reference types one.
