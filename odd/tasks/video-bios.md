@@ -235,6 +235,61 @@ registers with no state of its own.
   - **The state is the reference's own map.** The BIOS keeps no state of its
     own; the data area at `0040:0000` holds it, the guest can read it, and the
     panel reads it through the same door.
+- **L3 (2026-11-25).** The unit was verified twice, and both rounds found
+  something.
+  - **The native review** ran three lenses, a refuter and a targeted
+    validator over the committed candidate, and it found **one CRITICAL**: the
+    window scroll did not move the window's cells. The read-back buffer holds
+    every cell of the window, but the write-back took only the **first** cell
+    of the source row and wrote it to **every** column of the destination row,
+    so scrolling a window of text replaced each row with one repeated
+    character. The suite could not see it: the scroll cases seeded and
+    asserted only the first cell of each row. It is fixed in `be6d568`, and
+    the case now gives every cell of the window a character of its own.
+  - **The refuter's two verdicts, and why one of them is the interesting
+    one.** The refuter **corroborated** the scroll and **refuted** a second
+    claimed CRITICAL — that the screen widget chunks the guest's geometry and
+    panics on a zero chunk size. The refuter's proof was the line itself: the
+    widget computes `min(area.width, view.columns)` and walks the cells with a
+    `get`-guarded lookup, and the only `chunks()` calls in the tree take
+    constant sizes. **A lens had reported the opposite, and the parent read
+    the code before accepting the verdict.** One of three refuters confirmed
+    the lens's claim and two refuted it; the two were right.
+  - **The project's own verifier** checked S1-S11 against the specs and
+    against the silicon: **all eleven met**, and the four `CD 10` captures of
+    the 646 000 agree with the chip on the stack, the flags, the landing place
+    and the memory the chip left behind. It found **three more defects, all
+    one root cause**: the BIOS's data area is ordinary guest-writable memory,
+    and the geometry read out of it was computed with unchecked. A guest
+    writing `0FFFFh` into the columns word panicked the emulator on a `u16`
+    multiply, a guest writing `0100h` panicked it on the teletype's `u8`
+    increment, and the panel sized its cell vector from the guest's word — up
+    to 16 776 960 cells, about 134 MB, on **every frame**.
+  - **The correction** is one door. The hardware's text modes are forty
+    columns and eighty columns, both twenty-five rows tall, so `Cpu::columns()`
+    and `Cpu::rows()` bound the count at the hardware's own modes, and every
+    consumer reads the geometry through them. The data area keeps the guest's
+    words and the guest reads its own value back — the BIOS simply refuses to
+    compute with a value the hardware cannot hold. The panel needed no change:
+    with the geometry bounded, its arithmetic cannot overflow.
+  - **Two recorded states moved, and why.** `simplest` and `writebin` are
+    loaded at `0100h` and run past `0400h`, so the program's own code overlaps
+    the BIOS data area and the "geometry" the BIOS read was **code bytes**
+    (`simplest`'s columns word was `B9 00`, 185; `writebin`'s was `CD 21h`,
+    8653). Before the bound the BIOS computed with those numbers; after it,
+    it computes with 80x25. Any rule that bounds the geometry moves those two
+    states, and they were recorded again — which is what `S9` names.
+  - **The verifier's probes are in the tree** (`crates/core/tests/bios_verifier.rs`,
+    `crates/debug/tests/bios_verifier.rs`, `crates/core/tests/bios_oracle.rs`,
+    `crates/tui/tests/bios_verifier.rs`). They were written from the specs and
+    not from the implementer's tests, and they are the only evidence in this
+    tree that was written by somebody else.
+  - **Still open.** A guest that overwrites the ROM's own byte at `F400:0190`
+    gets the native service **and** its byte executed; the chip would run only
+    the guest's byte. `AH = 13h`'s write mode with interleaved attributes is
+    implemented and now covered, and `AH = 05h` and `AH = 02h` clamp a page
+    number above seven to the last page where the reference says 0..7. The
+    graphics modes and the pixel functions are their own unit.
 - **L2 (2026-11-24).** The silicon gate caught the hook, and the hook was
   wrong.
   - **What the first attempt did.** The BIOS's service ran where the vector

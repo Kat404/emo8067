@@ -17,9 +17,26 @@ VGA text page, so a program that prints to video memory can be seen.
   eighty columns by twenty-five rows, two bytes a cell, the character
   and the attribute — and it is read out of the machine's own memory
   through the segment the UI says, the way every other panel is read.
-  The core needed **nothing**: its memory is flat RAM, so `B800:0000` is
-  ordinary memory at physical `0xB8000`. There is still **no video
-  adapter and no BIOS**.
+  The core needed **nothing** for that: its memory is flat RAM, so
+  `B800:0000` is ordinary memory at physical `0xB8000`.
+- **The machine has a video BIOS.** `crates/core/src/bios.rs` implements
+  the reference's own **thirteen text-mode services** for `INT 10h`,
+  with the register contracts quoted from
+  `re/docs-txt/8086_bios_and_dos_interrupts.txt`. The `INT` is the
+  8086's `INT`: it pushes FLAGS, CS and IP, clears TF and IF, and loads
+  `CS:IP` from the vector table — the two `CD 10` captures of the
+  646 000 agree with the chip on the stack, the flags, the landing
+  place and the memory. The BIOS is a **handler at an address**: the
+  machine installs the vector for `10h` at boot, and the reference's
+  own map gives the video functions' entry as `F400:0190`. The ROM is
+  this project's own; the reference's `BIOS_ROM` is its code and is
+  never copied.
+- **The BIOS keeps no state of its own.** Everything it knows lives in
+  the BIOS data area at `0040:0000`, at the offsets the reference's
+  map gives: the columns at `0040:004A`, the current page's start at
+  `0040:004E`, the eight cursors at `0040:0050`, the current page at
+  `0040:0062`, the rows minus one at `0040:0084`. The guest can read
+  them back, and the panel reads them through the same door.
 - **The page is bounded.** The hardware has eight pages of text memory,
   four kilobytes apart, and a page past the last one is the last one.
   The page is read through the segment, so it cannot run off the bus
@@ -37,22 +54,23 @@ VGA text page, so a program that prints to video memory can be seen.
   while it is open, and the keys that act on the listing do not, because
   the listing's cursor is not on the screen while the takeover holds
   it.
-- **The plan is `odd/tasks/tui.md`** (T15, S37-S42, L20-L21). The tree is
-  **736 passed, 0 failed** and the clippy run is clean in every crate.
-- **It was verified independently.** All six specs met, no blockers, and
-  the verifier's own thirty probes pass and stay in the tree as
-  regression tests — they are the only tests here that were not written
-  by the implementer. The differential against the baseline says the
-  only difference in the whole screen is the help's own list, which
-  grew by the key `x`.
-- **The native review is pending, not refused.** The candidate's own
-  assessment is **medium** with the reason `under_budget`: a
-  medium-risk candidate is not reviewed on its own and waits for a
-  high-risk commit or the maintainer's word.
-- **What this slice cannot do.** `INT 10h` is not here: a program that
-  calls it still vectors to `0000:0000`, because there is no BIOS to
-  vector to. The reference's own `1_sample` writes "Hello, World!"
-  straight to `B800:0002`, but only after two `INT 10h` calls, so the
+- **The plan is `odd/tasks/tui.md`** (T15, S37-S42, L20-L21) and
+  `odd/tasks/video-bios.md` (T1, S1-S11, L1-L2). The tree is
+  **751 passed, 0 failed** and the clippy run is clean in every crate.
+- **It was verified independently, twice.** The native review ran three
+  lenses, a refuter and a targeted validator: it found one CRITICAL —
+  the window scroll repeated the first cell of the row across the whole
+  row instead of moving the cells — and it is fixed. The project's own
+  verifier checked S1-S11 against the specs and the silicon: all
+  eleven met, and it found three more defects — the guest-writable
+  geometry is computed with unchecked, which panics the emulator and
+  makes the panel allocate without bound. Those are being fixed.
+- **What this slice cannot do.** The graphics modes are not here: `13h`
+  and the pixel functions `0Ch`/`0Dh` belong to their own unit, and the
+  page of graphics is `A0000:B1000`. The reference's own `1_sample`
+  writes "Hello, World!" straight to `B800:0002`, but only after two
+  `INT 10h` calls, and the BIOS answers them now — so the corpus's
+  programs reach their text.
   corpus's BIOS-using programs need the BIOS slice before their output
   is on the page.
 
@@ -262,15 +280,18 @@ the two plans above.
 ## Where the tree stands
 
 ```
-cargo nextest run --workspace            736 passed, 0 failed
+cargo nextest run --workspace            751 passed, 0 failed
 cargo clippy --workspace --all-targets   0 warnings, 0 errors
 cargo fmt --all --check                 exit 0
 python3 odd/research/verify_opcodes.py   OK: 16 rows x 16 cells
 the examples' gate      85 of 85 assemble; the runner's gate pins the state
                          each of the 85 leaves behind
-HEAD                     48a0882 (the guest's screen), bee803a (the step
-                         back), d1a624f (the bounded journal), b208af3 (the
-                         keys that come with the core);
+the full capture gate  646000 captures, no disagreement; the two CD 10
+                         captures among them agree with the chip on the
+                         stack, the flags, the landing place and the memory
+HEAD                     be6d568 (the scroll moves the cells), dbc45f4 (the
+                         video BIOS), 48a0882 (the guest's screen), bee803a
+                         (the step back), d1a624f (the bounded journal);
                          every commit is GPG-signed and none is pushed
 ```
 
@@ -582,11 +603,10 @@ wins, so a device that writes a port byte does not reach the program.
     design pass the maintainer asked for — functions first, design last
     — is done. What is left of the TUI is T17 (packaging and CI) and
     T18 (the GUI, the last stage).
-14. **What is left besides that.** **The BIOS of video (`INT 10h`)** — the
-    core has none, so a program that calls it vectors to `0000:0000` and
-    the guest's screen shows nothing for the corpus's BIOS-using
-    programs; the research's own word for the next slice is the video
-    services, and the passive viewer is what they would show.
+14. **What is left besides that.** **The graphics modes of the video
+    BIOS** — `13h`, the page of graphics at `A0000:B1000`, and the pixel
+    functions `0Ch`/`0Dh` — are their own unit, and the screen panel is
+    a character grid that cannot show them yet.
     `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
     fondo, the eighty-five examples run with their own baseline pinned;
     the assembler's build directives (`#make_bin#`, `#make_com#`,
