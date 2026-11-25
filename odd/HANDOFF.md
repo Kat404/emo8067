@@ -4,9 +4,68 @@ Written 2026-10-15 at the end of a long session, and kept current since: the
 2026-10-19 work is folded into it, and the 2026-10-23 silicon and full-capture
 units with it, and the 2026-11-10 unit that closed the three families the
 full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
-window, and the 2026-11-24 unit that gave it the guest's screen.
+window, and the 2026-11-24 unit that gave it the guest's screen, and the
+2026-11-25 unit that is giving the BIOS its keyboard.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-25 work is
+
+**The BIOS has a keyboard.** The unit the maintainer chose on 2026-11-25
+is closed: `INT 16h`, the BIOS's other half, in the core, with the host's
+door, the TUI's forwarding and the runner's `--keys` script. Branch
+`feat/bios-keyboard`, cut from `main` at `5e4a702`. The plan is
+`odd/tasks/video-bios.md` (T2, S12-S21, L5-L6).
+
+- **The `INT 16h` is the 8086's `INT`**, like the `INT 10h`: it pushes
+  FLAGS, CS and IP, it clears TF and IF, and it loads `CS:IP` from the
+  vector table. The BIOS is a handler at `F400:01C0` — the entry the
+  reference's own map gives for the keyboard (`memory.txt:66`, "16 16x4 =
+  58 F400:01C0 - keyboard functions"), the mirror of the video's
+  `F400:0190`. The ROM is this project's own; the byte at the entry is the
+  `IRET` that comes out of the service.
+- **The two services are the reference's own two**, with its own register
+  contracts quoted from `re/docs-txt/8086_bios_and_dos_interrupts.txt`:
+  `AH = 00h` gets a keystroke without echo and removes it, `AH = 01h`
+  checks for one, sets `ZF = 1` when there is none, and leaves it there.
+- **The buffer is the BIOS data area**, at the offsets the maintainer
+  approved: the head at `0040:001A`, the tail at `0040:001C`, the start
+  at `0040:001E`, the size at `0040:0030` — `0040:001A`-`:0031` and
+  nothing outside it. The head and the tail hold the absolute offsets of
+  the entries to read and to write, the IBM's way. The body is
+  `0040:001E`-`:002F`: nine two-byte entries, and **eight keystrokes fit**,
+  because one slot stays free so that "the head equals the tail" is
+  unambiguously empty. The reference's own map documents none of it, so
+  the shape is the IBM PC's and the offsets are this project's own.
+- **The scan code is the IBM PC's set 1**, and the oracle is published:
+  the table at `https://www.marjorie.de/ps2/scancode-set1.htm`, the one
+  Wikipedia's "Scancode" article cites. **The letters are not contiguous
+  in it** — `Q = 10h`, `E = 12h`, `I = 17h`, `Z = 2Ch`, `M = 32h` — and the
+  corpus is the evidence in-repo: `snake.asm:37`-`:41` calls `4Bh`, `4Dh`,
+  `48h` and `50h` "bios key codes".
+- **`AH = 00h` waits**, one step at a time: the service stays at the
+  entry, the machine comes back to it on the next step, and the step
+  budget still bounds the run. `AH = 01h` never waits and never removes.
+- **The keys come from the host.** The TUI forwards the terminal's keys —
+  a key the debugger binds is the debugger's, and in the takeover every
+  key but the two quit keys reaches the guest as well, without taking the
+  debugger's keys away. The headless runner takes a script: `--keys
+  SCRIPT`, where the text is the keys and `\n`, `\r`, `\e`, `\b`, `\t`,
+  `\\`, `\up`, `\down`, `\left` and `\right` name the ones a character
+  cannot.
+- **The tree is 821 passed, 0 failed**, the clippy run is clean in every
+  crate, `cargo fmt --all --check` exits 0, and the full gate over all
+  646 000 captures passes with no family added.
+- **It was verified independently, and the verification was worth it.** The
+  verifier found the blocker: `set_zero_flag` added four to the stack
+  pointer without wrapping, and a guest whose `SP` starts at 2..5 killed
+  the emulator with "attempt to add with overflow". The parent's own
+  reading of the diff found three more — the size word sat inside the
+  ring, the head and the tail were ring-relative, and the CLI's `\r` meant
+  the right arrow. One verdict did not stand: the verifier's own set 1
+  table had the same mistake the code had, and confirmed the table it was
+  meant to check. **A verifier that builds its own oracle from the same
+  intuition as the code confirms the code's bug.**
 
 ## Where the 2026-11-24 work is
 
@@ -611,14 +670,25 @@ wins, so a device that writes a port byte does not reach the program.
     — is done. What is left of the TUI is T17 (packaging and CI) and
     T18 (the GUI, the last stage).
 14. **What is left besides that.** **The keyboard of the BIOS
-    (`INT 16h`)** is the next unit, chosen by the maintainer on
-    2026-11-25: sixty of the eighty-five reference programs call it, and
-    without it those programs sit waiting for a key that never comes. The
-    reference documents exactly two functions — `00h` gets a keystroke
-    and removes it from the buffer, `01h` checks for one and leaves it —
-    and its own memory map gives the keyboard buffer **no** home, so
-    where the buffer lives and where the keystrokes come from are the
-    unit's own decisions. The plan is `odd/tasks/video-bios.md` (T2).
+    (`INT 16h`)** is **done**: closed on 2026-11-25 on the branch
+    `feat/bios-keyboard`, cut from `main` at `5e4a702`. The reference
+    documents exactly two functions — `00h` gets a keystroke and removes
+    it from the buffer, `01h` checks for one and leaves it — and its own
+    memory map gives the keyboard buffer **no** home, but it **does** name
+    the keyboard's entry: `F400:01C0` (`memory.txt:66`). The maintainer
+    settled the two open decisions on 2026-11-25: the buffer lives in the
+    BIOS data area at the offsets the maintainer approved, and the
+    keystrokes come from the host's injection (the TUI forwards the
+    terminal's keys, the headless runner takes a `--keys` script).
+    `INT 16h/00h` waits when the buffer is empty, and the scan code is
+    the IBM's set 1 — the corpus is the evidence in-repo, `snake.asm`
+    calls `4Bh`, `4Dh`, `48h` and `50h` "bios key codes". The specs are
+    S12-S21 of `odd/tasks/video-bios.md` (T2, L5-L6), and the state is in
+    "Where the 2026-11-25 work is" above.
+    **The graphics modes of the video BIOS** — `13h`, the page of graphics
+    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
+    unit, and the screen panel is a character grid that cannot show them
+    yet.
     **The graphics modes of the video BIOS** — `13h`, the page of graphics
     at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
     unit, and the screen panel is a character grid that cannot show them

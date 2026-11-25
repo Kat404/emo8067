@@ -384,6 +384,82 @@ registers with no state of its own.
 
 ## Log
 
+- **L6 (2026-11-25).** The verification round: one blocker from the
+  independent verifier, three more from the parent's own reading of the
+  diff, and one verdict the parent does not accept.
+  - **The verifier's blocker.** `set_zero_flag` adds four to the stack
+    pointer without wrapping (`crates/core/src/bios.rs`, `let at =
+    cpu.regs.word(Reg16::Sp) + 4;`). The `INT` pushes three words, so a
+    guest whose `SP` starts at 2..5 puts the frame's flags word across the
+    segment's end — and the addition panics, "attempt to add with
+    overflow", killing the emulator. The verifier reproduced it with
+    `--sp 3`; the baseline `5e4a702` stops with "took INT 0x16" and does
+    not panic. **The fix is `wrapping_add(4)`**: the frame's flags word is
+    at the wrapped address, which is where the push put it.
+  - **The verifier's S15 verdict does not stand.** It ruled the scan-code
+    table "met — every shipped entry is set 1", on a table it built itself:
+    `b' = 1Fh`, `c = 20h`, `q = 2Eh` — the count from `A = 1Eh` that set 1
+    is not. The published table (`https://www.marjorie.de/ps2/scancode-set1.htm`,
+    the one Wikipedia's "Scancode" article cites) says `B = 30h`, `C =
+    2Eh`, `Q = 10h`, `E = 12h`, `I = 17h`, `Z = 2Ch`, `M = 32h`, and the
+    code's table is wrong for every letter but `a`. The parent's reading
+    had found this before the verifier reported; the two agree, and the
+    published table is the oracle.
+  - **The parent's own three findings.**
+    1. **The size word sat inside the ring.** S14 put the size at
+       `0040:0030` and the body at `0040:001E`-`:003E`, so the tenth
+       keystroke wrote over the size word, and `init` wrote it as a word,
+       over two ring bytes at once. **S14 is rewritten**: the range is
+       `0040:001A`-`:0031` and nothing outside it, the body is
+       `0040:001E`-`:002F`, the size word holds `0012h`, and the ring's end
+       is derived from it instead of stored.
+    2. **The head and the tail were ring-relative.** They are absolute now,
+       the IBM's way, so a guest that reads `0040:001A` sees where the
+       buffer is.
+    3. **The CLI's `\r` meant the right arrow**, and a literal newline gave
+       the guest ASCII `0Ah` where the corpus's programs compare `AL`
+       against `0Dh`. `\n` and `\r` are the enter key now, and the arrows
+       are `\up`, `\down`, `\left` and `\right`.
+  - **The verifier's advisories.** A (the size word, and the ring outside
+    the approved range) is the parent's finding 1. B (the takeover's
+    additive reading) is what **S18 now says**: the design document has
+    the last word there, and it says the debugger's own keys keep working
+    while the takeover is open (`design/DESIGN.md:90`-`:99`). C (the
+    shifted punctuation carried no code) is now in **S15**: a shifted
+    character has the code of the key it is on. D (the runner ate the whole
+    script when the door refused a keystroke) is fixed by the door's new
+    answer — it says whether the keystroke was taken, and the runner only
+    advances its script when it was. E (the TUI's help does not say which
+    keys) is **accepted**: the help's widest line may be 39 characters and
+    the line it has says the keys go to the guest's screen. F (the CLI's
+    help did not list every escape) is fixed with the new format.
+  - **The correction round's evidence.** **RED**: the verifier's own
+    probes, against the tree as it stood, ran 18 with **6 failed** — the
+    panic of C1 ("attempt to add with overflow"), the table of C2 ("the set
+    1 code of 'q' is 0x10, left: 46, right: 16"), and the three of C3. The
+    blocker end to end: `cargo run -p emo8067-cli -- run --sp 3 poll.asm`
+    panicked with exit 101. **GREEN**: the probes are 18/18 and 6/6, the
+    whole tree is **821 passed, 0 failed** (the base's 781, the unit's 15,
+    the probes' 24 and one new CLI test), the clippy run is clean in every
+    crate, `cargo fmt --all --check` exits 0, and the full gate over all
+    646 000 captures passes with no family added. The parent's own spot
+    check: `--sp 3` now stops with the empty buffer's answer, `ZF` set and
+    exit 0. The recorded states moved again — the layout changed the data
+    area — so 79 of the 85 goldens moved, all 85 were recorded again, and
+    the gate reports "85 examples, 85 matched, 0 changed"; the census is
+    the same: 38 stop at `INT 21h`, 33 at the step budget, 9 halt, 2 at
+    `INT 15h`, 2 at `INT 33h`, 1 at `INT 13h`.
+  - **Two of the probe's expectations changed, and the parent's reason is
+    recorded.** The verifier's `s14_the_size_word_is_inside_the_body_and_the_ring_clobbers_it`
+    asserted that the size word IS inside the body — it was a probe of the
+    defect, and under the corrected S14 it is a probe of its absence, so it
+    is now `s14_the_size_word_is_outside_the_body_and_the_ring_never_clobbers_it`.
+    Its `s12`/`s13`/`s19` expectations still read the head and the tail the
+    ring-relative way, and the TUI probe's helpers added the ring's start to
+    the head; those five are now absolute, the same correction the parent's
+    own `s14` probes got. **A probe's expectation changes only when the spec
+    it was written from changes, and the reason is in this log.**
+
 - **L5 (2026-11-25).** The keyboard's four decisions are the maintainer's,
   and the specs S12-S21 are written from them.
   - **The decisions**, the maintainer's answers verbatim: "Área de datos del
