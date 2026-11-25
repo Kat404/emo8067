@@ -272,6 +272,14 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // the memory, and the write of the step before is not this step's.
     cpu.mem.last_write = None;
     let at = cpu.regs.ip;
+    // The BIOS's entry. The machine reached the ROM through the interrupt
+    // vector, the way it reaches any handler, and the video service runs
+    // where the ROM's code is: this project's own code, native, at the
+    // address the vector names. The ROM's own byte at the entry — the
+    // `IRET` that comes out of it — is the instruction that retires.
+    if cpu.regs.segment(Seg::Cs) == crate::bios::ENTRY_SEGMENT && at == crate::bios::ENTRY_OFFSET {
+        crate::bios::service(cpu);
+    }
     let mut opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
 
     // A run of prefixes is consumed here, in a loop, rather than by each

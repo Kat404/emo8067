@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bios;
 pub mod devices;
 pub mod exec;
 pub mod flags;
@@ -112,7 +113,7 @@ impl Cpu {
     /// bit 1 is a fixed one on every x86 rather than a storage bit.
     #[must_use]
     pub fn new() -> Self {
-        Self {
+        let mut cpu = Self {
             regs: Registers::new(),
             mem: Memory::new(),
             seg_override: None,
@@ -122,7 +123,12 @@ impl Cpu {
             bus: devices::empty_bus(),
             history: History::default(),
             call_depth: 0,
-        }
+        };
+        // The machine starts in the emulator's own default video mode: the
+        // BIOS data area holds the geometry from the moment the machine
+        // starts.
+        bios::init(&mut cpu);
+        cpu
     }
 
     /// Turn the journal on, so that the machine can be rewound.

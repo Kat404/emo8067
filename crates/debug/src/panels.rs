@@ -335,11 +335,19 @@ pub struct StackView {
     pub words: Vec<u16>,
 }
 
-/// The columns the guest's text page has.
-pub const SCREEN_COLUMNS: usize = 80;
+/// The columns the guest's text page has by default.
+///
+/// The panel shows the geometry the machine has, and the machine's geometry
+/// is the mode's: the mode sets it and the data area holds it. This is the
+/// geometry a machine starts in.
+pub const SCREEN_COLUMNS: usize = emo8067_core::bios::DEFAULT_COLUMNS as usize;
 
-/// The rows the guest's text page has.
-pub const SCREEN_ROWS: usize = 25;
+/// The rows the guest's text page has by default.
+///
+/// The panel shows the geometry the machine has, and the machine's geometry
+/// is the mode's: the mode sets it and the data area holds it. This is the
+/// geometry a machine starts in.
+pub const SCREEN_ROWS: usize = emo8067_core::bios::DEFAULT_ROWS as usize;
 
 /// The pages of text memory the hardware has.
 pub const SCREEN_PAGES: u8 = 8;
@@ -384,12 +392,21 @@ impl ScreenCell {
     }
 }
 
+/// Where the cursor is on the guest's screen.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Cursor {
+    /// The row the cursor is on.
+    pub row: usize,
+    /// The column the cursor is on.
+    pub column: usize,
+}
+
 /// The screen panel: the guest's text page.
 ///
 /// The page is the machine's own memory: what the guest wrote to it is
-/// what it shows. There is no video adapter and no BIOS behind it — the
-/// page is read like any other memory, and a program that asks the
-/// machine's video for something gets nothing.
+/// what it shows. The geometry is the machine's own too — the mode sets it
+/// and the data area holds it — and so is the cursor: the panel reads the
+/// machine again every time and holds no copy of any of it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ScreenView {
     /// The segment the page is read through.
@@ -402,6 +419,12 @@ pub struct ScreenView {
     pub rows: usize,
     /// The cells of the page, row by row.
     pub cells: Vec<ScreenCell>,
+    /// The cursor, where the BIOS says it is.
+    ///
+    /// `None` when there is no cursor on the page the panel shows: the
+    /// guest hid it, or the panel shows another page than the one the
+    /// machine is on.
+    pub cursor: Option<Cursor>,
 }
 
 /// Every panel, drawn from the machine and the UI's state.
@@ -542,6 +565,10 @@ fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
 /// window reads its bytes: the physical address is masked, so the read
 /// cannot run off the bus whatever segment the UI names.
 ///
+/// The geometry is the machine's own — the mode sets it and the data area
+/// holds it — and so is the cursor: the panel reads the machine's video
+/// through the core's door and holds no copy of it.
+///
 /// The page number is bounded before it is used: the hardware has eight
 /// pages of text memory and no more, and a page past the last one is the
 /// last one.
@@ -549,7 +576,10 @@ fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
     let page = ui.screen_page.min(SCREEN_PAGES - 1);
     // The pages of text memory are four kilobytes apart.
     let base = u16::from(page) * PAGE_STRIDE;
-    let cells = (0..SCREEN_COLUMNS * SCREEN_ROWS)
+    let video = cpu.video();
+    let columns = usize::from(video.columns);
+    let rows = usize::from(video.rows);
+    let cells = (0..columns * rows)
         .map(|index| {
             // Two bytes a cell: the character and the attribute.
             let at = base.wrapping_add(2 * index as u16);
@@ -561,12 +591,19 @@ fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
             }
         })
         .collect();
+    // The cursor is on the page the panel shows only when the panel shows
+    // the machine's own page, and only when the guest has not hidden it.
+    let cursor = (video.page == page && video.cursor_visible).then_some(Cursor {
+        row: usize::from(video.cursor_row),
+        column: usize::from(video.cursor_column),
+    });
     ScreenView {
         segment: ui.screen_segment,
         page,
-        columns: SCREEN_COLUMNS,
-        rows: SCREEN_ROWS,
+        columns,
+        rows,
         cells,
+        cursor,
     }
 }
 

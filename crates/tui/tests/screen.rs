@@ -4,7 +4,7 @@
 //! screen takes the terminal over, and the debugger's keys keep working
 //! while it does.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use emo8067_core::regs::Seg;
@@ -91,19 +91,6 @@ fn buffer(app: &App, width: u16, height: u16) -> Buffer {
 
 /// A program that does nothing at all.
 const IDLE: &str = "org 100h\nhlt\n";
-
-/// One of the reference's own examples, when it is there.
-///
-/// The examples are local gold: they are not in the repository, and the
-/// gate stands aside when they are not.
-fn example(name: &str) -> Option<PathBuf> {
-    let path = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../re/extracted/app/examples"
-    ))
-    .join(name);
-    if path.is_file() { Some(path) } else { None }
-}
 
 /// The segment the text page lives in.
 const PAGE: u16 = 0xB800;
@@ -796,29 +783,96 @@ fn the_takeover_does_not_hide_the_machines_state() {
     );
 }
 
-/// An interrupt without a BIOS vectors to zero.
+/// The video interrupt is the machine's own `INT`, and the machine's own
+/// BIOS answers it where the vector points; another interrupt still
+/// vectors to the empty table.
 #[test]
-fn an_int_without_a_bios_vectors_to_zero() {
-    let Some(path) = example("1_sample.asm") else {
-        // The examples are local gold, not part of the repository.
-        return;
-    };
-    let mut app = match App::new(Some(path.to_string_lossy().to_string())) {
-        Ok(app) => app,
-        Err(error) => panic!("the sample loads: {error}"),
-    };
-    let vector_offset = app.cpu.mem.read_u16(0x0000, 0x0040);
-    let vector_segment = app.cpu.mem.read_u16(0x0000, 0x0042);
-    println!("the vector of INT 10h is {vector_segment:04X}:{vector_offset:04X}");
-    app.key(KeyEvent::new(KeyCode::F(8), KeyModifiers::NONE));
-    app.key(KeyEvent::new(KeyCode::F(8), KeyModifiers::NONE));
+fn the_video_interrupt_is_answered_and_another_one_vectors_to_zero() {
+    let mut app = app_of("bios", "org 100h\nmov ax, 0E41h\nint 10h\nhlt\n");
+    press(&mut app, &[KeyCode::F(8)]); // mov ax, 0E41h
+    press(&mut app, &[KeyCode::F(8)]); // int 10h
+    assert_eq!(
+        app.cpu.regs.segment(Seg::Cs),
+        0xF400,
+        "the machine is at the BIOS's entry: the interrupt vectors"
+    );
+    assert_eq!(app.cpu.regs.ip, 0x0190, "at the entry the vector names");
+
+    press(&mut app, &[KeyCode::F(8)]); // the service, and the return
+    assert_eq!(
+        app.cpu.regs.ip, 0x0105,
+        "and the machine carries on at the instruction after the call"
+    );
+    assert_eq!(
+        app.cpu.mem.read_u8(PAGE, 0x0000),
+        b'A',
+        "and the service wrote the character to the page"
+    );
+
+    // Another vector is untouched: it is taken, and the machine lands where
+    // the empty table says.
+    let mut app = app_of("other", "org 100h\nint 21h\nhlt\n");
+    press(&mut app, &[KeyCode::F(8)]);
     assert_eq!(
         app.cpu.regs.segment(Seg::Cs),
         0x0000,
-        "there is no BIOS: the vector is empty"
+        "there is no handler: the vector is empty"
     );
     assert_eq!(
         app.cpu.regs.ip, 0x0000,
         "and the machine lands at 0000:0000"
+    );
+}
+
+/// The cursor is drawn where the BIOS says it is, and only there.
+#[test]
+fn the_cursor_is_drawn_where_the_bios_says_it_is() {
+    let mut app = app_of(
+        "cursor",
+        "org 100h\nmov ah, 2\nmov dh, 3\nmov dl, 7\nint 10h\nhlt\n",
+    );
+    for _ in 0..5 {
+        press(&mut app, &[KeyCode::F(8)]);
+    }
+    press(&mut app, &[KeyCode::Char('x')]);
+
+    let buffer = buffer(&app, 80, 24);
+    let cursor = buffer.cell((7, 3)).expect("the cell is on the screen");
+    assert!(
+        cursor.style().add_modifier.contains(Modifier::UNDERLINED),
+        "the cursor is underlined where the BIOS says it is"
+    );
+    let other = buffer.cell((6, 3)).expect("the cell is on the screen");
+    assert!(
+        !other.style().add_modifier.contains(Modifier::UNDERLINED),
+        "and nowhere else"
+    );
+}
+
+/// The screen follows the machine's active video page.
+#[test]
+fn the_screen_follows_the_machines_active_page() {
+    let mut app = app_of(
+        "page",
+        "org 100h\nmov al, 2\nmov ah, 5\nint 10h\nmov ah, 9\nmov al, 'Z'\n\
+         mov bh, 2\nmov cx, 1\nint 10h\nhlt\n",
+    );
+    // Ten steps, not nine: an `INT 10h` is the chip's `INT`, so it pushes
+    // the frame and vectors, and the service is entered on the step after
+    // that. The first call takes two steps and so does the second.
+    for _ in 0..10 {
+        press(&mut app, &[KeyCode::F(8)]);
+    }
+    assert_eq!(
+        app.panels().screen.page,
+        2,
+        "the panel shows the page the machine has active"
+    );
+
+    press(&mut app, &[KeyCode::Char('x')]);
+    let text = rows(&app, 80, 24).join("\n");
+    assert!(
+        text.contains('Z'),
+        "and the character the guest wrote on that page is on the screen: {text}"
     );
 }

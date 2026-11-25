@@ -5,7 +5,8 @@
 //! what it shows.
 
 use emo8067_core::Cpu;
-use emo8067_debug::panels::{Panels, Ui};
+use emo8067_core::regs::{Reg8, Seg};
+use emo8067_debug::panels::{Cursor, Panels, Ui};
 
 /// The segment the text page lives in.
 const PAGE: u16 = 0xB800;
@@ -15,6 +16,26 @@ const PAGE_PHYSICAL: u32 = 0xB8000;
 
 /// The cells the page holds.
 const CELLS: usize = 80 * 25;
+
+/// The segment the test programs run in.
+const CODE: u16 = 0x1000;
+
+/// A machine that has called the video BIOS, with the registers the test
+/// sets before the call.
+///
+/// The call is two steps: the interrupt, and the service that comes out of
+/// it.
+fn bios(setup: impl FnOnce(&mut Cpu)) -> Cpu {
+    let mut cpu = Cpu::new();
+    cpu.mem
+        .load_at(0x10000, &[0xCD, 0x10, 0xF4]) // int 10h; hlt
+        .expect("the program loads");
+    cpu.regs.set_segment(Seg::Cs, CODE);
+    setup(&mut cpu);
+    cpu.step().expect("the call runs");
+    cpu.step().expect("the service runs");
+    cpu
+}
 
 #[test]
 fn the_screen_panel_is_read_out_of_the_machines_own_memory() {
@@ -383,6 +404,83 @@ fn the_attribute_says_the_colours_for_every_byte() {
             "the blink of {attribute:#04x} is the third bit"
         );
     }
+}
+
+/// S8 — The screen panel shows the guest's screen as the machine has it:
+/// the geometry the machine has, the page the machine has active, and the
+/// cursor where the BIOS says it is. The panel holds no copy of either.
+#[test]
+fn the_panel_shows_the_machines_geometry_the_page_and_the_cursor() {
+    // The machine's mode: forty columns by twenty-five rows.
+    let cpu = bios(|cpu| {
+        cpu.regs.set_byte(Reg8::Ah, 0x00);
+        cpu.regs.set_byte(Reg8::Al, 0x00);
+    });
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        screen.columns, 40,
+        "the panel shows the geometry the machine has"
+    );
+    assert_eq!(screen.rows, 25, "and the rows the machine has");
+    assert_eq!(
+        screen.cells.len(),
+        40 * 25,
+        "and the cells that geometry holds"
+    );
+
+    // The cursor is where the BIOS says it is.
+    let cpu = bios(|cpu| {
+        cpu.regs.set_byte(Reg8::Ah, 0x02);
+        cpu.regs.set_byte(Reg8::Dh, 3);
+        cpu.regs.set_byte(Reg8::Dl, 7);
+    });
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        screen.cursor,
+        Some(Cursor { row: 3, column: 7 }),
+        "the cursor is where the BIOS says it is"
+    );
+
+    // A cursor the guest hid is not on the screen.
+    let cpu = bios(|cpu| {
+        cpu.regs.set_byte(Reg8::Ah, 0x01);
+        // Bit 5 of CH set is the cursor that is not visible.
+        cpu.regs.set_byte(Reg8::Ch, 0x20);
+    });
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(screen.cursor, None, "a hidden cursor is not drawn");
+
+    // The panel reads the machine again: it holds no copy of the page.
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0000, b'A');
+    let first = Panels::of(&cpu, &Ui::default()).screen;
+    cpu.mem.write_u8(PAGE, 0x0000, b'B');
+    let second = Panels::of(&cpu, &Ui::default()).screen;
+    assert_eq!(
+        second.cells[0].character, 'B',
+        "the page is read again: the panel is a function of the machine"
+    );
+    assert_eq!(first.cells[0].character, 'A', "and it holds no copy");
+}
+
+/// The panel shows the page the panel shows, and the TUI follows the
+/// machine's active page with it.
+#[test]
+fn the_panel_shows_the_page_the_ui_says() {
+    let cpu = bios(|cpu| {
+        // The machine's active page is the third one.
+        cpu.regs.set_byte(Reg8::Ah, 0x05);
+        cpu.regs.set_byte(Reg8::Al, 2);
+    });
+    let screen = &Panels::of(
+        &cpu,
+        &Ui {
+            screen_page: 2,
+            ..Ui::default()
+        },
+    )
+    .screen;
+    assert_eq!(screen.page, 2, "the page the UI says is the page shown");
 }
 
 /// The background's own brightness is the eighth background, and not a

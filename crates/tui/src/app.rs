@@ -348,6 +348,10 @@ impl App {
         // The stack window follows the stack pointer, and the scroll is
         // where the user has moved it to.
         ui.stack_at = self.stack_at();
+        // The screen follows the machine's active video page: the guest
+        // draws on the page the BIOS has active, and that is the page the
+        // panel shows.
+        ui.screen_page = self.cpu.video().page;
         Panels::of(&self.cpu, &ui)
     }
 

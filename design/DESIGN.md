@@ -95,7 +95,8 @@ no header of its own. The debugger's own keys keep working while it is
 open — the machine still runs, still steps and still halts. The keys that
 act on the listing do not: the takeover holds the whole screen and the
 listing's cursor is not on it, and a cursor nobody can see is not one to
-move or to set a breakpoint at.
+move or to set a breakpoint at. The page carries the cursor the machine's
+BIOS set, and the cursor is drawn where the BIOS says it is.
 
 ## Surfaces
 
@@ -142,7 +143,13 @@ One family, geometric:
   cursor with the accent.
 - **The guest's screen**: the text page the guest wrote to, cell by
   cell — the character, and the foreground and the background its
-  attribute byte carries, in the guest's own colours.
+  attribute byte carries, in the guest's own colours. The cursor is
+  where the machine's BIOS says it is, and it is **underlined**: the
+  cell under it is underlined, the way the VGA draws its own cursor.
+  The underline is a mark and not a colour — the guest's colours are the
+  guest's — and a cursor the guest hid is not drawn at all. The guest's
+  screen has its own vocabulary, the guest's: the underline is not a
+  glyph of the debugger's family, and `▸` is not drawn on it.
 - **The status bar**: the hints on the left, the volatile data on the
   right, divided by `·`.
 

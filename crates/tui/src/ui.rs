@@ -1178,6 +1178,10 @@ fn screen(view: &ScreenView, frame: &mut Frame, area: Rect) {
 /// Every cell is one character with the colours its attribute byte
 /// carries: the foreground in the low three bits and the background in
 /// the high nibble, and the blink in the bit between them.
+///
+/// The cursor is the BIOS's own, and it is drawn the way the VGA draws it:
+/// the cell under it is underlined. The guest's colours are the guest's,
+/// so the cursor is a mark and not a colour of its own.
 struct Screen<'a> {
     /// The page the panel holds.
     view: &'a ScreenView,
@@ -1202,11 +1206,15 @@ impl Widget for Screen<'_> {
                 };
                 let mut bytes = [0u8; 4];
                 target.set_symbol(cell.character.encode_utf8(&mut bytes));
-                target.set_style(theme::guest(
-                    cell.foreground(),
-                    cell.background(),
-                    cell.blink(),
-                ));
+                let mut style = theme::guest(cell.foreground(), cell.background(), cell.blink());
+                if self
+                    .view
+                    .cursor
+                    .is_some_and(|cursor| cursor.row == row && cursor.column == column)
+                {
+                    style = style.add_modifier(Modifier::UNDERLINED);
+                }
+                target.set_style(style);
             }
         }
     }
