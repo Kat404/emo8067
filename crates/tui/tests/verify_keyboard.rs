@@ -198,3 +198,16 @@ fn s21_the_help_says_the_keys_go_to_the_guest() {
         emo8067_tui::ui::KEYS
     );
 }
+
+/// S18 - a key the set has no code for is not a keystroke: it reaches the
+/// guest nowhere, and the guest's buffer stays as it was.
+#[test]
+fn s18_a_key_the_set_has_no_code_for_is_not_a_keystroke() {
+    let mut app = app_of("no-code", "org 100h\nhlt\n");
+    press(&mut app, &[KeyCode::CapsLock]);
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        0,
+        "the guest's buffer is empty: an unnamed key is not a keystroke"
+    );
+}

@@ -37,6 +37,9 @@ const TAIL: u16 = 0x001C;
 const BUFFER: u16 = 0x001E;
 /// The offset of the keyboard buffer's size, in bytes.
 const SIZE: u16 = 0x0030;
+/// The bytes one entry of the keyboard buffer takes: the ASCII character
+/// and the scan code.
+const ENTRY: u16 = 2;
 
 /// The segment the text pages live in.
 const VIDEO: u16 = 0xB800;
@@ -128,12 +131,21 @@ fn int16_twice(first: impl FnOnce(&mut Cpu), second: impl FnOnce(&mut Cpu)) -> C
 /// Put a keystroke into the keyboard buffer, the way the host's door puts
 /// it there: the ASCII character and the scan code, at the tail.
 fn press(c: &mut Cpu, scan_code: u8, ascii: u8) {
+    // The end comes from the size word, which is the guest's own: an end
+    // that would leave the segment leaves the buffer empty, the way the
+    // door leaves it. The addition is checked for the same reason.
+    let Some(end) = BUFFER.checked_add(c.mem.read_u16(DATA, SIZE)) else {
+        return;
+    };
     let tail = c.mem.read_u16(DATA, TAIL);
     c.mem.write_u8(DATA, tail, ascii);
     c.mem.write_u8(DATA, tail + 1, scan_code);
     // The tail wraps at the ring's end, the way the door's does.
-    let end = BUFFER + c.mem.read_u16(DATA, SIZE);
-    let next = if tail + 2 >= end { BUFFER } else { tail + 2 };
+    let next = if tail + ENTRY >= end {
+        BUFFER
+    } else {
+        tail + ENTRY
+    };
     c.mem.write_u16(DATA, TAIL, next);
 }
 

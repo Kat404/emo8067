@@ -491,6 +491,25 @@ fn the_help_names_the_keys_option() {
     assert!(out.contains("--keys"), "the help names the option: {out}");
 }
 
+/// A script that does not fit in the guest's keyboard buffer is said out
+/// loud: the run is not a failure, but the guest did not get the script.
+#[test]
+fn a_script_that_does_not_fit_is_said_out_loud() {
+    let dir = scratch("too-many-keys");
+    let source = dir.join("program.asm");
+    // A program that never polls the keyboard, and a script of ten keys
+    // for a buffer that holds eight.
+    std::fs::write(&source, "org 100h\nmov ax, 1234h\nhlt\n").unwrap();
+    let (out, err, code) = run(&["run", "--keys", "abcdefghij", source.to_str().unwrap()]);
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(
+        err.contains("2 of the script's keys never reached the guest"),
+        "{err}"
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// The option does not change a run that asks for no key: the program runs
 /// as it always did.
 #[test]

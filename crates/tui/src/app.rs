@@ -1525,6 +1525,10 @@ struct Target {
     segment: Option<u16>,
 }
 
+/// The function keys the set names: the ten of the original keyboard and
+/// the two the enhanced one added. A key past them is not a keystroke.
+const FUNCTION_KEYS: u8 = 12;
+
 /// The scan code and the ASCII character of a key.
 ///
 /// The scan code is the IBM PC's set 1: the corpus is the evidence inside
@@ -1556,7 +1560,7 @@ fn key_of(code: KeyCode) -> Option<(u8, u8)> {
         KeyCode::PageDown => Some((SCAN_PAGE_DOWN, 0)),
         KeyCode::Insert => Some((SCAN_INSERT, 0)),
         KeyCode::Delete => Some((SCAN_DELETE, 0)),
-        KeyCode::F(number) if number <= 12 => Some((function_scan_code(number), 0)),
+        KeyCode::F(number) if number <= FUNCTION_KEYS => Some((function_scan_code(number), 0)),
         // A key the set has no code for is not a keystroke: it would reach
         // the guest as a NUL, and the guest cannot tell it from a real one.
         _ => None,

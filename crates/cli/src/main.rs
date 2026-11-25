@@ -326,7 +326,7 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     // not the script the user wrote.
     if next_key < script.len() {
         eprintln!(
-            "emo8067: {} of the script's keys did not fit in the guest's keyboard buffer",
+            "emo8067: {} of the script's keys never reached the guest",
             script.len() - next_key
         );
     }

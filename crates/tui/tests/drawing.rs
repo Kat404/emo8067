@@ -1593,6 +1593,11 @@ fn the_help_overlay_is_a_section_and_not_a_box() {
         .iter()
         .position(|row| row.contains("keys"))
         .expect("the help has a header of its own");
+    assert!(
+        rows[header].contains("the rest go to the guest"),
+        "the help says which keys reach the guest: {:?}",
+        rows[header]
+    );
     let panels = rows
         .iter()
         .position(|row| row.contains("registers"))
