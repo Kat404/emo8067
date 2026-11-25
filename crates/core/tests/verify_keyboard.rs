@@ -326,6 +326,23 @@ fn s14_a_guest_that_scribbles_the_ends_sees_an_empty_buffer() {
     assert_eq!(c.keys_waiting(), 0, "and the keystroke has nowhere to go");
 }
 
+/// S14 - the size word is the guest's own too: a size that would take the
+/// ring's end past the segment empties the buffer, and the emulator lives.
+#[test]
+fn s14_a_guest_that_scribbles_the_size_word_sees_an_empty_buffer() {
+    for scribble in [0x0000u16, 0x0001, 0x0012, 0x0014, 0xFFE2, 0xFFFE, 0xFFFF] {
+        let mut c = machine(&[0xCD, 0x16, 0xF4]);
+        c.mem.write_u16(DATA, SIZE, scribble);
+        c.regs.set_byte(Reg8::Ah, 0x01);
+        run(&mut c);
+        assert!(
+            c.regs.flags.get(flags::ZF),
+            "the size {scribble:#06x} is not a ring's size: the buffer is empty"
+        );
+        assert_eq!(c.regs.ip, 0x0003, "and the machine carried on");
+    }
+}
+
 /// S14 - the size word is at `0040:0030` and the buffer's body is
 /// `0040:001E`-`:002F`. The size word is OUTSIDE the body, so the ring can
 /// never clobber it, and the whole layout lives in `0040:001A`-`:0031`.

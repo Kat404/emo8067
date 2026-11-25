@@ -293,10 +293,14 @@ impl Cpu {
     /// whose ring would reach the size word, leaves the buffer empty.
     fn keyboard_end(&self) -> Option<u16> {
         let size = self.data_word(KEYBOARD_SIZE);
-        if size == 0 || size % 2 != 0 || KEYBOARD_BUFFER + size > KEYBOARD_SIZE {
+        // The size is the guest's own word, so the addition is checked: a
+        // size that would leave the segment leaves the buffer empty, and
+        // the emulator lives.
+        let end = KEYBOARD_BUFFER.checked_add(size)?;
+        if size == 0 || size % 2 != 0 || end > KEYBOARD_SIZE {
             return None;
         }
-        Some(KEYBOARD_BUFFER + size)
+        Some(end)
     }
 
     /// The head and the tail of the keyboard buffer, when they are offsets
