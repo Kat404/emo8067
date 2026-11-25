@@ -62,6 +62,18 @@ pub const DEFAULT_COLUMNS: u16 = 80;
 /// The rows the machine starts in.
 pub const DEFAULT_ROWS: u16 = 25;
 
+/// The widest text mode the hardware has: eighty columns.
+///
+/// The text modes are forty columns and eighty columns, and the widest of
+/// them is the bound a guest's column count cannot pass.
+const MAX_COLUMNS: u16 = 80;
+
+/// The tallest text mode the hardware has: twenty-five rows.
+///
+/// Both text modes are twenty-five rows tall, and that is the bound a
+/// guest's row count cannot pass.
+const MAX_ROWS: u16 = 25;
+
 /// The cursor's start line the machine starts with: the standard text
 /// cursor, the lines 6 and 7 of the cell.
 pub const DEFAULT_CURSOR_START: u8 = 6;
@@ -141,13 +153,23 @@ impl Cpu {
     }
 
     /// The columns on screen.
+    ///
+    /// The data area is ordinary memory and the guest can write it, so the
+    /// count is bounded before anything computes with it: the widest text
+    /// mode the hardware has is eighty columns, and a count above it is
+    /// that mode's count. The word in the data area is the guest's own,
+    /// and the guest reads it back.
     fn columns(&self) -> u16 {
-        self.data_word(COLUMNS)
+        self.data_word(COLUMNS).min(MAX_COLUMNS)
     }
 
     /// The rows on screen.
+    ///
+    /// The data area holds the rows minus one, so a byte of `0FFh` is 256
+    /// rows: the count is bounded the way the columns are, at the
+    /// twenty-five rows of the tallest text mode.
     fn rows(&self) -> u16 {
-        u16::from(self.data_byte(ROWS)) + 1
+        (u16::from(self.data_byte(ROWS)) + 1).min(MAX_ROWS)
     }
 
     /// The cursor's row and column on a page.
@@ -384,8 +406,27 @@ fn scroll(cpu: &mut Cpu, down: bool) {
 fn read_character(cpu: &mut Cpu) {
     let page = cpu.regs.byte(Reg8::Bh);
     let (row, column) = cpu.cursor(page);
-    let index = u16::from(row) * cpu.columns() + u16::from(column);
-    let (character, attribute) = cell(cpu, page, index);
+    let columns = cpu.columns();
+    let rows = cpu.rows();
+    let cells = columns * rows;
+    if cells == 0 {
+        // A machine with no geometry has no page to read from.
+        return;
+    }
+    // The cursor is the guest's own: the row is brought into the screen,
+    // the way it always was, and the column is the guest's own, because a
+    // cell is addressed by its index in the page: the row times the
+    // columns plus the column.
+    let row = u16::from(row).min(rows - 1);
+    let column = u16::from(column);
+    let index = row * columns + column;
+    let (character, attribute) = if index < cells {
+        cell(cpu, page, index)
+    } else {
+        // The cursor names no cell of the screen: the service reads a
+        // blank one.
+        (0, 0)
+    };
     cpu.regs.set_byte(Reg8::Ah, attribute);
     cpu.regs.set_byte(Reg8::Al, character);
 }
@@ -442,30 +483,38 @@ fn teletype(cpu: &mut Cpu) {
         return;
     }
     let (row, column) = cpu.cursor(page);
-    // A cursor outside the screen is brought back into it: the page is
-    // four kilobytes and the write must not leave it.
-    let mut row = row.min((rows - 1) as u8);
-    let mut column = column.min((columns - 1) as u8);
+    let cells = columns * rows;
+    // The cursor is the guest's own: the row is brought into the screen,
+    // the way it always was, and the column is the guest's own, because a
+    // cell is addressed by its index in the page: the row times the
+    // columns plus the column. The arithmetic is wide enough that it
+    // cannot overflow.
+    let row = u16::from(row).min(rows - 1);
+    let column = u16::from(column);
+    let index = row * columns + column;
+    if index >= cells {
+        // The cursor names no cell of the screen: there is nothing to
+        // print on, and the cursor does not move.
+        return;
+    }
 
-    put_cell(
-        cpu,
-        page,
-        u16::from(row) * columns + u16::from(column),
-        character,
-        TEXT_ATTRIBUTE,
-    );
+    put_cell(cpu, page, index, character, TEXT_ATTRIBUTE);
 
-    column += 1;
-    if u16::from(column) >= columns {
+    // The cursor advances, and the column and the row are counted in
+    // sixteen bits, so that neither of them can be incremented past what
+    // the type holds.
+    let mut column = column + 1;
+    let mut row = row;
+    if column >= columns {
         column = 0;
         row += 1;
-        if u16::from(row) >= rows {
+        if row >= rows {
             // The cursor reached the bottom: the page scrolls up.
             scroll_line(cpu, page, columns, rows);
-            row = (rows - 1) as u8;
+            row = rows - 1;
         }
     }
-    cpu.set_cursor(page, row, column);
+    cpu.set_cursor(page, row as u8, column as u8);
 }
 
 /// Scroll the whole page up by one line, and fill the last line with
@@ -544,3 +593,149 @@ fn write_string(cpu: &mut Cpu) {
 /// for is the one the page is already in. The service runs and the page is
 /// left as it is.
 fn toggle_intensity(_cpu: &mut Cpu) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A machine whose guest has written a geometry of its own.
+    fn cpu_with_the_guests_geometry(columns: u16, rows: u8) -> Cpu {
+        let mut cpu = Cpu::new();
+        cpu.set_data_word(COLUMNS, columns);
+        cpu.set_data_byte(ROWS, rows);
+        cpu
+    }
+
+    /// The character at a cell of a page.
+    fn character(cpu: &Cpu, page: u16, index: u16) -> u8 {
+        cpu.mem
+            .read_u8(VIDEO_SEGMENT, page * PAGE_STRIDE + index * 2)
+    }
+
+    /// The cursor of a page, the way the data area keeps it.
+    fn cursor(cpu: &Cpu, page: u8) -> (u8, u8) {
+        let word = cpu.data_word(CURSORS + 2 * u16::from(page));
+        ((word >> 8) as u8, (word & 0xFF) as u8)
+    }
+
+    /// The geometry the guest writes is bounded by the hardware's modes.
+    ///
+    /// The data area is ordinary memory and the guest can write it: a
+    /// column count or a row count the hardware cannot hold is bounded
+    /// before anything computes with it, and the widest text mode and the
+    /// tallest one are the bounds.
+    #[test]
+    fn the_geometry_the_guest_writes_is_bounded_by_the_hardware() {
+        let cpu = cpu_with_the_guests_geometry(0xFFFF, 0xFF);
+        let video = cpu.video();
+        assert_eq!(
+            video.columns, 80,
+            "the widest text mode the hardware has is eighty columns"
+        );
+        assert_eq!(
+            video.rows, 25,
+            "and the tallest text mode is twenty-five rows"
+        );
+        // The data area keeps the guest's own words: the BIOS has no state
+        // of its own, and the guest reads them back.
+        assert_eq!(
+            cpu.data_word(COLUMNS),
+            0xFFFF,
+            "the guest's column count is where the guest put it"
+        );
+        assert_eq!(cpu.data_byte(ROWS), 0xFF, "and so is its row count");
+    }
+
+    /// The teletype prints at the cell the cursor names.
+    ///
+    /// A cell is addressed by its index in the page: the row times the
+    /// columns plus the column. The column is the guest's own, and the
+    /// index is the one the cursor names.
+    #[test]
+    fn the_teletype_prints_at_the_cell_the_cursor_names() {
+        let mut cpu = cpu_with_the_guests_geometry(0xFFFF, 0xFF);
+        // The cursor of the page, at the row 0 and the column 255.
+        cpu.set_cursor(0, 0, 255);
+        cpu.regs.set_byte(Reg8::Al, b'X');
+        teletype(&mut cpu);
+        assert_eq!(
+            character(&cpu, 0, 255),
+            b'X',
+            "the character is at the cell the cursor names"
+        );
+        assert_eq!(cursor(&cpu, 0), (1, 0), "and the cursor advanced");
+    }
+
+    /// A cell that is not a cell of the screen is not written.
+    ///
+    /// The page is four kilobytes and a write must not leave it: a cursor
+    /// that names no cell of the screen has nothing to print on.
+    #[test]
+    fn a_cell_that_is_not_a_cell_of_the_screen_is_not_written() {
+        let mut cpu = cpu_with_the_guests_geometry(0xFFFF, 0xFF);
+        // The cursor of the page, at the last row and a column past it.
+        cpu.set_cursor(0, 24, 255);
+        cpu.regs.set_byte(Reg8::Al, b'X');
+        teletype(&mut cpu);
+        assert_eq!(
+            character(&cpu, 0, 24 * MAX_COLUMNS + 255),
+            0,
+            "nothing was written: the cell is not a cell of the screen"
+        );
+        assert_eq!(
+            character(&cpu, 0, 24 * MAX_COLUMNS + 79),
+            0,
+            "and nothing was written on the screen either"
+        );
+        assert_eq!(cursor(&cpu, 0), (24, 255), "and the cursor did not move");
+    }
+
+    /// Every service writes inside the page.
+    ///
+    /// The geometry the guest wrote is a count the hardware cannot hold,
+    /// and every service that writes computes with the bounded one: the
+    /// page's own cells are the only ones they touch.
+    #[test]
+    fn every_service_writes_inside_the_page() {
+        let mut cpu = cpu_with_the_guests_geometry(0xFFFF, 0xFF);
+        // The page the services write on, and the one after it, filled with
+        // a pattern of their own.
+        let base = 7 * PAGE_STRIDE;
+        for offset in base..base + 2 * PAGE_STRIDE {
+            cpu.mem.write_u8(VIDEO_SEGMENT, offset, 0xAA);
+        }
+        // The cursor of the page, at the last cell of the screen.
+        cpu.set_cursor(7, 24, 79);
+        for ah in [
+            0x00u8, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0E, 0x10, 0x13,
+        ] {
+            cpu.regs.set_byte(Reg8::Ah, ah);
+            cpu.regs.set_byte(Reg8::Al, 0xFF);
+            cpu.regs.set_byte(Reg8::Bh, 7);
+            cpu.regs.set_byte(Reg8::Bl, 0x1E);
+            cpu.regs.set_byte(Reg8::Ch, 0);
+            cpu.regs.set_byte(Reg8::Cl, 0);
+            cpu.regs.set_byte(Reg8::Dh, 24);
+            cpu.regs.set_byte(Reg8::Dl, 79);
+            cpu.regs.set_word(Reg16::Cx, 0xFFFF);
+            cpu.regs.set_word(Reg16::Bp, 0x0200);
+            service(&mut cpu);
+        }
+        // The cells of the page past the screen are untouched, and so is
+        // the page after the one the services wrote on.
+        for cell in MAX_COLUMNS * MAX_ROWS..PAGE_STRIDE / 2 {
+            assert_eq!(
+                cpu.mem.read_u8(VIDEO_SEGMENT, base + cell * 2),
+                0xAA,
+                "the page's cells past the screen are untouched"
+            );
+        }
+        for offset in base + PAGE_STRIDE..base + 2 * PAGE_STRIDE {
+            assert_eq!(
+                cpu.mem.read_u8(VIDEO_SEGMENT, offset),
+                0xAA,
+                "the page after the one the services wrote on is untouched"
+            );
+        }
+    }
+}
