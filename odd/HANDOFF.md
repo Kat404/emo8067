@@ -10,6 +10,13 @@ a real open item, not a reminder.
 
 ## Where the 2026-11-24 work is
 
+**The branch is merged.** `feat/tui-memory-window` went into `main` through
+pull request #1 on GitHub (merge commit `11422fb`), and **both remotes
+carry the same `main`** — GitHub and Codeberg, at `11422fb`. The merge
+changed nothing in the tree: `main` and the branch have the same tree
+(`8af53ca2`). The branch itself is still on both remotes, as the record
+of the work; the next unit takes a fresh branch from `main`.
+
 The TUI has **the guest's screen**: a passive viewer of the emulated
 VGA text page, so a program that prints to video memory can be seen.
 

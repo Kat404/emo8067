@@ -287,7 +287,9 @@ registers with no state of its own.
     crate; `cargo fmt --all --check` exits 0; **the full gate over all
     646 000 captures passes with no disagreement**, and the examples'
     gate is green with the recorded states recorded again. Both remotes
-    carry the branch.
+    carry the branch, and the branch went into `main` through pull request
+    #1 (merge commit `11422fb`); **the next unit takes a fresh branch from
+    `main`**, and `main` and the branch have the same tree.
   - **The native review of this unit is closed and its authority burned.**
     Three lenses, a refuter and a targeted validator; one CRITICAL found
     and fixed; the acknowledgement was the exact one the bound STATUS
