@@ -16,12 +16,17 @@
 //! so instead of pretending: the effective addresses (`d bx+5`), because
 //! the console reads plain addresses; and the symbols (`d lion L 10`),
 //! because this project has no symbol table.
+//!
+//! **The parser is the debug crate's**, because the two front ends share
+//! it: the TUI draws the console and the GUI will too, and neither of them
+//! owns the words.
 
 use emo8067_core::Cpu;
 use emo8067_core::regs::Seg;
-use emo8067_debug::expr;
-use emo8067_debug::machine::Machine;
-use emo8067_debug::panels::{Flag, Register};
+
+use crate::expr;
+use crate::machine::Machine;
+use crate::panels::{Flag, Register};
 
 /// The bytes a dump holds when the command names no count.
 ///

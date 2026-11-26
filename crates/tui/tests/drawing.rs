@@ -221,7 +221,7 @@ fn a_register_can_be_edited_in_place() {
         0xBEEF,
         "the value was written"
     );
-    assert!(app.edit.is_none(), "and the edit is over");
+    assert!(app.ui.edit.is_none(), "and the edit is over");
 }
 
 #[test]
@@ -263,17 +263,17 @@ fn the_focus_moves_between_the_panes() {
 fn the_arrows_still_move_the_disassembly_cursor() {
     let mut app = app("arrows");
     press(&mut app, &[KeyCode::Down]);
-    assert_eq!(app.cursor, 1, "the cursor moved down the listing");
+    assert_eq!(app.ui.cursor, 1, "the cursor moved down the listing");
     press(&mut app, &[KeyCode::Up]);
-    assert_eq!(app.cursor, 0, "and back up again");
+    assert_eq!(app.ui.cursor, 0, "and back up again");
 }
 
 #[test]
 fn the_arrows_move_the_cursor_of_the_pane_that_has_it() {
     let mut app = app("register-arrows");
     press(&mut app, &[KeyCode::Char('2'), KeyCode::Down]);
-    assert_eq!(app.register_cursor, 2, "one row down the panel");
-    assert_eq!(app.cursor, 0, "and the listing did not move");
+    assert_eq!(app.ui.register_cursor, 2, "one row down the panel");
+    assert_eq!(app.ui.cursor, 0, "and the listing did not move");
 }
 
 #[test]
@@ -475,8 +475,8 @@ fn the_word_the_pointer_is_at_is_marked() {
 fn the_arrows_do_not_move_the_listing_while_the_stack_pane_is_open() {
     let mut app = app("stack-listing");
     press(&mut app, &[KeyCode::Char('5'), KeyCode::Down]);
-    assert_eq!(app.cursor, 0, "the listing's cursor did not move");
-    assert_eq!(app.stack_scroll, 2, "and the stack window did");
+    assert_eq!(app.ui.cursor, 0, "the listing's cursor did not move");
+    assert_eq!(app.ui.stack_scroll, 2, "and the stack window did");
 }
 
 #[test]
@@ -500,9 +500,9 @@ fn a_breakpoint_is_not_set_while_the_stack_pane_holds_the_listings_place() {
 fn the_stack_window_starts_at_the_pointer_every_time_it_is_opened() {
     let mut app = app_of("stack-open", "org 100h\n#sp=0200#\nhlt\n");
     press(&mut app, &[KeyCode::Char('5'), KeyCode::Down]);
-    assert_eq!(app.stack_scroll, 2, "the window was moved away");
+    assert_eq!(app.ui.stack_scroll, 2, "the window was moved away");
     press(&mut app, &[KeyCode::Char('5'), KeyCode::Char('5')]);
-    assert_eq!(app.stack_scroll, 0, "and it starts at the pointer again");
+    assert_eq!(app.ui.stack_scroll, 0, "and it starts at the pointer again");
     let text = screen(&app, 80, 24);
     assert!(
         text.contains("0200  0000"),
@@ -746,7 +746,7 @@ fn the_byte_under_the_memory_cursor_is_written() {
         panels.memory.bytes[panels.memory.cursor], 0x34,
         "and the panel reads it back"
     );
-    assert!(app.edit.is_none(), "and the edit is over");
+    assert!(app.ui.edit.is_none(), "and the edit is over");
 }
 
 #[test]
@@ -762,7 +762,7 @@ fn a_byte_that_does_not_fit_is_refused() {
     );
     let status = app.status.clone().unwrap_or_default();
     assert!(status.contains("out of range"), "and it says why: {status}");
-    assert!(app.edit.is_some(), "and the edit is still open");
+    assert!(app.ui.edit.is_some(), "and the edit is still open");
 }
 
 #[test]
@@ -788,7 +788,7 @@ fn the_flag_under_the_flags_cursor_is_written() {
         app.panels().registers.flag(Flag::Cf),
         "and the panel reads the new value"
     );
-    assert!(app.edit.is_none(), "and the edit is over");
+    assert!(app.ui.edit.is_none(), "and the edit is over");
 }
 
 #[test]
@@ -811,7 +811,7 @@ fn a_flag_that_is_not_a_boolean_is_refused() {
     assert!(!app.cpu.regs.flags.get(CF), "the flag is as it was");
     let status = app.status.clone().unwrap_or_default();
     assert!(status.contains("out of range"), "and it says why: {status}");
-    assert!(app.edit.is_some(), "and the edit is still open");
+    assert!(app.ui.edit.is_some(), "and the edit is still open");
 }
 
 #[test]
@@ -830,18 +830,18 @@ fn the_flag_under_the_cursor_is_drawn_as_being_edited() {
 fn the_arrows_move_the_flags_cursor() {
     let mut app = app("flag-arrows");
     press(&mut app, &[KeyCode::Char('4')]);
-    assert_eq!(app.flag_cursor, 0, "the cursor is on the first flag");
+    assert_eq!(app.ui.flag_cursor, 0, "the cursor is on the first flag");
     press(&mut app, &[KeyCode::Right]);
-    assert_eq!(app.flag_cursor, 1, "one flag to the right");
+    assert_eq!(app.ui.flag_cursor, 1, "one flag to the right");
     press(&mut app, &[KeyCode::Down]);
-    assert_eq!(app.flag_cursor, 4, "and one row down");
+    assert_eq!(app.ui.flag_cursor, 4, "and one row down");
     press(&mut app, &[KeyCode::Up]);
-    assert_eq!(app.flag_cursor, 1, "and back up again");
+    assert_eq!(app.ui.flag_cursor, 1, "and back up again");
     press(&mut app, &[KeyCode::Left]);
-    assert_eq!(app.flag_cursor, 0, "and back to the first");
+    assert_eq!(app.ui.flag_cursor, 0, "and back to the first");
     press(&mut app, &[KeyCode::Char('2'), KeyCode::Down]);
     assert_eq!(
-        app.flag_cursor, 0,
+        app.ui.flag_cursor, 0,
         "and it stays put when another pane has the focus"
     );
 }
@@ -878,7 +878,7 @@ fn the_goto_with_a_label_jumps_to_the_label() {
     type_text(&mut app, "start");
     press(&mut app, &[KeyCode::Enter]);
     assert_eq!(app.ui.memory_at, 0x0100, "the window is at the label");
-    assert!(app.goto.is_none(), "and the prompt is closed");
+    assert!(app.ui.goto.is_none(), "and the prompt is closed");
 }
 
 #[test]
@@ -1022,7 +1022,7 @@ fn the_condition_under_the_cursor_is_edited_and_the_machine_stops_on_it() {
         Some("AX==1234h"),
         "the model has the condition"
     );
-    assert!(app.edit.is_none(), "and the prompt is closed");
+    assert!(app.ui.edit.is_none(), "and the prompt is closed");
     assert!(
         !app.breakpoints
             .stops_at(&Machine::new(&app.cpu), entry.segment, entry.offset),
@@ -1068,7 +1068,7 @@ fn a_condition_that_does_not_read_is_refused_and_the_old_one_stays() {
         status.contains("bad expression"),
         "the refusal is the evaluator's own: {status}"
     );
-    assert!(app.edit.is_some(), "and the prompt stays open");
+    assert!(app.ui.edit.is_some(), "and the prompt stays open");
 }
 
 #[test]
@@ -1093,7 +1093,7 @@ fn a_condition_that_is_typed_empty_clears_it() {
         .next()
         .expect("the entry is there");
     assert_eq!(entry.condition, None, "the condition is gone");
-    assert!(app.edit.is_none(), "and the prompt is closed");
+    assert!(app.ui.edit.is_none(), "and the prompt is closed");
 }
 
 #[test]
@@ -1313,7 +1313,7 @@ fn a_watchpoint_carries_no_condition_and_the_model_says_so() {
         status.contains("no breakpoint there"),
         "the model says that there is no breakpoint there: {status}"
     );
-    assert!(app.edit.is_some(), "and the prompt stays open");
+    assert!(app.ui.edit.is_some(), "and the prompt stays open");
 }
 
 /// The design's own rules, and what the screen says about them.

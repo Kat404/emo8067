@@ -143,7 +143,7 @@ fn the_screen_takes_the_terminal_over_and_the_keys_keep_working() {
         "and F9 sets no breakpoint at a cursor nobody can see"
     );
     press(&mut app, &[KeyCode::Down]);
-    assert_eq!(app.cursor, 0, "and the arrows move no cursor either");
+    assert_eq!(app.ui.cursor, 0, "and the arrows move no cursor either");
 
     // And `x` again closes it.
     press(&mut app, &[KeyCode::Char('x')]);
@@ -162,7 +162,7 @@ fn the_screen_takes_the_terminal_over_and_the_keys_keep_working() {
         "and F9 sets a breakpoint at the cursor once more"
     );
     press(&mut app, &[KeyCode::Down]);
-    assert_eq!(app.cursor, 1, "and the arrows move the cursor again");
+    assert_eq!(app.ui.cursor, 1, "and the arrows move the cursor again");
 }
 
 /// Only one window holds the screen at a time.
@@ -463,7 +463,7 @@ fn the_keys_that_act_on_the_listing_act_on_nothing() {
     );
     press(&mut app, &[KeyCode::Down]);
     press(&mut app, &[KeyCode::Right]);
-    assert_eq!(app.cursor, 0, "and the arrows move no cursor either");
+    assert_eq!(app.ui.cursor, 0, "and the arrows move no cursor either");
     assert_eq!(app.ui.memory_at, 0, "and no memory cursor either");
 }
 

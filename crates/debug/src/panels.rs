@@ -1,4 +1,4 @@
-//! The panel model.
+//! The panel model, and the UI's own state.
 //!
 //! Every panel is a pure function of the machine's state and of a UI state
 //! struct, which is what the research settled (`features-and-ux.md` §4.3):
@@ -9,14 +9,24 @@
 //! research draws (`features-and-ux.md` §4.4): the disassembly, the
 //! registers with their flags, the memory as hex and characters, and the
 //! stack.
+//!
+//! **The UI state is the two front ends' own**, and it is here: the cursors
+//! that say where the user is in each pane, the choices the user has made,
+//! and the prompts that are open. Both front ends hold one of these, and
+//! neither owns it.
 
 use emo8067_core::Cpu;
 use emo8067_core::bios::Video;
 use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg16, Seg};
 
-/// What the panels show, besides the machine's own state.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// What the panels show, besides the machine's own state, and where the
+/// user is.
+///
+/// The state is the two front ends' own: the cursors that say where the
+/// user is in each pane, the choices the user has made, and the prompts
+/// that are open. Both front ends hold one of these, and neither owns it.
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Ui {
     /// Where the memory panel's cursor is.
     ///
@@ -50,6 +60,105 @@ pub struct Ui {
     /// The hardware has eight pages of text memory and no more; a page
     /// past the last one is the last one.
     pub screen_page: u8,
+    /// Which line of the listing the cursor is on.
+    pub cursor: usize,
+    /// Which register of the panel the cursor is on.
+    pub register_cursor: usize,
+    /// Which flag of the panel the cursor is on.
+    pub flag_cursor: usize,
+    /// Which entry of the conditions listing the cursor is on.
+    pub condition_cursor: usize,
+    /// How far the stack window is from the stack pointer.
+    ///
+    /// The window follows the pointer, the way the listing follows the
+    /// instruction pointer, and this is the scroll the user has made from
+    /// it.
+    pub stack_scroll: u16,
+    /// The segment the last goto named.
+    ///
+    /// The memory window looks through the segment the goto named, and
+    /// through the data segment when no goto has named one: the choice is
+    /// kept until another goto names another segment.
+    pub goto_segment: Option<u16>,
+    /// What is being edited, in place.
+    pub edit: Option<Edit>,
+    /// The address the memory window is being jumped to.
+    pub goto: Option<Goto>,
+}
+
+/// What is being edited, in place.
+///
+/// The panels write three things: a register, a flag and a byte, and the
+/// conditions pane writes a condition. The edit says which one of them it
+/// is, because the value that is typed is written into a different place
+/// each time.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Edit {
+    /// The register under the cursor.
+    Register {
+        /// The register.
+        register: Register,
+        /// What has been typed so far.
+        text: String,
+    },
+    /// The flag under the cursor.
+    Flag {
+        /// The flag.
+        flag: Flag,
+        /// What has been typed so far.
+        text: String,
+    },
+    /// The byte under the memory cursor.
+    Byte {
+        /// The segment the byte is at.
+        segment: u16,
+        /// The offset the byte is at.
+        offset: u16,
+        /// What has been typed so far.
+        text: String,
+    },
+    /// The condition of the entry under the cursor.
+    ///
+    /// The condition is a text and not a value: it is read by the
+    /// evaluator, and it is written through the model's own door.
+    Condition {
+        /// The segment the entry is in.
+        segment: u16,
+        /// The offset the entry is at.
+        offset: u16,
+        /// What has been typed so far.
+        text: String,
+    },
+}
+
+impl Edit {
+    /// What has been typed so far.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        match self {
+            Edit::Register { text, .. }
+            | Edit::Flag { text, .. }
+            | Edit::Byte { text, .. }
+            | Edit::Condition { text, .. } => text,
+        }
+    }
+
+    /// What has been typed so far, to write into.
+    pub fn text_mut(&mut self) -> &mut String {
+        match self {
+            Edit::Register { text, .. }
+            | Edit::Flag { text, .. }
+            | Edit::Byte { text, .. }
+            | Edit::Condition { text, .. } => text,
+        }
+    }
+}
+
+/// The address the memory window is jumped to.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Goto {
+    /// What has been typed so far.
+    pub text: String,
 }
 
 impl Default for Ui {
@@ -64,6 +173,14 @@ impl Default for Ui {
             stack_at: 0,
             screen_segment: 0xB800,
             screen_page: 0,
+            cursor: 0,
+            register_cursor: 0,
+            flag_cursor: 0,
+            condition_cursor: 0,
+            stack_scroll: 0,
+            goto_segment: None,
+            edit: None,
+            goto: None,
         }
     }
 }

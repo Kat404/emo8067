@@ -1,9 +1,10 @@
 //! The TUI's state, and the keys that move it.
 //!
-//! The state here is the UI's own: where the cursor is, which addresses the
-//! machine has been at, and the breakpoints. Everything the panels show is
-//! drawn from the model in `emo8067-debug`, which is a pure function of the
-//! machine and the UI state struct.
+//! The state here is the TUI's own: which addresses the machine has been
+//! at, and the breakpoints. Everything the panels show is drawn from the
+//! model in `emo8067-debug`, which is a pure function of the machine and
+//! the UI state struct — and the cursors, the choices and the prompts are
+//! in that struct too, because the GUI holds them as well.
 
 use std::path::PathBuf;
 
@@ -16,13 +17,13 @@ use emo8067_core::bios::{
 use emo8067_core::regs::{Reg16, Seg};
 use emo8067_debug::Access;
 use emo8067_debug::breakpoints::{Breakpoints, Entry};
+use emo8067_debug::console::{self, Console};
 use emo8067_debug::expr;
 use emo8067_debug::machine::Machine;
-use emo8067_debug::panels::{Flag, Panels, Register, Ui};
+use emo8067_debug::panels::{Edit, Flag, Goto, Panels, Register, Ui};
 use emo8067_debug::source::SourceView;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use crate::console::{self, Console};
 use crate::ui;
 
 /// Which pane has the cursor.
@@ -36,81 +37,6 @@ pub enum Focus {
     Memory,
     /// The flags.
     Flags,
-}
-
-/// What is being edited, in place.
-///
-/// The panels write three things: a register, a flag and a byte, and the
-/// conditions pane writes a condition. The edit says which one of them it
-/// is, because the value that is typed is written into a different place
-/// each time.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Edit {
-    /// The register under the cursor.
-    Register {
-        /// The register.
-        register: Register,
-        /// What has been typed so far.
-        text: String,
-    },
-    /// The flag under the cursor.
-    Flag {
-        /// The flag.
-        flag: Flag,
-        /// What has been typed so far.
-        text: String,
-    },
-    /// The byte under the memory cursor.
-    Byte {
-        /// The segment the byte is at.
-        segment: u16,
-        /// The offset the byte is at.
-        offset: u16,
-        /// What has been typed so far.
-        text: String,
-    },
-    /// The condition of the entry under the cursor.
-    ///
-    /// The condition is a text and not a value: it is read by the
-    /// evaluator, and it is written through the model's own door.
-    Condition {
-        /// The segment the entry is in.
-        segment: u16,
-        /// The offset the entry is at.
-        offset: u16,
-        /// What has been typed so far.
-        text: String,
-    },
-}
-
-impl Edit {
-    /// What has been typed so far.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        match self {
-            Edit::Register { text, .. }
-            | Edit::Flag { text, .. }
-            | Edit::Byte { text, .. }
-            | Edit::Condition { text, .. } => text,
-        }
-    }
-
-    /// What has been typed so far, to write into.
-    pub fn text_mut(&mut self) -> &mut String {
-        match self {
-            Edit::Register { text, .. }
-            | Edit::Flag { text, .. }
-            | Edit::Byte { text, .. }
-            | Edit::Condition { text, .. } => text,
-        }
-    }
-}
-
-/// The address the memory window is jumped to.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Goto {
-    /// What has been typed so far.
-    pub text: String,
 }
 
 /// The bytes a row of the memory window holds.
@@ -205,36 +131,19 @@ pub struct App {
     pub last_ran: Option<u16>,
     /// How many instructions have run.
     pub steps: u64,
-    /// Which line of the listing the cursor is on.
-    pub cursor: usize,
     /// Which pane has the cursor.
     pub focus: Focus,
-    /// Which register of the panel the cursor is on.
-    pub register_cursor: usize,
-    /// Which flag of the panel the cursor is on.
-    pub flag_cursor: usize,
     /// Whether the stack pane is open where the listing is.
     ///
     /// The stack is a pane you open and not a fourth column: it takes the
     /// listing's place in the main band.
     pub stack_open: bool,
-    /// How far the stack window is from the stack pointer.
-    ///
-    /// The window follows the pointer, the way the listing follows the
-    /// instruction pointer, and this is the scroll the user has made from
-    /// it: it is the TUI's own state, like the listing's cursor.
-    pub stack_scroll: u16,
     /// Whether the conditions pane is open where the listing is.
     ///
     /// The conditions are a pane you open and not a fifth column: it takes
     /// the listing's place in the main band, the way the stack does, and
     /// only one of the two holds that place at a time.
     pub conditions_open: bool,
-    /// Which entry of the conditions listing the cursor is on.
-    ///
-    /// The cursor is over the entries of the model's own listing, and it
-    /// is the TUI's own state, like the listing's cursor.
-    pub condition_cursor: usize,
     /// Whether the console is open where the listing is.
     ///
     /// The console is a window and not a sixth column: it takes the
@@ -254,17 +163,10 @@ pub struct App {
     /// The console is the TUI's own: the commands it takes are the
     /// reference's own, and the words it says are this project's.
     pub console: Console,
-    /// What is being edited, in place.
-    pub edit: Option<Edit>,
-    /// The address the memory window is being jumped to.
-    pub goto: Option<Goto>,
-    /// The segment the last goto named.
-    ///
-    /// The memory window looks through the segment the goto named, and
-    /// through the data segment when no goto has named one: the choice is
-    /// kept until another goto names another segment.
-    pub goto_segment: Option<u16>,
     /// The UI's state, which the panels are drawn from.
+    ///
+    /// The cursors, the choices and the prompts live here: the state is
+    /// the debug crate's, because the GUI holds it too.
     pub ui: Ui,
     /// Whether the help overlay is up.
     pub help: bool,
@@ -290,20 +192,12 @@ impl App {
             executed: Vec::new(),
             last_ran: None,
             steps: 0,
-            cursor: 0,
             focus: Focus::Disassembly,
-            register_cursor: 0,
-            flag_cursor: 0,
             stack_open: false,
-            stack_scroll: 0,
             conditions_open: false,
-            condition_cursor: 0,
             console_open: false,
             screen_open: false,
             console: Console::default(),
-            edit: None,
-            goto: None,
-            goto_segment: None,
             ui: Ui::default(),
             help: false,
             finished: false,
@@ -341,7 +235,9 @@ impl App {
     /// instructions it finds in it, and the band says how many of them
     /// are shown.
     pub fn panels_with(&self, disassembly_len: usize) -> Panels {
-        let mut ui = self.ui;
+        // The UI's state is the debug crate's and it holds the prompts, so
+        // it is copied and not moved.
+        let mut ui = self.ui.clone();
         // The listing follows `CS:IP`, and the research says it is never
         // asked to disassemble a range.
         ui.disassembly_at = self.cpu.regs.ip;
@@ -367,7 +263,9 @@ impl App {
     /// the window looks through the data segment, the way it always has.
     #[must_use]
     pub fn memory_segment(&self) -> u16 {
-        self.goto_segment.unwrap_or(self.cpu.regs.segment(Seg::Ds))
+        self.ui
+            .goto_segment
+            .unwrap_or(self.cpu.regs.segment(Seg::Ds))
     }
 
     /// Where the stack window starts: the stack pointer and the scroll.
@@ -380,7 +278,7 @@ impl App {
         self.cpu
             .regs
             .word(Reg16::Sp)
-            .wrapping_add(self.stack_scroll)
+            .wrapping_add(self.ui.stack_scroll)
     }
 
     /// The source view: the program's own lines, and the machine's place
@@ -429,12 +327,12 @@ impl App {
             return;
         }
         // An open edit takes every key but the ones that end it.
-        if self.edit.is_some() {
+        if self.ui.edit.is_some() {
             self.edit_key(key);
             return;
         }
         // The goto takes every key too, while it is open.
-        if self.goto.is_some() {
+        if self.ui.goto.is_some() {
             self.goto_key(key);
             return;
         }
@@ -499,9 +397,9 @@ impl App {
         // The cursor never leaves the listing.
         let lines = self.panels().disassembly.len();
         if lines == 0 {
-            self.cursor = 0;
+            self.ui.cursor = 0;
         } else {
-            self.cursor = self.cursor.min(lines - 1);
+            self.ui.cursor = self.ui.cursor.min(lines - 1);
         }
     }
 
@@ -562,11 +460,11 @@ impl App {
     fn move_condition_cursor(&mut self, vertical: i32) {
         let count = self.breakpoints.listing().len();
         if count == 0 {
-            self.condition_cursor = 0;
+            self.ui.condition_cursor = 0;
             return;
         }
-        let at = self.condition_cursor as i32 + vertical;
-        self.condition_cursor = at.clamp(0, count as i32 - 1) as usize;
+        let at = self.ui.condition_cursor as i32 + vertical;
+        self.ui.condition_cursor = at.clamp(0, count as i32 - 1) as usize;
     }
 
     /// The stack window, a word at a time.
@@ -575,9 +473,9 @@ impl App {
     /// so the words above the pointer come into view.
     fn move_stack_window(&mut self, vertical: i32) {
         if vertical < 0 {
-            self.stack_scroll = self.stack_scroll.wrapping_sub(2);
+            self.ui.stack_scroll = self.ui.stack_scroll.wrapping_sub(2);
         } else if vertical > 0 {
-            self.stack_scroll = self.stack_scroll.wrapping_add(2);
+            self.ui.stack_scroll = self.ui.stack_scroll.wrapping_add(2);
         }
     }
 
@@ -595,7 +493,7 @@ impl App {
         self.screen_open = false;
         // The window starts at the pointer: the scroll is the user's own,
         // and it begins at the top of the stack.
-        self.stack_scroll = 0;
+        self.ui.stack_scroll = 0;
     }
 
     /// Open the conditions pane where the listing is, or close it again.
@@ -614,7 +512,7 @@ impl App {
         self.console_open = false;
         self.screen_open = false;
         // The cursor starts at the first entry of the listing.
-        self.condition_cursor = 0;
+        self.ui.condition_cursor = 0;
     }
 
     /// Open the console where the listing is, or close it again.
@@ -696,21 +594,21 @@ impl App {
     /// The listing's cursor, one line up or down.
     fn move_listing_cursor(&mut self, vertical: i32) {
         if vertical < 0 {
-            self.cursor = self.cursor.saturating_sub(1);
+            self.ui.cursor = self.ui.cursor.saturating_sub(1);
         } else if vertical > 0 {
-            self.cursor += 1;
+            self.ui.cursor += 1;
         }
     }
 
     /// The registers panel's cursor, on its two-column grid.
     fn move_register_cursor(&mut self, horizontal: i32, vertical: i32) {
         let last = Register::ALL.len() - 1;
-        let row = (self.register_cursor / 2) as i32 + vertical;
-        let column = ((self.register_cursor % 2) as i32 + horizontal).clamp(0, 1);
+        let row = (self.ui.register_cursor / 2) as i32 + vertical;
+        let column = ((self.ui.register_cursor % 2) as i32 + horizontal).clamp(0, 1);
         if row < 0 {
             return;
         }
-        self.register_cursor = ((row * 2 + column) as usize).min(last);
+        self.ui.register_cursor = ((row * 2 + column) as usize).min(last);
     }
 
     /// The flags panel's cursor, on its three-column grid.
@@ -721,12 +619,13 @@ impl App {
     fn move_flag_cursor(&mut self, horizontal: i32, vertical: i32) {
         let last = Flag::ALL.len() - 1;
         let columns = FLAGS_COLUMNS as i32;
-        let row = (self.flag_cursor / FLAGS_COLUMNS) as i32 + vertical;
-        let column = ((self.flag_cursor % FLAGS_COLUMNS) as i32 + horizontal).clamp(0, columns - 1);
+        let row = (self.ui.flag_cursor / FLAGS_COLUMNS) as i32 + vertical;
+        let column =
+            ((self.ui.flag_cursor % FLAGS_COLUMNS) as i32 + horizontal).clamp(0, columns - 1);
         if row < 0 {
             return;
         }
-        self.flag_cursor = ((row * columns + column) as usize).min(last);
+        self.ui.flag_cursor = ((row * columns + column) as usize).min(last);
     }
 
     /// The memory window's cursor: a byte at a time, or a row of sixteen.
@@ -753,7 +652,7 @@ impl App {
         }
         let edit = match self.focus {
             Focus::Registers => {
-                let Some(register) = Register::ALL.get(self.register_cursor).copied() else {
+                let Some(register) = Register::ALL.get(self.ui.register_cursor).copied() else {
                     return;
                 };
                 Edit::Register {
@@ -762,7 +661,7 @@ impl App {
                 }
             }
             Focus::Flags => {
-                let Some(flag) = Flag::ALL.get(self.flag_cursor).copied() else {
+                let Some(flag) = Flag::ALL.get(self.ui.flag_cursor).copied() else {
                     return;
                 };
                 Edit::Flag {
@@ -777,7 +676,7 @@ impl App {
             },
             Focus::Disassembly => return,
         };
-        self.edit = Some(edit);
+        self.ui.edit = Some(edit);
         self.status = None;
     }
 
@@ -789,7 +688,7 @@ impl App {
         let Some(entry) = self.condition_entry() else {
             return;
         };
-        self.edit = Some(Edit::Condition {
+        self.ui.edit = Some(Edit::Condition {
             segment: entry.segment,
             offset: entry.offset,
             text: String::new(),
@@ -804,7 +703,7 @@ impl App {
     fn condition_entry(&self) -> Option<Entry> {
         self.breakpoints
             .listing()
-            .get(self.condition_cursor)
+            .get(self.ui.condition_cursor)
             .cloned()
     }
 
@@ -812,17 +711,17 @@ impl App {
     fn edit_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
-                self.edit = None;
+                self.ui.edit = None;
                 self.status = None;
             }
             KeyCode::Enter => self.commit_edit(),
             KeyCode::Backspace => {
-                if let Some(edit) = &mut self.edit {
+                if let Some(edit) = &mut self.ui.edit {
                     edit.text_mut().pop();
                 }
             }
             KeyCode::Char(character) => {
-                if let Some(edit) = &mut self.edit {
+                if let Some(edit) = &mut self.ui.edit {
                     edit.text_mut().push(character);
                 }
             }
@@ -843,7 +742,7 @@ impl App {
     /// was. A condition is not a value at all: it is written through the
     /// model's own door.
     fn commit_edit(&mut self) {
-        let Some(edit) = self.edit.clone() else {
+        let Some(edit) = self.ui.edit.clone() else {
             return;
         };
         let text = edit.text().trim().to_string();
@@ -858,7 +757,7 @@ impl App {
                 self.commit_condition(*segment, *offset, None);
                 return;
             }
-            self.edit = None;
+            self.ui.edit = None;
             self.status = None;
             return;
         }
@@ -904,7 +803,7 @@ impl App {
                 return;
             }
         }
-        self.edit = None;
+        self.ui.edit = None;
         self.status = None;
     }
 
@@ -922,7 +821,7 @@ impl App {
     fn commit_condition(&mut self, segment: u16, offset: u16, condition: Option<&str>) {
         match self.breakpoints.set_condition(segment, offset, condition) {
             Ok(_) => {
-                self.edit = None;
+                self.ui.edit = None;
                 self.status = None;
             }
             Err(error) => {
@@ -936,7 +835,7 @@ impl App {
         if self.focus != Focus::Memory {
             return;
         }
-        self.goto = Some(Goto {
+        self.ui.goto = Some(Goto {
             text: String::new(),
         });
         self.status = None;
@@ -946,17 +845,17 @@ impl App {
     fn goto_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
-                self.goto = None;
+                self.ui.goto = None;
                 self.status = None;
             }
             KeyCode::Enter => self.commit_goto(),
             KeyCode::Backspace => {
-                if let Some(goto) = &mut self.goto {
+                if let Some(goto) = &mut self.ui.goto {
                     goto.text.pop();
                 }
             }
             KeyCode::Char(character) => {
-                if let Some(goto) = &mut self.goto {
+                if let Some(goto) = &mut self.ui.goto {
                     goto.text.push(character);
                 }
             }
@@ -972,12 +871,12 @@ impl App {
     /// in the evaluator's own words, the prompt stays open, and the window
     /// does not move.
     fn commit_goto(&mut self) {
-        let Some(goto) = self.goto.clone() else {
+        let Some(goto) = self.ui.goto.clone() else {
             return;
         };
         let text = goto.text.trim();
         if text.is_empty() {
-            self.goto = None;
+            self.ui.goto = None;
             self.status = None;
             return;
         }
@@ -987,9 +886,9 @@ impl App {
                 // The segment the goto named is kept: the window looks
                 // through it until another goto names another one.
                 if let Some(segment) = target.segment {
-                    self.goto_segment = Some(segment);
+                    self.ui.goto_segment = Some(segment);
                 }
-                self.goto = None;
+                self.ui.goto = None;
                 self.status = None;
             }
             Err(error) => {
@@ -1351,7 +1250,7 @@ impl App {
                     self.executed.push(at);
                 }
                 self.last_ran = Some(at);
-                self.cursor = 0;
+                self.ui.cursor = 0;
                 if info.opcode == 0xF4 {
                     self.finished = true;
                 }
@@ -1397,7 +1296,7 @@ impl App {
         let budget = BUDGET;
         for _ in 0..budget {
             if self.at_breakpoint() {
-                self.cursor = 0;
+                self.ui.cursor = 0;
                 return;
             }
             let stopped = self.step();
@@ -1429,7 +1328,7 @@ impl App {
             });
             return;
         }
-        self.cursor = 0;
+        self.ui.cursor = 0;
         // The address that is not executed any more goes off the list: it
         // is the address of the instruction that ran last.
         if let Some(ran) = self.last_ran.take() {
@@ -1502,7 +1401,7 @@ impl App {
     /// Set a breakpoint at the cursor, or take it away.
     fn toggle_breakpoint(&mut self) {
         let panels = self.panels();
-        let Some(line) = panels.disassembly.get(self.cursor) else {
+        let Some(line) = panels.disassembly.get(self.ui.cursor) else {
             return;
         };
         let address = line.offset;

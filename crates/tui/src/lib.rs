@@ -6,8 +6,10 @@
 //!
 //! This crate draws the panel model the `emo8067-debug` crate holds, and
 //! nothing else: the panels are a pure function of the machine's state and of
-//! a UI state struct, and the GUI will draw the same struct.
+//! a UI state struct, and the GUI will draw the same struct. The cursors,
+//! the choices and the prompts live in that struct too, and so does the
+//! console's parser: the state the two front ends share is the debug
+//! crate's.
 
 pub mod app;
-pub mod console;
 pub mod ui;

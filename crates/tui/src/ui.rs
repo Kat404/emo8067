@@ -22,7 +22,7 @@
 
 use std::num::NonZeroU16;
 
-use emo8067_debug::panels::{Cell, Flag, Graphics, Line as Instruction, Panels, ScreenView};
+use emo8067_debug::panels::{Cell, Edit, Flag, Graphics, Line as Instruction, Panels, ScreenView};
 use emo8067_debug::source::SourceView;
 use emo8067_debug::{Access, Entry, Kind};
 use ratatui::Frame;
@@ -32,7 +32,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph, Widget};
 
-use crate::app::{App, Edit, FLAGS_COLUMNS, Focus};
+use crate::app::{App, FLAGS_COLUMNS, Focus};
 
 /// The palette: the roles the screen has, and the values they hold.
 #[path = "theme.rs"]
@@ -476,7 +476,7 @@ fn disassembly(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
         ..area
     };
     let rows = usize::from(body.height);
-    let first = first_line(panels.disassembly.len(), app.cursor, rows);
+    let first = first_line(panels.disassembly.len(), app.ui.cursor, rows);
     let lines = panels
         .disassembly
         .iter()
@@ -509,7 +509,7 @@ fn first_line(lines: usize, cursor: usize, rows: usize) -> usize {
 /// line the cursor is on is the accent.
 fn listing_line(app: &App, at: usize, line: &Instruction) -> Line<'static> {
     let here = is_here(app, line);
-    let cursor = at == app.cursor;
+    let cursor = at == app.ui.cursor;
     let text = if here {
         theme::accent()
     } else if app.executed.contains(&line.offset) {
@@ -731,7 +731,7 @@ fn conditions(app: &App, frame: &mut Frame, area: Rect) {
             // The entry under the cursor is edited in place, and it shows
             // what has been typed over it, the way the register under the
             // cursor does.
-            let detail = match app.edit.as_ref() {
+            let detail = match app.ui.edit.as_ref() {
                 Some(Edit::Condition {
                     segment,
                     offset,
@@ -743,7 +743,7 @@ fn conditions(app: &App, frame: &mut Frame, area: Rect) {
                 Kind::Breakpoint => (BREAKPOINT, theme::warning()),
                 Kind::Watchpoint(_) => (WATCHPOINT, theme::error()),
             };
-            let cursor = index == app.condition_cursor;
+            let cursor = index == app.ui.condition_cursor;
             let address_style = if cursor {
                 theme::label().add_modifier(Modifier::REVERSED)
             } else {
@@ -884,13 +884,13 @@ fn registers(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
             let name = cell.register.name();
             // The value that is being typed over the register is shown
             // in place of the one the machine holds.
-            let text = match app.edit.as_ref() {
+            let text = match app.ui.edit.as_ref() {
                 Some(Edit::Register { register, text }) if *register == cell.register => {
                     text.clone()
                 }
                 _ => format!("{:04X}", cell.value),
             };
-            let cursor = index == app.register_cursor && app.focus == Focus::Registers;
+            let cursor = index == app.ui.register_cursor && app.focus == Focus::Registers;
             let name_style = if cursor {
                 theme::accent()
             } else {
@@ -958,7 +958,7 @@ fn memory(panels: &Panels, app: &App, frame: &mut Frame, area: Rect, window: &Me
             // The byte that is being edited shows what has been typed
             // over it, the way the register under the cursor does.
             let at = view.window_at.wrapping_add((index + column) as u16);
-            let text = match app.edit.as_ref() {
+            let text = match app.ui.edit.as_ref() {
                 Some(Edit::Byte {
                     segment,
                     offset,
@@ -1131,7 +1131,7 @@ fn flags(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
             let index = row * FLAGS_COLUMNS + column;
             // The value that is being typed over the flag is shown in
             // place of the one the machine holds.
-            let text = match app.edit.as_ref() {
+            let text = match app.ui.edit.as_ref() {
                 Some(Edit::Flag { flag: edited, text }) if edited == flag => text.clone(),
                 _ => {
                     if panels.registers.flag(*flag) {
@@ -1141,7 +1141,7 @@ fn flags(panels: &Panels, app: &App, frame: &mut Frame, area: Rect) {
                     }
                 }
             };
-            let cursor = index == app.flag_cursor && app.focus == Focus::Flags;
+            let cursor = index == app.ui.flag_cursor && app.focus == Focus::Flags;
             let name_style = if cursor {
                 theme::accent()
             } else {
@@ -1308,7 +1308,7 @@ fn average_of(graphics: &Graphics, left: usize, top: usize, right: usize, bottom
 /// the right. What the user is doing is said on its own, and it is said
 /// instead of the bar.
 fn status(app: &App, frame: &mut Frame, area: Rect) {
-    let message = match (&app.status, &app.edit, &app.goto) {
+    let message = match (&app.status, &app.ui.edit, &app.ui.goto) {
         (Some(status), _, _) => Some(status.clone()),
         (None, Some(edit), _) => Some(edit_says(edit)),
         (None, None, Some(goto)) => Some(format!("goto: {}", goto.text)),

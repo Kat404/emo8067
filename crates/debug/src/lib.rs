@@ -13,6 +13,7 @@
 //! So nothing here draws, and nothing here reads a terminal.
 
 pub mod breakpoints;
+pub mod console;
 pub mod expr;
 pub mod machine;
 pub mod panels;
@@ -21,9 +22,11 @@ pub mod source;
 pub use breakpoints::{
     Access, Breakpoints, ConditionError, Entry, Kind, Missed, Report, Watchpoint,
 };
+pub use console::{Address, Command, Console, Dump, Refusal, Segment};
 pub use expr::{Context, Error, Value, evaluate};
 pub use machine::Machine;
 pub use panels::{
-    Cell, Flag, MemoryView, Panels, Register, Registers, ScreenCell, ScreenView, StackView, Ui,
+    Cell, Edit, Flag, Goto, MemoryView, Panels, Register, Registers, ScreenCell, ScreenView,
+    StackView, Ui,
 };
 pub use source::SourceView;

@@ -258,6 +258,7 @@ fn the_panels_are_drawn_from_the_machine() {
         stack_at: 0x0000,
         screen_segment: 0xB800,
         screen_page: 0,
+        ..Ui::default()
     };
     let panels = Panels::of(&cpu, &ui);
 

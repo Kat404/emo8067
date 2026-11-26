@@ -164,6 +164,34 @@ that: "That is the main UI lesson to invert" (§4.2).
 
 ## Log
 
+- **L4 (2026-11-26).** T2 is in: the state the two front ends share is the
+  debug crate's.
+  - **The console's parser moved.** `crates/tui/src/console.rs` is
+    `crates/debug/src/console.rs` now: the ten words the reference documents
+    (`c`, `i`, `iw`, `o`, `ow`, `d`, `t`, `p`, `r` and `rf`), the commands,
+    the refusals and the evaluation are the debug crate's, and the TUI draws
+    the console and the GUI will too. **The TUI's own console tests pass
+    unchanged** — they drive the TUI and read `app.console.output`, and
+    that path did not move.
+  - **The cursors and the prompts moved.** The per-pane cursors (the
+    listing's row, the registers', the flags' and the conditions'), the
+    stack window's scroll, the segment a goto named, and the edit and the
+    goto prompts are in the debug crate's `Ui` now, beside the model's own
+    inputs. The `Ui` is no longer `Copy` — it holds the prompts' text — and
+    the TUI copies it once per draw.
+  - **Nothing is duplicated.** The `Edit` and `Goto` types live in
+    `crates/debug/src/panels.rs` and nowhere else, the console's parser
+    lives in `crates/debug/src/console.rs` and nowhere else, and the TUI's
+    `App` holds none of the moved fields.
+  - **The TUI's tests followed the state.** The twenty-seven lines that
+    named a cursor or a prompt now name them where they live
+    (`app.ui.cursor` and the like), and their assertions are unchanged.
+  - **What is still the front end's own**: the model's inputs are filled by
+    the front end that holds the machine — the listing's anchor, the memory
+    window's segment and the stack window's address — and the panes that
+    are open and the pane that has the focus are the TUI's. T3 and T5 will
+    want the first of those shared as well.
+
 - **L3 (2026-11-26).** The native review's findings that were worth taking.
   - **The toolkit's diagnostics now have somewhere to go.** The lock file
     brought the `log` and `tracing` facades with it and no implementation
