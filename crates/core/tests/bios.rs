@@ -29,6 +29,9 @@ const SHAPE: u16 = 0x0080;
 /// The rows on screen, minus one.
 const ROWS: u16 = 0x0084;
 
+/// The offset of the machine's current video mode.
+const MODE: u16 = 0x0049;
+
 /// The offset of the keyboard buffer's head.
 const HEAD: u16 = 0x001A;
 /// The offset of the keyboard buffer's tail.
@@ -43,6 +46,15 @@ const ENTRY: u16 = 2;
 
 /// The segment the text pages live in.
 const VIDEO: u16 = 0xB800;
+
+/// The segment the graphics page lives in.
+const GRAPHICS: u16 = 0xA000;
+
+/// The pixels a row of the graphics page has.
+const GRAPHICS_WIDTH: u16 = 320;
+
+/// The rows the graphics page has.
+const GRAPHICS_HEIGHT: u16 = 200;
 
 /// The segment the test programs run in.
 const CODE: u16 = 0x1000;
@@ -97,6 +109,31 @@ fn bios_twice(first: impl FnOnce(&mut Cpu), second: impl FnOnce(&mut Cpu)) -> Cp
     second(&mut c);
     c.step().expect("the second call runs");
     c.step().expect("the second service runs");
+    run(&mut c);
+    c
+}
+
+/// A machine that calls `INT 10h` three times: the first call with the
+/// registers the first closure sets, the second with the registers the
+/// second one sets, and the third with the registers the third one sets.
+///
+/// It is one machine throughout, so the first call's state is the second
+/// call's state.
+fn bios_thrice(
+    first: impl FnOnce(&mut Cpu),
+    second: impl FnOnce(&mut Cpu),
+    third: impl FnOnce(&mut Cpu),
+) -> Cpu {
+    let mut c = machine(&[0xCD, 0x10, 0xCD, 0x10, 0xCD, 0x10, 0xF4]);
+    first(&mut c);
+    c.step().expect("the first call runs");
+    c.step().expect("the first service runs");
+    second(&mut c);
+    c.step().expect("the second call runs");
+    c.step().expect("the second service runs");
+    third(&mut c);
+    c.step().expect("the third call runs");
+    c.step().expect("the third service runs");
     run(&mut c);
     c
 }
@@ -695,7 +732,7 @@ fn s5_the_mode_sets_the_geometry() {
 
     let c = bios(|c| {
         c.regs.set_byte(Reg8::Ah, 0x00);
-        c.regs.set_byte(Reg8::Al, 0x13);
+        c.regs.set_byte(Reg8::Al, 0x07);
     });
     assert_eq!(
         c.mem.read_u16(DATA, COLUMNS),
@@ -1303,4 +1340,302 @@ fn s17_the_check_never_waits_and_never_removes() {
         BUFFER + 2,
         "and the next get took the keystroke out of the buffer"
     );
+}
+
+/// S22 — The mode `13h` is a mode the machine has.
+///
+/// `AH = 00h` with `AL = 13h` sets it, and the mode is the reference's
+/// own: "13h - graphical mode. 40x25. 256 colors. 320x200 pixels. 1
+/// page." The data area's words keep their meaning and their shape: the
+/// columns become forty and the rows twenty-five, the mode's own cell
+/// grid, and the active page becomes zero, because the mode has one page.
+#[test]
+fn s22_the_mode_13h_is_a_mode_the_machine_has() {
+    // The machine is on the third page before the mode is set.
+    let c = bios_twice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x05);
+            c.regs.set_byte(Reg8::Al, 2);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x13);
+        },
+    );
+
+    assert_eq!(
+        c.mem.read_u16(DATA, COLUMNS),
+        40,
+        "the mode's cell grid is forty columns"
+    );
+    assert_eq!(
+        c.mem.read_u8(DATA, ROWS),
+        24,
+        "and twenty-five rows: the map holds the rows minus one"
+    );
+    assert_eq!(
+        c.mem.read_u8(DATA, PAGE),
+        0,
+        "the active page is the first one: the mode has one page"
+    );
+    assert_eq!(
+        c.mem.read_u16(DATA, PAGE_START),
+        0,
+        "and its start in video memory is zero"
+    );
+}
+
+/// S23 — The framebuffer is the published mode `13h` one.
+///
+/// "the screen is an array of 64000 contiguous bytes, arranged as 200 rows
+/// of 320 bytes, with one byte per pixel, located in memory at absolute
+/// address `$A000:$0000`" (Dr Bill Verts, *Notes on VGA 320x200 256-Color
+/// Mode*). So the framebuffer is at `A000:0000`, a row is 320 bytes, there
+/// are 200 rows, and the pixel at the column and the row is at the offset
+/// `row * 320 + column`.
+#[test]
+fn s23_the_framebuffer_is_the_published_mode_13h_one() {
+    let c = bios_thrice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x13);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x2A);
+            c.regs.set_word(Reg16::Cx, 7);
+            c.regs.set_word(Reg16::Dx, 3);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x3B);
+            c.regs.set_word(Reg16::Cx, GRAPHICS_WIDTH - 1);
+            c.regs.set_word(Reg16::Dx, GRAPHICS_HEIGHT - 1);
+        },
+    );
+
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, 3 * GRAPHICS_WIDTH + 7),
+        0x2A,
+        "the pixel is at the offset row * 320 + column"
+    );
+    assert_eq!(
+        c.mem.read_u8(
+            GRAPHICS,
+            (GRAPHICS_HEIGHT - 1) * GRAPHICS_WIDTH + GRAPHICS_WIDTH - 1
+        ),
+        0x3B,
+        "and the last pixel of the framebuffer is at the last offset of it"
+    );
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, GRAPHICS_HEIGHT * GRAPHICS_WIDTH),
+        0x00,
+        "the framebuffer is two hundred rows: the byte after it is not its own"
+    );
+}
+
+/// S24 — `AH = 0Ch` writes a pixel.
+///
+/// "INT 10h / AH = 0Ch - change color for a single pixel. input: AL =
+/// pixel color. CX = column. DX = row." There is no page register: the
+/// reference names none, and the mode has one page.
+#[test]
+fn s24_the_write_puts_the_colour_at_the_pixel() {
+    let c = bios_twice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x13);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x2A);
+            c.regs.set_word(Reg16::Cx, 10);
+            c.regs.set_word(Reg16::Dx, 20);
+            // A page register is not a register: the mode has one page.
+            c.regs.set_byte(Reg8::Bh, 7);
+        },
+    );
+
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, 20 * GRAPHICS_WIDTH + 10),
+        0x2A,
+        "the colour is at the pixel the column and the row name"
+    );
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, 0),
+        0x00,
+        "and nothing was written on another page"
+    );
+}
+
+/// S25 — `AH = 0Dh` reads a pixel.
+///
+/// "INT 10h / AH = 0Dh - get color of a single pixel. input: CX = column.
+/// DX = row. output: AL = pixel color". The byte comes from the same
+/// offset the write used.
+#[test]
+fn s25_the_read_returns_the_colour_of_the_pixel() {
+    let c = bios_thrice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x13);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x2A);
+            c.regs.set_word(Reg16::Cx, 10);
+            c.regs.set_word(Reg16::Dx, 20);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0D);
+            c.regs.set_byte(Reg8::Al, 0x00);
+            c.regs.set_word(Reg16::Cx, 10);
+            c.regs.set_word(Reg16::Dx, 20);
+        },
+    );
+
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x2A,
+        "the read returns the colour that was written"
+    );
+}
+
+/// S26 — The two functions answer only in the graphics mode.
+///
+/// The IBM's own BIOS says the pixel functions are "not supported in text
+/// modes", and in a text mode this BIOS's answer is nothing at all. A
+/// coordinate outside the framebuffer writes nothing and reads zero: the
+/// IBM ignores a pixel that is outside the screen, and this project does
+/// the same rather than wrapping the address into the page.
+#[test]
+fn s26_the_pixel_functions_answer_only_in_the_graphics_mode() {
+    // In a text mode the service does not answer at all.
+    let c = bios_twice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x2A);
+            c.regs.set_word(Reg16::Cx, 10);
+            c.regs.set_word(Reg16::Dx, 20);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0D);
+            c.regs.set_byte(Reg8::Al, 0x77);
+            c.regs.set_word(Reg16::Cx, 10);
+            c.regs.set_word(Reg16::Dx, 20);
+        },
+    );
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, 20 * GRAPHICS_WIDTH + 10),
+        0x00,
+        "a text mode writes no pixel"
+    );
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x77,
+        "and the read does not answer at all"
+    );
+
+    // In the graphics mode, a pixel outside the framebuffer: nothing is
+    // written, and the read is zero.
+    let c = bios_thrice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x13);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0C);
+            c.regs.set_byte(Reg8::Al, 0x2A);
+            c.regs.set_word(Reg16::Cx, GRAPHICS_WIDTH);
+            c.regs.set_word(Reg16::Dx, 0);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x0D);
+            c.regs.set_word(Reg16::Cx, 0);
+            c.regs.set_word(Reg16::Dx, GRAPHICS_HEIGHT);
+        },
+    );
+    assert_eq!(
+        c.mem.read_u8(GRAPHICS, 0),
+        0x00,
+        "a pixel outside the framebuffer is not written"
+    );
+    assert_eq!(
+        c.regs.byte(Reg8::Al),
+        0x00,
+        "and a pixel outside it reads zero"
+    );
+}
+
+/// S27 — The machine's mode is one byte in the data area, at `0040:0049`.
+///
+/// "40:49 byte current CRT mode (hex value)". It is one byte, not a word.
+#[test]
+fn s27_the_machines_mode_is_one_byte_in_the_data_area() {
+    // The machine starts in the emulator's own default video mode, and the
+    // byte says so.
+    let c = Cpu::new();
+    assert_eq!(
+        c.mem.read_u8(DATA, MODE),
+        0x03,
+        "the machine's mode is the one it starts in"
+    );
+
+    let c = bios(|c| {
+        c.regs.set_byte(Reg8::Ah, 0x00);
+        c.regs.set_byte(Reg8::Al, 0x13);
+    });
+    assert_eq!(
+        c.mem.read_u8(DATA, MODE),
+        0x13,
+        "the mode is one byte, at 0040:0049"
+    );
+
+    // The text modes name themselves too, and a mode the machine does not
+    // have leaves the machine as it was.
+    let c = bios_twice(
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x03);
+        },
+        |c| {
+            c.regs.set_byte(Reg8::Ah, 0x00);
+            c.regs.set_byte(Reg8::Al, 0x07);
+        },
+    );
+    assert_eq!(
+        c.mem.read_u8(DATA, MODE),
+        0x03,
+        "the machine is still in the mode it was in"
+    );
+}
+
+/// The text modes are the text modes: the mode the machine had before
+/// this unit is the mode it has now.
+///
+/// The change adds a mode; it does not change the two the machine already
+/// had.
+#[test]
+fn the_text_modes_still_set_their_own_geometry() {
+    let c = bios(|c| {
+        c.regs.set_byte(Reg8::Ah, 0x00);
+        c.regs.set_byte(Reg8::Al, 0x00);
+    });
+    assert_eq!(
+        c.mem.read_u16(DATA, COLUMNS),
+        40,
+        "mode 00h is forty columns"
+    );
+    assert_eq!(c.mem.read_u8(DATA, ROWS), 24, "and twenty-five rows");
+
+    let c = bios(|c| {
+        c.regs.set_byte(Reg8::Ah, 0x00);
+        c.regs.set_byte(Reg8::Al, 0x03);
+    });
+    assert_eq!(
+        c.mem.read_u16(DATA, COLUMNS),
+        80,
+        "mode 03h is eighty columns"
+    );
+    assert_eq!(c.mem.read_u8(DATA, ROWS), 24, "and twenty-five rows");
 }

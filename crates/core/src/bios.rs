@@ -22,6 +22,10 @@
 //! kilobytes apart: a page is read and written like any other memory, and
 //! what the guest wrote to it is what the panel shows.
 //!
+//! The graphical mode `13h` has a page of its own, at `A000:0000`: 320
+//! pixels of one byte each, two hundred rows of them. The two pixel
+//! services write and read it, and they answer only in that mode.
+//!
 //! The keyboard's entry is the mirror of the video's, `F400:01C0`, and the
 //! reference's own map gives it too: "16 16x4 = 58 F400:01C0 - keyboard
 //! functions" (`memory.txt:66`). Its buffer is the BIOS data area as well:
@@ -37,6 +41,27 @@ pub const DATA_SEGMENT: u16 = 0x0040;
 
 /// The segment the text pages live in.
 pub const VIDEO_SEGMENT: u16 = 0xB800;
+
+/// The segment the graphics page lives in.
+///
+/// The published mode `13h` framebuffer is at `A000:0000`: "the screen is
+/// an array of 64000 contiguous bytes, arranged as 200 rows of 320 bytes,
+/// with one byte per pixel, located in memory at absolute address
+/// `$A000:$0000`" (Dr Bill Verts, *Notes on VGA 320x200 256-Color Mode*,
+/// `https://people.cs.umass.edu/~verts/cs32/vga_320.html`).
+pub const GRAPHICS_SEGMENT: u16 = 0xA000;
+
+/// The pixels a row of the graphics page has.
+pub const GRAPHICS_WIDTH: u16 = 320;
+
+/// The rows the graphics page has.
+pub const GRAPHICS_HEIGHT: u16 = 200;
+
+/// The mode `13h`: the graphical mode, 320x200 pixels in 256 colours.
+///
+/// "13h - graphical mode. 40x25. 256 colors. 320x200 pixels. 1 page."
+/// (`8086_bios_and_dos_interrupts.txt:76`).
+pub const MODE_GRAPHICS: u8 = 0x13;
 
 /// The bytes between two pages of text memory.
 pub const PAGE_STRIDE: u16 = 0x1000;
@@ -79,6 +104,19 @@ pub const DEFAULT_COLUMNS: u16 = 80;
 /// The rows the machine starts in.
 pub const DEFAULT_ROWS: u16 = 25;
 
+/// The mode the machine starts in.
+///
+/// The emulator's own default video mode: eighty columns by twenty-five
+/// rows in colour, which is the mode `03h` names.
+const DEFAULT_MODE: u8 = 0x03;
+
+/// The columns of the graphical mode's cell grid.
+///
+/// The mode `13h` is forty by twenty-five cells, and a cell is eight
+/// pixels wide and eight pixels tall — "13h = G 40x25 8x8 320x200
+/// 256/256k A000" (`https://pdos.csail.mit.edu/6.828/2008/readings/hardware/vgadoc/VGABIOS.TXT`).
+const GRAPHICS_COLUMNS: u16 = 40;
+
 /// The widest text mode the hardware has: eighty columns.
 ///
 /// The text modes are forty columns and eighty columns, and the widest of
@@ -98,6 +136,15 @@ pub const DEFAULT_CURSOR_START: u8 = 6;
 /// The cursor's bottom line the machine starts with.
 pub const DEFAULT_CURSOR_BOTTOM: u8 = 7;
 
+/// The offset of the machine's current video mode.
+///
+/// "40:49 byte current CRT mode (hex value)"
+/// (`https://pic.hallikainen.org/techref/bios/dataarea.htm`; the same in
+/// Ralf Brown's Interrupt List's data-area map and in `VGABIOS.TXT`'s
+/// "0:449h BYTE Video current mode"). The reference's own map documents
+/// none of it, so the offset is this project's own assumption, the way the
+/// cursor's shape at `0040:0080` already is.
+const MODE: u16 = 0x0049;
 /// The offset of the number of columns on screen.
 const COLUMNS: u16 = 0x004A;
 /// The offset of the current video page's start in video memory.
@@ -180,8 +227,8 @@ const TEXT_ATTRIBUTE: u8 = 0x07;
 /// The bit of the cursor's start line that hides the cursor.
 const CURSOR_HIDDEN: u8 = 0x20;
 
-/// What the machine's video is: the page it is on, its geometry and its
-/// cursor.
+/// What the machine's video is: the page it is on, the mode it is in, its
+/// geometry and its cursor.
 ///
 /// This is the door the panel reads the machine's video through. The panel
 /// holds no copy of any of it: it reads the machine again every time.
@@ -189,6 +236,12 @@ const CURSOR_HIDDEN: u8 = 0x20;
 pub struct Video {
     /// The active video page.
     pub page: u8,
+    /// The machine's current video mode.
+    ///
+    /// The mode is the byte at `0040:0049`, and it names the machine's
+    /// own state: the graphical mode is [`MODE_GRAPHICS`], and every
+    /// other mode is a text mode.
+    pub mode: u8,
     /// The columns on screen.
     pub columns: u16,
     /// The rows on screen.
@@ -212,12 +265,21 @@ impl Cpu {
         let (cursor_row, cursor_column) = self.cursor(page);
         Video {
             page,
+            mode: self.data_byte(MODE),
             columns: self.columns(),
             rows: self.rows(),
             cursor_row,
             cursor_column,
             cursor_visible: self.data_byte(SHAPE) & CURSOR_HIDDEN == 0,
         }
+    }
+
+    /// Whether the machine is in the graphical mode.
+    ///
+    /// The mode is the machine's own memory — the byte at `0040:0049` —
+    /// so the guest can write it and the answer is what it says.
+    fn in_graphics_mode(&self) -> bool {
+        self.data_byte(MODE) == MODE_GRAPHICS
     }
 
     /// The active video page.
@@ -464,6 +526,7 @@ pub fn init(cpu: &mut Cpu) {
     cpu.set_data_word(PAGE_START, 0);
     cpu.set_data_byte(PAGE, 0);
     cpu.set_data_byte(ROWS, (DEFAULT_ROWS - 1) as u8);
+    cpu.set_data_byte(MODE, DEFAULT_MODE);
     cpu.set_data_byte(SHAPE, DEFAULT_CURSOR_START);
     cpu.set_data_byte(SHAPE + 1, DEFAULT_CURSOR_BOTTOM);
     for page in 0..PAGES {
@@ -530,6 +593,8 @@ pub fn service(cpu: &mut Cpu) {
         0x08 => read_character(cpu),
         0x09 => write_character(cpu, true),
         0x0A => write_character(cpu, false),
+        0x0C => write_pixel(cpu),
+        0x0D => read_pixel(cpu),
         0x0E => teletype(cpu),
         0x10 => toggle_intensity(cpu),
         0x13 => write_string(cpu),
@@ -540,16 +605,28 @@ pub fn service(cpu: &mut Cpu) {
 /// `AH = 00h` — set video mode. `AL` = desired video mode.
 ///
 /// `00h` is text mode, forty columns by twenty-five rows; `03h` is text
-/// mode, eighty columns by twenty-five rows. A mode this slice does not
-/// have — `13h` and every other — leaves the geometry as it was.
+/// mode, eighty columns by twenty-five rows; and `13h` is the graphical
+/// mode, forty columns by twenty-five rows with a 320x200 framebuffer.
+/// A mode the machine does not have leaves the machine as it was.
 fn set_mode(cpu: &mut Cpu) {
-    let (columns, rows) = match cpu.regs.byte(Reg8::Al) {
+    let mode = cpu.regs.byte(Reg8::Al);
+    let (columns, rows) = match mode {
         0x00 => (40, DEFAULT_ROWS),
         0x03 => (DEFAULT_COLUMNS, DEFAULT_ROWS),
+        MODE_GRAPHICS => (GRAPHICS_COLUMNS, DEFAULT_ROWS),
         _ => return,
     };
     cpu.set_data_word(COLUMNS, columns);
     cpu.set_data_byte(ROWS, (rows - 1) as u8);
+    // The machine's mode is one byte in the data area, and the mode the
+    // guest asked for is the mode the machine is in.
+    cpu.set_data_byte(MODE, mode);
+    if mode == MODE_GRAPHICS {
+        // The graphical mode has one page: the active page is the first
+        // one, and its start in video memory is zero.
+        cpu.set_data_byte(PAGE, 0);
+        cpu.set_data_word(PAGE_START, 0);
+    }
 }
 
 /// `AH = 01h` — set the text-mode cursor shape.
@@ -720,6 +797,64 @@ fn write_character(cpu: &mut Cpu, with_attribute: bool) {
         };
         put_cell(cpu, page, at, character, attribute);
     }
+}
+
+/// `AH = 0Ch` — write a pixel.
+///
+/// "INT 10h / AH = 0Ch - change color for a single pixel. input: AL =
+/// pixel color. CX = column. DX = row."
+/// (`8086_bios_and_dos_interrupts.txt:150`-`:154`).
+///
+/// **There is no page register**: the reference names none, and the mode
+/// has one page. The service answers only in the graphical mode, and a
+/// pixel outside the framebuffer is not written.
+fn write_pixel(cpu: &mut Cpu) {
+    if !cpu.in_graphics_mode() {
+        return;
+    }
+    let colour = cpu.regs.byte(Reg8::Al);
+    let column = cpu.regs.word(Reg16::Cx);
+    let row = cpu.regs.word(Reg16::Dx);
+    let Some(at) = pixel_offset(column, row) else {
+        // The pixel is outside the framebuffer: the IBM ignores a pixel
+        // that is outside the screen, and this project does the same
+        // rather than wrapping the address into the page.
+        return;
+    };
+    cpu.mem.write_u8(GRAPHICS_SEGMENT, at, colour);
+}
+
+/// `AH = 0Dh` — read a pixel.
+///
+/// "INT 10h / AH = 0Dh - get color of a single pixel. input: CX = column.
+/// DX = row. output: AL = pixel color"
+/// (`8086_bios_and_dos_interrupts.txt:164`-`:169`).
+///
+/// The byte comes from the same offset the write used, and a pixel
+/// outside the framebuffer reads zero.
+fn read_pixel(cpu: &mut Cpu) {
+    if !cpu.in_graphics_mode() {
+        // In a text mode the service does not answer at all.
+        return;
+    }
+    let column = cpu.regs.word(Reg16::Cx);
+    let row = cpu.regs.word(Reg16::Dx);
+    let colour = match pixel_offset(column, row) {
+        Some(at) => cpu.mem.read_u8(GRAPHICS_SEGMENT, at),
+        None => 0,
+    };
+    cpu.regs.set_byte(Reg8::Al, colour);
+}
+
+/// The offset of a pixel in the graphics page.
+///
+/// The pixel at the column and the row is at the offset `row * 320 +
+/// column`, and a pixel outside the framebuffer has no offset at all.
+fn pixel_offset(column: u16, row: u16) -> Option<u16> {
+    if column >= GRAPHICS_WIDTH || row >= GRAPHICS_HEIGHT {
+        return None;
+    }
+    Some(row * GRAPHICS_WIDTH + column)
 }
 
 /// `AH = 0Eh` — teletype output. `AL` = character to write.
@@ -1054,7 +1189,8 @@ mod tests {
         // The cursor of the page, at the last cell of the screen.
         cpu.set_cursor(7, 24, 79);
         for ah in [
-            0x00u8, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0E, 0x10, 0x13,
+            0x00u8, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0C, 0x0D, 0x0E, 0x10,
+            0x13,
         ] {
             cpu.regs.set_byte(Reg8::Ah, ah);
             cpu.regs.set_byte(Reg8::Al, 0xFF);
