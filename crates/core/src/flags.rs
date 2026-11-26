@@ -44,7 +44,7 @@ pub const WRITABLE_MASK: u16 = STATUS_MASK | DF;
 /// Even-parity bit for a low byte: set when the byte has an even popcount.
 #[must_use]
 pub fn parity_even(byte: u8) -> bool {
-    byte.count_ones() % 2 == 0
+    byte.count_ones().is_multiple_of(2)
 }
 
 /// The FLAGS register.

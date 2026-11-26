@@ -154,10 +154,10 @@ pub fn find_for(
             form.opcode == opcode && form.names().any(|name| name.eq_ignore_ascii_case(mnemonic))
         })
         .collect();
-    if let Some(fits) = fits {
-        if let Some(form) = candidates.iter().find(|form| fits(form.operands())) {
-            return Some(form.clone());
-        }
+    if let Some(fits) = fits
+        && let Some(form) = candidates.iter().find(|form| fits(form.operands()))
+    {
+        return Some(form.clone());
     }
     candidates.into_iter().next()
 }

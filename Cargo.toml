@@ -1,11 +1,18 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/cli", "crates/asm", "crates/debug", "crates/tui"]
+members = [
+    "crates/core",
+    "crates/cli",
+    "crates/asm",
+    "crates/debug",
+    "crates/tui",
+    "crates/gui",
+]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 license = "Unlicense"
 repository = "https://github.com/USER/emu8067"
 

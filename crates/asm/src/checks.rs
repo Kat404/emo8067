@@ -96,12 +96,12 @@ pub fn check(form: &str, operands: &[Operand]) -> Result<(), Error> {
         return Err("first operand cannot be an immediate value");
     }
     // The second operand, when the form wants eight bits of it.
-    if parts.len() > 1 && parts[1] == "i8" {
-        if let Operand::Immediate(value) = operands[1] {
-            if value > 0xFF {
-                return Err("second operand is over 8 bits!");
-            }
-        }
+    if parts.len() > 1
+        && parts[1] == "i8"
+        && let Operand::Immediate(value) = operands[1]
+        && value > 0xFF
+    {
+        return Err("second operand is over 8 bits!");
     }
     for (index, (part, operand)) in parts.iter().zip(operands).enumerate() {
         check_part(part, operand, index)?;

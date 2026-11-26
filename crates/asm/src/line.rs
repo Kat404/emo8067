@@ -153,25 +153,26 @@ pub fn parse(line: &str) -> Result<Line, Error> {
                 label = Some(name.to_string());
                 index += 1;
             }
-        } else if let Some((name, tail)) = word.split_once(':') {
-            if !name.is_empty() && !tail.is_empty() {
-                // The rest of the word is the instruction, and the words
-                // after it are its operands.
-                let mut operands = Vec::new();
-                let first_operand = words[index + 1..].join(" ").trim().to_string();
-                if !first_operand.is_empty() {
-                    operands.push(first_operand);
-                }
-                operands.extend(parts.drain(1..));
-                let (qualifier, operands) = take_qualifier(operands);
-                return Ok(Line {
-                    prefixes,
-                    label: Some(name.to_string()),
-                    mnemonic: tail.to_string(),
-                    operands,
-                    qualifier,
-                });
+        } else if let Some((name, tail)) = word.split_once(':')
+            && !name.is_empty()
+            && !tail.is_empty()
+        {
+            // The rest of the word is the instruction, and the words
+            // after it are its operands.
+            let mut operands = Vec::new();
+            let first_operand = words[index + 1..].join(" ").trim().to_string();
+            if !first_operand.is_empty() {
+                operands.push(first_operand);
             }
+            operands.extend(parts.drain(1..));
+            let (qualifier, operands) = take_qualifier(operands);
+            return Ok(Line {
+                prefixes,
+                label: Some(name.to_string()),
+                mnemonic: tail.to_string(),
+                operands,
+                qualifier,
+            });
         }
     }
     // A label with no colon, with the instruction after it: `msg0 db 'x'`.

@@ -196,14 +196,14 @@ impl<'a, 'c> Parser<'a, 'c> {
                 .collect::<String>();
             // `SSSS:OOOO`: the two halves are hex and need no suffix.
             if word.contains(':') {
-                if let Some((left, right)) = word.split_once(':') {
-                    if let (Ok(segment), Ok(offset)) = (
+                if let Some((left, right)) = word.split_once(':')
+                    && let (Ok(segment), Ok(offset)) = (
                         u16::from_str_radix(left, 16),
                         u16::from_str_radix(right, 16),
-                    ) {
-                        self.at += word.len();
-                        return Ok(Some(Token::Memory(segment, offset)));
-                    }
+                    )
+                {
+                    self.at += word.len();
+                    return Ok(Some(Token::Memory(segment, offset)));
                 }
                 return Err(Error::BadSyntax);
             }

@@ -374,7 +374,7 @@ impl Cpu {
         // size that would leave the segment leaves the buffer empty, and
         // the emulator lives.
         let end = KEYBOARD_BUFFER.checked_add(size)?;
-        if size == 0 || size % 2 != 0 || end > KEYBOARD_SIZE {
+        if size == 0 || !size.is_multiple_of(2) || end > KEYBOARD_SIZE {
             return None;
         }
         Some(end)
@@ -393,7 +393,7 @@ impl Cpu {
         let head = self.data_word(KEYBOARD_HEAD);
         let tail = self.data_word(KEYBOARD_TAIL);
         let offset_of_the_ring =
-            |offset: u16| offset >= KEYBOARD_BUFFER && offset < end && offset % 2 == 0;
+            |offset: u16| offset >= KEYBOARD_BUFFER && offset < end && offset.is_multiple_of(2);
         (offset_of_the_ring(head) && offset_of_the_ring(tail)).then_some((head, tail, end))
     }
 

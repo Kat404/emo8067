@@ -267,11 +267,11 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     let mut executed = 0u64;
     let mut failure: Option<String> = None;
     while executed < max {
-        if let Some(server) = &mut server {
-            if let Err(e) = server.poll(&mut cpu.bus.borrow_mut()) {
-                failure = Some(format!("device socket: {e}"));
-                break;
-            }
+        if let Some(server) = &mut server
+            && let Err(e) = server.poll(&mut cpu.bus.borrow_mut())
+        {
+            failure = Some(format!("device socket: {e}"));
+            break;
         }
         // The next key of the script goes in when the door takes it: the
         // script moves on only then, and the door's refusal stops the

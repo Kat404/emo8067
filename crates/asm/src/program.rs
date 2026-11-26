@@ -707,10 +707,10 @@ fn segments_of(lines: &[Source]) -> Vec<String> {
             // `.data` is the segment called `data`.
             segments.push(mnemonic.to_ascii_lowercase());
         }
-        if mnemonic == "SEGMENT" {
-            if let Some(label) = &source.parsed.label {
-                segments.push(label.to_ascii_lowercase());
-            }
+        if mnemonic == "SEGMENT"
+            && let Some(label) = &source.parsed.label
+        {
+            segments.push(label.to_ascii_lowercase());
         }
     }
     segments
@@ -834,18 +834,16 @@ fn effect(
     // A conditional jump whose target is too far is replaced by the
     // reference's own workaround, and the replacement is what the program
     // counts.
-    if jump {
-        if let Some(bytes) = replacement(&swapped.mnemonic, &operands, opcode)? {
-            let size = prefixes.len() + bytes.len();
-            let mut all = prefixes;
-            all.extend(bytes);
-            return Ok(Effect::Instruction(
-                swapped.label.clone().unwrap_or_default(),
-                texts,
-                address,
-                size,
-            ));
-        }
+    if jump && let Some(bytes) = replacement(&swapped.mnemonic, &operands, opcode)? {
+        let size = prefixes.len() + bytes.len();
+        let mut all = prefixes;
+        all.extend(bytes);
+        return Ok(Effect::Instruction(
+            swapped.label.clone().unwrap_or_default(),
+            texts,
+            address,
+            size,
+        ));
     }
     // The first walk does not know where a jump goes yet, so it does not
     // check the range of its displacement.
@@ -897,12 +895,10 @@ fn assemble_instruction(
     })?;
     // A conditional jump whose target is too far is replaced by the
     // reference's own workaround.
-    if jump {
-        if let Some(bytes) = replacement(&parsed.mnemonic, &operands, opcode)? {
-            let mut all = prefixes;
-            all.extend(bytes);
-            return Ok(all);
-        }
+    if jump && let Some(bytes) = replacement(&parsed.mnemonic, &operands, opcode)? {
+        let mut all = prefixes;
+        all.extend(bytes);
+        return Ok(all);
     }
     let result = assemble::assemble_parts(parsed, &operands, address);
     result.map_err(|error| bad(parsed, error))
@@ -1091,13 +1087,13 @@ fn resolve(
         return Ok(Operand::Immediate(0));
     }
     // A far pointer: `0FFFFh:0000h`.
-    if let Some((segment, offset)) = trimmed.split_once(':') {
-        if let (Ok(segment), Ok(offset)) = (
+    if let Some((segment, offset)) = trimmed.split_once(':')
+        && let (Ok(segment), Ok(offset)) = (
             literals::parse(segment.trim()),
             literals::parse(offset.trim()),
-        ) {
-            return Ok(Operand::Far(offset as u16, segment as u16));
-        }
+        )
+    {
+        return Ok(Operand::Far(offset as u16, segment as u16));
     }
     let known = names
         .iter()
@@ -1393,12 +1389,12 @@ fn equ(
     // The name is the label and the directive is the instruction:
     // `count: equ 10`, and `precision = 30`, which the reference writes
     // with an equals sign instead of the word.
-    if parsed.mnemonic.eq_ignore_ascii_case("EQU") || parsed.mnemonic == "=" {
-        if let Some(name) = &parsed.label {
-            let values = values_of_operands(&parsed.operands, constants, names, address)?;
-            if !values.is_empty() {
-                return Some((name.clone(), values));
-            }
+    if (parsed.mnemonic.eq_ignore_ascii_case("EQU") || parsed.mnemonic == "=")
+        && let Some(name) = &parsed.label
+    {
+        let values = values_of_operands(&parsed.operands, constants, names, address)?;
+        if !values.is_empty() {
+            return Some((name.clone(), values));
         }
     }
     // The directive first: `EQU SIZE, 10`.
@@ -1487,13 +1483,12 @@ fn fold_directive(
         if let Some((_, values)) = constants
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(trimmed))
+            && values.len() > 1
         {
-            if values.len() > 1 {
-                for value in values {
-                    out.push(value.to_string());
-                }
-                continue;
+            for value in values {
+                out.push(value.to_string());
             }
+            continue;
         }
         let folded = fold(trimmed, constants, names, address);
         out.push(fold_inside(&folded, constants));

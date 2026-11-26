@@ -335,12 +335,12 @@ pub(crate) fn run(case: &Case) -> Result<(), String> {
     // to hold the chip's value: the bytes the chip wrote, and the bytes it
     // left alone.
     for (address, want) in &case.final_mem {
-        if let Some(word) = fault {
-            if *address == word || *address == word.wrapping_add(1) {
-                // The word the chip pushed is the flags word, and the
-                // flags are undefined after a divide error.
-                continue;
-            }
+        if let Some(word) = fault
+            && (*address == word || *address == word.wrapping_add(1))
+        {
+            // The word the chip pushed is the flags word, and the
+            // flags are undefined after a divide error.
+            continue;
         }
         let got = read_physical(&cpu, *address);
         if got != *want {

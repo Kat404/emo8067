@@ -409,12 +409,11 @@ impl App {
             terminal.draw(|frame| {
                 crate::ui::draw(self, frame);
             })?;
-            if event::poll(std::time::Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        self.key(key);
-                    }
-                }
+            if event::poll(std::time::Duration::from_millis(100))?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                self.key(key);
             }
         }
         Ok(())
@@ -1015,17 +1014,16 @@ impl App {
     fn target_of(&self, text: &str) -> Result<Target, String> {
         // A name of the program's own names: the address it is at is an
         // offset in the segment the window looks through.
-        if let Some(program) = &self.program {
-            if let Some((_, at)) = program
+        if let Some(program) = &self.program
+            && let Some((_, at)) = program
                 .names
                 .iter()
                 .find(|(name, _)| name.eq_ignore_ascii_case(text))
-            {
-                return Ok(Target {
-                    offset: *at,
-                    segment: None,
-                });
-            }
+        {
+            return Ok(Target {
+                offset: *at,
+                segment: None,
+            });
         }
         // A memory reference: `SSSS:OOOO`. The left half may be the name
         // of a segment, and then it is the machine's own value of it.
