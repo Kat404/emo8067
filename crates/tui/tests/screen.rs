@@ -14,7 +14,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::style::Modifier;
+use ratatui::style::{Color, Modifier};
 
 /// The counter that tells the directories of one run apart.
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -94,6 +94,9 @@ const IDLE: &str = "org 100h\nhlt\n";
 
 /// The segment the text page lives in.
 const PAGE: u16 = 0xB800;
+
+/// The segment the graphics page lives in.
+const GRAPHICS: u16 = 0xA000;
 
 /// The screen takes the terminal over, and the keys keep working.
 #[test]
@@ -874,5 +877,121 @@ fn the_screen_follows_the_machines_active_page() {
     assert!(
         text.contains('Z'),
         "and the character the guest wrote on that page is on the screen: {text}"
+    );
+}
+
+/// S28 — The graphics page is drawn scaled.
+///
+/// The framebuffer is 320 by 200 pixels and a terminal's cells are not
+/// pixels: each cell of the panel's area is a block of the framebuffer's
+/// pixels, and the cell's colour is the average of the block's colours.
+/// The block's size is the framebuffer's size over the area's size.
+#[test]
+fn s28_the_graphics_page_is_drawn_scaled_with_the_average_colour() {
+    let mut app = app_of(
+        "graphics",
+        "org 100h\nmov ah, 0\nmov al, 13h\nint 10h\nhlt\n",
+    );
+    // The machine sets the graphical mode: the interrupt, and the service
+    // that comes out of it.
+    for _ in 0..4 {
+        press(&mut app, &[KeyCode::F(8)]);
+    }
+
+    // The framebuffer is black, and the first block of it is half red and
+    // half green. The takeover takes every row but the status line, so the
+    // area is eighty columns by twenty-three rows.
+    for index in 0..320 * 200 {
+        app.cpu.mem.write_u8(GRAPHICS, index as u16, 0x00);
+    }
+    let block_width = 320 / 80;
+    let block_height = 200 / 23;
+    for y in 0..block_height {
+        for x in 0..block_width {
+            let colour = if x < block_width / 2 { 0x04 } else { 0x02 };
+            app.cpu.mem.write_u8(GRAPHICS, (y * 320 + x) as u16, colour);
+        }
+    }
+
+    press(&mut app, &[KeyCode::Char('x')]);
+    let buffer = buffer(&app, 80, 24);
+
+    // The first cell is the first block: sixteen red pixels and sixteen
+    // green ones, and the average of the two is the colour of the cell.
+    let cell = buffer.cell((0, 0)).expect("the cell is drawn");
+    assert_eq!(
+        cell.bg,
+        Color::Rgb(85, 85, 0),
+        "the cell is a block of pixels, and its colour is their average"
+    );
+    // And the second cell is the block after it, which is black.
+    let next = buffer.cell((1, 0)).expect("the cell is drawn");
+    assert_eq!(
+        next.bg,
+        Color::Rgb(0, 0, 0),
+        "and the block after it is the block it is"
+    );
+}
+
+/// The palette is the VGA's own 256-colour DAC.
+///
+/// The sixteen the project already had are the table's first sixteen
+/// exactly, and the table is the published one: the sixteen EGA text
+/// colours, then sixteen evenly spaced greys, then the 216
+/// hue-saturation-intensity colours, then eight unused blacks.
+#[test]
+fn the_palette_is_the_vga_dacs_own_table() {
+    assert_eq!(theme::VGA_DAC.len(), 256, "the DAC holds 256 colours");
+    for index in 0..theme::VGA.len() {
+        assert_eq!(
+            theme::VGA_DAC[index],
+            theme::VGA[index],
+            "the DAC's {index} is the VGA's {index}"
+        );
+    }
+    // The greys: sixteen evenly spaced ones, from black to white.
+    assert_eq!(
+        theme::VGA_DAC[16],
+        Color::Rgb(0x00, 0x00, 0x00),
+        "the greys start at black"
+    );
+    assert_eq!(
+        theme::VGA_DAC[31],
+        Color::Rgb(0xff, 0xff, 0xff),
+        "and end at white"
+    );
+    // And the eight unused blacks at the end of the table.
+    assert_eq!(
+        theme::VGA_DAC[248],
+        Color::Rgb(0x00, 0x00, 0x00),
+        "the last eight entries are unused blacks"
+    );
+    assert_eq!(
+        theme::VGA_DAC[255],
+        Color::Rgb(0x00, 0x00, 0x00),
+        "and the last one of them too"
+    );
+}
+
+/// The text page is still drawn cell by cell.
+///
+/// The graphics page is a second shape of the same thing: in a text mode
+/// the page is still a grid of characters, and the takeover draws them
+/// one cell at a time.
+#[test]
+fn the_text_page_is_still_drawn_cell_by_cell() {
+    let mut app = app_of("text-page", IDLE);
+    app.cpu.mem.write_u8(PAGE, 0x0000, b'A');
+    app.cpu.mem.write_u8(PAGE, 0x0001, 0x14);
+    press(&mut app, &[KeyCode::Char('x')]);
+
+    let buffer = buffer(&app, 80, 24);
+    let cell = buffer.cell((0, 0)).expect("the cell is drawn");
+
+    assert_eq!(cell.symbol(), "A", "the character is drawn");
+    assert_eq!(
+        cell.bg,
+        theme::VGA[1],
+        "and the background is the attribute's own blue"
     );
 }

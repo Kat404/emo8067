@@ -56,6 +56,14 @@ else.
 | 6 | brown | `#AA5500` | 14 | yellow | `#FFFF55` |
 | 7 | light grey | `#AAAAAA` | 15 | white | `#FFFFFF` |
 
+**The Guest's DAC.** The graphical mode's pixels name the VGA's own
+256-colour DAC, and that table is the published one: the sixteen colours
+above, then sixteen evenly spaced greys, then the 216
+hue-saturation-intensity colours, then eight unused blacks. It is **not**
+the `{0, 51, 102, 153, 204, 255}` cube, which is Windows 3.x's and
+xterm's: the VGA's own steps are `00`, `55`, `aa` and `ff`. The sixteen
+above are that table's first sixteen, exactly.
+
 ## Type roles
 
 | Role | Attribute | Where |
@@ -100,6 +108,14 @@ does not take the debugger's away: every key but the quit keys reaches the
 guest's keyboard, the arrows most of all, for the guest is the one that
 wants them. The page carries the cursor the machine's BIOS set, and the
 cursor is drawn where the BIOS says it is.
+
+**The Graphics Page.** The graphical mode has a page of its own: 320 by
+200 pixels at `A000:0000`, and they do not fit a terminal's cells. The
+takeover draws it **scaled**: each cell of the area is a block of the
+framebuffer's pixels, the block's size is the framebuffer's size over the
+area's size, and the cell's colour is the average of the block's colours.
+The colours are the DAC's own. The page has no text cursor: the cursor
+belongs to the text page.
 
 ## Surfaces
 
@@ -153,6 +169,10 @@ One family, geometric:
   guest's — and a cursor the guest hid is not drawn at all. The guest's
   screen has its own vocabulary, the guest's: the underline is not a
   glyph of the debugger's family, and `▸` is not drawn on it.
+- **The guest's graphics page**: the framebuffer of the graphical mode,
+  scaled — one cell of the area for each block of the framebuffer's
+  pixels, and the cell's colour is the average of the block's colours,
+  in the DAC's own colours.
 - **The status bar**: the hints on the left, the volatile data on the
   right, divided by `·`.
 

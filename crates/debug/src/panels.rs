@@ -11,6 +11,7 @@
 //! stack.
 
 use emo8067_core::Cpu;
+use emo8067_core::bios::Video;
 use emo8067_core::flags::{AF, CF, DF, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg16, Seg};
 
@@ -401,6 +402,21 @@ pub struct Cursor {
     pub column: usize,
 }
 
+/// The graphics page: the framebuffer of the graphical mode.
+///
+/// The mode `13h` has a page of its own, at `A000:0000`: 320 pixels of
+/// one byte each, and two hundred rows of them. The bytes are the colour
+/// indices the VGA's own DAC names.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Graphics {
+    /// The framebuffer's width, in pixels.
+    pub width: usize,
+    /// The framebuffer's height, in pixels.
+    pub height: usize,
+    /// The colour index of every pixel, row by row.
+    pub pixels: Vec<u8>,
+}
+
 /// The screen panel: the guest's text page.
 ///
 /// The page is the machine's own memory: what the guest wrote to it is
@@ -425,6 +441,11 @@ pub struct ScreenView {
     /// guest hid it, or the panel shows another page than the one the
     /// machine is on.
     pub cursor: Option<Cursor>,
+    /// The graphics page, when the machine is in the graphical mode.
+    ///
+    /// `None` in a text mode: the graphics page is a second shape of the
+    /// same thing, and the mode names which one the panel shows.
+    pub graphics: Option<Graphics>,
 }
 
 /// Every panel, drawn from the machine and the UI's state.
@@ -573,10 +594,15 @@ fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
 /// pages of text memory and no more, and a page past the last one is the
 /// last one.
 fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
+    let video = cpu.video();
+    if video.mode == emo8067_core::bios::MODE_GRAPHICS {
+        // The graphical mode has a page of its own, and it is the one the
+        // panel shows.
+        return graphics_of(cpu, &video);
+    }
     let page = ui.screen_page.min(SCREEN_PAGES - 1);
     // The pages of text memory are four kilobytes apart.
     let base = u16::from(page) * PAGE_STRIDE;
-    let video = cpu.video();
     let columns = usize::from(video.columns);
     let rows = usize::from(video.rows);
     let cells = (0..columns * rows)
@@ -604,6 +630,40 @@ fn screen_of(cpu: &Cpu, ui: &Ui) -> ScreenView {
         rows,
         cells,
         cursor,
+        graphics: None,
+    }
+}
+
+/// The graphics page: the framebuffer the graphical mode has.
+///
+/// The framebuffer is the machine's own memory at `A000:0000`, 320 pixels
+/// of one byte each and two hundred rows of them, and the panel reads it
+/// like any other memory: what the guest drew is what the panel shows.
+fn graphics_of(cpu: &Cpu, video: &Video) -> ScreenView {
+    let width = usize::from(emo8067_core::bios::GRAPHICS_WIDTH);
+    let height = usize::from(emo8067_core::bios::GRAPHICS_HEIGHT);
+    let pixels = (0..width * height)
+        .map(|index| {
+            cpu.mem
+                .read_u8(emo8067_core::bios::GRAPHICS_SEGMENT, index as u16)
+        })
+        .collect();
+    ScreenView {
+        segment: emo8067_core::bios::GRAPHICS_SEGMENT,
+        // The graphical mode has one page.
+        page: 0,
+        // The machine's own cell grid: forty columns by twenty-five rows,
+        // whose cells are eight pixels wide and eight pixels tall.
+        columns: usize::from(video.columns),
+        rows: usize::from(video.rows),
+        cells: Vec::new(),
+        // The graphics page has no text cursor.
+        cursor: None,
+        graphics: Some(Graphics {
+            width,
+            height,
+            pixels,
+        }),
     }
 }
 

@@ -11,6 +11,9 @@ use emo8067_debug::panels::{Cursor, Panels, Ui};
 /// The segment the text page lives in.
 const PAGE: u16 = 0xB800;
 
+/// The segment the graphics page lives in.
+const GRAPHICS: u16 = 0xA000;
+
 /// The physical address the text page lives at.
 const PAGE_PHYSICAL: u32 = 0xB8000;
 
@@ -504,5 +507,61 @@ fn the_bright_background_bit_is_the_eighth_background_and_not_a_shade_of_the_sev
         screen.cells[0].foreground(),
         0,
         "and the foreground is still the low three bits"
+    );
+}
+
+/// S28 — The panel shows the graphics page.
+///
+/// In the graphics mode the panel reads the framebuffer from `A000:0000`,
+/// and it reads the machine's own memory: what the guest drew is what the
+/// panel shows.
+#[test]
+fn s28_the_panel_reads_the_framebuffer_in_the_graphics_mode() {
+    let mut cpu = bios(|cpu| {
+        cpu.regs.set_byte(Reg8::Ah, 0x00);
+        cpu.regs.set_byte(Reg8::Al, 0x13);
+    });
+    // A pixel the guest drew, at the row 20 and the column 10.
+    cpu.mem.write_u8(GRAPHICS, 20 * 320 + 10, 0x2A);
+
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+    let graphics = screen
+        .graphics
+        .as_ref()
+        .expect("the panel shows the graphics page");
+
+    assert_eq!(graphics.width, 320, "the framebuffer is 320 pixels wide");
+    assert_eq!(graphics.height, 200, "and two hundred rows tall");
+    assert_eq!(
+        graphics.pixels[20 * 320 + 10],
+        0x2A,
+        "the pixel is at the offset row * 320 + column"
+    );
+    assert_eq!(
+        screen.columns, 40,
+        "and the machine's cell grid is forty columns"
+    );
+    assert_eq!(screen.rows, 25, "and twenty-five rows");
+    assert_eq!(screen.cursor, None, "the graphics page has no text cursor");
+}
+
+/// The text page is still the page the panel shows.
+///
+/// The graphics page is a second shape of the same thing: the text page
+/// is the one the panel shows when the machine is in a text mode.
+#[test]
+fn the_text_page_is_still_the_page_the_panel_shows() {
+    let mut cpu = Cpu::new();
+    cpu.mem.write_u8(PAGE, 0x0000, b'A');
+
+    let screen = &Panels::of(&cpu, &Ui::default()).screen;
+
+    assert_eq!(
+        screen.cells[0].character, 'A',
+        "the text page is the page the panel shows"
+    );
+    assert!(
+        screen.graphics.is_none(),
+        "and there is no graphics page in a text mode"
     );
 }

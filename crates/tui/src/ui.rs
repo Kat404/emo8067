@@ -22,13 +22,13 @@
 
 use std::num::NonZeroU16;
 
-use emo8067_debug::panels::{Cell, Flag, Line as Instruction, Panels, ScreenView};
+use emo8067_debug::panels::{Cell, Flag, Graphics, Line as Instruction, Panels, ScreenView};
 use emo8067_debug::source::SourceView;
 use emo8067_debug::{Access, Entry, Kind};
 use ratatui::Frame;
 use ratatui::buffer::{Buffer, CellDiffOption};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph, Widget};
 
@@ -1189,6 +1189,10 @@ struct Screen<'a> {
 
 impl Widget for Screen<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        if let Some(graphics) = &self.view.graphics {
+            graphics_page(graphics, area, buf);
+            return;
+        }
         // The page is eighty columns by twenty-five rows, and the
         // terminal is not always that big: what does not fit is cut, and
         // the cells past the page's own width are not the row below.
@@ -1218,6 +1222,73 @@ impl Widget for Screen<'_> {
             }
         }
     }
+}
+
+/// The graphics page: the framebuffer, drawn scaled.
+///
+/// The framebuffer is 320 by 200 pixels and a terminal's cells are not
+/// pixels, so each cell of the area is a block of the framebuffer's
+/// pixels: the block's size is the framebuffer's size over the area's
+/// size, and the cell's colour is the average of the block's colours.
+fn graphics_page(graphics: &Graphics, area: Rect, buf: &mut Buffer) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+    let block_width = (graphics.width / usize::from(area.width)).max(1);
+    let block_height = (graphics.height / usize::from(area.height)).max(1);
+    for row in 0..usize::from(area.height) {
+        for column in 0..usize::from(area.width) {
+            let Some(target) = buf.cell_mut((area.x + column as u16, area.y + row as u16)) else {
+                continue;
+            };
+            let colour = average_of(graphics, column, row, block_width, block_height);
+            target.set_symbol(" ");
+            target.set_style(Style::default().fg(colour).bg(colour));
+        }
+    }
+}
+
+/// The average colour of the block of pixels at the column and the row.
+///
+/// The colours are the DAC's own: the average of a block's colours is the
+/// average of the RGB triples the DAC holds for the block's pixels.
+fn average_of(
+    graphics: &Graphics,
+    column: usize,
+    row: usize,
+    block_width: usize,
+    block_height: usize,
+) -> Color {
+    let mut red = 0u32;
+    let mut green = 0u32;
+    let mut blue = 0u32;
+    let mut count = 0u32;
+    for y in row * block_height..(row + 1) * block_height {
+        if y >= graphics.height {
+            break;
+        }
+        for x in column * block_width..(column + 1) * block_width {
+            if x >= graphics.width {
+                break;
+            }
+            let index = graphics.pixels[y * graphics.width + x];
+            let Color::Rgb(r, g, b) = theme::pixel(index) else {
+                continue;
+            };
+            red += u32::from(r);
+            green += u32::from(g);
+            blue += u32::from(b);
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return Color::Rgb(0, 0, 0);
+    }
+    Color::Rgb(
+        (red / count) as u8,
+        (green / count) as u8,
+        (blue / count) as u8,
+    )
 }
 
 /// The status bar: the hints on the left, and the volatile data on the
