@@ -360,3 +360,168 @@ fn a_raw_binary_is_still_loaded_raw() {
 
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// The runner takes the keys from a script, and the guest's keyboard gets
+/// them.
+///
+/// The script is fed as the guest consumes it, so a script longer than the
+/// buffer works.
+#[test]
+fn the_runner_takes_the_keys_from_a_script() {
+    let dir = scratch("keys");
+    let source = dir.join("program.asm");
+    // The program asks for a key, keeps the pair it got, and asks for
+    // another one.
+    std::fs::write(
+        &source,
+        "org 100h\n\
+         mov ah, 0\n\
+         int 16h\n\
+         mov bx, ax\n\
+         mov ah, 0\n\
+         int 16h\n\
+         hlt\n",
+    )
+    .unwrap();
+
+    let (out, err, code) = run(&["run", source.to_str().unwrap(), "--keys", "AB"]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    // 'A' is 1Eh and 'B' is 30h in the IBM's set 1.
+    assert!(
+        out.contains("BX 1E41"),
+        "the first key reached the guest: {out}"
+    );
+    assert!(out.contains("AX 3042"), "and so did the second one: {out}");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// The script's escapes name the keys a character cannot.
+///
+/// `\n` and `\r` are the enter key — and so is a literal newline, the DOS
+/// way — and the arrows are `\up`, `\down`, `\left` and `\right`.
+#[test]
+fn the_script_escapes_name_the_keys() {
+    let dir = scratch("escapes");
+    let source = dir.join("program.asm");
+    // The program asks for three keys and keeps the characters it got.
+    std::fs::write(
+        &source,
+        "org 100h\n\
+         mov ah, 0\n\
+         int 16h\n\
+         mov [0200h], al\n\
+         mov ah, 0\n\
+         int 16h\n\
+         mov [0201h], al\n\
+         mov ah, 0\n\
+         int 16h\n\
+         mov [0202h], al\n\
+         hlt\n",
+    )
+    .unwrap();
+
+    let (golden, err, code) = run(&[
+        "run",
+        source.to_str().unwrap(),
+        "--keys",
+        "a\\n\\up",
+        "--golden",
+    ]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {golden}");
+    // The character, the enter key — 0Dh, the way the corpus's programs
+    // compare it — and the arrow, which has no character of its own.
+    assert!(
+        golden.contains("00200  61 0D"),
+        "the character, the enter key and the arrow: {golden}"
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A script longer than the buffer works: the script is fed as the guest
+/// consumes it, and not all at once.
+#[test]
+fn a_script_longer_than_the_buffer_works() {
+    let dir = scratch("long-keys");
+    let source = dir.join("program.asm");
+    // The program asks for twenty keys, more than the buffer holds.
+    std::fs::write(
+        &source,
+        "org 100h\n\
+         mov cx, 20\n\
+         again:\n\
+         mov ah, 0\n\
+         int 16h\n\
+         dec cx\n\
+         jnz again\n\
+         hlt\n",
+    )
+    .unwrap();
+
+    let (out, err, code) = run(&[
+        "run",
+        source.to_str().unwrap(),
+        "--keys",
+        "abcdefghijklmnopqrst",
+    ]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(
+        !out.contains("step budget exhausted"),
+        "the guest did not wait for a key that never came: {out}"
+    );
+    // The last key of the script is the 't', whose set 1 code is 14h.
+    assert!(
+        out.contains("1474"),
+        "the guest read all twenty keys: {out}"
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// The CLI's own help names the `--keys` option.
+#[test]
+fn the_help_names_the_keys_option() {
+    let (out, err, code) = run(&["--help"]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("--keys"), "the help names the option: {out}");
+}
+
+/// A script that does not fit in the guest's keyboard buffer is said out
+/// loud: the run is not a failure, but the guest did not get the script.
+#[test]
+fn a_script_that_does_not_fit_is_said_out_loud() {
+    let dir = scratch("too-many-keys");
+    let source = dir.join("program.asm");
+    // A program that never polls the keyboard, and a script of ten keys
+    // for a buffer that holds eight.
+    std::fs::write(&source, "org 100h\nmov ax, 1234h\nhlt\n").unwrap();
+    let (out, err, code) = run(&["run", "--keys", "abcdefghij", source.to_str().unwrap()]);
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(
+        err.contains("2 of the script's keys never reached the guest"),
+        "{err}"
+    );
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// The option does not change a run that asks for no key: the program runs
+/// as it always did.
+#[test]
+fn the_keys_option_leaves_a_program_that_asks_for_no_key_alone() {
+    let dir = scratch("no-keys");
+    let source = dir.join("program.asm");
+    std::fs::write(&source, "org 100h\nmov ax, 1234h\nhlt\n").unwrap();
+
+    let (out, err, code) = run(&["run", "--keys", "xy", source.to_str().unwrap()]);
+    assert!(err.is_empty(), "{err}");
+    assert_eq!(code, 0, "the program halted: {out}");
+    assert!(out.contains("AX 1234"), "{out}");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+}

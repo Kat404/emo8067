@@ -1,13 +1,17 @@
-# The video BIOS — `INT 10h`
+# The video BIOS — `INT 10h` — and the keyboard of the BIOS — `INT 16h`
 
-Objective: the video services `INT 10h`, in the core, so a guest that asks
-the BIOS for something gets it, and the guest's screen shows what the guest
-asked for. Branch: `feat/tui-memory-window`. Delivery: one commit, one
-independent verifier. Test runner: `cargo nextest run --workspace`.
+Objective: the BIOS's services, in the core, so a guest that asks the BIOS
+for something gets it: the video services `INT 10h` (T1) and the keyboard's
+`INT 16h` (T2). Branch: `feat/tui-memory-window` (T1), `feat/bios-keyboard`
+(T2, cut from `main`). Delivery: one commit and one independent verifier per
+unit. Test runner: `cargo nextest run --workspace`.
 
 **Risk: item 3** — the core's interrupt path is shared code that the runner,
 the CLI, the programs gate, the TUI and every program consume, and this unit
-changes what the machine does when a program calls `INT 10h`.
+changes what the machine does when a program calls `INT 10h`. T2 carries the
+same risk and one more of the same kind: it gives the core a door the host
+writes into, so the `Cpu` and the BIOS's data area become a contract that the
+TUI and the CLI consume.
 
 Written 2026-11-24. Continues `odd/tasks/tui.md` (T15, the guest's screen),
 whose passive viewer is what the BIOS's output is seen through.
@@ -151,22 +155,217 @@ registers with no state of its own.
   guest's stack and the guest's flags are where they were and the machine's
   depth of calls goes down as it came up — the way the `IRET` that comes out
   of an interrupt does.
+- **S12** — The `INT 16h` is the 8086's `INT`, exactly as the `INT 10h` is
+  (S1). It pushes FLAGS, CS and IP, it clears TF and IF, and it loads
+  `CS:IP` from the interrupt vector table. The BIOS is a handler at an
+  address: the machine installs the vector for `16h` when it starts, and the
+  entry is the one the reference's own map gives — "16 16x4 = 58 F400:01C0 -
+  keyboard functions" (`memory.txt:66`) — the mirror of the video entry
+  `F400:0190` (`memory.txt:60`). The ROM is this project's own code, and
+  the byte at the entry is the `IRET` that comes out of the service, the way
+  `F400:0190` holds the video's.
+- **S13** — The two services are the reference's own two, with the
+  reference's own register contracts, quoted verbatim from
+  `re/docs-txt/8086_bios_and_dos_interrupts.txt:304`-`:315`:
+  - `AH = 00h` — "get keystroke from keyboard (no echo)." "return: AH = BIOS
+    scan code. AL = ASCII character. (if a keystroke is present, it is
+    removed from the keyboard buffer)."
+  - `AH = 01h` — "check for keystroke in the keyboard buffer." "return: ZF =
+    1 if keystroke is not available. ZF = 0 if keystroke available. AH = BIOS
+    scan code. AL = ASCII character. (if a keystroke is present, it is not
+    removed from the keyboard buffer)."
+  No other `AH` is answered: the reference documents no other `INT 16h`
+  function, and the corpus calls no other.
+- **S14** — The keyboard buffer is the BIOS data area, at the offsets the
+  maintainer approved: the head at `0040:001A`, the tail at `0040:001C`,
+  the start at `0040:001E` and the size at `0040:0030` — the range
+  `0040:001A`-`:0031` and nothing outside it. The head and the tail hold
+  the **absolute** offsets of the entry to read and of the entry to write,
+  the way the IBM's own buffer holds them, so a guest that reads
+  `0040:001A` sees where the buffer is. The size word holds the ring's
+  size in bytes — `0012h`, eighteen — and the ring's end is derived from it
+  (`start` + `size`), not stored: the four words the range holds are the
+  head, the tail, the start and the size. The body is `0040:001E`-`:002F`:
+  nine two-byte entries, the ASCII character and the scan code.
+  **The reference's own map documents none of this**: `memory.txt` gives
+  the area `0040:0000`-`:0084` seven entries, all of video (`memory.txt:85`,
+  `:109`, `:115`, `:119`, `:123`, `:128`, `:132`). The **shape** is the IBM
+  PC's — a head, a tail, a start and a size in the BIOS data area — and the
+  offsets are this project's own, so the code says so where it is written.
+  The BIOS keeps no state of its own, as in S3: the buffer is the machine's
+  memory.
+  - **One slot stays free.** The ring holds nine slots, so that "the head
+    equals the tail" is unambiguously empty; the ninth slot is what tells
+    full from empty, and **eight keystrokes fit**. A keystroke that does
+    not fit is dropped. The reference detects the overflow and signals it
+    audibly (`odd/research/features-and-ux.md:153`, SCR-7); this project has
+    no bell.
+  - **The data area is guest-writable memory**, and every value the BIOS
+    reads from it is untrusted: the BIOS validates the head and the tail
+    against the ring before it trusts them, and a guest that scribbles there
+    sees an empty buffer, never a panic. The video BIOS learned this the
+    hard way — the guest's geometry overflowed `u16` and killed the
+    emulator — and the same rule holds here.
+- **S15** — The scan code is the IBM PC's set 1. The corpus is the evidence
+  inside the repository: `re/extracted/app/examples/snake.asm:37`-`:41`
+  names them "bios key codes" — `left equ 4bh`, `right equ 4dh`, `up equ
+  48h`, `down equ 50h` — and compares the returned `AH` against them (`:143`,
+  `:204`-`:211`); it is the only program of the eighty-five that reads `AH`
+  at all. The published table is the oracle for the rest: the set 1 table
+  at `https://www.marjorie.de/ps2/scancode-set1.htm`, the one Wikipedia's
+  "Scancode" article cites. **The letters are not contiguous in it** — the
+  rows break at the bracket keys and at the `` ` `` and `\` keys — so `Q =
+  10h`, `E = 12h`, `I = 17h`, `Z = 2Ch` and `M = 32h`; a table that counts
+  from `A = 1Eh` is not set 1's, and it is wrong for every letter but the
+  first. A character the shift made — `?`, `:`, `|`, the rest — has the code
+  of the **key** it is on (`35h`, `27h`, `2Bh`), the way the IBM's own BIOS
+  answers, because the shift itself lives in the `AH = 02h` service this
+  unit does not have.
+- **S16** — `AH = 00h` waits when the buffer is empty. The project's own
+  research says so of the reference: "`INT 16h/00h` blocks for a key,
+  `INT 16h/01h` polls the buffer" (`odd/research/features-and-ux.md:152`,
+  SCR-6), and the IBM's BIOS does. **The reference's own `INT 16h` block
+  says nothing about waiting**: the sentence "if there is no character in
+  the keyboard buffer, the function waits until any key is pressed"
+  (`8086_bios_and_dos_interrupts.txt:339`) belongs to the `INT 21h / AH=1`
+  block, not to `INT 16h`. That is a correction to the brief this task was
+  written from.
+  - **The wait costs the machine one step at a time.** The service stays at
+    the ROM's entry and the machine re-enters it on the next step, so the
+    step budget still bounds the run and the TUI still gets its turn between
+    steps. The wait never spins inside a single step. The 646 000-capture
+    gate is the judge of the shape (L2).
+- **S17** — `AH = 01h` never waits. With an empty buffer it sets ZF = 1 and
+  returns; with a keystroke it sets ZF = 0 and returns the pair **without**
+  removing the keystroke, and the next `AH = 00h` returns the same one. The
+  three programs that poll rely on this: `keybrd.asm:28`-`:30`,
+  `bintest.asm:68`, `snake.asm:133`.
+- **S18** — Where the keys come from: the host injects them. There is no
+  keyboard hardware in the emulator, and the core gains no channel, no thread
+  and no queue for it.
+  - **The TUI forwards the terminal's keys.** A key the TUI binds to a
+    debugger command is the debugger's, and every other key goes to the
+    guest's keyboard buffer. **When the guest's screen has the focus — the
+    takeover the `x` key gives it — the keys reach the guest as well, all
+    of them but the TUI's quit keys.** The takeover **adds** the guest's
+    keys, it does not take the debugger's away: the design document says
+    the debugger's own keys keep working while the takeover is open
+    (`design/DESIGN.md:90`-`:99`) and the tree's own tests pin it. The
+    arrows are the guest's most wanted key: `snake.asm` reads `48h`, `4Bh`,
+    `4Dh` and `50h`.
+  - **The headless runner takes the keys from a script** on the command line
+    (`--keys`), and it feeds the script as the guest consumes it, so a
+    script longer than the buffer works. With no script the runner has no
+    keyboard at all, and the guest waits (S16).
+- **S19** — The core's one door: a keystroke goes into the BIOS data area's
+  buffer, and the BIOS reads it from there. The BIOS module owns the
+  buffer's layout, so the door it offers is the pair of the scan code and
+  the ASCII character, and what it reports back is how many keystrokes are
+  waiting **and whether the keystroke it was given was taken**. The TUI and
+  the CLI use that door and nothing else.
+- **S20** — The recorded states move. The programs that ask the BIOS for a
+  key now run past it, and the ones that wait for a key that never comes end
+  with the step budget spent ("step budget exhausted"), which is not a
+  failure. The recorded states are this project's own (S9), so they are
+  recorded again.
+- **S21** — The help and the docs move with the change: the CLI's `--keys`
+  option is in the CLI's own help, and the TUI's help says which keys reach
+  the guest.
+- **S22** — The mode `13h` is a mode the machine has. `AH = 00h` with
+  `AL = 13h` sets it, and the mode is the reference's own: "13h - graphical
+  mode. 40x25. 256 colors. 320x200 pixels. 1 page."
+  (`8086_bios_and_dos_interrupts.txt:76`). The data area's words keep their
+  meaning and their shape: the columns become **40** and the rows **25**,
+  the mode's own cell grid, whose cells are eight pixels wide and eight
+  pixels tall — "13h = G 40x25 8x8 320x200 256/256k A000"
+  (`https://pdos.csail.mit.edu/6.828/2008/readings/hardware/vgadoc/VGABIOS.TXT`)
+  — and the active page becomes zero, because the mode has one page. Every
+  other mode leaves the machine as it was (S5).
+- **S23** — The framebuffer is the published mode `13h` one: "the screen is
+  an array of 64000 contiguous bytes, arranged as 200 rows of 320 bytes,
+  with one byte per pixel, located in memory at absolute address
+  $A000:$0000" (Dr Bill Verts, *Notes on VGA 320x200 256-Color Mode*,
+  `https://people.cs.umass.edu/~verts/cs32/vga_320.html`; the same in
+  Abrash's *Graphics Programming Black Book*, ch. 27, and in
+  `https://en.wikipedia.org/wiki/Mode_13h`). So the framebuffer is at
+  `A000:0000`, a row is 320 bytes, there are 200 rows, and **the pixel at
+  the column and the row is at the offset `row * 320 + column`** (Abrash's
+  own formula). One byte carries one pixel's colour index.
+- **S24** — `AH = 0Ch` writes a pixel, with the reference's own register
+  contract: "INT 10h / AH = 0Ch - change color for a single pixel. input:
+  AL = pixel color. CX = column. DX = row."
+  (`8086_bios_and_dos_interrupts.txt:150`-`:154`). The byte goes at the
+  framebuffer's offset (S23). **There is no page register**: the reference
+  names none, and the mode has one page.
+- **S25** — `AH = 0Dh` reads a pixel, with the reference's own contract:
+  "INT 10h / AH = 0Dh - get color of a single pixel. input: CX = column.
+  DX = row. output: AL = pixel color"
+  (`8086_bios_and_dos_interrupts.txt:164`-`:169`). The byte comes from the
+  same offset the write used.
+- **S26** — The two functions answer only in the graphics mode: the IBM's
+  own BIOS says the pixel functions are "not supported in text modes"
+  (Ralf Brown's Interrupt List, `INT 10h/AH = 0Ch`), and in a text mode
+  this BIOS's answer is nothing at all. A coordinate outside the framebuffer
+  writes nothing and reads zero — the IBM ignores a pixel that is outside
+  the screen, and this project does the same rather than wrapping the
+  address into the page.
+- **S27** — The machine's mode is one byte in the data area, at
+  `0040:0049`: "40:49 byte current CRT mode (hex value)"
+  (`https://pic.hallikainen.org/techref/bios/dataarea.htm`; the same in
+  Ralf Brown's Interrupt List's data-area map and in `VGABIOS.TXT`'s "0:449h
+  BYTE Video current mode"). **The reference's own map documents none of
+  it** — `memory.txt:115`-`:134` gives `004A`, `004E`, `0050`, `0062` and
+  `0084` — so the word is this project's assumption, the way the cursor's
+  shape at `0040:0080` already is (S3). It is one byte, not a word; and
+  `0040:0063` is **not** it: that is the 6845's base I/O port.
+- **S28** — The panel shows the graphics page. In the graphics mode the
+  panel reads the framebuffer from `A000:0000` and draws it **scaled**: the
+  framebuffer's 320×200 do not fit a terminal's cells, so each cell of the
+  panel's area is a block of the framebuffer's pixels and the cell's colour
+  is the **average** of the block's colours. The palette is the VGA's own
+  DAC: the sixteen the project already has are the published table's first
+  sixteen exactly (the EGFF table's sixteen EGA colours, `00`/`55`/`aa`/`ff`
+  steps), and the DAC's own default palette is "the first 16 locations"
+  (the EGA text colours), then "16 evenly spaced gray shades", then "the
+  remaining 216 locations ... based on a hue-saturation-intensity model",
+  then eight unused blacks (IBM's *VGA Technical Reference*, p. 4-39,
+  quoted at `https://retrocomputing.stackexchange.com/questions/27994`; the
+  table itself at `https://www.fileformat.info/mirror/egff/ch02_02.htm`).
+  **The `{0, 51, 102, 153, 204, 255}` cube and the twenty-four greys of the
+  step 10 are Windows 3.x's and xterm's, not the VGA's** (Netscape's
+  technical note 10117, `http://www.bonniehill.net/pages/netscape.colors.html`;
+  xterm's own cube is `{0, 95, 135, 175, 215, 255}`), and they are not the
+  project's palette.
+- **S29** — The recorded states move. The three programs that use the
+  graphics mode now run past it: `pixel.asm` reads its pixel back and gets
+  the colour it wrote, `0_sample_vga_graphics.asm` draws its rectangle, and
+  `mouse2.asm` reads, XORs and writes. The data area's mode byte is in the
+  golden (the runner dumps the low 32 kilobytes), and the framebuffer is
+  not (the dump does not reach `A0000`).
 
 ## Out of scope
 
-- **The graphics modes.** `13h` is forty by twenty-five in 256 colours with a
-  320×200 framebuffer, and the pixel functions `0Ch` and `0Dh` belong to it.
-  The page of graphics is `A0000:B1000` (`memory.txt:24-27`), the pixel's
-  address is a row of 320 pixels in eight-pixel bytes, and the screen panel
-  is a character grid. That is its own unit.
 - **The rest of the BIOS and the DOS.** Thirty-eight `AH` functions across
   eleven vectors is the reference's whole surface, and the research's verdict
   is to match the recovered set and stop.
 - **The reference's ROM.** `INT_VECT` and `BIOS_ROM` are the reference's own
   code, local gold that is never committed, and no code of the reference is
   ever copied.
-- **The keyboard.** `INT 16h` is in sixty of the examples and is the BIOS's
-  other half; it is not this unit.
+- **The keyboard's other functions.** The reference documents two `INT 16h`
+  functions and the corpus calls two (S13); the IBM's `AH = 02h` (the shift
+  flags), `AH = 05h` (storing a keystroke) and the enhanced-keyboard
+  functions are not in the reference's surface, so they are not in ours.
+- **The mode read-back.** The IBM's `INT 10h/AH = 0Fh` returns the display
+  mode in `AL`, but the reference does not document it and the corpus does
+  not call it, so it is not in the reference's surface and it is not in ours.
+- **The XOR clause.** The IBM's pixel functions XOR the colour onto the
+  screen when bit 7 is set — "except in 256-color modes", which is where we
+  are. The reference's own contract says nothing about it, and `mouse2.asm`
+  does its own XOR by hand, so the clause is not in ours.
+- **The graphics page in the recorded states.** The runner's dump covers the
+  low 32 kilobytes, so the framebuffer is not in the golden; the golden
+  shows what the program left in its registers and in the data area, and the
+  unit's own tests show the pixels.
 
 ## Tasks
 
@@ -222,54 +421,332 @@ registers with no state of its own.
   deleted and recorded again.
 - **T2** — The keyboard of the BIOS: `INT 16h`. Route: delegated, one
   bounded writer, one commit, one independent verifier. **CHOSEN
-  2026-11-25, NOT STARTED.** The maintainer's decision: "El teclado del
-  BIOS: INT 16h". It is the BIOS's other half, and the one the corpus
-  needs most — **sixty of the eighty-five reference programs call it**,
-  and without it those programs sit waiting for a key that never comes.
-  What the next session needs to know, and what it still has to decide:
-  - **The reference documents exactly two functions**
-    (`re/docs-txt/8086_bios_and_dos_interrupts.txt:304`-`:315`): `AH =
-    00h` gets a keystroke **without echo** and **removes it from the
-    keyboard buffer**, returning `AH` = the BIOS scan code and `AL` = the
-    ASCII character; `AH = 01h` checks for a keystroke, sets `ZF = 1`
-    when there is none, returns the same pair, and **does not remove**
-    the keystroke.
-  - **The keyboard buffer has no documented home.** The reference's own
-    memory map (`re/docs-txt/memory.txt`) gives the *video* state its
-    offsets in the data area and gives the **keyboard buffer none** —
-    `0040:001A`-`:0032` are not in it. So the video BIOS could keep its
-    state where the reference says it is, and the keyboard cannot. Two
-    candidates: the IBM PC's conventional BIOS keyboard buffer
-    (`0040:001A` head, `0040:001C` tail, `0040:001E` start, `0040:0030`
-    end, `0040:0031` size), or Rust state in the core fed by the host's
-    keyboard. **This is the unit's first design decision, and it is not
-    the parent's to make alone.**
-  - **Where the keystrokes come from is the second decision.** The TUI
-    has a keyboard — the terminal's own keys — and the headless runner
-    has none, and the reference's `INT 16h/00h` **waits** when the buffer
-    is empty ("if there is no character in the keyboard buffer, the
-    function waits until any key is pressed", `:339`). So the runner's
-    keyboard has to be decided: an empty buffer and programs that wait
-    until the budget ends them, or a buffer the runner can be given, or
-    something else. The eighty-five recorded states will move whatever
-    the answer is.
-  - **The scan code table needs its own evidence.** The reference's
-    document says only "AH = BIOS scan code" and never gives the table.
-    The IBM's set 1 is the obvious candidate, and the project's rule is
-    that a claim needs a source: either the published table or the
-    reference's own observed behaviour.
-  - **The BIOS's shape carries over.** The services live in
-    `crates/core/src/bios.rs`, the state in the data area where the
-    reference puts it, the `INT` is the 8086's, and the ROM's entry is
-    the vector's target. The keyboard's two functions are the same shape
-    of thing: the `INT` is the chip's `INT`, and the service answers
-    where the ROM is.
+  2026-11-25; DONE AND REVIEWED** — the four decisions are the
+  maintainer's, taken the same day through the question tool, and the specs
+  S12-S21 above are written from them. The decisions, verbatim:
+  - "Área de datos del BIOS (0040:001A-0031)" — the buffer lives in the BIOS
+    data area, at the IBM PC's conventional offsets.
+  - "Inyección del host: TUI + guion del CLI" — the keystrokes come from
+    the host: the TUI forwards the terminal's keys, and the headless runner
+    takes a script.
+  - "Espera hasta que haya tecla" — `INT 16h/00h` waits when the buffer is
+    empty.
+  - "Set 1 del IBM" — the scan code table is the IBM's set 1.
+  - **The unit.** The `INT 16h` is the 8086's `INT` (S12): it pushes FLAGS,
+    CS and IP, it clears TF and IF, and it loads `CS:IP` from the vector
+    table. The BIOS is a handler at `F400:01C0` — the entry the reference's
+    own map gives for the keyboard (`memory.txt:66`), the mirror of the
+    video's `F400:0190` — the ROM is this project's own, and the byte at the
+    entry is the `IRET` that comes out of the service. The two services are
+    the reference's own two, with its own register contracts (S13). The
+    buffer is the BIOS data area at the IBM's conventional offsets (S14),
+    one slot kept free so that "the head equals the tail" is unambiguously
+    empty, and the head and the tail validated before they are trusted,
+    because the data area is guest-writable memory. The scan code is the
+    IBM's set 1 (S15), whose four arrow codes the corpus itself names.
+    `AH = 00h` waits, one step at a time, so the step budget still bounds
+    the run (S16); `AH = 01h` never waits and never removes the keystroke
+    (S17). The keys come from the host — the TUI forwards the terminal's
+    keys, the runner takes a script (S18) — through the one door the BIOS
+    module offers (S19). The recorded states move (S20) and the help moves
+    with the change (S21).
+  - **The files** are `crates/core/src/bios.rs`, `crates/core/src/lib.rs`,
+    `crates/core/src/exec.rs`, `crates/core/tests/bios.rs`,
+    `crates/cli/src/main.rs`, `crates/tui/src/app.rs`, `crates/tui/src/ui.rs`
+    and the docs that carry the help.
   - **Do not forget the rule L2 states**: a hook that changes what an
     instruction does is decided by the oracle, not by the brief. The
     646 000-capture gate is the judge, and it is the one that caught the
     first attempt.
 
+- **T3** — The graphics modes of the video BIOS: `13h`, `0Ch`, `0Dh`. Route:
+  delegated, one bounded writer, **two work-unit commits**, one independent
+  verifier. **CHOSEN 2026-11-25.** The maintainer's decisions, verbatim:
+  - "Una unidad: el BIOS y el panel" — the unit is the BIOS's functions and
+    the panel together, not two units.
+  - "Bloques escalados, con el color promedio" — the panel draws the
+    framebuffer scaled, each cell a block of pixels coloured with the
+    average of the block's colours.
+  - "Abre el PR del teclado; fusiono yo; gráficos desde main" — the
+    keyboard's pull request is opened and merged first, and this unit takes
+    a fresh branch from `main`.
+  - **The unit.** The mode `13h` is a mode the machine has (S22): the
+    columns and the rows become the mode's own cell grid, the active page
+    becomes zero, and the mode itself is one byte in the data area at
+    `0040:0049` (S27). The framebuffer is the published mode `13h` one
+    (S23): 320 pixels of one byte each at `A000:0000`, a row of 320 bytes,
+    the pixel's offset `row * 320 + column`. The two pixel functions are
+    the reference's own, with the reference's own register contracts (S24,
+    S25), and they answer only in the graphics mode (S26). The panel draws
+    the graphics page scaled, with the VGA's own 256-colour DAC (S28).
+  - **The files** are `crates/core/src/bios.rs`, `crates/core/src/lib.rs`,
+    `crates/core/tests/bios.rs`, `crates/debug/src/panels.rs`,
+    `crates/debug/tests/screen.rs`, `crates/tui/src/ui.rs`,
+    `crates/tui/src/theme.rs`, `crates/tui/tests/screen.rs`,
+    `crates/cli/tests/examples.rs` and `design/DESIGN.md`.
+  - **The two work units.** **W1** is the BIOS: the mode, the mode byte, the
+    two pixel functions, the framebuffer's bounds and the core's tests.
+    **W2** is the panel: the palette, the framebuffer's reading, the scaled
+    drawing and the TUI's tests. The palette belongs to W2: the BIOS writes
+    a colour's index and never sees a colour.
+
 ## Log
+
+- **L9 (2026-11-25).** The next unit is the graphics modes, and its three
+  decisions are the maintainer's.
+  - **The decisions**, the maintainer's own words: "Una unidad: el BIOS y el
+    panel"; "Bloques escalados, con el color promedio"; "Abre el PR del
+    teclado; fusiono yo; gráficos desde main".
+  - **The unit's own research, and what it corrected.** The census of the
+    corpus: **three** programs use the graphics mode —
+    `0_sample_vga_graphics.asm` (four `0Ch`), `pixel.asm` (a `0Ch` and a
+    `0Dh`) and `mouse2.asm` (two of each) — and all three set the mode
+    through the BIOS, and none writes the graphics page directly. **The
+    list L8 carried was wrong**: `attrib.asm` is a DOS file-attribute
+    program, `scroll.asm` a text-mode window scroll, and `pages.asm`,
+    `colors.asm` and `mouse.asm` are text mode. L8 and the research's own
+    SCR-4 are corrected.
+  - **Three corrections to the brief, from the published sources.**
+    - **The framebuffer is one byte per pixel**, not "a row of 320 pixels in
+      eight-pixel bytes": "an array of 64000 contiguous bytes, arranged as
+      200 rows of 320 bytes, with one byte per pixel, located in memory at
+      absolute address $A000:$0000" (Dr Bill Verts,
+      `https://people.cs.umass.edu/~verts/cs32/vga_320.html`; the same in
+      Abrash's *Graphics Programming Black Book* ch. 27 and in
+      `https://en.wikipedia.org/wiki/Mode_13h`).
+    - **The palette is the VGA's own DAC, not the cube of Windows 3.x.** The
+      DAC's default is "the first 16 locations" (the EGA text colours),
+      then "16 evenly spaced gray shades", then "the remaining 216
+      locations ... based on a hue-saturation-intensity model", then eight
+      unused blacks (IBM's *VGA Technical Reference* p. 4-39, quoted at
+      `https://retrocomputing.stackexchange.com/questions/27994`; the table
+      at `https://www.fileformat.info/mirror/egff/ch02_02.htm`). The
+      `{0, 51, 102, 153, 204, 255}` cube and the greys of the step 10 are
+      Netscape's and xterm's — xterm's own cube is `{0, 95, 135, 175, 215,
+      255}` — and **the project's existing sixteen are the published DAC's
+      first sixteen exactly**, so the palette has one home and one rule.
+    - **The mode's word is `0040:0049`, one byte**: "40:49 byte current CRT
+      mode (hex value)" (`https://pic.hallikainen.org/techref/bios/dataarea.htm`;
+      the same in Ralf Brown's data-area map and in `VGABIOS.TXT`'s "0:449h
+      BYTE Video current mode"). **`0040:0063` is not it**: that is the
+      6845's base I/O port. The reference's own map documents none of it, so
+      it is the project's assumption (S27), the way the cursor's shape at
+      `0040:0080` already is.
+  - **The reference's own ROM stays unobserved.** Its identity (sha256
+    `8ff8497d11497710`) and its load address (`F4000`, `memory.txt:47-50`)
+    are recorded; no Ghidra project was ever made for it, so the published
+    tables are this unit's oracle (`odd/research/softonic-build-comparison.md:85`,
+    `:403-405`).
+  - **What the unit does not do** (the out-of-scope section, rewritten):
+    the IBM's `AH = 0Fh` mode read-back, which the reference does not
+    document; the IBM's XOR clause, which the reference does not mention and
+    which the mode's own 256 colours would not apply to anyway; and the
+    graphics page in the recorded states, because the runner's dump reaches
+    the low 32 kilobytes and not `A0000`.
+
+- **L8 (2026-11-25).** The next unit is chosen and the construction
+  pauses.
+  - **The decision**, the maintainer's own words: "Los modos gráficos del
+    BIOS (13h, 0Ch/0Dh) pero solo guarda la respuesta en memoria y en
+    odd/, seguiremos la construcción en otro momento". So: the unit is
+    recorded here and in the handoff, and the construction stops for now.
+  - **What the unit is.** The video BIOS's other half: the mode `13h`
+    (forty by twenty-five in 256 colours with a 320×200 framebuffer), the
+    page of graphics at `A0000:B1000` (`memory.txt:24`-`:27`), the
+    pixel's address, and the pixel functions `0Ch` (write a pixel) and
+    `0Dh` (read a pixel). **Three** of the corpus's programs use it:
+    `0_sample_vga_graphics.asm` (four `0Ch`), `pixel.asm` (a `0Ch` and a
+    `0Dh`) and `mouse2.asm` (two of each). All three set the mode
+    through the BIOS, and none writes the graphics page directly.
+  - **What it will have to settle.** The screen panel is a grid of
+    characters, and a 320×200 framebuffer is not that: either the panel
+    draws pixels or the unit keeps to the BIOS's functions and the panel
+    comes later. The mode `13h` also changes the machine's geometry, and
+    the BIOS data area's own video state — the page's start, the rows —
+    has one shape for text and another for graphics. The reference
+    documents `0Ch` and `0Dh` in
+    `re/docs-txt/8086_bios_and_dos_interrupts.txt`, and its map gives the
+    page's home.
+  - **Where the work stands.** Branch `feat/bios-keyboard`, pushed to
+    GitHub and Codeberg at `4809944`: the unit (`47d2b4e`), the
+    verification round's log (`b112196`), the native review's correction
+    (`3c5741e`), the advisories' follow-up (`030756a`) and this log
+    (`4809944`). **822 passed, 0 failed**; clippy clean; `cargo fmt
+    --all --check` exits 0; the full gate over all 646 000 captures passes
+    with no family added. The unit's own native review is closed and its
+    authority burned; the follow-up commit's review is the one this
+    session opened last.
+
+- **L7 (2026-11-25).** The native review of the unit: four lenses, a
+  refuter and a targeted validator, and the authority burned.
+  - **What the review found.** The risk lens and the reliability lens
+    reported the same CRITICAL: `keyboard_end` derived the ring's end with
+    an unchecked `u16` addition of the size word, which is the guest's own,
+    so a guest that wrote `0xFFE2` into `0040:0030` and called `INT 16h`
+    killed the emulator with "attempt to add with overflow". **It is the
+    sibling of the `SP + 4` this unit had already fixed**, and the parent
+    had read the same class in the diff and missed this one. The refuter
+    corroborated both claims, and the parent reproduced it:
+    `cargo run -p emo8067-cli -- run --ds 0040 size.asm` panicked with
+    exit 101.
+  - **The correction** — one bounded correction, the budget's 200 lines:
+    the size word's addition is checked now (`KEYBOARD_BUFFER.checked_add(size)?`),
+    and a size that would leave the segment leaves the buffer empty, which
+    is what S14 asks of every value the BIOS reads from that area. The probe
+    `s14_a_guest_that_scribbles_the_size_word_sees_an_empty_buffer` pins it:
+    RED (the overflow panic on the unfixed code) and GREEN (19/19). The
+    commit is `3c5741e`, and the targeted validator passed both
+    `original_criteria` and `correction_regression`.
+  - **The review is closed and its authority burned**: the acknowledgement
+    was the exact one the bound STATUS named, and the envelope says
+    `authority: burned`.
+  - **The advisories are not corrections.** The review's own words: "Every
+    finding listed here is non-blocking... Treat them as separate later
+    work, never as a reason to re-run review on this candidate."
+    **What the follow-up commit took**: the key mapper's catch-all no
+    longer turns an unnamed key into a NUL keystroke (three lenses
+    reported it, and the code contradicted its own doc comment); the CLI
+    says out loud the keys of a script that never reached the guest; the
+    CLI's own test now passes the option its name claims; the ring's end
+    comes from the validated ends once instead of being derived twice
+    with an unreachable fallback; and the test helper wraps the tail the
+    way the door does. **What is left, accepted**: the TUI's help names the
+    keys in its header ("keys · the rest go to the guest"), because a line
+    of the list may be 39 characters at most; the TUI still drops a
+    keystroke silently when the guest's buffer is full, because this
+    project has no bell; the probes re-declare the layout's offsets on
+    purpose, so that they do not lean on the implementation's constants; and
+    the quit keys are matched twice, which is a duplication and not a
+    defect.
+  - **The tooling, for whoever runs the next review here.** The OpenCode
+    host relay refuses at the `start` operation with the typed frame
+    `provider_failed`, **but the reviewer task runs anyway** and its result
+    arrives as a background result. The prompt must be the provider's exact
+    `GENTLE_AI_REVIEW_BINDING` line: a prompt that only points at a file is
+    refused with `binding_mismatch` **before the session is created**, so
+    the task never runs and the desktop card lies about it. The refuter's
+    and the validator's results are captured with
+    `gentle-ai review capture-refuter --input <file> --agent pi` (and
+    `capture-validation`): `--execute --agent pi` fails because the role's
+    agent is not installed for pi, `--execute --agent claude-code` fails
+    because that CLI is not logged in, and `--input --agent opencode` is
+    refused because opencode has no role capture contract.
+
+- **L6 (2026-11-25).** The verification round: one blocker from the
+  independent verifier, three more from the parent's own reading of the
+  diff, and one verdict the parent does not accept.
+  - **The verifier's blocker.** `set_zero_flag` adds four to the stack
+    pointer without wrapping (`crates/core/src/bios.rs`, `let at =
+    cpu.regs.word(Reg16::Sp) + 4;`). The `INT` pushes three words, so a
+    guest whose `SP` starts at 2..5 puts the frame's flags word across the
+    segment's end — and the addition panics, "attempt to add with
+    overflow", killing the emulator. The verifier reproduced it with
+    `--sp 3`; the baseline `5e4a702` stops with "took INT 0x16" and does
+    not panic. **The fix is `wrapping_add(4)`**: the frame's flags word is
+    at the wrapped address, which is where the push put it.
+  - **The verifier's S15 verdict does not stand.** It ruled the scan-code
+    table "met — every shipped entry is set 1", on a table it built itself:
+    `b' = 1Fh`, `c = 20h`, `q = 2Eh` — the count from `A = 1Eh` that set 1
+    is not. The published table (`https://www.marjorie.de/ps2/scancode-set1.htm`,
+    the one Wikipedia's "Scancode" article cites) says `B = 30h`, `C =
+    2Eh`, `Q = 10h`, `E = 12h`, `I = 17h`, `Z = 2Ch`, `M = 32h`, and the
+    code's table is wrong for every letter but `a`. The parent's reading
+    had found this before the verifier reported; the two agree, and the
+    published table is the oracle.
+  - **The parent's own three findings.**
+    1. **The size word sat inside the ring.** S14 put the size at
+       `0040:0030` and the body at `0040:001E`-`:003E`, so the tenth
+       keystroke wrote over the size word, and `init` wrote it as a word,
+       over two ring bytes at once. **S14 is rewritten**: the range is
+       `0040:001A`-`:0031` and nothing outside it, the body is
+       `0040:001E`-`:002F`, the size word holds `0012h`, and the ring's end
+       is derived from it instead of stored.
+    2. **The head and the tail were ring-relative.** They are absolute now,
+       the IBM's way, so a guest that reads `0040:001A` sees where the
+       buffer is.
+    3. **The CLI's `\r` meant the right arrow**, and a literal newline gave
+       the guest ASCII `0Ah` where the corpus's programs compare `AL`
+       against `0Dh`. `\n` and `\r` are the enter key now, and the arrows
+       are `\up`, `\down`, `\left` and `\right`.
+  - **The verifier's advisories.** A (the size word, and the ring outside
+    the approved range) is the parent's finding 1. B (the takeover's
+    additive reading) is what **S18 now says**: the design document has
+    the last word there, and it says the debugger's own keys keep working
+    while the takeover is open (`design/DESIGN.md:90`-`:99`). C (the
+    shifted punctuation carried no code) is now in **S15**: a shifted
+    character has the code of the key it is on. D (the runner ate the whole
+    script when the door refused a keystroke) is fixed by the door's new
+    answer — it says whether the keystroke was taken, and the runner only
+    advances its script when it was. E (the TUI's help does not say which
+    keys) is **accepted**: the help's widest line may be 39 characters and
+    the line it has says the keys go to the guest's screen. F (the CLI's
+    help did not list every escape) is fixed with the new format.
+  - **The correction round's evidence.** **RED**: the verifier's own
+    probes, against the tree as it stood, ran 18 with **6 failed** — the
+    panic of C1 ("attempt to add with overflow"), the table of C2 ("the set
+    1 code of 'q' is 0x10, left: 46, right: 16"), and the three of C3. The
+    blocker end to end: `cargo run -p emo8067-cli -- run --sp 3 poll.asm`
+    panicked with exit 101. **GREEN**: the probes are 18/18 and 6/6, the
+    whole tree is **821 passed, 0 failed** (the base's 781, the unit's 15,
+    the probes' 24 and one new CLI test), the clippy run is clean in every
+    crate, `cargo fmt --all --check` exits 0, and the full gate over all
+    646 000 captures passes with no family added. The parent's own spot
+    check: `--sp 3` now stops with the empty buffer's answer, `ZF` set and
+    exit 0. The recorded states moved again — the layout changed the data
+    area — so 79 of the 85 goldens moved, all 85 were recorded again, and
+    the gate reports "85 examples, 85 matched, 0 changed"; the census is
+    the same: 38 stop at `INT 21h`, 33 at the step budget, 9 halt, 2 at
+    `INT 15h`, 2 at `INT 33h`, 1 at `INT 13h`.
+  - **Two of the probe's expectations changed, and the parent's reason is
+    recorded.** The verifier's `s14_the_size_word_is_inside_the_body_and_the_ring_clobbers_it`
+    asserted that the size word IS inside the body — it was a probe of the
+    defect, and under the corrected S14 it is a probe of its absence, so it
+    is now `s14_the_size_word_is_outside_the_body_and_the_ring_never_clobbers_it`.
+    Its `s12`/`s13`/`s19` expectations still read the head and the tail the
+    ring-relative way, and the TUI probe's helpers added the ring's start to
+    the head; those five are now absolute, the same correction the parent's
+    own `s14` probes got. **A probe's expectation changes only when the spec
+    it was written from changes, and the reason is in this log.**
+
+- **L5 (2026-11-25).** The keyboard's four decisions are the maintainer's,
+  and the specs S12-S21 are written from them.
+  - **The decisions**, the maintainer's answers verbatim: "Área de datos del
+    BIOS (0040:001A-0031)"; "Inyección del host: TUI + guion del CLI";
+    "Espera hasta que haya tecla"; "Set 1 del IBM". They are S12-S21 above,
+    and T2 above carries them.
+  - **What the research changed in the brief.** Three findings:
+    1. **The reference's own map DOES name the keyboard's entry**:
+       `memory.txt:66` — "16 16x4 = 58 F400:01C0 - keyboard functions" — the
+       mirror of the video's `F400:0190` (`memory.txt:60`). T2's brief said
+       the map gave the keyboard nothing; that is true of the **buffer** and
+       false of the **entry**. The buffer's offsets are still the IBM's
+       convention and still this project's assumption (S14); the entry is
+       the reference's own.
+    2. **The wait is not in the reference's `INT 16h` contract.** The
+       sentence "if there is no character in the keyboard buffer, the
+       function waits until any key is pressed" (`:339`) is inside the
+       `INT 21h / AH=1` block; the `INT 16h` section (`:304`-`:315`) says
+       nothing about waiting. The project's own research already had it
+       right — `odd/research/features-and-ux.md:152` (SCR-6): "`INT 16h/00h`
+       blocks for a key, `INT 16h/01h` polls the buffer" — and so does the
+       IBM's BIOS.
+    3. **The corpus is the scan code's evidence**: `snake.asm:37`-`:41`
+       calls `4Bh`, `4Dh`, `48h` and `50h` "bios key codes" and compares the
+       returned `AH` against them; it is the only one of the eighty-five
+       that reads `AH` at all. The census: **62** programs call `INT 16h`
+       (the brief said sixty), 79 call sites, 76 of them `AH = 00h` and 3 of
+       them `AH = 01h` — the three that poll first (`keybrd.asm`,
+       `bintest.asm`, `snake.asm`).
+  - **What the map found in the code.** The core has **no input surface at
+    all** — no channel, no keyboard, no queue; the only host doors are the
+    I/O port bus and the device socket. **23 of the 85 recorded states**
+    already stop with "took INT 0x16". The TUI consumes every key itself
+    (28 bound keys) and none of them ever reaches the `Cpu`. The headless
+    runner has an instruction budget (`100_000` by default) and no input
+    channel, and spending the budget is not a failure.
+  - **Where the work stands.** Branch `feat/bios-keyboard`, cut from `main`
+    at `5e4a702`; `main` and the merged feature branch have the same tree,
+    and both remotes carry `main` at `5e4a702`.
 
 - **L4 (2026-11-25).** The session ends here, on the maintainer's word:
   "deja de construir por hoy".

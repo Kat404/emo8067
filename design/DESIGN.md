@@ -95,8 +95,11 @@ no header of its own. The debugger's own keys keep working while it is
 open — the machine still runs, still steps and still halts. The keys that
 act on the listing do not: the takeover holds the whole screen and the
 listing's cursor is not on it, and a cursor nobody can see is not one to
-move or to set a breakpoint at. The page carries the cursor the machine's
-BIOS set, and the cursor is drawn where the BIOS says it is.
+move or to set a breakpoint at. The takeover **adds** the guest's keys and
+does not take the debugger's away: every key but the quit keys reaches the
+guest's keyboard, the arrows most of all, for the guest is the one that
+wants them. The page carries the cursor the machine's BIOS set, and the
+cursor is drawn where the BIOS says it is.
 
 ## Surfaces
 

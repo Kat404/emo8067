@@ -756,3 +756,85 @@ fn the_refusal_says_that_a_bulk_write_threw_the_history_away() {
         "and the refusal says it"
     );
 }
+
+/// S18 — The TUI forwards the terminal's keys to the guest.
+///
+/// A key the TUI binds to a debugger command is the debugger's, and every
+/// other key goes to the guest's keyboard buffer. When the guest's screen
+/// has the focus — the takeover the `x` key gives it — the keys go to the
+/// guest instead, all of them but the TUI's quit keys.
+#[test]
+fn s18_the_tui_forwards_the_keys_to_the_guest() {
+    let mut app = app_of("keys-to-guest", "org 100h\nhlt\n");
+
+    // A key the TUI does not bind is the guest's.
+    press(&mut app, &[KeyCode::Char('a')]);
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        1,
+        "the key reached the guest's keyboard"
+    );
+
+    // A key the TUI binds is the debugger's, and it does not reach the
+    // guest.
+    press(&mut app, &[KeyCode::Char('x')]);
+    assert!(app.screen_open, "the guest's screen took the terminal over");
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        1,
+        "and the bound key did not reach the guest"
+    );
+
+    // In the takeover the keyboard is the guest's, and the arrows are the
+    // guest's most wanted key: `snake.asm` reads 48h, 4Bh, 4Dh and 50h.
+    press(&mut app, &[KeyCode::Up]);
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        2,
+        "the arrow reached the guest's keyboard"
+    );
+
+    // And a key the TUI does not bind reaches the guest once, and not
+    // twice.
+    press(&mut app, &[KeyCode::Char('z')]);
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        3,
+        "the key reached the guest's keyboard once"
+    );
+
+    // And the quit keys are the TUI's own, in every mode.
+    press(&mut app, &[KeyCode::Char('q')]);
+    assert!(app.quit, "the user asked to quit");
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        3,
+        "and the quit key did not reach the guest"
+    );
+}
+
+/// S21 — The help says which keys reach the guest.
+#[test]
+fn s21_the_help_says_which_keys_reach_the_guest() {
+    assert!(
+        emo8067_tui::ui::KEYS
+            .iter()
+            .any(|line| line.contains("the guest's screen") && line.contains("keys")),
+        "the help says the keys go to the guest: {:?}",
+        emo8067_tui::ui::KEYS
+    );
+}
+
+/// The keys the TUI binds are still the debugger's: the guest's keyboard
+/// does not get them.
+#[test]
+fn a_bound_key_is_still_the_debuggers() {
+    let mut app = app_of("bound-key", "org 100h\nhlt\n");
+    press(&mut app, &[KeyCode::Char('?')]);
+    assert!(app.help, "the help is up");
+    assert_eq!(
+        app.cpu.keys_waiting(),
+        0,
+        "and the key did not reach the guest"
+    );
+}

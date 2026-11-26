@@ -16,6 +16,10 @@ use std::process::ExitCode;
 
 use emo8067_asm::disasm;
 use emo8067_asm::program::{self, Error};
+use emo8067_core::bios::{
+    SCAN_BACKSPACE, SCAN_DOWN, SCAN_ENTER, SCAN_ESCAPE, SCAN_LEFT, SCAN_RIGHT, SCAN_TAB, SCAN_UP,
+    scan_code,
+};
 use emo8067_core::flags::{AF, CF, DF, Flags, IF, OF, PF, SF, TF, ZF};
 use emo8067_core::regs::{Reg8, Reg16, Seg};
 use emo8067_core::{Cpu, StopReason};
@@ -41,6 +45,7 @@ RUN OPTIONS:
     --sp VALUE         set SP                           (default FFFE)
     --ds SEG           set DS                           (default 0100, or 0000)
     --max N            stop after N instructions       (default 100000)
+    --keys SCRIPT      the guest's keys: text, \\n \\r \\e \\b \\t \\\\ \\up \\down \\left \\right
     --include DIR      look for includes in DIR        (repeatable)
     --golden           print the memory that is not zero, page by page
     --trace            print one line per instruction
@@ -87,6 +92,7 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     let mut sp: Option<u16> = None;
     let mut ds: Option<u16> = None;
     let mut max = 100_000u64;
+    let mut keys: Option<String> = None;
     let mut trace = false;
     let mut golden = false;
     let mut dump: Option<(u32, usize)> = None;
@@ -131,6 +137,10 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
             }
             "--max" => {
                 max = value()?.parse().map_err(|_| "bad --max")?;
+                i += 1;
+            }
+            "--keys" => {
+                keys = Some(value()?.to_string());
                 i += 1;
             }
             "--device-socket" => {
@@ -249,6 +259,11 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
         None => None,
     };
 
+    // The guest's keyboard: the script of keys, and the one the runner
+    // has not fed yet. The script is fed as the guest consumes it, so a
+    // script longer than the buffer works.
+    let script = keys.as_deref().map(script_of).unwrap_or_default();
+    let mut next_key = 0;
     let mut executed = 0u64;
     let mut failure: Option<String> = None;
     while executed < max {
@@ -257,6 +272,17 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
                 failure = Some(format!("device socket: {e}"));
                 break;
             }
+        }
+        // The next key of the script goes in when the door takes it: the
+        // script moves on only then, and the door's refusal stops the
+        // pushing — the guest scribbles where the buffer's ends live, and
+        // the script would never be fed again.
+        while next_key < script.len() {
+            let (scan_code, ascii) = script[next_key];
+            if !cpu.push_key(scan_code, ascii) {
+                break;
+            }
+            next_key += 1;
         }
         let before = cpu.regs.ip;
         match cpu.step() {
@@ -295,6 +321,16 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
         }
     }
 
+    // A script's tail that never reached the guest is said out loud: the
+    // run itself is not a failure, but a script the guest did not get is
+    // not the script the user wrote.
+    if next_key < script.len() {
+        eprintln!(
+            "emo8067: {} of the script's keys never reached the guest",
+            script.len() - next_key
+        );
+    }
+
     print_state(&cpu, executed, max, &failure);
     if golden {
         pages(&cpu);
@@ -307,6 +343,98 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// The keys a script holds: the scan code and the ASCII character of each.
+///
+/// The script is a string of characters, and a backslash names the keys a
+/// character cannot: `\n` and `\r` are the enter key — and so is a literal
+/// newline, the DOS way — `\e` the escape, `\b` the backspace, `\t` the
+/// tab, `\\` a literal backslash, and `\up`, `\down`, `\left` and
+/// `\right` the arrows.
+fn script_of(script: &str) -> Vec<(u8, u8)> {
+    let characters: Vec<char> = script.chars().collect();
+    let mut keys = Vec::new();
+    let mut at = 0;
+    while at < characters.len() {
+        let character = characters[at];
+        at += 1;
+        match character {
+            // The enter key: the two escapes and the literal newline.
+            '\n' | '\r' => keys.push((SCAN_ENTER, 0x0D)),
+            '\\' => {
+                let rest = &characters[at..];
+                if rest.starts_with(&['u', 'p']) {
+                    keys.push((SCAN_UP, 0));
+                    at += 2;
+                } else if rest.starts_with(&['d', 'o', 'w', 'n']) {
+                    keys.push((SCAN_DOWN, 0));
+                    at += 4;
+                } else if rest.starts_with(&['l', 'e', 'f', 't']) {
+                    keys.push((SCAN_LEFT, 0));
+                    at += 4;
+                } else if rest.starts_with(&['r', 'i', 'g', 'h', 't']) {
+                    keys.push((SCAN_RIGHT, 0));
+                    at += 5;
+                } else {
+                    match rest.first() {
+                        Some('n') | Some('r') => {
+                            keys.push((SCAN_ENTER, 0x0D));
+                            at += 1;
+                        }
+                        Some('e') => {
+                            keys.push((SCAN_ESCAPE, 0x1B));
+                            at += 1;
+                        }
+                        Some('b') => {
+                            keys.push((SCAN_BACKSPACE, 0x08));
+                            at += 1;
+                        }
+                        Some('t') => {
+                            keys.push((SCAN_TAB, 0x09));
+                            at += 1;
+                        }
+                        Some('\\') => {
+                            if let Some(key) = key_of('\\') {
+                                keys.push(key);
+                            }
+                            at += 1;
+                        }
+                        Some(other) => {
+                            if let Some(key) = key_of(*other) {
+                                keys.push(key);
+                            }
+                            at += 1;
+                        }
+                        // A backslash at the end of the script is a
+                        // backslash.
+                        None => {
+                            if let Some(key) = key_of('\\') {
+                                keys.push(key);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                if let Some(key) = key_of(character) {
+                    keys.push(key);
+                }
+            }
+        }
+    }
+    keys
+}
+
+/// The scan code and the ASCII character of a character of the script.
+///
+/// A character that is not ASCII is not a keystroke: it is skipped.
+fn key_of(character: char) -> Option<(u8, u8)> {
+    if !character.is_ascii() {
+        return None;
+    }
+    let ascii = u8::try_from(character).ok()?;
+    Some((scan_code(ascii), ascii))
 }
 
 /// The disassembler: a listing of a file, one instruction per line.

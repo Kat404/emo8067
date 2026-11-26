@@ -127,7 +127,7 @@ pub const KEYS: [&str; 25] = [
     "e    edit the value under the cursor",
     "g    jump to an address, label, segment",
     "w    a watchpoint at the cursor",
-    "x    the guest's screen (x closes it)",
+    "x    the guest's screen (keys go to it)",
     "↑ ↓  move the cursor",
     "← →  move the cursor (registers, flags)",
     "PgUp PgDn  a page of memory",
@@ -1305,7 +1305,7 @@ fn help(app: &App, frame: &mut Frame, area: Rect) {
     // The overlay covers what is under it: the panels are behind it.
     frame.render_widget(Clear, area);
     let header = Line::from(Span::styled(
-        "keys",
+        "keys · the rest go to the guest",
         section_style(app.focus == Focus::Disassembly),
     ));
     frame.render_widget(

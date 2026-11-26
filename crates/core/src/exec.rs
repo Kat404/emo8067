@@ -272,13 +272,30 @@ pub fn step(cpu: &mut crate::Cpu) -> Result<crate::StepInfo, ExecError> {
     // the memory, and the write of the step before is not this step's.
     cpu.mem.last_write = None;
     let at = cpu.regs.ip;
-    // The BIOS's entry. The machine reached the ROM through the interrupt
-    // vector, the way it reaches any handler, and the video service runs
-    // where the ROM's code is: this project's own code, native, at the
-    // address the vector names. The ROM's own byte at the entry — the
-    // `IRET` that comes out of it — is the instruction that retires.
-    if cpu.regs.segment(Seg::Cs) == crate::bios::ENTRY_SEGMENT && at == crate::bios::ENTRY_OFFSET {
-        crate::bios::service(cpu);
+    // The BIOS's entries. The machine reached the ROM through the interrupt
+    // vector, the way it reaches any handler, and the service runs where
+    // the ROM's code is: this project's own code, native, at the address
+    // the vector names. The ROM's own byte at the entry — the `IRET` that
+    // comes out of it — is the instruction that retires.
+    if cpu.regs.segment(Seg::Cs) == crate::bios::ENTRY_SEGMENT {
+        if at == crate::bios::ENTRY_OFFSET {
+            crate::bios::service(cpu);
+        } else if at == crate::bios::KEYBOARD_ENTRY_OFFSET {
+            // The keyboard's service waits for a keystroke: with an empty
+            // buffer the machine stays at the entry and comes back to it on
+            // the next step, so the wait costs the machine one step at a
+            // time and the step budget still bounds it.
+            if !crate::bios::keyboard_service(cpu) {
+                // The service waits: the ROM's own byte at the entry — the
+                // `IRET` — does not retire, and the machine comes back to
+                // the entry on the next step.
+                return Ok(crate::StepInfo {
+                    at,
+                    opcode: crate::bios::ENTRY_BYTE,
+                    next_ip: at,
+                });
+            }
+        }
     }
     let mut opcode = fetch_u8(&cpu.mem, &mut cpu.regs);
 
