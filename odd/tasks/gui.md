@@ -164,6 +164,57 @@ that: "That is the main UI lesson to invert" (§4.2).
 
 ## Log
 
+- **L6 (2026-11-26).** T1, T2 and T3 are closed, each with a commit and
+  each with the native review's approval and its authority burned. **T4 is
+  next.**
+  - **T1** (`c060a85`, with the review's follow-up `c713df5` and the
+    bounded correction `339a352`): the crate `emo8067-gui`, egui/eframe
+    0.36.2 with eframe's defaults off, the MSRV at 1.95, `run_native`
+    with a Vulkan-then-OpenGL fallback, `tracing-subscriber` so the
+    toolkit's diagnostics reach a subscriber, and a first window drawing the
+    disassembly from `Panels::of`. The review found twenty-three findings,
+    none severe.
+  - **T2** (`8eef540`): the console's parser moved into
+    `crates/debug/src/console.rs` byte for byte, and the shared cursors,
+    the scroll, the goto's segment and the prompts moved into the debug
+    crate's `Ui`. The TUI's own console tests — three hundred and sixty-three
+    lines — pass untouched.
+  - **T3** (`e7170d4`): the panels' widgets, all on screen at once, so no
+    panel hides behind a key; and the model's contract, which now resolves
+    its three machine-derived inputs itself. The TUI changed in four places.
+  - **The one CRITICAL the review found**: the two egui grids **never ended a
+    row** — `advance()` moves the cursor right and `end_row()` alone
+    advances the row counter — so the registers and the flags panels were
+    one long horizontal line that the panel's clip rect cut away. The
+    refuter corroborated it against egui's own source, the bounded
+    correction ended the rows and corrected the flags grid's column count,
+    and the proof is a headless layout test that counts the distinct
+    vertical tops of the labels: one before, thirteen and nine after.
+  - **What T4 is**: the guest's screen drawn as **real pixels** (S5) — the
+    framebuffer's 320×200, one pixel to a pixel, with the DAC's own
+    colours. It is the one thing the GUI does better than the TUI, which
+    draws blocks coloured with the average of the block. The model already
+    carries the framebuffer (`ScreenView::graphics`), so this is the GUI's
+    rendering of it.
+  - **What T5 is**: the debugger's actions and the guest's keys (S9) —
+    step, step back, step over, run to the next breakpoint, the
+    breakpoints, the watchpoints, the conditions, the edit, the goto, the
+    console, and the guest's screen; and the guest's keys reaching the
+    guest through the BIOS's own `push_key` door, never by writing the
+    machine's memory. **The GUI's console is inert until T5 gives it a
+    path**, and the panels' snapshot needs T5's invalidation.
+  - **The advisories still open**, for the follow-up after the unit: the
+    disassembly window's slice index is never clamped to its 256-byte
+    window, so a longer listing panics (pre-existing); the GUI's row
+    builders duplicate the rules the TUI applies inline; the plan's log
+    contradicted itself between L4 and L5 about who fills the model's
+    inputs (**L4 is the one that is stale**); the flag, memory-byte and
+    condition overlays have no test while the register overlay has one;
+    the panel functions are named for only their first section;
+    `Ui::anchored_at` never reads its receiver while its two siblings do;
+    the GUI recomputes the stack addresses instead of taking them from the
+    panel view; and the evaluator's depth limit is a bare `70` in a test.
+
 - **L5 (2026-11-26).** T3 is in: the panels have their widgets, and the
   model's contract says where each of its inputs comes from.
   - **The model's contract.** The three inputs the front ends used to fill

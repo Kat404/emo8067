@@ -725,7 +725,31 @@ wins, so a device that writes a port byte does not reach the program.
     design pass the maintainer asked for — functions first, design last
     — is done. What is left of the TUI is T17 (packaging and CI) and
     T18 (the GUI, the last stage).
-14. **What is left besides that.** **The keyboard of the BIOS
+14. **The GUI is in flight** (T18), on the branch `feat/gui`, cut from
+    `feat/graphics-modes`. The maintainer chose it on 2026-11-25 with
+    three decisions: **"La GUI de depuración, al lado de la TUI"**,
+    **"egui 0.36.2 y el MSRV sube a 1.95"**, and **"La GUI primero"**
+    (T17, packaging and CI, after). The shape is the research's own
+    rule, already implemented: "the panel model is the product; ratatui
+    and egui are two renderers of it" — `emo8067-debug` re-exports
+    `Panels`, `ScreenView` and `Ui`, and `Panels::of` reads "Nothing
+    here reads a terminal: the same call serves the TUI and the GUI".
+    **T1, T2 and T3 are closed, each with a commit and each with the
+    native review's approval and its authority burned** (`c060a85`,
+    `8eef540`, `e7170d4`, plus the follow-ups `c713df5` and the bounded
+    correction `339a352`): the crate `emo8067-gui` with egui/eframe
+    0.36.2, the Vulkan-then-OpenGL fallback, the logger, the console's
+    parser moved into the debug crate, the shared cursors in the `Ui`, the
+    seven panels' widgets, and the model's contract. **903 passed, 0
+    failed**, clippy clean, fmt clean, the 646 000-capture gate green.
+    **T4 is next** (the guest's screen as real pixels) and then T5 (the
+    actions and the guest's keys). The plan is `odd/tasks/gui.md`
+    (S1-S13, T1-T5, L1-L6), and the plan's log says what each unit
+    still owes. The unit's open advisories are in that log too, and the
+    native review's one CRITICAL — the egui grids that never ended a row,
+    so the registers and the flags panels could show nothing — is fixed
+    and proved by a headless layout test.
+15. **What is left besides that.** **The keyboard of the BIOS
     (`INT 16h`)** is **done**: closed on 2026-11-25 on the branch
     `feat/bios-keyboard`, cut from `main` at `5e4a702`. The reference
     documents exactly two functions — `00h` gets a keystroke and removes
