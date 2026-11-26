@@ -63,12 +63,25 @@ that: "That is the main UI lesson to invert" (§4.2).
   (`odd/research/features-and-ux.md:604`-`:607`). The GUI is a consumer of
   the core, never its dependency.
 - **S3** — The toolkit is `egui`/`eframe` **0.36.2**, with eframe's default
-  features **off**: `accesskit` stays out, because the accessibility story
-  this project has is the TUI's
-  (`odd/research/documentation-guide.md:869`-`:873`). The workspace's
-  `rust-version` rises to **1.95**, the version egui 0.36.2 declares. The
-  entry point is `eframe::run_native` and the app is `App::ui(ui, frame)`
-  plus `App::logic` — **never** `App::update`.
+  features **off** (`default-features = false`), so eframe's enabled
+  features are exactly `default_fonts`, `wayland`, `wgpu` and `x11` — and
+  not `default`. **eframe's `accesskit` feature stays off**, because the
+  accessibility story this project has is the TUI's
+  (`odd/research/documentation-guide.md:869`-`:873`); egui 0.36.2 depends
+  on the accesskit *crate* unconditionally, so the crate is in the tree and
+  the platform bridge is not. `arboard` and `smithay-clipboard` arrive with
+  egui-winit's `clipboard` feature, which is eframe's own choice and not
+  trimmable without patching eframe. The workspace's `rust-version` rises
+  to **1.95**, the version egui 0.36.2 declares. The entry point is
+  `eframe::run_native` and the app is `App::ui(ui, frame)` plus
+  `App::logic` — **never** `App::update`.
+- **S3a** — **The floor's rise is not a metadata change.** Clippy applies
+  what the declared floor allows, so at 1.95 two lints it suppressed at
+  1.85 become live (`collapsible_if`, which suggests let-chains, and
+  `manual_is_multiple_of`, which suggests `is_multiple_of`). The sites
+  that trip them are the project's own, and the project writes them the
+  way the new floor wants them written — the lints are **not** muted
+  workspace-wide.
 - **S4** — The window carries the debugger's panels: the disassembly, the
   registers and the flags, the memory window, the stack, the conditions,
   the console and the source strip. That is the TUI's set, and the TUI's
@@ -150,6 +163,43 @@ that: "That is the main UI lesson to invert" (§4.2).
   handoff.
 
 ## Log
+
+- **L2 (2026-11-25).** T1 is in: the crate, the dependency and the first
+  window.
+  - **The crate.** `crates/gui`, the package `emo8067-gui`, depending on
+    `emo8067-core`, `emo8067-debug` and `emo8067-asm` — and on nothing else
+    of the project's own; the core's and the assembler's dependency lists
+    are still empty, and a test says so. The toolkit is egui/eframe
+    **0.36.2** with eframe's default features off: eframe's enabled features
+    are exactly `default_fonts`, `wayland`, `wgpu` and `x11`. The entry
+    point is `eframe::run_native`, and the app is `App::logic` +
+    `App::ui`; **`App::update` does not exist in the code**, because eframe
+    0.36 replaced it and the widely copied form does not compile there.
+    The workspace's floor is **1.95**.
+  - **The window** draws the disassembly from `Panels::of(cpu, ui)`, and
+    the drawing's logic is a **pure function** over the panel model, so the
+    tree's tests exercise it **without a display** — and no `egui_kittest`
+    was added. The window opened on this machine's Wayland session, loaded
+    the program and ran.
+  - **The floor's rise was not a metadata change** (S3a). Clippy applies
+    what the declared floor allows, so at 1.95 the lints it suppressed at
+    1.85 became live: `collapsible_if` (which suggests let-chains, stable
+    in edition 2024 since 1.88) and `manual_is_multiple_of` (which
+    suggests `is_multiple_of`, stable since 1.87). **The sites they lit up
+    were the project's own, in the assembler, the core, the debug crate,
+    the TUI and the CLI**, and the project now writes them the way the new
+    floor wants them written. The lints are **not** muted workspace-wide:
+    that would hide the signal for the new code too.
+  - **The evidence**: the tree is green with the new crate in it, clippy is
+    clean everywhere, and `cargo tree` says the GUI's own features are the
+    four above. The verifier's own correction to the implementer's
+    expectation is worth recording: the disassembler prints `MOV AX, 01234h`,
+    not the lowercase `mov ax, 1234h` the source listings show, and the
+    test now pins the disassembler's real output.
+  - **What the crate brings that the project did not have**: 221 crates in
+    the lock file, none removed, and the `accesskit` crate — which egui
+    depends on unconditionally — even though eframe's accesskit *feature*,
+    the platform bridge, is off.
 
 - **L1 (2026-11-25).** The unit is chosen and its shape is settled.
   - **The decision**, the maintainer's own words: "T18: la GUI"; "La GUI de
