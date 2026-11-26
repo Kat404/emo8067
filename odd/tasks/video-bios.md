@@ -483,8 +483,14 @@ registers with no state of its own.
   - **The files** are `crates/core/src/bios.rs`, `crates/core/src/lib.rs`,
     `crates/core/tests/bios.rs`, `crates/debug/src/panels.rs`,
     `crates/debug/tests/screen.rs`, `crates/tui/src/ui.rs`,
-    `crates/tui/src/theme.rs`, `crates/tui/tests/screen.rs`,
-    `crates/cli/tests/examples.rs` and `design/DESIGN.md`.
+    `crates/tui/src/theme.rs`, `crates/tui/tests/screen.rs` and
+    `design/DESIGN.md`.
+  - **The recorded states are not in that list, and they are not in the
+    commit.** They live in `re/extracted/app/goldens/`, they are gitignored
+    local gold (`.gitignore:8`), and the gate writes them when the file is
+    absent — so the unit deleted the ones that moved and let the gate
+    record them again. A reader who must reproduce the gate needs the
+    corpus's own programs and the gate, not a file in the tree.
   - **The two work units.** **W1** is the BIOS: the mode, the mode byte, the
     two pixel functions, the framebuffer's bounds and the core's tests.
     **W2** is the panel: the palette, the framebuffer's reading, the scaled
@@ -532,6 +538,15 @@ registers with no state of its own.
     the golden (`0_sample_vga_graphics`'s rectangle is at `A1960`); and the
     out-of-scope section's entry about the graphics page in the recorded
     states is gone for the same reason.
+  - **Where the recorded states live.** `re/extracted/app/goldens/`, one
+    file per program, **gitignored** (`.gitignore:8`) and never committed:
+    they are this project's own local gold, the gate writes them when the
+    file is absent, and the unit deleted the ones that moved and let the
+    gate record them again. The gate reports "85 examples, 85 matched, 0
+    changed" afterwards, and the goldens carry the mode byte and the
+    framebuffer's pixels ✓ — `pixel.asm`'s `AX` is `000F`, the colour it
+    wrote and read back, and `0_sample_vga_graphics`'s rectangle is at
+    `A1960`.
   - **Two choices the implementer flagged and the parent took.** The mode
     byte is written at boot with `03h` — the mode the machine's eighty
     columns are — because the data area holds the machine's state from the
