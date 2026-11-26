@@ -114,8 +114,8 @@ registers with no state of its own.
   origin, the current page zero and its start at zero.
 - **S5** — The mode sets the geometry. `00h` is forty columns by twenty-five
   rows and `03h` is eighty columns by twenty-five rows, and the mode writes
-  the columns and the rows into the data area. A mode this slice does not
-  have — `13h` and every other — leaves the geometry as it was.
+  the columns and the rows into the data area. A mode the machine does not
+  have — `07h` and every other — leaves the geometry as it was.
 - **S6** — The page is laid out the way the geometry says: a row is the
   geometry's columns, a cell is two bytes — the character and the attribute —
   and a page is four kilobytes, because "the emulator always uses 1000h
@@ -339,9 +339,14 @@ registers with no state of its own.
 - **S29** — The recorded states move. The three programs that use the
   graphics mode now run past it: `pixel.asm` reads its pixel back and gets
   the colour it wrote, `0_sample_vga_graphics.asm` draws its rectangle, and
-  `mouse2.asm` reads, XORs and writes. The data area's mode byte is in the
-  golden (the runner dumps the low 32 kilobytes), and the framebuffer is
-  not (the dump does not reach `A0000`).
+  `mouse2.asm` reads, XORs and writes. The runner's dump covers the whole
+  megabyte (`crates/cli/src/main.rs`, `PAGES = (1 << 20) / PAGE`), so the
+  golden carries the mode byte at `0040:0049` and the framebuffer's pixels
+  as well — `0_sample_vga_graphics`'s rectangle is in the golden at `A1960`.
+  **Seventy-nine of the eighty-five goldens move**, not only the three: the
+  mode byte names the machine's mode from the moment the machine starts
+  (`03h`, the eighty columns the machine boots with, S4) and after every
+  `AH = 00h`, and the dump reaches that byte.
 
 ## Out of scope
 
@@ -362,10 +367,6 @@ registers with no state of its own.
   screen when bit 7 is set — "except in 256-color modes", which is where we
   are. The reference's own contract says nothing about it, and `mouse2.asm`
   does its own XOR by hand, so the clause is not in ours.
-- **The graphics page in the recorded states.** The runner's dump covers the
-  low 32 kilobytes, so the framebuffer is not in the golden; the golden
-  shows what the program left in its registers and in the data area, and the
-  unit's own tests show the pixels.
 
 ## Tasks
 
@@ -492,6 +493,56 @@ registers with no state of its own.
 
 ## Log
 
+- **L10 (2026-11-25).** The graphics modes are in: W1 is the BIOS and W2
+  the panel, and the work corrected three of the parent's own sentences.
+  - **W1, the BIOS** (`d677321`): the mode `13h` is a mode the machine has
+    (S22), the mode is one byte at `0040:0049` (S27), the framebuffer is
+    the published one (S23), and the two pixel functions are the
+    reference's own (S24, S25) and answer only in the graphics mode (S26).
+    The BIOS keeps no state of its own: the mode is read out of the data
+    area every time, the way the geometry is.
+  - **W2, the panel** (`e3f8a2a`): the panel reads the framebuffer and
+    draws it scaled, each cell a block of pixels coloured with the average
+    of the block's colours (S28), and the palette is the VGA's own DAC,
+    transcribed from the published table — with the project's sixteen now
+    *defined* as that table's first sixteen, so the two cannot drift.
+  - **RED**: six failures in the core — "the mode's cell grid is forty
+    columns: left 80, right 40", "the pixel is at the offset row * 320 +
+    column: left 0, right 42", "the colour is at the pixel the column and
+    the row name", "the read returns the colour that was written", "a text
+    mode writes no pixel", "the mode is one byte, at 0040:0049: left 0,
+    right 19" — and, in the panel, tests that did not compile ("no field
+    'graphics' on type '&ScreenView'", "cannot find value 'VGA_DAC' in
+    module 'theme'").
+  - **GREEN**: **836 passed, 0 failed**; clippy clean in every crate;
+    `cargo fmt --all --check` exits 0; the full gate over all 646 000
+    captures passes with no family added. The parent's spot check: the same
+    836. A differential against the base commit's binary over all
+    eighty-five examples: every text-mode program differs in exactly one
+    byte — `0040:0049`, `00` → `03` — and nothing else; the three graphics
+    programs also carry the mode byte `13`, the columns `28 00` (= 40) and
+    the framebuffer's pixels, and `pixel.asm`'s `AX` is `000F`, the colour
+    it wrote and read back.
+  - **Three corrections the work itself made**, to the parent's own
+    sentences: **S5** still said "`13h` and every other" leaves the
+    geometry as it was — `13h` is a mode now, so the sentence names `07h`;
+    **S29** said the framebuffer is not in the recorded states and that the
+    runner's dump reaches the low 32 kilobytes — the dump covers the whole
+    megabyte (`PAGES = (1 << 20) / PAGE`), so the graphics page **is** in
+    the golden (`0_sample_vga_graphics`'s rectangle is at `A1960`); and the
+    out-of-scope section's entry about the graphics page in the recorded
+    states is gone for the same reason.
+  - **Two choices the implementer flagged and the parent took.** The mode
+    byte is written at boot with `03h` — the mode the machine's eighty
+    columns are — because the data area holds the machine's state from the
+    moment it starts (S4); **seventy-nine of the eighty-five goldens
+    move** for that reason, not only the three graphics programs, and the
+    byte has to be written for the text modes too, or a guest that leaves
+    `13h` would still get pixel answers (S26). And in a text mode the
+    pixel read **does not answer at all** (`AL` is left as it was), while a
+    read outside the framebuffer in the graphics mode answers zero — the
+    distinction S26 draws.
+
 - **L9 (2026-11-25).** The next unit is the graphics modes, and its three
   decisions are the maintainer's.
   - **The decisions**, the maintainer's own words: "Una unidad: el BIOS y el
@@ -539,10 +590,8 @@ registers with no state of its own.
     `:403-405`).
   - **What the unit does not do** (the out-of-scope section, rewritten):
     the IBM's `AH = 0Fh` mode read-back, which the reference does not
-    document; the IBM's XOR clause, which the reference does not mention and
-    which the mode's own 256 colours would not apply to anyway; and the
-    graphics page in the recorded states, because the runner's dump reaches
-    the low 32 kilobytes and not `A0000`.
+    document; and the IBM's XOR clause, which the reference does not mention
+    and which the mode's own 256 colours would not apply to anyway.
 
 - **L8 (2026-11-25).** The next unit is chosen and the construction
   pauses.
