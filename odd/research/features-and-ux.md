@@ -147,7 +147,7 @@ the roadmap in section 6.
 | SCR-1 | Emulated VGA text screen | Eight 4 096-byte text pages in `B800:0000`, addressable through `INT 10h/05h`. | A resizable emulator screen window. | docs-txt/memory.txt |
 | SCR-2 | Teletype output | `INT 10h/0Eh` writes a character and advances the cursor. | The basis of the `PUTC` and `PRINT` macros. | docs-txt/8086_bios_and_dos_interrupts.txt; `inc/emu8086.inc` |
 | SCR-3 | Cursor control | Set cursor shape (`01h`), set position (`02h`), read position (`03h`), scroll (`06h`), hide/show (`07h`). | Programmatic only. | docs-txt/8086_bios_and_dos_interrupts.txt |
-| SCR-4 | 256-colour graphics mode | VGA mode `13h` fills `A0000:B1000`; examples draw shapes, pixels, attributes and scroll. | `0_sample_vga_graphics.asm`, `pixel.asm`, `attrib.asm`, `scroll.asm`, `pages.asm`. | docs-txt/memory.txt; `re/extracted/app/examples/` |
+| SCR-4 | 256-colour graphics mode | VGA mode `13h` fills `A0000:B1000`; three examples set the mode through the BIOS and draw through the pixel functions. | `0_sample_vga_graphics.asm`, `pixel.asm`, `mouse2.asm`. | docs-txt/memory.txt; `re/extracted/app/examples/` |
 | SCR-5 | Text attributes | Foreground/background colour on a character write. | `INT 10h/13h`. | docs-txt/8086_bios_and_dos_interrupts.txt; `examples/colors.asm` |
 | SCR-6 | Keyboard input | `INT 16h/00h` blocks for a key, `INT 16h/01h` polls the buffer. | `examples/keybrd.asm`, `examples/Count_Key_Presses.asm`. | docs-txt/8086_bios_and_dos_interrupts.txt |
 | SCR-7 | Keyboard buffer overflow | Overflow is detectable and audibly signalled. | `emu8086.ini` `BEEP` also fires on ASCII 7. | `emu8086.ini` `BEEP` |

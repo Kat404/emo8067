@@ -271,14 +271,80 @@ registers with no state of its own.
 - **S21** — The help and the docs move with the change: the CLI's `--keys`
   option is in the CLI's own help, and the TUI's help says which keys reach
   the guest.
+- **S22** — The mode `13h` is a mode the machine has. `AH = 00h` with
+  `AL = 13h` sets it, and the mode is the reference's own: "13h - graphical
+  mode. 40x25. 256 colors. 320x200 pixels. 1 page."
+  (`8086_bios_and_dos_interrupts.txt:76`). The data area's words keep their
+  meaning and their shape: the columns become **40** and the rows **25**,
+  the mode's own cell grid, whose cells are eight pixels wide and eight
+  pixels tall — "13h = G 40x25 8x8 320x200 256/256k A000"
+  (`https://pdos.csail.mit.edu/6.828/2008/readings/hardware/vgadoc/VGABIOS.TXT`)
+  — and the active page becomes zero, because the mode has one page. Every
+  other mode leaves the machine as it was (S5).
+- **S23** — The framebuffer is the published mode `13h` one: "the screen is
+  an array of 64000 contiguous bytes, arranged as 200 rows of 320 bytes,
+  with one byte per pixel, located in memory at absolute address
+  $A000:$0000" (Dr Bill Verts, *Notes on VGA 320x200 256-Color Mode*,
+  `https://people.cs.umass.edu/~verts/cs32/vga_320.html`; the same in
+  Abrash's *Graphics Programming Black Book*, ch. 27, and in
+  `https://en.wikipedia.org/wiki/Mode_13h`). So the framebuffer is at
+  `A000:0000`, a row is 320 bytes, there are 200 rows, and **the pixel at
+  the column and the row is at the offset `row * 320 + column`** (Abrash's
+  own formula). One byte carries one pixel's colour index.
+- **S24** — `AH = 0Ch` writes a pixel, with the reference's own register
+  contract: "INT 10h / AH = 0Ch - change color for a single pixel. input:
+  AL = pixel color. CX = column. DX = row."
+  (`8086_bios_and_dos_interrupts.txt:150`-`:154`). The byte goes at the
+  framebuffer's offset (S23). **There is no page register**: the reference
+  names none, and the mode has one page.
+- **S25** — `AH = 0Dh` reads a pixel, with the reference's own contract:
+  "INT 10h / AH = 0Dh - get color of a single pixel. input: CX = column.
+  DX = row. output: AL = pixel color"
+  (`8086_bios_and_dos_interrupts.txt:164`-`:169`). The byte comes from the
+  same offset the write used.
+- **S26** — The two functions answer only in the graphics mode: the IBM's
+  own BIOS says the pixel functions are "not supported in text modes"
+  (Ralf Brown's Interrupt List, `INT 10h/AH = 0Ch`), and in a text mode
+  this BIOS's answer is nothing at all. A coordinate outside the framebuffer
+  writes nothing and reads zero — the IBM ignores a pixel that is outside
+  the screen, and this project does the same rather than wrapping the
+  address into the page.
+- **S27** — The machine's mode is one byte in the data area, at
+  `0040:0049`: "40:49 byte current CRT mode (hex value)"
+  (`https://pic.hallikainen.org/techref/bios/dataarea.htm`; the same in
+  Ralf Brown's Interrupt List's data-area map and in `VGABIOS.TXT`'s "0:449h
+  BYTE Video current mode"). **The reference's own map documents none of
+  it** — `memory.txt:115`-`:134` gives `004A`, `004E`, `0050`, `0062` and
+  `0084` — so the word is this project's assumption, the way the cursor's
+  shape at `0040:0080` already is (S3). It is one byte, not a word; and
+  `0040:0063` is **not** it: that is the 6845's base I/O port.
+- **S28** — The panel shows the graphics page. In the graphics mode the
+  panel reads the framebuffer from `A000:0000` and draws it **scaled**: the
+  framebuffer's 320×200 do not fit a terminal's cells, so each cell of the
+  panel's area is a block of the framebuffer's pixels and the cell's colour
+  is the **average** of the block's colours. The palette is the VGA's own
+  DAC: the sixteen the project already has are the published table's first
+  sixteen exactly (the EGFF table's sixteen EGA colours, `00`/`55`/`aa`/`ff`
+  steps), and the DAC's own default palette is "the first 16 locations"
+  (the EGA text colours), then "16 evenly spaced gray shades", then "the
+  remaining 216 locations ... based on a hue-saturation-intensity model",
+  then eight unused blacks (IBM's *VGA Technical Reference*, p. 4-39,
+  quoted at `https://retrocomputing.stackexchange.com/questions/27994`; the
+  table itself at `https://www.fileformat.info/mirror/egff/ch02_02.htm`).
+  **The `{0, 51, 102, 153, 204, 255}` cube and the twenty-four greys of the
+  step 10 are Windows 3.x's and xterm's, not the VGA's** (Netscape's
+  technical note 10117, `http://www.bonniehill.net/pages/netscape.colors.html`;
+  xterm's own cube is `{0, 95, 135, 175, 215, 255}`), and they are not the
+  project's palette.
+- **S29** — The recorded states move. The three programs that use the
+  graphics mode now run past it: `pixel.asm` reads its pixel back and gets
+  the colour it wrote, `0_sample_vga_graphics.asm` draws its rectangle, and
+  `mouse2.asm` reads, XORs and writes. The data area's mode byte is in the
+  golden (the runner dumps the low 32 kilobytes), and the framebuffer is
+  not (the dump does not reach `A0000`).
 
 ## Out of scope
 
-- **The graphics modes.** `13h` is forty by twenty-five in 256 colours with a
-  320×200 framebuffer, and the pixel functions `0Ch` and `0Dh` belong to it.
-  The page of graphics is `A0000:B1000` (`memory.txt:24-27`), the pixel's
-  address is a row of 320 pixels in eight-pixel bytes, and the screen panel
-  is a character grid. That is its own unit.
 - **The rest of the BIOS and the DOS.** Thirty-eight `AH` functions across
   eleven vectors is the reference's whole surface, and the research's verdict
   is to match the recovered set and stop.
@@ -289,6 +355,17 @@ registers with no state of its own.
   functions and the corpus calls two (S13); the IBM's `AH = 02h` (the shift
   flags), `AH = 05h` (storing a keystroke) and the enhanced-keyboard
   functions are not in the reference's surface, so they are not in ours.
+- **The mode read-back.** The IBM's `INT 10h/AH = 0Fh` returns the display
+  mode in `AL`, but the reference does not document it and the corpus does
+  not call it, so it is not in the reference's surface and it is not in ours.
+- **The XOR clause.** The IBM's pixel functions XOR the colour onto the
+  screen when bit 7 is set — "except in 256-color modes", which is where we
+  are. The reference's own contract says nothing about it, and `mouse2.asm`
+  does its own XOR by hand, so the clause is not in ours.
+- **The graphics page in the recorded states.** The runner's dump covers the
+  low 32 kilobytes, so the framebuffer is not in the golden; the golden
+  shows what the program left in its registers and in the data area, and the
+  unit's own tests show the pixels.
 
 ## Tasks
 
@@ -382,7 +459,90 @@ registers with no state of its own.
     646 000-capture gate is the judge, and it is the one that caught the
     first attempt.
 
+- **T3** — The graphics modes of the video BIOS: `13h`, `0Ch`, `0Dh`. Route:
+  delegated, one bounded writer, **two work-unit commits**, one independent
+  verifier. **CHOSEN 2026-11-25.** The maintainer's decisions, verbatim:
+  - "Una unidad: el BIOS y el panel" — the unit is the BIOS's functions and
+    the panel together, not two units.
+  - "Bloques escalados, con el color promedio" — the panel draws the
+    framebuffer scaled, each cell a block of pixels coloured with the
+    average of the block's colours.
+  - "Abre el PR del teclado; fusiono yo; gráficos desde main" — the
+    keyboard's pull request is opened and merged first, and this unit takes
+    a fresh branch from `main`.
+  - **The unit.** The mode `13h` is a mode the machine has (S22): the
+    columns and the rows become the mode's own cell grid, the active page
+    becomes zero, and the mode itself is one byte in the data area at
+    `0040:0049` (S27). The framebuffer is the published mode `13h` one
+    (S23): 320 pixels of one byte each at `A000:0000`, a row of 320 bytes,
+    the pixel's offset `row * 320 + column`. The two pixel functions are
+    the reference's own, with the reference's own register contracts (S24,
+    S25), and they answer only in the graphics mode (S26). The panel draws
+    the graphics page scaled, with the VGA's own 256-colour DAC (S28).
+  - **The files** are `crates/core/src/bios.rs`, `crates/core/src/lib.rs`,
+    `crates/core/tests/bios.rs`, `crates/debug/src/panels.rs`,
+    `crates/debug/tests/screen.rs`, `crates/tui/src/ui.rs`,
+    `crates/tui/src/theme.rs`, `crates/tui/tests/screen.rs`,
+    `crates/cli/tests/examples.rs` and `design/DESIGN.md`.
+  - **The two work units.** **W1** is the BIOS: the mode, the mode byte, the
+    two pixel functions, the framebuffer's bounds and the core's tests.
+    **W2** is the panel: the palette, the framebuffer's reading, the scaled
+    drawing and the TUI's tests. The palette belongs to W2: the BIOS writes
+    a colour's index and never sees a colour.
+
 ## Log
+
+- **L9 (2026-11-25).** The next unit is the graphics modes, and its three
+  decisions are the maintainer's.
+  - **The decisions**, the maintainer's own words: "Una unidad: el BIOS y el
+    panel"; "Bloques escalados, con el color promedio"; "Abre el PR del
+    teclado; fusiono yo; gráficos desde main".
+  - **The unit's own research, and what it corrected.** The census of the
+    corpus: **three** programs use the graphics mode —
+    `0_sample_vga_graphics.asm` (four `0Ch`), `pixel.asm` (a `0Ch` and a
+    `0Dh`) and `mouse2.asm` (two of each) — and all three set the mode
+    through the BIOS, and none writes the graphics page directly. **The
+    list L8 carried was wrong**: `attrib.asm` is a DOS file-attribute
+    program, `scroll.asm` a text-mode window scroll, and `pages.asm`,
+    `colors.asm` and `mouse.asm` are text mode. L8 and the research's own
+    SCR-4 are corrected.
+  - **Three corrections to the brief, from the published sources.**
+    - **The framebuffer is one byte per pixel**, not "a row of 320 pixels in
+      eight-pixel bytes": "an array of 64000 contiguous bytes, arranged as
+      200 rows of 320 bytes, with one byte per pixel, located in memory at
+      absolute address $A000:$0000" (Dr Bill Verts,
+      `https://people.cs.umass.edu/~verts/cs32/vga_320.html`; the same in
+      Abrash's *Graphics Programming Black Book* ch. 27 and in
+      `https://en.wikipedia.org/wiki/Mode_13h`).
+    - **The palette is the VGA's own DAC, not the cube of Windows 3.x.** The
+      DAC's default is "the first 16 locations" (the EGA text colours),
+      then "16 evenly spaced gray shades", then "the remaining 216
+      locations ... based on a hue-saturation-intensity model", then eight
+      unused blacks (IBM's *VGA Technical Reference* p. 4-39, quoted at
+      `https://retrocomputing.stackexchange.com/questions/27994`; the table
+      at `https://www.fileformat.info/mirror/egff/ch02_02.htm`). The
+      `{0, 51, 102, 153, 204, 255}` cube and the greys of the step 10 are
+      Netscape's and xterm's — xterm's own cube is `{0, 95, 135, 175, 215,
+      255}` — and **the project's existing sixteen are the published DAC's
+      first sixteen exactly**, so the palette has one home and one rule.
+    - **The mode's word is `0040:0049`, one byte**: "40:49 byte current CRT
+      mode (hex value)" (`https://pic.hallikainen.org/techref/bios/dataarea.htm`;
+      the same in Ralf Brown's data-area map and in `VGABIOS.TXT`'s "0:449h
+      BYTE Video current mode"). **`0040:0063` is not it**: that is the
+      6845's base I/O port. The reference's own map documents none of it, so
+      it is the project's assumption (S27), the way the cursor's shape at
+      `0040:0080` already is.
+  - **The reference's own ROM stays unobserved.** Its identity (sha256
+    `8ff8497d11497710`) and its load address (`F4000`, `memory.txt:47-50`)
+    are recorded; no Ghidra project was ever made for it, so the published
+    tables are this unit's oracle (`odd/research/softonic-build-comparison.md:85`,
+    `:403-405`).
+  - **What the unit does not do** (the out-of-scope section, rewritten):
+    the IBM's `AH = 0Fh` mode read-back, which the reference does not
+    document; the IBM's XOR clause, which the reference does not mention and
+    which the mode's own 256 colours would not apply to anyway; and the
+    graphics page in the recorded states, because the runner's dump reaches
+    the low 32 kilobytes and not `A0000`.
 
 - **L8 (2026-11-25).** The next unit is chosen and the construction
   pauses.
@@ -393,10 +553,11 @@ registers with no state of its own.
   - **What the unit is.** The video BIOS's other half: the mode `13h`
     (forty by twenty-five in 256 colours with a 320×200 framebuffer), the
     page of graphics at `A0000:B1000` (`memory.txt:24`-`:27`), the
-    pixel's address (a row of 320 pixels in eight-pixel bytes), and the
-    pixel functions `0Ch` (write a pixel) and `0Dh` (read a pixel). The
-    corpus draws in it: `0_sample_vga_graphics.asm`, `pixel.asm`,
-    `attrib.asm`, `scroll.asm`.
+    pixel's address, and the pixel functions `0Ch` (write a pixel) and
+    `0Dh` (read a pixel). **Three** of the corpus's programs use it:
+    `0_sample_vga_graphics.asm` (four `0Ch`), `pixel.asm` (a `0Ch` and a
+    `0Dh`) and `mouse2.asm` (two of each). All three set the mode
+    through the BIOS, and none writes the graphics page directly.
   - **What it will have to settle.** The screen panel is a grid of
     characters, and a 320×200 framebuffer is not that: either the panel
     draws pixels or the unit keeps to the BIOS's functions and the panel
