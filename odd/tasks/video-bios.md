@@ -503,6 +503,22 @@ registers with no state of its own.
 
 ## Log
 
+- **L12 (2026-11-25).** The next unit is the GUI — T18, the last stage of
+  the plan.
+  - **The decision**, the maintainer's own words: "T18: la GUI". The
+    research's own recommendation was the opposite
+    (`odd/research/features-and-ux.md` §4.3: "TUI primary, GUI secondary"),
+    and the maintainer chose it anyway; that is the decision, and the unit's
+    first job is to say what a GUI here is for, given that the TUI already
+    carries every panel and every command.
+  - **The delivery, for the two branches that are waiting.** The keyboard's
+    pull request is open and awaits the maintainer's merge, and the
+    graphics branch is based on it, so the graphics pull request comes
+    after that merge and carries only the graphics work. The follow-up
+    commits — the verifier's twenty probes and the advisories' fixes —
+    wait like the project's other medium candidates, for a high-risk commit
+    or the maintainer's word.
+
 - **L11 (2026-11-25).** The review's advisories, the independent
   verifier's two findings and the targeted validator's third follow-up are
   in. The unit is reviewed and approved, and this batch changes **how the
