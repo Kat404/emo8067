@@ -76,6 +76,53 @@ door, the TUI's forwarding and the runner's `--keys` script. Branch
   the review says so itself, and the follow-up commit took the ones that
   are this project's own errors.
 
+**The BIOS has a graphics mode.** The unit the maintainer chose on
+2026-11-25 is closed too: `INT 10h`'s graphical mode `13h`, the two pixel
+functions, and the screen panel that draws the framebuffer. Branch
+`feat/graphics-modes`, cut from `main`. The plan is
+`odd/tasks/video-bios.md` (T3, S22-S29, L9-L11).
+
+- **The mode `13h` is a mode the machine has.** `AH = 00h` with `AL = 13h`
+  sets it: the data area's columns become 40 and its rows 25 — the mode's
+  own cell grid, whose cells are eight pixels wide and eight pixels tall —
+  the active page becomes zero, because the mode has one page, and the
+  machine's mode is **one byte at `0040:0049`**, the IBM's own "40:49 byte
+  current CRT mode (hex value)". The BIOS keeps no state of its own: the
+  mode is read out of the data area every time, the way the geometry is.
+- **The framebuffer is the published one**: 320 pixels of **one byte**
+  each at `A000:0000`, two hundred rows of them, and the pixel at the
+  column and the row is at the offset `row * 320 + column`.
+- **The two pixel functions are the reference's own**: `AH = 0Ch` writes a
+  pixel (`AL` the colour, `CX` the column, `DX` the row) and `AH = 0Dh`
+  reads one into `AL`. There is **no page register**, and they answer
+  only in the graphical mode: a coordinate outside the framebuffer writes
+  nothing and reads zero.
+- **The panel shows the graphics page**, drawn **scaled**: each cell of
+  the takeover's area is a block of the framebuffer's pixels, the blocks
+  tile the framebuffer, and the cell's colour is the **average** of the
+  block's colours. The palette is the **VGA's own 256-colour DAC**,
+  transcribed from the published table, and the sixteen the project
+  already had are that table's first sixteen exactly — they are now
+  *defined* as it, so the two cannot drift.
+- **The recorded states move, and here is exactly how.** **Seventy-nine of
+  the eighty-five move.** **Seventy-four differ in the `00440` line
+  alone** — the mode byte, `00` → `03` — and in nothing else. **Five
+  differ in more**: `0_sample_vga_graphics` (the rectangle's pixels at
+  `A1960`), `pixel` (`AX 0000` → `AX 000F`, the colour it read back), and
+  `paramexe`, `z01` and `z02`, which fall into the interrupt vector table
+  and **execute memory as code**, so the mode byte's change alters the
+  byte they execute. **Six do not move at all**: `Calculator`, `float`,
+  `mouse`, `simplest`, `sort` and `writebin`. **`mouse2.asm` never reaches
+  its pixels**: it takes `INT 33h` after seven instructions, at the
+  baseline too, because the mouse device is out of scope.
+- **It was verified independently**, and the verifier's own probes are in
+  the tree — `crates/core/tests/verify_graphics.rs` and
+  `crates/tui/tests/verify_graphics.rs` — written against the published
+  sources and not against the implementation.
+- **The tree is 862 passed, 0 failed**, the clippy run is clean in every
+  crate, `cargo fmt --all --check` exits 0, and the full gate over all
+  646 000 captures passes with no family added.
+
 ## Where the 2026-11-24 work is
 
 **The branch is merged.** `feat/tui-memory-window` went into `main` through
@@ -695,17 +742,17 @@ wins, so a device that writes a port byte does not reach the program.
     S12-S21 of `odd/tasks/video-bios.md` (T2, L5-L6), and the state is in
     "Where the 2026-11-25 work is" above.
     **The graphics modes of the video BIOS** — `13h`, the page of graphics
-    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — are their own
-    unit, and the screen panel is a character grid that cannot show them
-    yet. **That is the next unit, chosen by the maintainer on 2026-11-25**
-    and now written: "Una unidad: el BIOS y el panel", "Bloques escalados,
-    con el color promedio", and "Abre el PR del teclado; fusiono yo;
-    gráficos desde main". Its specs are **S22-S29** of
-    `odd/tasks/video-bios.md` (T3, L9), and its research corrected three
-    things the brief had wrong: the framebuffer is **one byte per pixel**,
-    the palette is the **VGA's own DAC** (not the `{0, 51, 102, …}` cube of
-    Windows 3.x), and the mode's word is **`0040:0049`**, one byte — not
-    `0040:0063`, which is the 6845's base port.
+    at `A0000:B1000`, and the pixel functions `0Ch`/`0Dh` — **are in**:
+    they are their own unit, the screen panel draws the framebuffer
+    scaled, and the unit was chosen by the maintainer on 2026-11-25 ("Una
+    unidad: el BIOS y el panel", "Bloques escalados, con el color
+    promedio"). Its specs are **S22-S29** of `odd/tasks/video-bios.md`
+    (T3, L9-L11), and its research corrected three things the brief had
+    wrong: the framebuffer is **one byte per pixel**, the palette is the
+    **VGA's own DAC** (not the `{0, 51, 102, …}` cube of Windows 3.x),
+    and the mode's word is **`0040:0049`**, one byte — not `0040:0063`,
+    which is the 6845's base port. **See "Where the 2026-11-25 work is"
+    above.**
     `IDIV r/m16`'s `-32768h` quotient, which no capture covers; T12 a
     fondo, the eighty-five examples run with their own baseline pinned;
     the assembler's build directives (`#make_bin#`, `#make_com#`,

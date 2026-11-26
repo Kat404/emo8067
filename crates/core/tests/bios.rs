@@ -167,6 +167,11 @@ fn int16_twice(first: impl FnOnce(&mut Cpu), second: impl FnOnce(&mut Cpu)) -> C
 
 /// Put a keystroke into the keyboard buffer, the way the host's door puts
 /// it there: the ASCII character and the scan code, at the tail.
+///
+/// The helper mirrors the door's rule: a keystroke whose next entry would
+/// meet the head is **refused** and the tail stays where it was, so the
+/// buffer never reads as empty where the machine has kept everything it
+/// accepted.
 fn press(c: &mut Cpu, scan_code: u8, ascii: u8) {
     // The end comes from the size word, which is the guest's own: an end
     // that would leave the segment leaves the buffer empty, the way the
@@ -174,15 +179,21 @@ fn press(c: &mut Cpu, scan_code: u8, ascii: u8) {
     let Some(end) = BUFFER.checked_add(c.mem.read_u16(DATA, SIZE)) else {
         return;
     };
+    let head = c.mem.read_u16(DATA, HEAD);
     let tail = c.mem.read_u16(DATA, TAIL);
-    c.mem.write_u8(DATA, tail, ascii);
-    c.mem.write_u8(DATA, tail + 1, scan_code);
     // The tail wraps at the ring's end, the way the door's does.
     let next = if tail + ENTRY >= end {
         BUFFER
     } else {
         tail + ENTRY
     };
+    if next == head {
+        // The ring is full: the keystroke is dropped and the tail is left
+        // where it was, the way the door drops it.
+        return;
+    }
+    c.mem.write_u8(DATA, tail, ascii);
+    c.mem.write_u8(DATA, tail + 1, scan_code);
     c.mem.write_u16(DATA, TAIL, next);
 }
 
@@ -1607,6 +1618,67 @@ fn s27_the_machines_mode_is_one_byte_in_the_data_area() {
         c.mem.read_u8(DATA, MODE),
         0x03,
         "the machine is still in the mode it was in"
+    );
+}
+
+/// The test helper mirrors the door: a full ring refuses the keystroke
+/// and keeps everything it accepted.
+///
+/// The helper used to wrap the tail back to the ring's start when the
+/// next entry would pass the end, so the ninth keystroke left the head
+/// equal to the tail: the buffer read as empty where the machine keeps
+/// what it accepted — a state the guest could never reach.
+#[test]
+fn the_test_helper_mirrors_the_door_at_the_full_ring() {
+    let mut c = machine(&[0xF4]);
+    for step in 0..8u8 {
+        press(&mut c, 0x1E, b'A' + step);
+    }
+    assert_eq!(c.keys_waiting(), 8, "the ring holds the eight keystrokes");
+
+    // The ninth does not fit: the door refuses it and leaves the tail
+    // where it was.
+    press(&mut c, 0x1E, b'I');
+    assert_eq!(
+        c.keys_waiting(),
+        8,
+        "the ninth keystroke was refused: the buffer is not empty"
+    );
+
+    // And the machine's own door refuses it the same way.
+    let mut d = machine(&[0xF4]);
+    for step in 0..8u8 {
+        d.push_key(0x1E, b'A' + step);
+    }
+    assert!(
+        !d.push_key(0x1E, b'I'),
+        "the door refuses the ninth keystroke"
+    );
+    assert_eq!(d.keys_waiting(), 8, "and keeps the eight it accepted");
+}
+
+/// The keyboard buffer's capacity is the ring's own.
+///
+/// The capacity is published, so that a consumer of it — the runner's
+/// warning about a script that does not fit — does not count the ring's
+/// slots itself, and the two cannot drift apart.
+#[test]
+fn the_keyboard_buffer_holds_its_capacity() {
+    let mut c = machine(&[0xF4]);
+    for _ in 0..emo8067_core::bios::KEYBOARD_CAPACITY {
+        press(&mut c, 0x1E, b'A');
+    }
+    assert_eq!(
+        c.keys_waiting(),
+        emo8067_core::bios::KEYBOARD_CAPACITY,
+        "the buffer holds its capacity"
+    );
+    // And one more does not fit.
+    press(&mut c, 0x1E, b'A');
+    assert_eq!(
+        c.keys_waiting(),
+        emo8067_core::bios::KEYBOARD_CAPACITY,
+        "and the ring is full"
     );
 }
 

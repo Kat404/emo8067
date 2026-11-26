@@ -336,17 +336,21 @@ registers with no state of its own.
   technical note 10117, `http://www.bonniehill.net/pages/netscape.colors.html`;
   xterm's own cube is `{0, 95, 135, 175, 215, 255}`), and they are not the
   project's palette.
-- **S29** — The recorded states move. The three programs that use the
-  graphics mode now run past it: `pixel.asm` reads its pixel back and gets
-  the colour it wrote, `0_sample_vga_graphics.asm` draws its rectangle, and
-  `mouse2.asm` reads, XORs and writes. The runner's dump covers the whole
-  megabyte (`crates/cli/src/main.rs`, `PAGES = (1 << 20) / PAGE`), so the
+- **S29** — The recorded states move. The programs that use the graphics
+  mode now run past it: `pixel.asm` reads its pixel back and gets the
+  colour it wrote, and `0_sample_vga_graphics.asm` draws its rectangle.
+  **`mouse2.asm` does not**: it takes `INT 33h` after seven instructions,
+  long before its pixel code — **at the baseline too** — because the mouse
+  device is out of scope, so that program never reaches the pixels it
+  reads, XORs and writes. The runner's dump covers the whole megabyte
+  (`crates/cli/src/main.rs`, `PAGES = (1 << 20) / PAGE`), so the
   golden carries the mode byte at `0040:0049` and the framebuffer's pixels
   as well — `0_sample_vga_graphics`'s rectangle is in the golden at `A1960`.
-  **Seventy-nine of the eighty-five goldens move**, not only the three: the
-  mode byte names the machine's mode from the moment the machine starts
+  **Seventy-nine of the eighty-five goldens move**, not only those two:
+  the mode byte names the machine's mode from the moment the machine starts
   (`03h`, the eighty columns the machine boots with, S4) and after every
-  `AH = 00h`, and the dump reaches that byte.
+  `AH = 00h`, and the dump reaches that byte. **L10 says which of them
+  differ in more, and which do not move at all.**
 
 ## Out of scope
 
@@ -499,6 +503,107 @@ registers with no state of its own.
 
 ## Log
 
+- **L11 (2026-11-25).** The review's advisories, the independent
+  verifier's two findings and the targeted validator's third follow-up are
+  in. The unit is reviewed and approved, and this batch changes **how the
+  code says and shapes things**, not what the machine does.
+  - **The ten advisories.**
+    1. **The scaled drawing truncated the framebuffer.** The block's size
+       was the framebuffer's size over the area's size with a floor, so at
+       the takeover's eighty columns by twenty-three rows the block was
+       4x8 and the picture's last sixteen rows were never drawn. **The
+       blocks tile the framebuffer now**: each cell owns the share of it
+       the area's size gives it, and the whole picture is drawn. **The
+       uniform ceiling the advisory asked for would have broken the
+       verifier's own probe** — it pins the first cell's average at
+       thirty-two pixels a cell — so the goal is reached the way the probe
+       allows, and the doc comment says what the code does.
+    2. **The graphics view published a geometry it did not have.** The
+       view's cells are as many as its geometry claims in every mode, so a
+       consumer that maps a cell to `row * columns + column` finds one; a
+       graphics page has no characters, so its cells are blank.
+    3. **The palette's prose was wrong.** The greys the table ships are the
+       VGA's own ladder (`00`, `14`, `20`, `2c`, `38`, `45`, `51`, `61`,
+       `71`, `82`, `92`, `a2`, `b6`, `cb`, `e3`, `ff`), not evenly spaced
+       ones. The table is unchanged; the prose says what the table has.
+    4. **The mode's offset and the mode's value differ by a suffix.** The
+       offset is `MODE_OFFSET` now, and the machine's three modes are
+       named: `MODE_TEXT_40`, `MODE_TEXT_80` and `MODE_GRAPHICS`.
+    5. **The test helper mirrors the door.** A full ring refuses the
+       keystroke and leaves the tail where it was; the helper used to wrap
+       the tail back and leave the buffer reading as empty where the
+       machine keeps everything it accepted.
+    6. **The CLI's warning names the stage.** The count is taken at the
+       **enqueue**: the message says the keys "never entered the guest's
+       keyboard", and not that they never reached the guest — in the test's
+       own run the guest read none of the ten.
+    7. **The CLI's test derives its count** from the keyboard buffer's
+       published capacity, and the capacity is asserted in the core's own
+       test, so the two cannot drift.
+    8. **The function-key guard admits zero no more.** The keys are
+       numbered from one, so `F(0)` is not a keystroke: it would reach the
+       guest as a NUL.
+    9. **The help's header is left as it is, and here is why.** The line
+       may be 39 characters at most, and the promise's exception — the keys
+       the BIOS's scan-code set has no code for, the lock keys, print
+       screen, the media keys — does not fit in what is left of the line
+       once the promise itself is said; and the test in
+       `crates/tui/tests/drawing.rs` pins the phrase "the rest go to the
+       guest" in the header, so the line cannot be reworded at all
+       without breaking a test this batch may not edit. **The help's
+       promise is true of every key the set has a code for, and the keys it
+       has none for reach neither the guest nor any indicator.**
+    10. **The palette's type says what it is.** The DAC is a table of
+        three channels, and `theme::pixel` hands the three channels over:
+        the drawing's dead arm — every entry of the DAC is an `Rgb` — is
+        gone.
+  - **The measurement the two lenses asked for.** The panel materialises
+    the whole 64 000-byte framebuffer on every rebuild, and the TUI walks
+    it again per cell; the text path reads 2 000 bytes. The numbers, on
+    this machine, in a release build (the median of three runs):
+    - **The panel's build**: the text page **5.7 µs**, the graphics page
+      **11.2 µs** — twice the time, for sixteen times the bytes read
+      (4 000 against 64 000). The graphics path reads the framebuffer in
+      one tight loop and copies it once; the text path builds two thousand
+      cells, and that is what it pays for.
+    - **The takeover's whole drawing** (80x24): the text page **170 µs**,
+      the graphics page **207 µs** — the graphics drawing walks 58 880
+      pixels, and the framebuffer's copy is the rest of the difference.
+    - **The CLI's run over the corpus with `--golden`**: **3.10 s** at the
+      base commit's binary, **3.00 s** now — no measurable difference, and
+      there is none to have: the runner never builds a panel and never
+      reads the framebuffer.
+    No benchmark harness went into the tree: the numbers come from a
+    scratch program under `/tmp/opencode`, and it is not part of the
+    repository.
+  - **The verifier's two findings and the validator's follow-up.**
+    - **L10's differential claim was inaccurate** and is corrected above:
+      seventy-nine of the eighty-five recorded states move, seventy-four
+      of them in the `00440` line alone, five in more — `paramexe`, `z01`
+      and `z02` among them, because they execute memory as code — and six
+      do not move at all.
+    - **S29's `mouse2` clause was unmet and cannot be met**: the program
+      takes `INT 33h` after seven instructions, at the baseline too, so it
+      never reaches the pixels it reads, XORs and writes. S29 says so now.
+    - **`odd/HANDOFF.md` repeated the claims** and is brought in line.
+  - **The verifier's own probes are in the tree**, copied verbatim:
+    `crates/core/tests/verify_graphics.rs` (thirteen) and
+    `crates/tui/tests/verify_graphics.rs` (seven). They are the unit's
+    regression tests, and they lean on the published sources and not on the
+    implementation's own constants.
+  - **RED**: the helper's test — "the ninth keystroke was refused: the
+    buffer is not empty: left 0, right 8"; the view's shape — "the
+    graphics page's cells are the grid's: left 0, right 2000"; the
+    drawing — "the picture's last row is on the screen: left Rgb(0, 0, 0),
+    right Rgb(0, 0, 0)"; the function keys — "F0 is not a key: left
+    Some((0, 0)), right None"; and the CLI's warning, whose new wording
+    the old message does not match.
+  - **GREEN**: **862 passed, 0 failed** (the tree's 836, the twenty probes
+    and the six new tests), clippy clean in every crate, `cargo fmt --all
+    --check` exits 0, and the full gate over all 646 000 captures passes
+    with no family added. **No golden moved**: the batch changes what the
+    panel says and how it is shaped, not what the machine does.
+
 - **L10 (2026-11-25).** The graphics modes are in: W1 is the BIOS and W2
   the panel, and the work corrected three of the parent's own sentences.
   - **W1, the BIOS** (`d677321`): the mode `13h` is a mode the machine has
@@ -524,11 +629,22 @@ registers with no state of its own.
     `cargo fmt --all --check` exits 0; the full gate over all 646 000
     captures passes with no family added. The parent's spot check: the same
     836. A differential against the base commit's binary over all
-    eighty-five examples: every text-mode program differs in exactly one
-    byte — `0040:0049`, `00` → `03` — and nothing else; the three graphics
-    programs also carry the mode byte `13`, the columns `28 00` (= 40) and
-    the framebuffer's pixels, and `pixel.asm`'s `AX` is `000F`, the colour
-    it wrote and read back.
+    eighty-five examples: **seventy-nine of the recorded states move, and
+    the first version of this sentence said otherwise — it said that every
+    text-mode program differs in exactly one byte and nothing else, and
+    that is not what the measurement says.** The measured truth:
+    - **Seventy-four differ in the `00440` line alone** — the mode byte,
+      `00` → `03` — and in nothing else.
+    - **Five differ in more**: `0_sample_vga_graphics` (the mode byte and
+      the rectangle's pixels at `A1960`), `pixel` (the mode byte, `AX 0000`
+      → `AX 000F`, and the pixels), and `paramexe`, `z01` and `z02` —
+      DOS programs that fall into the interrupt vector table and **execute
+      memory as code**, so the mode byte's change alters the byte they
+      execute and their recorded behaviour changes with it.
+    - **Six do not move at all**: `Calculator`, `float`, `mouse`,
+      `simplest`, `sort` and `writebin` — they set a text mode of their
+      own or never reach the data area, so the byte they leave there is
+      the byte they left there before.
   - **Three corrections the work itself made**, to the parent's own
     sentences: **S5** still said "`13h` and every other" leaves the
     geometry as it was — `13h` is a mode now, so the sentence names `07h`;

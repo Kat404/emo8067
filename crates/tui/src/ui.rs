@@ -1228,53 +1228,62 @@ impl Widget for Screen<'_> {
 ///
 /// The framebuffer is 320 by 200 pixels and a terminal's cells are not
 /// pixels, so each cell of the area is a block of the framebuffer's
-/// pixels: the block's size is the framebuffer's size over the area's
-/// size, and the cell's colour is the average of the block's colours.
+/// pixels: the framebuffer's size is divided over the area's size, and
+/// the blocks **tile** it — so the whole picture is drawn, and a cell the
+/// framebuffer does not reach has no block and shows the ground. The
+/// cell's colour is the average of the block's colours.
 fn graphics_page(graphics: &Graphics, area: Rect, buf: &mut Buffer) {
     if area.width == 0 || area.height == 0 {
         return;
     }
-    let block_width = (graphics.width / usize::from(area.width)).max(1);
-    let block_height = (graphics.height / usize::from(area.height)).max(1);
     for row in 0..usize::from(area.height) {
         for column in 0..usize::from(area.width) {
+            let Some(colour) = block_colour(graphics, column, row, area) else {
+                // The cell is past the framebuffer: it has no block, and
+                // the ground is what it shows.
+                continue;
+            };
             let Some(target) = buf.cell_mut((area.x + column as u16, area.y + row as u16)) else {
                 continue;
             };
-            let colour = average_of(graphics, column, row, block_width, block_height);
             target.set_symbol(" ");
             target.set_style(Style::default().fg(colour).bg(colour));
         }
     }
 }
 
-/// The average colour of the block of pixels at the column and the row.
+/// The colour of the block of pixels the cell at the column and the row
+/// owns.
+///
+/// The block is the cell's share of the framebuffer: the framebuffer's
+/// size is divided over the area's size, and the blocks tile it, so the
+/// last block of a row or of a column may be one pixel larger than the
+/// others — and a cell the framebuffer does not reach owns no pixels at
+/// all.
+fn block_colour(graphics: &Graphics, column: usize, row: usize, area: Rect) -> Option<Color> {
+    let left = column * graphics.width / usize::from(area.width);
+    let right = (column + 1) * graphics.width / usize::from(area.width);
+    let top = row * graphics.height / usize::from(area.height);
+    let bottom = (row + 1) * graphics.height / usize::from(area.height);
+    if left >= right || top >= bottom {
+        return None;
+    }
+    Some(average_of(graphics, left, top, right, bottom))
+}
+
+/// The average colour of the block of pixels.
 ///
 /// The colours are the DAC's own: the average of a block's colours is the
 /// average of the RGB triples the DAC holds for the block's pixels.
-fn average_of(
-    graphics: &Graphics,
-    column: usize,
-    row: usize,
-    block_width: usize,
-    block_height: usize,
-) -> Color {
+fn average_of(graphics: &Graphics, left: usize, top: usize, right: usize, bottom: usize) -> Color {
     let mut red = 0u32;
     let mut green = 0u32;
     let mut blue = 0u32;
     let mut count = 0u32;
-    for y in row * block_height..(row + 1) * block_height {
-        if y >= graphics.height {
-            break;
-        }
-        for x in column * block_width..(column + 1) * block_width {
-            if x >= graphics.width {
-                break;
-            }
+    for y in top..bottom {
+        for x in left..right {
             let index = graphics.pixels[y * graphics.width + x];
-            let Color::Rgb(r, g, b) = theme::pixel(index) else {
-                continue;
-            };
+            let (r, g, b) = theme::pixel(index);
             red += u32::from(r);
             green += u32::from(g);
             blue += u32::from(b);
@@ -1446,4 +1455,71 @@ fn key_lines(width: u16) -> Vec<Line<'static>> {
             ))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A framebuffer of the mode `13h`: 320 by 200 pixels, one byte a
+    /// pixel.
+    fn framebuffer() -> Graphics {
+        Graphics {
+            width: 320,
+            height: 200,
+            pixels: vec![0; 320 * 200],
+        }
+    }
+
+    /// The whole framebuffer is drawn.
+    ///
+    /// The framebuffer's size is divided over the area's size, and the
+    /// blocks tile it: the picture's last row is on the screen, and not
+    /// cut away at the bottom.
+    #[test]
+    fn the_whole_framebuffer_is_drawn() {
+        let mut graphics = framebuffer();
+        // The framebuffer's last row is white: the DAC's index 15.
+        let last = 199 * 320;
+        for column in 0..320 {
+            graphics.pixels[last + column] = 15;
+        }
+        let area = Rect::new(0, 0, 80, 23);
+        let mut buffer = Buffer::empty(area);
+        graphics_page(&graphics, area, &mut buffer);
+
+        let bottom = buffer.cell((0, 22)).expect("the cell is drawn");
+        assert_ne!(
+            bottom.bg,
+            Color::Rgb(0, 0, 0),
+            "the picture's last row is on the screen"
+        );
+    }
+
+    /// The first block is the first block: the framebuffer's size over
+    /// the area's size, and nothing else.
+    #[test]
+    fn the_first_block_is_the_framebuffers_own_share() {
+        let mut graphics = framebuffer();
+        // The framebuffer's first pixel is red: the DAC's index 4.
+        graphics.pixels[0] = 4;
+        let area = Rect::new(0, 0, 80, 23);
+        let mut buffer = Buffer::empty(area);
+        graphics_page(&graphics, area, &mut buffer);
+
+        // The block is four pixels wide and eight rows tall: thirty-two
+        // pixels, one of them red.
+        let cell = buffer.cell((0, 0)).expect("the cell is drawn");
+        assert_eq!(
+            cell.bg,
+            Color::Rgb(170 / 32, 0, 0),
+            "the cell is a block of thirty-two pixels, and its colour is their average"
+        );
+        let next = buffer.cell((1, 0)).expect("the cell is drawn");
+        assert_eq!(
+            next.bg,
+            Color::Rgb(0, 0, 0),
+            "and the next cell is the block after it"
+        );
+    }
 }

@@ -1526,7 +1526,11 @@ struct Target {
 }
 
 /// The function keys the set names: the ten of the original keyboard and
-/// the two the enhanced one added. A key past them is not a keystroke.
+/// the two the enhanced one added.
+///
+/// **They are numbered from one**, so the keys the set names are `F1`
+/// through `F12`: a key past them is not a keystroke, and neither is the
+/// key before the first.
 const FUNCTION_KEYS: u8 = 12;
 
 /// The scan code and the ASCII character of a key.
@@ -1560,7 +1564,9 @@ fn key_of(code: KeyCode) -> Option<(u8, u8)> {
         KeyCode::PageDown => Some((SCAN_PAGE_DOWN, 0)),
         KeyCode::Insert => Some((SCAN_INSERT, 0)),
         KeyCode::Delete => Some((SCAN_DELETE, 0)),
-        KeyCode::F(number) if number <= FUNCTION_KEYS => Some((function_scan_code(number), 0)),
+        KeyCode::F(number) if (1..=FUNCTION_KEYS).contains(&number) => {
+            Some((function_scan_code(number), 0))
+        }
         // A key the set has no code for is not a keystroke: it would reach
         // the guest as a NUL, and the guest cannot tell it from a real one.
         _ => None,
@@ -1601,4 +1607,30 @@ fn hexadecimal(text: &str) -> Result<u16, String> {
 /// words.
 fn bad_syntax() -> String {
     expr::Error::BadSyntax.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The function keys are numbered from one.
+    ///
+    /// `F(0)` is not a key the set names, and it is not a keystroke: it
+    /// would reach the guest as a NUL, and the guest cannot tell it from
+    /// a real one.
+    #[test]
+    fn the_function_keys_are_numbered_from_one() {
+        assert_eq!(
+            key_of(KeyCode::F(1)),
+            Some((SCAN_FUNCTION_FIRST, 0)),
+            "F1 is the first function key"
+        );
+        assert_eq!(
+            key_of(KeyCode::F(12)),
+            Some((0x58, 0)),
+            "and F12 is the last one the set names"
+        );
+        assert_eq!(key_of(KeyCode::F(0)), None, "F0 is not a key");
+        assert_eq!(key_of(KeyCode::F(13)), None, "and F13 is not a key");
+    }
 }

@@ -57,6 +57,16 @@ pub const GRAPHICS_WIDTH: u16 = 320;
 /// The rows the graphics page has.
 pub const GRAPHICS_HEIGHT: u16 = 200;
 
+/// The mode `00h`: the text mode, forty columns by twenty-five rows.
+///
+/// "00h - text mode. 40x25. 16 colors. 8 pages."
+pub const MODE_TEXT_40: u8 = 0x00;
+
+/// The mode `03h`: the text mode, eighty columns by twenty-five rows.
+///
+/// "03h - text mode. 80x25. 16 colors. 8 pages."
+pub const MODE_TEXT_80: u8 = 0x03;
+
 /// The mode `13h`: the graphical mode, 320x200 pixels in 256 colours.
 ///
 /// "13h - graphical mode. 40x25. 256 colors. 320x200 pixels. 1 page."
@@ -104,12 +114,6 @@ pub const DEFAULT_COLUMNS: u16 = 80;
 /// The rows the machine starts in.
 pub const DEFAULT_ROWS: u16 = 25;
 
-/// The mode the machine starts in.
-///
-/// The emulator's own default video mode: eighty columns by twenty-five
-/// rows in colour, which is the mode `03h` names.
-const DEFAULT_MODE: u8 = 0x03;
-
 /// The columns of the graphical mode's cell grid.
 ///
 /// The mode `13h` is forty by twenty-five cells, and a cell is eight
@@ -144,7 +148,7 @@ pub const DEFAULT_CURSOR_BOTTOM: u8 = 7;
 /// "0:449h BYTE Video current mode"). The reference's own map documents
 /// none of it, so the offset is this project's own assumption, the way the
 /// cursor's shape at `0040:0080` already is.
-const MODE: u16 = 0x0049;
+const MODE_OFFSET: u16 = 0x0049;
 /// The offset of the number of columns on screen.
 const COLUMNS: u16 = 0x004A;
 /// The offset of the current video page's start in video memory.
@@ -177,6 +181,17 @@ const KEYBOARD_SIZE: u16 = 0x0030;
 /// The size word holds it, and the ring's end is derived from it. The
 /// word is outside the body, so the ring can never clobber it.
 const KEYBOARD_RING: u16 = 0x0012;
+
+/// The bytes one entry of the keyboard buffer takes: the ASCII character
+/// and the scan code.
+const KEYBOARD_ENTRY: u16 = 2;
+
+/// The keystrokes the keyboard buffer holds.
+///
+/// The ring holds nine two-byte entries and **one of them stays free**, so
+/// that "the head equals the tail" is unambiguously empty: eight
+/// keystrokes fit, and the ninth is dropped.
+pub const KEYBOARD_CAPACITY: usize = (KEYBOARD_RING / KEYBOARD_ENTRY - 1) as usize;
 
 /// The IBM PC's set 1 scan codes.
 ///
@@ -265,7 +280,7 @@ impl Cpu {
         let (cursor_row, cursor_column) = self.cursor(page);
         Video {
             page,
-            mode: self.data_byte(MODE),
+            mode: self.data_byte(MODE_OFFSET),
             columns: self.columns(),
             rows: self.rows(),
             cursor_row,
@@ -279,7 +294,7 @@ impl Cpu {
     /// The mode is the machine's own memory — the byte at `0040:0049` —
     /// so the guest can write it and the answer is what it says.
     fn in_graphics_mode(&self) -> bool {
-        self.data_byte(MODE) == MODE_GRAPHICS
+        self.data_byte(MODE_OFFSET) == MODE_GRAPHICS
     }
 
     /// The active video page.
@@ -427,10 +442,10 @@ impl Cpu {
 ///
 /// The ring wraps: the entry after the last one is the first one again.
 fn next_entry(offset: u16, end: u16) -> u16 {
-    if offset + 2 >= end {
+    if offset + KEYBOARD_ENTRY >= end {
         KEYBOARD_BUFFER
     } else {
-        offset + 2
+        offset + KEYBOARD_ENTRY
     }
 }
 
@@ -526,7 +541,7 @@ pub fn init(cpu: &mut Cpu) {
     cpu.set_data_word(PAGE_START, 0);
     cpu.set_data_byte(PAGE, 0);
     cpu.set_data_byte(ROWS, (DEFAULT_ROWS - 1) as u8);
-    cpu.set_data_byte(MODE, DEFAULT_MODE);
+    cpu.set_data_byte(MODE_OFFSET, MODE_TEXT_80);
     cpu.set_data_byte(SHAPE, DEFAULT_CURSOR_START);
     cpu.set_data_byte(SHAPE + 1, DEFAULT_CURSOR_BOTTOM);
     for page in 0..PAGES {
@@ -611,8 +626,8 @@ pub fn service(cpu: &mut Cpu) {
 fn set_mode(cpu: &mut Cpu) {
     let mode = cpu.regs.byte(Reg8::Al);
     let (columns, rows) = match mode {
-        0x00 => (40, DEFAULT_ROWS),
-        0x03 => (DEFAULT_COLUMNS, DEFAULT_ROWS),
+        MODE_TEXT_40 => (40, DEFAULT_ROWS),
+        MODE_TEXT_80 => (DEFAULT_COLUMNS, DEFAULT_ROWS),
         MODE_GRAPHICS => (GRAPHICS_COLUMNS, DEFAULT_ROWS),
         _ => return,
     };
@@ -620,7 +635,7 @@ fn set_mode(cpu: &mut Cpu) {
     cpu.set_data_byte(ROWS, (rows - 1) as u8);
     // The machine's mode is one byte in the data area, and the mode the
     // guest asked for is the mode the machine is in.
-    cpu.set_data_byte(MODE, mode);
+    cpu.set_data_byte(MODE_OFFSET, mode);
     if mode == MODE_GRAPHICS {
         // The graphical mode has one page: the active page is the first
         // one, and its start in video memory is zero.

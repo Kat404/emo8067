@@ -434,6 +434,11 @@ pub struct ScreenView {
     /// The rows the page has.
     pub rows: usize,
     /// The cells of the page, row by row.
+    ///
+    /// There are as many of them as the geometry claims — `columns *
+    /// rows` — in every mode, so that a consumer which maps a cell to
+    /// `row * columns + column` finds one. A graphics page has no
+    /// characters, so its cells are blank.
     pub cells: Vec<ScreenCell>,
     /// The cursor, where the BIOS says it is.
     ///
@@ -648,15 +653,20 @@ fn graphics_of(cpu: &Cpu, video: &Video) -> ScreenView {
                 .read_u8(emo8067_core::bios::GRAPHICS_SEGMENT, index as u16)
         })
         .collect();
+    // The machine's own cell grid: forty columns by twenty-five rows,
+    // whose cells are eight pixels wide and eight pixels tall.
+    let columns = usize::from(video.columns);
+    let rows = usize::from(video.rows);
     ScreenView {
         segment: emo8067_core::bios::GRAPHICS_SEGMENT,
         // The graphical mode has one page.
         page: 0,
-        // The machine's own cell grid: forty columns by twenty-five rows,
-        // whose cells are eight pixels wide and eight pixels tall.
-        columns: usize::from(video.columns),
-        rows: usize::from(video.rows),
-        cells: Vec::new(),
+        columns,
+        rows,
+        // The graphics page has no characters, so its cells are blank —
+        // but there are as many of them as the grid claims, so that a
+        // consumer that maps a cell to `row * columns + column` finds one.
+        cells: vec![BLANK_CELL; columns * rows],
         // The graphics page has no text cursor.
         cursor: None,
         graphics: Some(Graphics {
@@ -666,6 +676,12 @@ fn graphics_of(cpu: &Cpu, video: &Video) -> ScreenView {
         }),
     }
 }
+
+/// A cell of a page that has no characters in it.
+const BLANK_CELL: ScreenCell = ScreenCell {
+    character: ' ',
+    attribute: 0,
+};
 
 /// The character a byte is drawn as.
 ///
@@ -677,5 +693,49 @@ fn printable(byte: u8) -> char {
         byte as char
     } else {
         ' '
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The segment the BIOS data area lives in.
+    const DATA: u16 = 0x0040;
+    /// The offset of the machine's current video mode.
+    const MODE: u16 = 0x0049;
+
+    /// The view's shape is the same in both modes: the cells are as many
+    /// as the geometry claims.
+    ///
+    /// A consumer that maps a cell to `row * columns + column` — the
+    /// mapping the text path itself uses — must find one, or the view is
+    /// not the shape it says it is.
+    #[test]
+    fn the_view_publishes_as_many_cells_as_its_geometry_claims() {
+        let cpu = Cpu::new();
+        let text = &Panels::of(&cpu, &Ui::default()).screen;
+        assert_eq!(
+            text.cells.len(),
+            text.columns * text.rows,
+            "the text page's cells are the grid's"
+        );
+
+        // And the graphics page: the machine's own cell grid, and as many
+        // cells as it claims.
+        let mut cpu = Cpu::new();
+        // The mode byte is the guest's own: the BIOS reads it out of the
+        // data area, and it keeps no copy of it.
+        cpu.mem.write_u8(DATA, MODE, 0x13);
+        let graphics = &Panels::of(&cpu, &Ui::default()).screen;
+        assert!(
+            graphics.graphics.is_some(),
+            "the panel shows the graphics page"
+        );
+        assert_eq!(
+            graphics.cells.len(),
+            graphics.columns * graphics.rows,
+            "the graphics page's cells are the grid's"
+        );
     }
 }

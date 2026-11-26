@@ -58,11 +58,12 @@ else.
 
 **The Guest's DAC.** The graphical mode's pixels name the VGA's own
 256-colour DAC, and that table is the published one: the sixteen colours
-above, then sixteen evenly spaced greys, then the 216
-hue-saturation-intensity colours, then eight unused blacks. It is **not**
-the `{0, 51, 102, 153, 204, 255}` cube, which is Windows 3.x's and
-xterm's: the VGA's own steps are `00`, `55`, `aa` and `ff`. The sixteen
-above are that table's first sixteen, exactly.
+above, then the sixteen greys of the VGA's own ladder (`00`, `14`, `20`,
+`2c`, `38`, `45`, `51`, `61`, `71`, `82`, `92`, `a2`, `b6`, `cb`, `e3`,
+`ff`), then the 216 hue-saturation-intensity colours, then eight unused
+blacks. It is **not** the `{0, 51, 102, 153, 204, 255}` cube, which is
+Windows 3.x's and xterm's: the VGA's own steps are `00`, `55`, `aa` and
+`ff`. The sixteen above are that table's first sixteen, exactly.
 
 ## Type roles
 
@@ -112,10 +113,11 @@ cursor is drawn where the BIOS says it is.
 **The Graphics Page.** The graphical mode has a page of its own: 320 by
 200 pixels at `A000:0000`, and they do not fit a terminal's cells. The
 takeover draws it **scaled**: each cell of the area is a block of the
-framebuffer's pixels, the block's size is the framebuffer's size over the
-area's size, and the cell's colour is the average of the block's colours.
-The colours are the DAC's own. The page has no text cursor: the cursor
-belongs to the text page.
+framebuffer's pixels, the framebuffer's size is divided over the area's
+size, and the blocks **tile** it — so the whole picture is drawn, and the
+cell's colour is the average of the block's colours. The colours are the
+DAC's own. The page has no text cursor: the cursor belongs to the text
+page.
 
 ## Surfaces
 

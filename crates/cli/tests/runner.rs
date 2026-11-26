@@ -492,18 +492,26 @@ fn the_help_names_the_keys_option() {
 }
 
 /// A script that does not fit in the guest's keyboard buffer is said out
-/// loud: the run is not a failure, but the guest did not get the script.
+/// loud: the run is not a failure, but the guest's buffer never took the
+/// script.
+///
+/// The count is the one the buffer's capacity gives: the script has ten
+/// keys and the buffer holds eight, so two of them never entered it.
 #[test]
 fn a_script_that_does_not_fit_is_said_out_loud() {
     let dir = scratch("too-many-keys");
     let source = dir.join("program.asm");
     // A program that never polls the keyboard, and a script of ten keys
-    // for a buffer that holds eight.
+    // for a buffer that holds the keyboard's own capacity.
     std::fs::write(&source, "org 100h\nmov ax, 1234h\nhlt\n").unwrap();
     let (out, err, code) = run(&["run", "--keys", "abcdefghij", source.to_str().unwrap()]);
     assert_eq!(code, 0, "the program halted: {out}");
+    let capacity = emo8067_core::bios::KEYBOARD_CAPACITY;
+    let expected = 10 - capacity;
     assert!(
-        err.contains("2 of the script's keys never reached the guest"),
+        err.contains(&format!(
+            "{expected} of the script's keys never entered the guest's keyboard"
+        )),
         "{err}"
     );
 

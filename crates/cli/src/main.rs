@@ -321,12 +321,14 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
         }
     }
 
-    // A script's tail that never reached the guest is said out loud: the
-    // run itself is not a failure, but a script the guest did not get is
-    // not the script the user wrote.
+    // A script's tail that never entered the guest's keyboard is said out
+    // loud: the run itself is not a failure, but a script the guest's
+    // buffer never took is not the script the user wrote. The count is
+    // taken at the **enqueue**: the keys the door refused are counted
+    // here, and the keys the guest read later are not.
     if next_key < script.len() {
         eprintln!(
-            "emo8067: {} of the script's keys never reached the guest",
+            "emo8067: {} of the script's keys never entered the guest's keyboard",
             script.len() - next_key
         );
     }
