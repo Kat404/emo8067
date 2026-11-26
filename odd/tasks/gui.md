@@ -164,6 +164,80 @@ that: "That is the main UI lesson to invert" (§4.2).
 
 ## Log
 
+- **L3 (2026-11-26).** The native review's findings that were worth taking.
+  - **The toolkit's diagnostics now have somewhere to go.** The lock file
+    brought the `log` and `tracing` facades with it and no implementation
+    behind them, so the adapter, the surface and the device-lost messages
+    — the ones that decide whether the window can open at all — went
+    nowhere. The crate installs **`tracing-subscriber` 0.3.23** with the
+    features `fmt`, `std` and `tracing-log`: the smallest that takes both
+    facades, because the `tracing-log` feature bridges the `log` records
+    of winit and eframe into the same subscriber as the `tracing` events
+    of wgpu, and `RUST_LOG` is honoured without the `env-filter` feature.
+    It adds **five** crates to the lock file (`tracing-subscriber`,
+    `tracing-log`, `sharded-slab`, `thread_local` and `valuable` — the
+    last one of them in the lock only, not in the build). The window's own
+    diagnostics are visible now: eframe says which renderer it took, and
+    wgpu names the adapters it found.
+  - **Two backends, not one.** eframe's `glow` feature is on, so the window
+    can come up on the OpenGL path as well as the Vulkan one: the Vulkan
+    path is tried first and the OpenGL one second, and **both** were seen
+    to open a window on this machine. The glow feature adds **nothing** to
+    the lock file — `glow`, `glutin`, `glutin-winit` and `egui_glow` were
+    already in it. What the OpenGL path needs of the host is an EGL or a
+    GLX implementation (mesa); the Vulkan path needs a Vulkan driver.
+  - **The model is built once.** The constructor loads the machine, draws
+    the panels and draws the listing's rows from them: there is **no**
+    per-frame rebuild at all, where there was one per frame before, and
+    nothing in this unit moves the machine, so a rebuild could only
+    reproduce what was already there. Where the machine is — its `CS:IP` —
+    is read **once**, and the listing's anchor and the marker of the
+    current row both come from that one reading, so the two cannot
+    disagree.
+  - **The failure paths are tested.** The error text of a program that
+    does not assemble and of one that does not load, the empty machine,
+    the listing's anchor, the exit code the binary refuses with, what the
+    binary says it takes, and the two states of the listing where no row
+    carries the marker — an empty listing, and a listing that does not
+    reach the machine — all of them display-free and deterministic. The
+    load's refusal now names the file too, the way the assembly's
+    refusal already did.
+  - **The rules are checked, not promised.** The two tests that policed
+    the rules by searching the crate's own text are gone: one searched for
+    five hard-coded spellings and refused the code the crate itself
+    writes, and the other could not tell a second reading of the machine
+    from the first. What is left says what it means — the app's panels are
+    the model's own and the app's rows are the panels' own — and the
+    manifest's scanner sees **every** table, the target-specific ones
+    included, reads a value that runs over several lines as one entry,
+    and compares sets. The scanner has a test of its own.
+  - **The advisory scan.** The RustSec advisory database — 1548
+    advisories, read from a checkout of `rustsec/advisory-db`, with **no
+    tool installed** — against the versions in the lock file: the lock
+    holds **411** crates, **226** of them new since the GUI came in, and
+    **no vulnerability touches a locked version**. One advisory mentions
+    one: `RUSTSEC-2022-0048` (`xml-rs` 0.8.29), an "unmaintained" notice
+    that was **withdrawn** on 2023-05-04, and `xml-rs` is a
+    build-dependency of `gl_generator` — the OpenGL bindings' generator —
+    so it is in no binary. The scanner was checked against a
+    known-vulnerable version before it was trusted.
+  - **The display is not private.** eframe's X11 backend is on, and X11
+    gives no isolation between the clients of one display: another process
+    on the same display can read what the window shows, the way it can
+    read what the TUI writes to the terminal. It is a property of the
+    front end and not a defect of it, and the crate's own doc says so.
+  - **What T17 has to carry.** The GUI is in the workspace, so **every**
+    workspace build needs the Wayland and OpenGL development packages now:
+    `pkg-config`, the Wayland client, cursor and EGL libraries and the
+    `wayland-scanner` program (`libwayland-dev` and `libwayland-bin` on
+    Debian and Ubuntu, `wayland` on Arch), and `xkbcommon`
+    (`libxkbcommon-dev`, `libxkbcommon`). The X11 path needs no
+    development package — it loads `libX11` at run time — and the OpenGL
+    path needs an EGL or a GLX implementation at run time (`mesa`). And
+    the floor of **1.95** applies to the core and the CLI as well, and
+    not only to the GUI. Nothing detects either yet, because the
+    packaging and the CI are T17.
+
 - **L2 (2026-11-25).** T1 is in: the crate, the dependency and the first
   window.
   - **The crate.** `crates/gui`, the package `emo8067-gui`, depending on

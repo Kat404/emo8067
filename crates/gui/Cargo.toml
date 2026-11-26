@@ -14,8 +14,13 @@ workspace = true
 emo8067-asm = { path = "../asm" }
 emo8067-core = { path = "../core" }
 emo8067-debug = { path = "../debug" }
-eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "wayland", "wgpu", "x11"] }
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow", "wayland", "wgpu", "x11"] }
 egui = { version = "0.36.2", default-features = false, features = ["default_fonts"] }
+tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt", "std", "tracing-log"] }
+
+[dev-dependencies]
+log = "0.4.35"
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 
 [[bin]]
 name = "emo8067-gui"

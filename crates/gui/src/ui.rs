@@ -9,6 +9,19 @@ use emo8067_debug::panels::{Line, Panels};
 
 use crate::theme;
 
+/// Where the machine is: the address the listing is anchored on, and the
+/// instruction that carries the marker.
+///
+/// The machine's `CS:IP` is read once, and both the listing's start and
+/// the marker of the current row come from it, so the two cannot disagree.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Here {
+    /// The segment the machine is in.
+    pub segment: u16,
+    /// The offset the instruction pointer holds.
+    pub offset: u16,
+}
+
 /// One row of the listing: what the window shows of one instruction.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Row {
@@ -27,7 +40,7 @@ pub struct Row {
 /// The rows are the model's own: the GUI reads the machine nowhere else,
 /// and it reads the model for everything it shows.
 #[must_use]
-pub fn listing(panels: &Panels) -> Vec<Row> {
+pub fn listing(panels: &Panels, here: Here) -> Vec<Row> {
     panels
         .disassembly
         .iter()
@@ -35,7 +48,7 @@ pub fn listing(panels: &Panels) -> Vec<Row> {
             address: format!("{:04X}:{:04X}", line.segment, line.offset),
             bytes: bytes_of(line),
             text: line.text.clone(),
-            here: line.offset == panels.registers.ip && line.segment == panels.registers.cs,
+            here: line.offset == here.offset && line.segment == here.segment,
         })
         .collect()
 }
@@ -50,7 +63,7 @@ fn bytes_of(line: &Line) -> String {
 }
 
 /// The window: the disassembly, in the panel the TUI draws it in.
-pub fn window(ui: &mut Ui, panels: &Panels) {
+pub fn window(ui: &mut Ui, rows: &[Row]) {
     CentralPanel::default().show(ui, |ui| {
         ui.label(
             RichText::new("disassembly")
@@ -58,8 +71,8 @@ pub fn window(ui: &mut Ui, panels: &Panels) {
                 .color(theme::TEXT_SECONDARY),
         );
         ScrollArea::vertical().show(ui, |ui| {
-            for row in listing(panels) {
-                row_ui(ui, &row);
+            for row in rows {
+                row_ui(ui, row);
             }
         });
     });
