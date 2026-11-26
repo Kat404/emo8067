@@ -164,6 +164,38 @@ that: "That is the main UI lesson to invert" (§4.2).
 
 ## Log
 
+- **L5 (2026-11-26).** T3 is in: the panels have their widgets, and the
+  model's contract says where each of its inputs comes from.
+  - **The model's contract.** The three inputs the front ends used to fill
+    are the model's own now, and the `Ui` says where each comes from: the
+    listing's anchor is the machine's instruction pointer
+    (`Ui::anchored_at`), the memory window looks through the segment the
+    last goto named — or through the data segment
+    (`Ui::memory_segment`) — and the stack window starts at the stack
+    pointer plus the scroll (`Ui::stack_at`). The `Ui`'s fields
+    `memory_segment`, `stack_at` and `disassembly_at` are gone: the model
+    reads the machine and the UI's state, and the front ends fill neither.
+    **The TUI's own code changed in three places**: `panels_with` no
+    longer sets the three, and `memory_segment()` and `stack_at()`
+    delegate to the `Ui` — the TUI's tests call the first of them, and
+    that path did not move.
+  - **The panels have their widgets.** The registers and the flags, the
+    memory window, the stack, the conditions, the console and the source
+    strip are in the window, and **every one of them is on the screen at
+    once**: the GUI's own argument for existing is that a panel is one
+    click away, and a panel that is always there is nearer than that. No
+    keymap reaches them, and none of them hides.
+  - **The widgets' logic is pure.** Each panel's rows come from a pure
+    function over the panel model — `registers_rows`, `flags_rows`,
+    `memory_rows`, `stack_rows`, `condition_rows`, `source_rows` and
+    `console_view` — so the tree's tests read them **without a display**,
+    the shape T1 established. The GUI's `App` holds what the panels need:
+    the machine, the program, the breakpoints and the console.
+  - **The conditions' words are the debug crate's.** The three words the
+    panel says — what an entry is called, what it carries and what a
+    watchpoint watches — moved from the TUI's `ui.rs` to the debug crate's
+    `breakpoints.rs`, so the two front ends say the same words.
+
 - **L4 (2026-11-26).** T2 is in: the state the two front ends share is the
   debug crate's.
   - **The console's parser moved.** `crates/tui/src/console.rs` is

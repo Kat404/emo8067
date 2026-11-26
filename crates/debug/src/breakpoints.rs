@@ -366,3 +366,42 @@ impl Breakpoints {
         report
     }
 }
+
+/// What an entry of the listing is called.
+///
+/// The kind is the model's own: a breakpoint is a breakpoint and a
+/// watchpoint is a watchpoint, and the panel says which is which.
+#[must_use]
+pub fn kind_of(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Breakpoint => "breakpoint",
+        Kind::Watchpoint(_) => "watchpoint",
+    }
+}
+
+/// What an entry of the listing carries.
+///
+/// A breakpoint carries a condition, or none at all; a watchpoint carries
+/// no condition and says what it watches instead.
+#[must_use]
+pub fn detail_of(entry: &Entry) -> String {
+    match entry.kind {
+        Kind::Breakpoint => match entry.condition.as_deref() {
+            Some(text) if !text.is_empty() => text.to_string(),
+            _ => "no condition".to_string(),
+        },
+        Kind::Watchpoint(access) => access_of(access).to_string(),
+    }
+}
+
+/// What a watchpoint watches, in words.
+///
+/// The access says what it watches: a write, a read, or both.
+#[must_use]
+pub fn access_of(access: Access) -> &'static str {
+    match access {
+        Access::Write => "write",
+        Access::Read => "read",
+        Access::Both => "read and write",
+    }
+}

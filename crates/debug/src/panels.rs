@@ -26,6 +26,12 @@ use emo8067_core::regs::{Reg16, Seg};
 /// The state is the two front ends' own: the cursors that say where the
 /// user is in each pane, the choices the user has made, and the prompts
 /// that are open. Both front ends hold one of these, and neither owns it.
+///
+/// **The three inputs the model takes from the machine are resolved here**,
+/// and the front ends fill none of them: [`Ui::anchored_at`] says where
+/// the listing starts, [`Ui::memory_segment`] which segment the memory
+/// window looks through, and [`Ui::stack_at`] where the stack window
+/// starts. One contract, and both front ends fill it the same way.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Ui {
     /// Where the memory panel's cursor is.
@@ -34,22 +40,12 @@ pub struct Ui {
     /// the bytes it holds are the ones around it, and the cursor is in the
     /// middle of them.
     pub memory_at: u16,
-    /// The segment the memory panel looks through.
-    pub memory_segment: u16,
     /// How many bytes the memory panel's window holds.
     pub memory_len: usize,
-    /// Where the disassembly starts.
-    pub disassembly_at: u16,
     /// How many instructions the disassembly lists.
     pub disassembly_len: usize,
     /// How many words the stack panel shows.
     pub stack_len: usize,
-    /// Where the stack window starts.
-    ///
-    /// The window is a window over the stack and not the stack itself: it
-    /// starts at this offset, so the pointer can be inside it or above it,
-    /// and the words around the pointer are there to be looked at.
-    pub stack_at: u16,
     /// The segment the screen panel reads the text page through.
     ///
     /// The page is at `B800:0000` by default, and the segment is the
@@ -161,16 +157,45 @@ pub struct Goto {
     pub text: String,
 }
 
+impl Ui {
+    /// The segment the memory panel looks through.
+    ///
+    /// The segment the last goto named, or the data segment when no goto
+    /// has named one: the choice is kept until another goto names another
+    /// segment.
+    #[must_use]
+    pub fn memory_segment(&self, cpu: &Cpu) -> u16 {
+        self.goto_segment
+            .unwrap_or_else(|| cpu.regs.segment(Seg::Ds))
+    }
+
+    /// Where the stack window starts: the stack pointer and the scroll.
+    ///
+    /// The window follows the pointer, the way the listing follows the
+    /// instruction pointer, and the scroll is how far the user has moved it
+    /// from there.
+    #[must_use]
+    pub fn stack_at(&self, cpu: &Cpu) -> u16 {
+        cpu.regs.word(Reg16::Sp).wrapping_add(self.stack_scroll)
+    }
+
+    /// Where the disassembly starts: the machine's instruction pointer.
+    ///
+    /// The listing follows `CS:IP`, and the research says it is never
+    /// asked to disassemble a range.
+    #[must_use]
+    pub fn anchored_at(&self, cpu: &Cpu) -> u16 {
+        cpu.regs.ip
+    }
+}
+
 impl Default for Ui {
     fn default() -> Self {
         Ui {
             memory_at: 0,
-            memory_segment: 0x1000,
             memory_len: 256,
-            disassembly_at: 0,
             disassembly_len: 16,
             stack_len: 8,
-            stack_at: 0,
             screen_segment: 0xB800,
             screen_page: 0,
             cursor: 0,
@@ -618,20 +643,18 @@ impl Panels {
     }
 }
 
-/// The disassembly panel: the instructions from where the UI says.
+/// The disassembly panel: the instructions from where the machine is.
 fn disassembly_of(cpu: &Cpu, ui: &Ui) -> Vec<Line> {
     let segment = cpu.regs.segment(Seg::Cs);
+    let anchor = ui.anchored_at(cpu);
     let mut bytes = Vec::new();
     for offset in 0..=255u16 {
-        bytes.push(
-            cpu.mem
-                .read_u8(segment, ui.disassembly_at.wrapping_add(offset)),
-        );
+        bytes.push(cpu.mem.read_u8(segment, anchor.wrapping_add(offset)));
     }
     let mut out = Vec::new();
-    let mut at = ui.disassembly_at;
+    let mut at = anchor;
     for _ in 0..ui.disassembly_len {
-        let rest = &bytes[usize::from(at.wrapping_sub(ui.disassembly_at))..];
+        let rest = &bytes[usize::from(at.wrapping_sub(anchor))..];
         let Ok(instruction) = emo8067_asm::disasm::disassemble(rest, at) else {
             break;
         };
@@ -653,13 +676,14 @@ fn disassembly_of(cpu: &Cpu, ui: &Ui) -> Vec<Line> {
 /// address, so there is no megabyte of memory in the UI anywhere.
 fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
     let count = ui.memory_len.max(1);
+    let segment = ui.memory_segment(cpu);
     // The cursor sits in the middle of the window, so there are as many
     // bytes before it as there are after it.
     let window_at = ui.memory_at.saturating_sub((count / 2) as u16);
     let bytes = (0..count)
         .map(|offset| {
             cpu.mem
-                .read_u8(ui.memory_segment, window_at.wrapping_add(offset as u16))
+                .read_u8(segment, window_at.wrapping_add(offset as u16))
         })
         .collect::<Vec<u8>>();
     let ascii = bytes
@@ -673,7 +697,7 @@ fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
         })
         .collect();
     MemoryView {
-        segment: ui.memory_segment,
+        segment,
         at: ui.memory_at,
         window_at,
         cursor: usize::from(ui.memory_at.wrapping_sub(window_at)),
@@ -691,11 +715,12 @@ fn memory_of(cpu: &Cpu, ui: &Ui) -> MemoryView {
 fn stack_of(cpu: &Cpu, ui: &Ui) -> StackView {
     let segment = cpu.regs.segment(Seg::Ss);
     let sp = cpu.regs.word(Reg16::Sp);
+    let at = ui.stack_at(cpu);
     let words = (0..ui.stack_len)
         .map(|index| {
             // The offset wraps inside the segment, the way every other
             // offset in the model does.
-            let offset = ui.stack_at.wrapping_add(2u16.wrapping_mul(index as u16));
+            let offset = at.wrapping_add(2u16.wrapping_mul(index as u16));
             cpu.mem.read_u16(segment, offset)
         })
         .collect();

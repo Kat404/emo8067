@@ -53,7 +53,8 @@ fn the_listing_is_anchored_on_the_instruction_pointer() {
     let app = App::new(Some(program.argument())).expect("the program loads");
 
     assert_eq!(
-        app.ui.disassembly_at, 0x0100,
+        app.rows.first().map(|row| row.address.as_str()),
+        Some("0000:0100"),
         "the listing starts where the machine is"
     );
     assert!(

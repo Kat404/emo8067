@@ -250,12 +250,9 @@ fn the_panels_are_drawn_from_the_machine() {
     let cpu = machine();
     let ui = Ui {
         memory_at: 0x0000,
-        memory_segment: 0x1000,
         memory_len: 4,
-        disassembly_at: 0x0000,
         disassembly_len: 2,
         stack_len: 2,
-        stack_at: 0x0000,
         screen_segment: 0xB800,
         screen_page: 0,
         ..Ui::default()

@@ -20,7 +20,8 @@ pub mod panels;
 pub mod source;
 
 pub use breakpoints::{
-    Access, Breakpoints, ConditionError, Entry, Kind, Missed, Report, Watchpoint,
+    Access, Breakpoints, ConditionError, Entry, Kind, Missed, Report, Watchpoint, access_of,
+    detail_of, kind_of,
 };
 pub use console::{Address, Command, Console, Dump, Refusal, Segment};
 pub use expr::{Context, Error, Value, evaluate};

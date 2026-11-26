@@ -14,7 +14,7 @@ use emo8067_core::bios::{
     SCAN_HOME, SCAN_INSERT, SCAN_LEFT, SCAN_PAGE_DOWN, SCAN_PAGE_UP, SCAN_RIGHT, SCAN_TAB, SCAN_UP,
     scan_code,
 };
-use emo8067_core::regs::{Reg16, Seg};
+use emo8067_core::regs::Seg;
 use emo8067_debug::Access;
 use emo8067_debug::breakpoints::{Breakpoints, Entry};
 use emo8067_debug::console::{self, Console};
@@ -238,21 +238,15 @@ impl App {
         // The UI's state is the debug crate's and it holds the prompts, so
         // it is copied and not moved.
         let mut ui = self.ui.clone();
-        // The listing follows `CS:IP`, and the research says it is never
-        // asked to disassemble a range.
-        ui.disassembly_at = self.cpu.regs.ip;
         // The listing is as long as the band that holds it.
         ui.disassembly_len = disassembly_len;
-        // The memory window looks through the segment the goto named, and
-        // through the data segment when no goto has named one.
-        ui.memory_segment = self.memory_segment();
-        // The stack window follows the stack pointer, and the scroll is
-        // where the user has moved it to.
-        ui.stack_at = self.stack_at();
         // The screen follows the machine's active video page: the guest
         // draws on the page the BIOS has active, and that is the page the
         // panel shows.
         ui.screen_page = self.cpu.video().page;
+        // The listing's anchor, the memory window's segment and the stack
+        // window's address are the model's own now: it says where each of
+        // them comes from, and both front ends fill them the same way.
         Panels::of(&self.cpu, &ui)
     }
 
@@ -263,9 +257,7 @@ impl App {
     /// the window looks through the data segment, the way it always has.
     #[must_use]
     pub fn memory_segment(&self) -> u16 {
-        self.ui
-            .goto_segment
-            .unwrap_or(self.cpu.regs.segment(Seg::Ds))
+        self.ui.memory_segment(&self.cpu)
     }
 
     /// Where the stack window starts: the stack pointer and the scroll.
@@ -275,10 +267,7 @@ impl App {
     /// from there.
     #[must_use]
     pub fn stack_at(&self) -> u16 {
-        self.cpu
-            .regs
-            .word(Reg16::Sp)
-            .wrapping_add(self.ui.stack_scroll)
+        self.ui.stack_at(&self.cpu)
     }
 
     /// The source view: the program's own lines, and the machine's place

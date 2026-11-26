@@ -41,18 +41,18 @@ fn the_listing_is_the_panels_own_disassembly() {
         "one row per instruction the model found"
     );
     assert_eq!(
-        rows[0].address, "0200:0000",
+        rows[0].address, "0200:0003",
         "the address is the model's own"
     );
-    assert_eq!(rows[0].bytes, "B8 34 12", "the bytes are the model's own");
+    assert_eq!(rows[0].bytes, "CD 21", "the bytes are the model's own");
+    assert_eq!(rows[0].text, "INT 021h", "the text is the model's own");
+    assert!(rows[0].here, "the machine is at this one");
+    assert_eq!(rows[1].address, "0200:0005", "the next one follows");
     assert_eq!(
-        rows[0].text, "MOV AX, 01234h",
-        "the text is the model's own"
+        rows[1].text, "XCHG AX, AX",
+        "and its text is the model's own"
     );
-    assert!(!rows[0].here, "the machine is not at this one");
-    assert_eq!(rows[1].address, "0200:0003", "the next one follows");
-    assert_eq!(rows[1].text, "INT 021h", "and its text is the model's own");
-    assert!(rows[1].here, "the machine is at this one");
+    assert!(!rows[1].here, "and the machine is not at that one");
 }
 
 #[test]
@@ -69,14 +69,16 @@ fn an_empty_listing_marks_nothing() {
 #[test]
 fn a_listing_that_does_not_reach_the_machine_marks_nothing() {
     let cpu = machine();
-    // The listing starts past the machine, so its rows are not its own.
-    let ui = Ui {
-        disassembly_at: cpu.regs.ip + 4,
-        ..Ui::default()
-    };
-    let panels = Panels::of(&cpu, &ui);
+    let panels = Panels::of(&cpu, &Ui::default());
 
-    let rows = listing(&panels, here(&cpu));
+    // The machine is somewhere the listing does not reach.
+    let rows = listing(
+        &panels,
+        Here {
+            segment: 0x0200,
+            offset: 0x0099,
+        },
+    );
 
     assert!(!rows.is_empty(), "the listing has rows of its own");
     assert!(

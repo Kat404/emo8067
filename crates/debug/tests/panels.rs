@@ -88,14 +88,80 @@ fn a_flag_can_be_written_and_the_others_are_left_alone() {
 }
 
 #[test]
+fn the_listing_is_anchored_on_the_instruction_pointer() {
+    let mut cpu = machine();
+    cpu.regs.ip = 0x0003;
+
+    let panels = Panels::of(&cpu, &Ui::default());
+
+    assert_eq!(
+        panels.disassembly[0].offset, 0x0003,
+        "the listing starts where the machine is"
+    );
+    assert_eq!(
+        panels.disassembly[0].segment, 0x0200,
+        "and in the machine's own segment"
+    );
+}
+
+#[test]
+fn the_memory_window_looks_through_the_gotos_segment_or_the_data_segment() {
+    let mut cpu = machine();
+    cpu.regs.set_segment(Seg::Ds, 0x0300);
+
+    let panels = Panels::of(&cpu, &Ui::default());
+    assert_eq!(
+        panels.memory.segment, 0x0300,
+        "the window looks through the data segment"
+    );
+
+    let ui = Ui {
+        goto_segment: Some(0x0400),
+        ..Ui::default()
+    };
+    let panels = Panels::of(&cpu, &ui);
+    assert_eq!(
+        panels.memory.segment, 0x0400,
+        "and through the segment the last goto named"
+    );
+}
+
+#[test]
+fn the_stack_window_starts_at_the_stack_pointer_plus_the_scroll() {
+    let mut cpu = Cpu::new();
+    cpu.regs.set_segment(Seg::Ss, 0x0200);
+    cpu.regs.set_word(Reg16::Sp, 0x0100);
+    cpu.mem.write_u16(0x0200, 0x0100, 0xAAAA);
+    cpu.mem.write_u16(0x0200, 0x0180, 0xBBBB);
+
+    let panels = Panels::of(&cpu, &Ui::default());
+    assert_eq!(
+        panels.stack.words[0], 0xAAAA,
+        "the window starts at the stack pointer"
+    );
+
+    let ui = Ui {
+        stack_scroll: 0x0080,
+        stack_len: 4,
+        ..Ui::default()
+    };
+    let panels = Panels::of(&cpu, &ui);
+    assert_eq!(
+        panels.stack.words[0], 0xBBBB,
+        "and the scroll moves it away from the pointer"
+    );
+    assert_eq!(panels.stack.sp, 0x0100, "the pointer is still reported");
+}
+
+#[test]
 fn the_stack_window_is_where_the_ui_says_and_not_where_the_pointer_is() {
     let mut cpu = Cpu::new();
     cpu.regs.set_segment(Seg::Ss, 0x0200);
     cpu.regs.set_word(Reg16::Sp, 0x0100);
     cpu.mem.write_u16(0x0200, 0x0100, 0xAAAA);
-    cpu.mem.write_u16(0x0200, 0x0080, 0xBBBB);
+    cpu.mem.write_u16(0x0200, 0x0180, 0xBBBB);
     let ui = Ui {
-        stack_at: 0x0080,
+        stack_scroll: 0x0080,
         stack_len: 4,
         ..Ui::default()
     };
@@ -116,10 +182,10 @@ fn the_stack_window_is_where_the_ui_says_and_not_where_the_pointer_is() {
 fn the_stack_window_wraps_inside_the_segment() {
     let mut cpu = Cpu::new();
     cpu.regs.set_segment(Seg::Ss, 0x0200);
+    cpu.regs.set_word(Reg16::Sp, 0xFFFF);
     cpu.mem.write_u16(0x0200, 0xFFFF, 0x1111);
     cpu.mem.write_u16(0x0200, 0x0001, 0x2222);
     let ui = Ui {
-        stack_at: 0xFFFF,
         stack_len: 2,
         ..Ui::default()
     };
@@ -139,7 +205,7 @@ fn the_memory_panel_is_a_window_around_the_cursor() {
     cpu.mem.load_at(0x02010, &[0xAB]).unwrap();
     let ui = Ui {
         memory_at: 0x0010,
-        memory_segment: 0x0200,
+        goto_segment: Some(0x0200),
         memory_len: 16,
         ..Ui::default()
     };
