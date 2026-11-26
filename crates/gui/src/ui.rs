@@ -356,14 +356,17 @@ fn registers_panel(ui: &mut egui::Ui, app: &App) {
         for row in registers_rows(&app.panels, &app.ui) {
             ui.label(RichText::new(row.name).color(label_colour(row.cursor)));
             ui.label(RichText::new(row.value).color(value_colour(row.cursor)));
+            // A grid row ends only when the user ends it.
+            ui.end_row();
         }
     });
     ui.separator();
     section(ui, "flags");
-    egui::Grid::new("flags").num_columns(3).show(ui, |ui| {
+    egui::Grid::new("flags").num_columns(2).show(ui, |ui| {
         for row in flags_rows(&app.panels, &app.ui) {
             ui.label(RichText::new(row.name).color(label_colour(row.cursor)));
             ui.label(RichText::new(row.value).color(value_colour(row.cursor)));
+            ui.end_row();
         }
     });
 }

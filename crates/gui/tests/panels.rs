@@ -12,6 +12,7 @@ use emo8067_debug::panels::{Edit, Panels, Register, Ui};
 use emo8067_gui::app::App;
 use emo8067_gui::ui::{
     condition_rows, console_view, flags_rows, memory_rows, registers_rows, source_rows, stack_rows,
+    window,
 };
 
 /// A machine with a little code in it.
@@ -185,6 +186,72 @@ fn the_console_panel_shows_the_log_and_the_command_line() {
         "the echo of the command is the first line"
     );
     assert_eq!(view.line, "r BX", "and the command line is what was typed");
+}
+
+/// The shapes a headless run drew.
+///
+/// The run needs no display: egui lays the widgets out and hands back the
+/// shapes it would have painted.
+fn headless(add: impl FnMut(&mut egui::Ui)) -> Vec<egui::epaint::ClippedShape> {
+    let ctx = egui::Context::default();
+    // The first frame loads the fonts, so the run is done twice and the
+    // shapes of the second one carry the text.
+    ctx.run_ui(egui::RawInput::default(), |_| {})
+        .drop_without_applying_deltas();
+    let output = ctx.run_ui(egui::RawInput::default(), add);
+    let shapes = output.shapes.clone();
+    // The textures of the run are nobody's: the test reads the shapes and
+    // paints nothing.
+    output.drop_without_applying_deltas();
+    shapes
+}
+
+/// The rows the labels of the given names took.
+///
+/// A row of a grid is where the labels of it start, so the rows are the
+/// distinct tops those labels took.
+fn rows_of(shapes: &[egui::epaint::ClippedShape], names: &[&str]) -> usize {
+    let mut tops: Vec<f32> = shapes
+        .iter()
+        .filter_map(|clipped| match &clipped.shape {
+            egui::Shape::Text(text) => {
+                let name = text.galley.text();
+                names.contains(&name).then_some(text.pos.y)
+            }
+            _ => None,
+        })
+        .collect();
+    tops.sort_by(f32::total_cmp);
+    tops.dedup();
+    tops.len()
+}
+
+#[test]
+fn the_registers_panel_lays_the_registers_out_in_thirteen_rows() {
+    let app = App::new(None).expect("the machine is empty");
+    let shapes = headless(|ui| window(ui, &app));
+
+    let names = [
+        "AX", "BX", "CX", "DX", "SI", "DI", "BP", "SP", "CS", "DS", "ES", "SS", "IP",
+    ];
+    assert_eq!(
+        rows_of(&shapes, &names),
+        13,
+        "the thirteen registers are thirteen rows and not one long line"
+    );
+}
+
+#[test]
+fn the_flags_panel_lays_the_flags_out_in_nine_rows() {
+    let app = App::new(None).expect("the machine is empty");
+    let shapes = headless(|ui| window(ui, &app));
+
+    let names = ["CF", "PF", "AF", "ZF", "SF", "TF", "OF", "IF", "DF"];
+    assert_eq!(
+        rows_of(&shapes, &names),
+        9,
+        "the nine flags are nine rows and not one long line"
+    );
 }
 
 #[test]
