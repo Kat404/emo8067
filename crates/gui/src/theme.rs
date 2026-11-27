@@ -39,3 +39,25 @@ pub fn visuals() -> Visuals {
     visuals.override_text_color = Some(TEXT_PRIMARY);
     visuals
 }
+
+/// The colour of a pixel: the DAC's own entry for its index.
+///
+/// The DAC is the core's own table (`emo8067_core::bios::VGA_DAC`): the
+/// VGA's palette is part of the model of the VGA, so the TUI and the GUI
+/// read it there and not each in its own.
+#[must_use]
+pub fn pixel(index: u8) -> Color32 {
+    let (red, green, blue) = emo8067_core::bios::VGA_DAC[usize::from(index)];
+    Color32::from_rgb(red, green, blue)
+}
+
+/// The colours of a cell of the guest's text page: its character and its
+/// ground.
+///
+/// The foreground is one of the DAC's first eight and the background one of
+/// its first sixteen — the TUI's own `guest` mapping, so the two front ends
+/// show the guest's colours the same way.
+#[must_use]
+pub fn guest(foreground: u8, background: u8) -> (Color32, Color32) {
+    (pixel(foreground & 0x07), pixel(background & 0x0F))
+}

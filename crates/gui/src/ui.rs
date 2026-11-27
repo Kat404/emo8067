@@ -13,7 +13,7 @@ use egui::{CentralPanel, RichText, ScrollArea};
 use emo8067_core::Cpu;
 use emo8067_debug::breakpoints::{Entry, Kind, detail_of, kind_of};
 use emo8067_debug::console::Console;
-use emo8067_debug::panels::{Edit, Flag, Panels, Ui as State};
+use emo8067_debug::panels::{Edit, Flag, Panels, ScreenView, Ui as State};
 use emo8067_debug::source::SourceView;
 
 use crate::app::App;
@@ -326,6 +326,203 @@ fn bytes_of(line: &emo8067_debug::panels::Line) -> String {
         .join(" ")
 }
 
+/// One cell of the guest's text page, as the window draws it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct TextCell {
+    /// The character the guest wrote.
+    pub character: char,
+    /// The colour of the character: the DAC's own.
+    pub foreground: egui::Color32,
+    /// The colour of the cell's ground: the DAC's own.
+    pub background: egui::Color32,
+    /// Whether the cursor is on this cell.
+    pub cursor: bool,
+}
+
+/// The guest's screen, as the window draws it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Screen {
+    /// The graphical mode: the framebuffer's pixels, one to a pixel.
+    Graphics {
+        /// The framebuffer's width, in pixels.
+        width: usize,
+        /// The framebuffer's height, in pixels.
+        height: usize,
+        /// The colour of every pixel, row by row: the DAC's own.
+        pixels: Vec<egui::Color32>,
+    },
+    /// A text mode: the page's character grid.
+    Text {
+        /// The columns the page has.
+        columns: usize,
+        /// The rows the page has.
+        rows: usize,
+        /// The cells of the page, row by row.
+        cells: Vec<TextCell>,
+    },
+}
+
+/// The guest's screen, drawn from the model.
+///
+/// The model is the product: the framebuffer's bytes are the pixels and
+/// the page's cells are the characters. The GUI reads the model and
+/// nothing else — not the machine's memory, and not the framebuffer
+/// again.
+#[must_use]
+pub fn screen(view: &ScreenView) -> Screen {
+    match &view.graphics {
+        Some(graphics) => Screen::Graphics {
+            width: graphics.width,
+            height: graphics.height,
+            // Every byte of the framebuffer is a colour the DAC names.
+            pixels: graphics
+                .pixels
+                .iter()
+                .map(|index| theme::pixel(*index))
+                .collect(),
+        },
+        None => Screen::Text {
+            columns: view.columns,
+            rows: view.rows,
+            cells: text_cells(view),
+        },
+    }
+}
+
+/// The text page's cells, as the panel draws them.
+///
+/// The character is the guest's own, the colours are the DAC's, and the
+/// cursor is where the BIOS says it is.
+#[must_use]
+pub fn text_cells(view: &ScreenView) -> Vec<TextCell> {
+    view.cells
+        .iter()
+        .enumerate()
+        .map(|(index, cell)| {
+            let (foreground, background) = theme::guest(cell.foreground(), cell.background());
+            TextCell {
+                character: cell.character,
+                foreground,
+                background,
+                cursor: view
+                    .cursor
+                    .is_some_and(|cursor| cursor.row * view.columns + cursor.column == index),
+            }
+        })
+        .collect()
+}
+
+/// The guest's screen, in its own window.
+///
+/// The window is the GUI's mirror of the TUI's takeover: it draws the page
+/// over the debugger's panels. It is open by default and it can be closed;
+/// the action that opens it again is T5's.
+pub fn screen_window(ctx: &egui::Context, screen: &Screen) {
+    let id = egui::Id::new("guest screen");
+    let mut open = ctx.memory_mut(|memory| *memory.data.get_temp_mut_or_insert_with(id, || true));
+    egui::Window::new("guest screen")
+        .open(&mut open)
+        .show(ctx, |ui| {
+            draw_screen(ui, screen);
+        });
+    // The window's own close button has the say, and the flag is the
+    // window's state: it lives between the frames.
+    ctx.memory_mut(|memory| memory.data.insert_temp(id, open));
+}
+
+/// The screen, as it is drawn: the framebuffer's pixels, or the character
+/// grid.
+fn draw_screen(ui: &mut egui::Ui, screen: &Screen) {
+    match screen {
+        Screen::Graphics {
+            width,
+            height,
+            pixels,
+        } => {
+            let texture = screen_texture(ui.ctx(), *width, *height, pixels);
+            // The image is the framebuffer's own size — a guest pixel to a
+            // point — and the nearest of neighbours, so that a scaled
+            // picture keeps the DAC's own colours and never a blend.
+            ui.add(egui::Image::new(&texture).texture_options(egui::TextureOptions::NEAREST));
+        }
+        Screen::Text { columns, cells, .. } => {
+            let galley = text_galley(ui, *columns, cells);
+            ui.label(galley);
+        }
+    }
+}
+
+/// The texture of the guest's screen.
+///
+/// The framebuffer is uploaded once and kept: the picture changes only
+/// when the machine moves, and the pixels are the picture, so the two are
+/// compared to know whether the texture is still the framebuffer.
+fn screen_texture(
+    ctx: &egui::Context,
+    width: usize,
+    height: usize,
+    pixels: &[egui::Color32],
+) -> egui::TextureHandle {
+    let id = egui::Id::new("guest screen texture");
+    let cached = ctx.memory(|memory| {
+        memory
+            .data
+            .get_temp::<(Vec<egui::Color32>, egui::TextureHandle)>(id)
+    });
+    if let Some((cached, texture)) = cached
+        && cached == pixels
+    {
+        return texture;
+    }
+    let image = egui::ColorImage::new([width, height], pixels.to_vec());
+    let texture = ctx.load_texture("guest screen", image, egui::TextureOptions::NEAREST);
+    ctx.memory_mut(|memory| {
+        memory
+            .data
+            .insert_temp(id, (pixels.to_vec(), texture.clone()));
+    });
+    texture
+}
+
+/// The character grid, laid out as one galley.
+///
+/// Every cell is a section of its own, so the character keeps its own
+/// colour and its own ground, and the cursor's cell is underlined — the
+/// TUI's own drawing, in egui's own way.
+fn text_galley(
+    ui: &egui::Ui,
+    columns: usize,
+    cells: &[TextCell],
+) -> std::sync::Arc<egui::text::Galley> {
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let mut job = egui::text::LayoutJob::default();
+    // The grid is a grid: the rows are not wrapped, and the spaces among
+    // the cells keep their ground.
+    job.wrap.max_width = f32::INFINITY;
+    job.keep_trailing_whitespace = true;
+    let columns = columns.max(1);
+    for (index, cell) in cells.iter().enumerate() {
+        let format = egui::text::TextFormat {
+            font_id: font.clone(),
+            color: cell.foreground,
+            background: cell.background,
+            underline: if cell.cursor {
+                egui::Stroke::new(1.0, cell.foreground)
+            } else {
+                egui::Stroke::NONE
+            },
+            ..egui::text::TextFormat::default()
+        };
+        if index > 0 && index % columns == 0 {
+            // The end of the row: the next cell is on the next line.
+            job.append("\n", 0.0, format.clone());
+        }
+        let mut bytes = [0u8; 4];
+        job.append(cell.character.encode_utf8(&mut bytes), 0.0, format);
+    }
+    ui.painter().fonts_mut(|fonts| fonts.layout_job(job))
+}
+
 /// The window: the debugger's panels, all of them at once.
 pub fn window(ui: &mut egui::Ui, app: &App) {
     Panel::top("header").show(ui, |ui| {
@@ -347,6 +544,9 @@ pub fn window(ui: &mut egui::Ui, app: &App) {
     CentralPanel::default().show(ui, |ui| {
         disassembly_panel(ui, app);
     });
+    // The guest's screen is a window of its own, over the panels: the
+    // GUI's mirror of the TUI's takeover.
+    screen_window(ui.ctx(), &screen(&app.panels.screen));
 }
 
 /// The registers and the flags.
