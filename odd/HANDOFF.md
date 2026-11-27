@@ -756,6 +756,11 @@ wins, so a device that writes a port byte does not reach the program.
     picture is behind an `Arc`, the grid is found by its rows and proved by
     the guest's character in it) or named as T5's (the blink, the snapshot's
     invalidation, the window's way back).
+    **What is still owed**: the **independent verifier**. The unit's Risk
+    line names item 3 — the DAC's table moves into the core's public
+    surface — so the change gets a verifier of its own, after the native
+    review, and it has not run yet. It is the next step of this unit, and
+    the probes it builds become the regression tests.
 15. **What is left besides that.** **The keyboard of the BIOS
     (`INT 16h`)** is **done**: closed on 2026-11-25 on the branch
     `feat/bios-keyboard`, cut from `main` at `5e4a702`. The reference
