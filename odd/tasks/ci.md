@@ -191,3 +191,36 @@ What the workflow adds over the hand run, and nothing else:
     go the other way: cherry-pick it onto `main` and the checks are there
     at once — the only conflict is `odd/HANDOFF.md`, which every unit
     edits.
+- **L5 (2026-11-26)** — **the first run, and what it found.** The run on
+  the branch's push (`45920068767`): the Gate (linux, stable) **success**,
+  the Floor (rust 1.95) **success**, the Portability (macos-latest)
+  **success**, The transcribed tables **success**, the Advisories
+  **success** — and the Portability (windows-latest) **failure**.
+  - **The Windows failure was not a workflow's bug: it was the project's.**
+    `crates/cli/src/main.rs` called
+    `emo8067_core::transport::socket::DeviceServer::bind`, and that whole
+    module is behind `#[cfg(unix)]` (`crates/core/src/transport.rs:133`),
+    so the tree did not compile on Windows at all: `error[E0433]: cannot
+    find `socket` in `transport``. The core's own doc says why the socket
+    is unix: "Unix only, because that is where a device on the same
+    machine can reach it; a device on another machine wants a TCP socket,
+    which is the same frames over a different pipe." The README promises
+    Linux, macOS and Windows, and only Linux had ever been built.
+  - **The maintainer chose**: fix it at once, as a short unit — the option
+    behind `#[cfg(unix)]` and the CLI refusing it with a clear message
+    elsewhere. That is `b8a007f`, with a test of both halves of the
+    contract (where the socket is, the bus is served on it; where it is
+    not, the option is refused, says why, and makes no socket) and a test
+    of the usage's half (the option is in the usage where it works and out
+    of it where it does not).
+  - **Two promises are proved now that never were**: the declared floor
+    (**1.95**) builds the tree and passes the suite, and the tree builds
+    and passes the suite on **macOS**. The Windows half is the Windows
+    job's to say, once the fix is in.
+  - **The matrix earned its keep in six minutes**: it found a defect that
+    a Linux-only CI would have carried for the life of the project.
+- **L6 (2026-11-26)** — the branch was rebased onto `feat/gui`'s tip, so
+  the CI carries the GUI and every run proves the whole workspace: the
+  GUI's build on Ubuntu (the wayland package list of S3 has never been
+  exercised anywhere but in a log), and the GUI on macOS and on Windows
+  too.

@@ -69,6 +69,18 @@ plan is `odd/tasks/ci.md` (S1-S9, T1-T3, L1-L4).
   is in no binary.
 - **The tree is 903 passed, 0 failed** (the deep gate among them), clippy
   clean, fmt clean.
+- **The first run found a real defect.** The Gate (linux, stable), the
+  Floor (rust 1.95), the Portability (macos-latest), The transcribed
+  tables and the Advisories all passed — and the **Windows job failed**,
+  and not with a workflow's bug: `crates/cli/src/main.rs` called
+  `emo8067_core::transport::socket::DeviceServer::bind`, and that module
+  is behind `#[cfg(unix)]`, so **the tree did not compile on Windows at
+  all**. The README promises Windows; only Linux had ever been built.
+  The maintainer chose to fix it at once (`b8a007f`): the option behind
+  `#[cfg(unix)]`, the CLI refusing it with a clear message elsewhere, and
+  the usage not offering it there.
+- **What is now proved that never was**: the declared floor (**1.95**)
+  builds the tree and passes the suite, and so does **macOS**.
 
 ## Where the 2026-11-25 work is
 
