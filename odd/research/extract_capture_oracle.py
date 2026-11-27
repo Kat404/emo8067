@@ -59,6 +59,7 @@ Run:  python3 odd/research/extract_capture_oracle.py
 import argparse
 import gzip
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -66,7 +67,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 GUIDE = HERE / "documentation-guide.md"
 CACHE = HERE / ".captures"
-BASE = "https://raw.githubusercontent.com/SingleStepTests/8086/main"
+# The captures live on `main`, which moves. A run that has to be reproducible
+# — the CI's, over the whole set — points at the commit below instead, so
+# the oracle it generates is the one the committed oracle came from.
+BASE = os.environ.get(
+    "CAPTURES_BASE", "https://raw.githubusercontent.com/SingleStepTests/8086/main"
+)
 # The commit the cases were taken from. The captures are a moving target, and
 # a case that changed under the oracle has to be traceable to a revision.
 SOURCE_COMMIT = "e71c68d215a6bb8c356bd4cb3842de3bef345ca9"

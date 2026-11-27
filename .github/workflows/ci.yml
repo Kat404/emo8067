@@ -1,0 +1,178 @@
+# The everyday gate: does the workspace compile, is it clean, does the suite
+# pass, and does the program run?
+#
+# Every command here is one the maintainer runs by hand, so a red run means
+# the same thing it means on the machine: the tree is not shippable. The
+# repository is public, so the runners are free, and the matrix is wide on
+# purpose — the README promises Linux, macOS and Windows, and only Linux is
+# ever built by hand.
+#
+# The plan of record is odd/tasks/ci.md.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# One run per branch. A new push cancels the run it supersedes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The workflow reads the repository and nothing else.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  gate:
+    name: Gate (linux, stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      # The GUI's build needs the Wayland and xkbcommon development
+      # packages: eframe's Wayland backend links the Wayland client and
+      # cursor libraries, and the Wayland bindings generate their code
+      # with the wayland-scanner *program*. The X11 path needs no package
+      # (it loads libX11 at run time) and neither does OpenGL (EGL and
+      # GLX are loaded at run time too). See odd/tasks/gui.md L1.
+      - name: The system's packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libwayland-dev \
+            libwayland-bin \
+            libxkbcommon-dev
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      # nextest and not cargo test: it runs every test in its own process,
+      # so one test cannot take the others down with it.
+      - name: The suite
+        run: cargo nextest run --workspace
+
+      # The binaries that ship are release builds, and the release profile
+      # is not the debug one: thin LTO and panic = abort are in it.
+      - name: The release build
+        run: cargo build --workspace --release
+
+      # The program itself: the runner's usage, and a screen the TUI draws
+      # with no terminal behind it.
+      - name: The program runs
+        run: |
+          cargo run -p emo8067-cli -- --help
+          cargo run -p emo8067-tui --example screenshot -- 80 24 "$RUNNER_TEMP/shot.svg"
+
+  floor:
+    name: Floor (rust 1.95)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The workspace declares `rust-version = "1.95"`, and the floor is a
+      # promise: the tree has to build and the suite has to pass on it, not
+      # only on whatever toolchain happens to be newest.
+      - uses: dtolnay/rust-toolchain@1.95
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: The system's packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libwayland-dev \
+            libwayland-bin \
+            libxkbcommon-dev
+
+      - name: Build
+        run: cargo build --workspace --all-targets
+
+      - name: The suite
+        run: cargo nextest run --workspace
+
+  portability:
+    name: Portability (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform's failure must not hide the others'.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Build
+        run: cargo build --workspace --release
+
+      - name: The suite
+        run: cargo nextest run --workspace
+
+  transcription:
+    name: The transcribed tables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The tables the core is built on are transcribed by hand from the
+      # 1979 manual, and these two scripts guard them: one checks the
+      # shape of the opcode grid and the flag table, the other pins the
+      # two rules the capture extraction depends on. Both are standard
+      # library only, and both exit non-zero when they find something.
+      - name: The opcode and flag tables
+        run: python3 odd/research/verify_opcodes.py
+
+      - name: The extraction's contract
+        run: python3 odd/research/test_extraction_contract.py
+
+  advisories:
+    name: Advisories (informational)
+    runs-on: ubuntu-latest
+    # A new advisory in a build-only dependency is information, not a
+    # reason to stop the pipeline: the report is what matters, and the
+    # lock file's 411 crates are scanned here and there.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        run: cargo audit

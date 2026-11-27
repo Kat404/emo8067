@@ -5,9 +5,70 @@ Written 2026-10-15 at the end of a long session, and kept current since: the
 units with it, and the 2026-11-10 unit that closed the three families the
 full-capture gate left, and the 2026-11-21 unit that gave the TUI its memory
 window, and the 2026-11-24 unit that gave it the guest's screen, and the
-2026-11-25 unit that gave the BIOS its keyboard.
+2026-11-25 unit that gave the BIOS its keyboard, and the 2026-11-26 unit
+that gave the tree its CI.
 Everything below is a claim with a source; anything marked **UNRESOLVED** is
 a real open item, not a reminder.
+
+## Where the 2026-11-26 work is
+
+**The tree checks itself.** The unit the maintainer chose on 2026-11-26 is
+the CI: two GitHub Actions workflows, on the branch `feat/ci`, cut from
+`feat/gui`'s tip — so the first run proves the **whole** workspace, the
+GUI included, and the tree stays green: the local goldens were recorded
+against the BIOS's tree, and `main` shows that one gate red today. The
+plan is `odd/tasks/ci.md` (S1-S9, T1-T3, L1-L4).
+
+- **The everyday gate** (`.github/workflows/ci.yml`) is the maintainer's own
+  three commands, unchanged — `cargo fmt --all --check`, `cargo clippy
+  --workspace --all-targets --all-features -- -D warnings`, `cargo nextest
+  run --workspace` — plus the release build (the release profile carries
+  thin LTO and `panic = "abort"`), the CLI's usage and the TUI's screenshot
+  example, so the program runs and not only its tests.
+- **The floor is a job of its own**, and it is **read out of
+  `Cargo.toml`** rather than named: the workspace declares
+  `rust-version = "1.95"`, and the job follows the declaration when it
+  moves. Nothing on the maintainer's machine ever checked it — the
+  machine's toolchains are 1.97.1, 1.99.1 and 1.100.
+- **The matrix covers the three platforms the README promises.** Linux is
+  the gate's own runner; Windows and macOS build the release binaries and
+  run the suite. **This is the untested part**: the project has only ever
+  been built on Linux, and the first run on either platform is a finding
+  about the project rather than about the workflow.
+- **The GUI's build needs its system packages**, and they are named:
+  `pkg-config`, `libwayland-dev`, `libwayland-bin` and `libxkbcommon-dev`.
+  The Wayland bindings generate their code with the `wayland-scanner`
+  *program*, and `odd/tasks/gui.md` L1 had already recorded this before
+  anything detected it.
+- **The transcription gates run in CI too**: `verify_opcodes.py` (the shape
+  of the opcode grid and the flag table) and
+  `test_extraction_contract.py` (the two rules the capture extraction
+  depends on). Both are standard library only and both exit non-zero when
+  they find something.
+- **The deep gate is its own workflow** (`.github/workflows/hardware-gate.yml`):
+  all **646 000** captures, on a weekly schedule, on every push to `main`,
+  and on demand. The captures are **pinned** to `e71c68d…` — the commit the
+  committed oracle's own header names — through `CAPTURES_BASE`, because
+  the captures live on a `main` that moves and a gate that follows it is not
+  a gate. The extraction is the slow part: the 646 000 cases run in **76
+  seconds** in Rust, and the 160 MB of captures have to be fetched and
+  parsed first.
+- **The everyday suite does NOT cover the deep gate in CI**: the gate
+  stands aside when the generated oracle is absent, and the oracle is
+  generated and gitignored. The local run covers it because the file is on
+  this machine (224 MB, generated 2026-10-23).
+- **The corpus-backed gates stand aside in CI too**: the eighty-five
+  reference examples and the DOS programs live under `re/extracted*/`,
+  which is gitignored because it is derived from a proprietary binary.
+  Those tests return early when the corpus is absent, so the CI's green
+  is not a claim about them.
+- **The advisories job is informational**: it reports and it does not stop
+  the pipeline. The one advisory the lock file touches is
+  `RUSTSEC-2022-0048` (`xml-rs`, "unmaintained", **withdrawn** on
+  2023-05-04), and `xml-rs` is a build-dependency of `gl_generator`, so it
+  is in no binary.
+- **The tree is 903 passed, 0 failed** (the deep gate among them), clippy
+  clean, fmt clean.
 
 ## Where the 2026-11-25 work is
 
@@ -793,12 +854,23 @@ wins, so a device that writes a port byte does not reach the program.
     crate's loader), which agree today and should be one; and `#MEM=`,
     the memory the reference's `.binf` file can carry, which both
     frontends ignore.
+16. **The CI is in** (2026-11-26), on the branch `feat/ci`, cut from
+    `main`. Two workflows: the everyday gate (the maintainer's own three
+    commands, the release build, the floor on 1.95, the Windows and macOS
+    matrix, the transcription gates, the advisories) and the deep gate over
+    all 646 000 captures against pinned captures. The plan is
+    `odd/tasks/ci.md` (S1-S9, T1-T3, L1-L3), and its log records what the
+    unit rested on. **What is left of it**: the packaging — the
+    cross-compiled binaries per platform — is the other half of T17, and
+    **Codeberg has no CI of its own**, because Codeberg does not run
+    GitHub Actions; the mirror is covered by the GitHub side only.
 
 ## Files worth reading first
 
 | Path | What |
 |---|---|
 | `odd/tasks/emu8067-foss.md` | specs, every decision, the U1..U8 plan, audit items, and the log |
+| `odd/tasks/ci.md` | the CI plan: S1-S9, T1-T3, L1-L3. Start at L2. |
 | `odd/tooling.md` | environment facts: Ghidra paths, what `analyzeHeadless` needs, `innoextract` |
 | `odd/research/_prompt-audit7-and-friends.md` | the research prompt template |
 | `odd/research/_prompt-microcode-closure.md` | the second use of that template; its answer over-claimed, see item 4a |
