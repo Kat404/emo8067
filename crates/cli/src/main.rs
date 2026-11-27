@@ -50,8 +50,21 @@ RUN OPTIONS:
     --golden           print the memory that is not zero, page by page
     --trace            print one line per instruction
     --dump ADDR:LEN    hex dump of memory at physical ADDR
-    --device-socket P serve the I/O bus on a unix socket at P
+";
 
+/// The device socket's own line of the usage.
+///
+/// The bus speaks over a unix socket, and a unix socket is a unix thing:
+/// the platforms without one do not offer the option, and they refuse it
+/// if it is asked for anyway.
+#[cfg(unix)]
+const USAGE_DEVICE_SOCKET: &str = "    --device-socket P serve the I/O bus on a unix socket at P\n";
+
+/// The device socket's own line of the usage, where there is none.
+#[cfg(not(unix))]
+const USAGE_DEVICE_SOCKET: &str = "";
+
+const USAGE_DISASM: &str = "
 DISASM OPTIONS:
     --at SEG:OFF       start the listing at SEG:OFF    (default: where the image loads)
     --count N          how many instructions to list   (default: all of them)
@@ -73,13 +86,15 @@ fn main() -> ExitCode {
 /// The command the arguments name.
 fn dispatch(args: &[String]) -> Result<ExitCode, String> {
     if args.is_empty() || args[0] == "-h" || args[0] == "--help" {
-        print!("{USAGE}");
+        print!("{USAGE}{USAGE_DEVICE_SOCKET}{USAGE_DISASM}");
         return Ok(ExitCode::SUCCESS);
     }
     match args[0].as_str() {
         "run" => run_command(&args[1..]),
         "disasm" => disasm_command(&args[1..]),
-        other => Err(format!("unknown command `{other}`\n\n{USAGE}")),
+        other => Err(format!(
+            "unknown command `{other}`\n\n{USAGE}{USAGE_DEVICE_SOCKET}{USAGE_DISASM}"
+        )),
     }
 }
 
@@ -96,6 +111,9 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     let mut trace = false;
     let mut golden = false;
     let mut dump: Option<(u32, usize)> = None;
+    // The device socket is a unix thing: the platforms without one do not
+    // have the variable at all.
+    #[cfg(unix)]
     let mut device_socket: Option<PathBuf> = None;
     let mut includes: Vec<PathBuf> = Vec::new();
 
@@ -145,7 +163,19 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
             }
             "--device-socket" => {
                 let v = value()?;
-                device_socket = Some(std::path::PathBuf::from(v));
+                // The bus speaks over a unix socket, and a unix socket is a
+                // unix thing: the platforms without one refuse the option
+                // here, and they do not offer it in the usage either.
+                #[cfg(unix)]
+                {
+                    device_socket = Some(PathBuf::from(v));
+                }
+                #[cfg(not(unix))]
+                {
+                    return Err(format!(
+                        "--device-socket needs a unix socket, and {v} is not one on this platform"
+                    ));
+                }
                 i += 1;
             }
             "--trace" => trace = true,
@@ -250,7 +280,8 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     // The device server: a device connects to the socket and its reads and
     // writes go to the bus. It is served between instructions, from this
     // thread, because the bus is shared with the emulator and a device is
-    // not `Send`.
+    // not `Send`. The socket is a unix thing, so the server is too.
+    #[cfg(unix)]
     let mut server = match &device_socket {
         Some(path) => Some(
             emo8067_core::transport::socket::DeviceServer::bind(path)
@@ -267,6 +298,7 @@ fn run_command(args: &[String]) -> Result<ExitCode, String> {
     let mut executed = 0u64;
     let mut failure: Option<String> = None;
     while executed < max {
+        #[cfg(unix)]
         if let Some(server) = &mut server
             && let Err(e) = server.poll(&mut cpu.bus.borrow_mut())
         {

@@ -1,0 +1,62 @@
+# The deep gate: every capture the chip made.
+#
+# The everyday suite runs the committed oracle — 2 689 cases from 245
+# opcodes. The whole capture set is 646 000 cases and 214 MB of generated
+# text, so it is not in the repository and it is not run on every push. This
+# workflow fetches the captures, generates the whole oracle, and runs the
+# research gate over it.
+#
+# The gate pins the number of cases and the known divergences exactly, so a
+# change upstream is a finding rather than a surprise. The captures are
+# pinned to the commit the committed oracle was generated from, so the run
+# is reproducible: without the pin, the gate would follow `main` and could
+# fail on a capture that changed after the oracle was written.
+#
+# The plan of record is odd/tasks/ci.md.
+
+name: Hardware gate
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, Sunday at 04:17 UTC.
+    - cron: "17 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # The commit the committed oracle names as its source.
+  CAPTURES_BASE: https://raw.githubusercontent.com/SingleStepTests/8086/e71c68d215a6bb8c356bd4cb3842de3bef345ca9
+
+jobs:
+  captures:
+    name: Every capture
+    runs-on: ubuntu-latest
+    # The extraction parses 646 000 cases and the gate runs every one of
+    # them; the timeout is an hour and a half because the whole thing is
+    # one job and not allowed to hang.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      # 160 MB of gzipped captures, and 214 MB of text out of them. The
+      # cache is the script's own (odd/research/.captures), so a re-run in
+      # the same job does not download twice.
+      - name: The captures, and the whole oracle
+        run: python3 odd/research/extract_capture_oracle.py --all
+
+      - name: The gate
+        run: cargo nextest run -p emo8067-core --test hardware_full
