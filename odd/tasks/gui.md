@@ -164,6 +164,52 @@ that: "That is the main UI lesson to invert" (§4.2).
 
 ## Log
 
+- **L7 (2026-11-26).** T4 is in: the guest's screen, drawn as real pixels.
+  - **The unit** (`e292eda`): the framebuffer's 320×200 as one egui
+    texture, nearest of neighbours, so a scaled picture keeps the DAC's own
+    colours and never a blend; the text modes as the character grid, a
+    section a cell, with the cursor's cell underlined. The screen is a
+    floating window over the panels — the GUI's mirror of the TUI's
+    takeover — open by default and closable.
+  - **The DAC moved**, byte for byte, out of the TUI's theme into the core:
+    `emo8067_core::bios::VGA_DAC`. The palette is part of the model of the
+    VGA, so the two front ends read it there and neither keeps a copy. The
+    core gained data and no dependency, and the TUI's tables are still built
+    from the same table.
+  - **The review**: four lenses (risk, resilience, readability, reliability),
+    the consent the maintainer gave, and the approval. The risk lens found
+    nothing at all; the other three found advisories and no blocker. The
+    authority is burned.
+  - **The advisories taken**: the attribute byte's rule is the model's own
+    (the foreground's three bits and the background's four) and the GUI does
+    not repeat it; the picture is mapped only while the window is open; the
+    texture's picture is held behind an `Arc`, because egui's memory clones
+    what it hands back and the picture is sixty-four thousand pixels; the
+    size and the bytes are asserted to agree; the test finds the grid by its
+    rows and proves that the guest's own character is in it with the
+    guest's own colour; the window's open-and-close contract has a test of
+    its own; and the texture's own test says that the picture is kept while
+    it does not change.
+  - **The advisories left**: the blink is not drawn (the repaint model is
+    T5's); the picture comes from the model's snapshot, so it lags the
+    machine until T5's invalidation; the picture is mapped on every frame
+    it is drawn; the window has no way back once it is closed (T5's
+    action); and the disassembly's slice index is still not clamped
+    (pre-existing).
+  - **One of the review's claims did not hold.** It said the guest's window
+    could have changed the layout tests' counts, because the shared window
+    entry point now opens it. It did not: `rows_of` counts the rows of the
+    *named* labels, so a window full of the guest's characters cannot have
+    moved them. The tree said so, and the tree was right.
+  - **What T5 is**: the debugger's actions and the guest's keys (S9) — step,
+    step back, step over, run to the next breakpoint, the breakpoints, the
+    watchpoints, the conditions, the edit, the goto, the console, and the
+    guest's screen; and the guest's keys reaching the guest through the
+    BIOS's own `push_key` door, never by writing the machine's memory. **The
+    GUI's console is inert until T5 gives it a path**, the panels' snapshot
+    needs T5's invalidation, and the guest's screen window needs T5's
+    action to come back.
+
 - **L6 (2026-11-26).** T1, T2 and T3 are closed, each with a commit and
   each with the native review's approval and its authority burned. **T4 is
   next.**

@@ -54,10 +54,12 @@ pub fn pixel(index: u8) -> Color32 {
 /// The colours of a cell of the guest's text page: its character and its
 /// ground.
 ///
-/// The foreground is one of the DAC's first eight and the background one of
-/// its first sixteen — the TUI's own `guest` mapping, so the two front ends
-/// show the guest's colours the same way.
+/// The model hands over the attribute byte's own bits: the foreground is the
+/// low three (one of the DAC's first eight) and the background the high four
+/// (one of its first sixteen). The rule is the VGA's and it is applied once,
+/// in the model — the TUI's own `guest` mapping, so the two front ends show
+/// the guest's colours the same way.
 #[must_use]
 pub fn guest(foreground: u8, background: u8) -> (Color32, Color32) {
-    (pixel(foreground & 0x07), pixel(background & 0x0F))
+    (pixel(foreground), pixel(background))
 }

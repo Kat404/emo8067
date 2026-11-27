@@ -734,21 +734,28 @@ wins, so a device that writes a port byte does not reach the program.
     and egui are two renderers of it" — `emo8067-debug` re-exports
     `Panels`, `ScreenView` and `Ui`, and `Panels::of` reads "Nothing
     here reads a terminal: the same call serves the TUI and the GUI".
-    **T1, T2 and T3 are closed, each with a commit and each with the
+    **T1, T2, T3 and T4 are closed, each with a commit and each with the
     native review's approval and its authority burned** (`c060a85`,
-    `8eef540`, `e7170d4`, plus the follow-ups `c713df5` and the bounded
-    correction `339a352`): the crate `emo8067-gui` with egui/eframe
+    `8eef540`, `e7170d4`, `e292eda`, plus the follow-ups `c713df5` and the
+    bounded correction `339a352`): the crate `emo8067-gui` with egui/eframe
     0.36.2, the Vulkan-then-OpenGL fallback, the logger, the console's
     parser moved into the debug crate, the shared cursors in the `Ui`, the
-    seven panels' widgets, and the model's contract. **903 passed, 0
-    failed**, clippy clean, fmt clean, the 646 000-capture gate green.
-    **T4 is next** (the guest's screen as real pixels) and then T5 (the
-    actions and the guest's keys). The plan is `odd/tasks/gui.md`
-    (S1-S13, T1-T5, L1-L6), and the plan's log says what each unit
-    still owes. The unit's open advisories are in that log too, and the
-    native review's one CRITICAL — the egui grids that never ended a row,
-    so the registers and the flags panels could show nothing — is fixed
-    and proved by a headless layout test.
+    seven panels' widgets, the model's contract, and **the guest's screen
+    drawn as real pixels** — the framebuffer's 320×200 as one texture with
+    the DAC's own colours, and the text modes as the character grid. **909
+    passed, 0 failed**, clippy clean, fmt clean, the 646 000-capture gate
+    green. **T5 is next** (the actions and the guest's keys). The plan is
+    `odd/tasks/gui.md` (S1-S13, T1-T5, L1-L7), and the plan's log says what
+    each unit still owes. The unit's open advisories are in that log too,
+    and the native review's one CRITICAL — the egui grids that never ended a
+    row, so the registers and the flags panels could show nothing — is
+    fixed and proved by a headless layout test. **T4's review** found no
+    blocker either: the risk lens found nothing at all, and the other three
+    lenses' advisories are fixed (the attribute byte's rule is the model's
+    own, the picture is mapped only while the window is open, the texture's
+    picture is behind an `Arc`, the grid is found by its rows and proved by
+    the guest's character in it) or named as T5's (the blink, the snapshot's
+    invalidation, the window's way back).
 15. **What is left besides that.** **The keyboard of the BIOS
     (`INT 16h`)** is **done**: closed on 2026-11-25 on the branch
     `feat/bios-keyboard`, cut from `main` at `5e4a702`. The reference

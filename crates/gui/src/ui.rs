@@ -368,6 +368,11 @@ pub enum Screen {
 /// the page's cells are the characters. The GUI reads the model and
 /// nothing else — not the machine's memory, and not the framebuffer
 /// again.
+///
+/// The picture is mapped on every frame it is drawn: the graphical mode's
+/// sixty-four thousand pixels, one colour each. The model is a snapshot,
+/// so the picture is as fresh as the snapshot is — the panels' own
+/// invalidation is T5's.
 #[must_use]
 pub fn screen(view: &ScreenView) -> Screen {
     match &view.graphics {
@@ -412,13 +417,28 @@ pub fn text_cells(view: &ScreenView) -> Vec<TextCell> {
         .collect()
 }
 
+/// The Id the guest screen's window keeps its open flag under.
+#[must_use]
+pub fn screen_window_id() -> egui::Id {
+    egui::Id::new("guest screen")
+}
+
+/// Whether the guest screen's window is open.
+///
+/// The window is open until it is closed, and it is closed by its own close
+/// button: the flag lives in egui's memory, between the frames.
+pub fn screen_window_open(ctx: &egui::Context) -> bool {
+    let id = screen_window_id();
+    ctx.memory_mut(|memory| *memory.data.get_temp_mut_or_insert_with(id, || true))
+}
+
 /// The guest's screen, in its own window.
 ///
 /// The window is the GUI's mirror of the TUI's takeover: it draws the page
 /// over the debugger's panels. It is open by default and it can be closed;
 /// the action that opens it again is T5's.
 pub fn screen_window(ctx: &egui::Context, screen: &Screen) {
-    let id = egui::Id::new("guest screen");
+    let id = screen_window_id();
     let mut open = ctx.memory_mut(|memory| *memory.data.get_temp_mut_or_insert_with(id, || true));
     egui::Window::new("guest screen")
         .open(&mut open)
@@ -454,10 +474,11 @@ fn draw_screen(ui: &mut egui::Ui, screen: &Screen) {
 
 /// The texture of the guest's screen.
 ///
-/// The framebuffer is uploaded once and kept: the picture changes only
-/// when the machine moves, and the pixels are the picture, so the two are
-/// compared to know whether the texture is still the framebuffer.
-fn screen_texture(
+/// The framebuffer is uploaded and kept: the picture is compared to know
+/// whether the texture still is it, and a changed picture is uploaded
+/// again. The picture is held behind an `Arc` because egui's memory clones
+/// what it hands back, and the picture is sixty-four thousand pixels.
+pub fn screen_texture(
     ctx: &egui::Context,
     width: usize,
     height: usize,
@@ -467,19 +488,26 @@ fn screen_texture(
     let cached = ctx.memory(|memory| {
         memory
             .data
-            .get_temp::<(Vec<egui::Color32>, egui::TextureHandle)>(id)
+            .get_temp::<(std::sync::Arc<Vec<egui::Color32>>, egui::TextureHandle)>(id)
     });
     if let Some((cached, texture)) = cached
-        && cached == pixels
+        && cached.as_slice() == pixels
     {
         return texture;
     }
+    // The model's own size and the model's own bytes are one thing: the
+    // framebuffer is width by height pixels, and the image is that.
+    debug_assert_eq!(
+        pixels.len(),
+        width * height,
+        "the framebuffer's pixels and its size agree"
+    );
     let image = egui::ColorImage::new([width, height], pixels.to_vec());
     let texture = ctx.load_texture("guest screen", image, egui::TextureOptions::NEAREST);
     ctx.memory_mut(|memory| {
         memory
             .data
-            .insert_temp(id, (pixels.to_vec(), texture.clone()));
+            .insert_temp(id, (std::sync::Arc::new(pixels.to_vec()), texture.clone()));
     });
     texture
 }
@@ -545,8 +573,12 @@ pub fn window(ui: &mut egui::Ui, app: &App) {
         disassembly_panel(ui, app);
     });
     // The guest's screen is a window of its own, over the panels: the
-    // GUI's mirror of the TUI's takeover.
-    screen_window(ui.ctx(), &screen(&app.panels.screen));
+    // GUI's mirror of the TUI's takeover. The picture is mapped only
+    // while the window is open: a closed window draws nothing, and the
+    // graphical mode's picture is sixty-four thousand pixels.
+    if screen_window_open(ui.ctx()) {
+        screen_window(ui.ctx(), &screen(&app.panels.screen));
+    }
 }
 
 /// The registers and the flags.
